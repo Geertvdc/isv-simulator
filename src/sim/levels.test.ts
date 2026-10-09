@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ORDER_RATE_BY_PLAYERS } from './balance';
-import { GARAGE, orderRate, settingsForPlayers } from './levels';
+import { MAX_PLAYERS, getTile } from './level';
+import { GARAGE, LEVELS, levelById, orderRate, settingsForPlayers } from './levels';
 import { createGame } from './state';
 
 describe('settingsForPlayers', () => {
@@ -51,4 +52,48 @@ describe('settingsForPlayers', () => {
   it('createGame uses the settings for its number of players', () => {
     expect(createGame(GARAGE, 1, [1, 2, 3]).settings).toEqual(settingsForPlayers(GARAGE, 3));
   });
+});
+
+describe('levels', () => {
+  it('have unique ids and can be found by id', () => {
+    expect(new Set(LEVELS.map((l) => l.id)).size).toBe(LEVELS.length);
+    for (const level of LEVELS) expect(levelById(level.id)).toBe(level);
+    expect(levelById('nope')).toBeUndefined();
+  });
+
+  for (const level of LEVELS) {
+    it(`${level.name} parses with a spawn per player and one of each must-have tile`, () => {
+      expect(level.map.spawns).toHaveLength(MAX_PLAYERS);
+      for (const tile of [
+        'inbox',
+        'bugQueue',
+        'keyboard',
+        'testBench',
+        'pipeline',
+        'ship',
+        'bin',
+      ]) {
+        expect(level.map.tiles).toContain(tile);
+      }
+      expect(level.map.width).toBe(14);
+      expect(level.map.height).toBe(10);
+    });
+
+    it(`${level.name}: every review station can be worked from two sides`, () => {
+      const { map } = level;
+      for (let y = 0; y < map.height; y++) {
+        for (let x = 0; x < map.width; x++) {
+          if (getTile(map, x, y) !== 'review') continue;
+          const open = [
+            [1, 0],
+            [-1, 0],
+            [0, 1],
+            [0, -1],
+          ].filter(([dx = 0, dy = 0]) => getTile(map, x + dx, y + dy) === 'floor');
+          expect(open.length).toBeGreaterThanOrEqual(2);
+        }
+      }
+      if (level.reviewShare > 0) expect(map.tiles).toContain('review');
+    });
+  }
 });

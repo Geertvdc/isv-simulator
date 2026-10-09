@@ -3,6 +3,8 @@
  */
 
 import garageMap from '../../maps/level-01-garage.txt?raw';
+import openPlanMap from '../../maps/level-02-open-plan.txt?raw';
+import scaleUpMap from '../../maps/level-03-scale-up.txt?raw';
 import { ORDER_RATE_BY_PLAYERS, REVIEWERS_NEEDED, TICKS_PER_SECOND } from './balance';
 import { LEVEL_NAMES } from './content';
 import { type LevelMap, parseLevelMap } from './level';
@@ -62,6 +64,36 @@ export const GARAGE: Level = {
   map: parseLevelMap(garageMap),
   ...GARAGE_SETTINGS,
 };
+
+/** Split down the middle by a counter wall: code on the left, test and ship on the right. */
+export const OPEN_PLAN: Level = {
+  id: 'open-plan',
+  name: LEVEL_NAMES['open-plan'] ?? 'open-plan',
+  map: parseLevelMap(openPlanMap),
+  ...GARAGE_SETTINGS,
+  // Tuned with `npm run sim`: perfect bots average ~160 solo, ~270 with two.
+  starThresholds: [45, 90, 135],
+  reviewShare: 0.3,
+};
+
+/** The review station sits at the end of a long corridor, and half the features need a review. */
+export const SCALE_UP: Level = {
+  id: 'scale-up',
+  name: LEVEL_NAMES['scale-up'] ?? 'scale-up',
+  map: parseLevelMap(scaleUpMap),
+  ...GARAGE_SETTINGS,
+  // Tuned with `npm run sim` for two or more: perfect bots average ~270 with two.
+  // Solo has no reviews and scores more (~215).
+  starThresholds: [45, 90, 135],
+  reviewShare: 0.5,
+};
+
+/** Every level, in level select order. */
+export const LEVELS: readonly Level[] = [GARAGE, OPEN_PLAN, SCALE_UP];
+
+export function levelById(id: string): Level | undefined {
+  return LEVELS.find((l) => l.id === id);
+}
 
 /** Order rate multiplier for a number of players. */
 export function orderRate(playerCount: number): number {

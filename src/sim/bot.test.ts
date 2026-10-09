@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { PIPELINE_FAIL_TICKS, REPAIR_TICKS, TICKS_PER_SECOND } from './balance';
 import { botInput, createBot, findPath, runBots } from './bot';
 import { parseLevelMap } from './level';
-import { GARAGE } from './levels';
+import { GARAGE, LEVELS, SCALE_UP } from './levels';
 import { pipelineAt } from './pipeline';
 import { COL, addTicket, idle, newTestGame } from './testing';
 import { tick } from './tick';
@@ -45,6 +45,20 @@ describe('bot run on the garage', () => {
 
   it('is deterministic per seed', () => {
     expect(runBots(GARAGE, 3, 2)).toEqual(runBots(GARAGE, 3, 2));
+  });
+});
+
+describe('bot runs on every level', () => {
+  for (const level of LEVELS) {
+    it(`${level.name}: two bots earn at least 1 star`, () => {
+      expect(runBots(level, 1, 2).result.stars).toBeGreaterThanOrEqual(1);
+    });
+  }
+
+  it('two bots team up for reviews', () => {
+    const run = runBots(SCALE_UP, 1, 2);
+    expect(run.shippedReviewed).toBeGreaterThan(2);
+    expect(run.expired).toBeLessThanOrEqual(1);
   });
 });
 

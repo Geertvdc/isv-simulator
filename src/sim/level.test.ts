@@ -92,7 +92,7 @@ describe('parseLevelMap', () => {
     expect(getTile(map, 12, 2)).toBe('testBench');
     expect(getTile(map, 5, 3)).toBe('counter');
     expect(getTile(map, 12, 6)).toBe('pipeline');
-    expect(getTile(map, 1, 8)).toBe('review');
+    expect(getTile(map, 1, 8)).toBe('counter');
     expect(getTile(map, 6, 9)).toBe('ship');
   });
 });

@@ -29,6 +29,8 @@ export const PIPELINE_BROKE_TEXT = 'Build server down!';
 /** Level names, by level id. */
 export const LEVEL_NAMES: Readonly<Record<string, string>> = {
   garage: 'The Garage',
+  'open-plan': 'Open Plan Office',
+  'scale-up': 'The Scale-Up',
 };
 
 /** Title of the bug that comes back after shipping a ticket called `title`. */
