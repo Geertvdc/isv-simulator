@@ -14,7 +14,7 @@
 /** Screen width of one tile at zero yaw. */
 export const TILE_SIZE = 64;
 /** Vertical squash of the floor: 1 is straight top-down, lower is a flatter view. */
-export const VIEW_PITCH = 0.6;
+export const VIEW_PITCH = 0.5;
 /** Clockwise turn of the level on screen, in radians. 0 makes the front edge exactly horizontal. */
 export const VIEW_YAW: number = 0;
 
