@@ -1,10 +1,14 @@
 import Phaser from 'phaser';
 import garage from '../../maps/level-01-garage.txt?raw';
-import { type LevelMap, type Tile, getTile, parseLevelMap } from '../sim/level';
+import { type LevelMap, type Tile, getTile, isWorkSurface, parseLevelMap } from '../sim/level';
+import { createGame, targetTile } from '../sim/state';
 import { CameraController } from './CameraController';
 import type { WorldRect } from './cameraFit';
+import { GameLoop } from './GameLoop';
+import { KeyboardInput } from './KeyboardInput';
 import { MAP_OVERHANG, MapRenderer, OVERLAY_DEPTH, vectors } from './MapRenderer';
-import { screenToTile, tileCorners } from './projection';
+import { PlayerRenderer } from './PlayerRenderer';
+import { screenToTile, tileCorners, tileDepth } from './projection';
 
 export interface TileHover {
   x: number;
@@ -19,12 +23,23 @@ export interface TileHover {
 export const TILE_HOVER_EVENT = 'tile-hover';
 
 const HOVER_COLOR = 0xffffff;
+const TARGET_COLOR = 0xfff3a0;
+/** Over the target block's top, under its label. */
+const TARGET_DEPTH_OFFSET = 0.005;
+/** Fixed until levels pick their own; the sim has no randomness yet anyway. */
+const GAME_SEED = 1;
+const LOCAL_PLAYER = 1;
 
 export class GameScene extends Phaser.Scene {
   private map!: LevelMap;
   private cameraController!: CameraController;
   private mapRenderer!: MapRenderer;
   private hoverOutline!: Phaser.GameObjects.Graphics;
+  private loop!: GameLoop;
+  private keyboard!: KeyboardInput;
+  private playerRenderer!: PlayerRenderer;
+  private targetHighlight!: Phaser.GameObjects.Graphics;
+  private targeted: { x: number; y: number } | null = null;
   private hovered: TileHover | null = null;
   private debugVisible = false;
 
@@ -36,6 +51,10 @@ export class GameScene extends Phaser.Scene {
     this.map = parseLevelMap(garage);
     this.mapRenderer = new MapRenderer(this, this.map);
     this.hoverOutline = this.add.graphics().setDepth(OVERLAY_DEPTH).setVisible(false);
+    this.loop = new GameLoop(createGame(this.map, GAME_SEED));
+    this.keyboard = new KeyboardInput(this, LOCAL_PLAYER);
+    this.playerRenderer = new PlayerRenderer(this);
+    this.targetHighlight = this.add.graphics().setVisible(false);
     this.cameraController = new CameraController(this, this.mapBounds());
 
     const K = Phaser.Input.Keyboard.KeyCodes;
@@ -49,8 +68,31 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  update(): void {
+  update(_time: number, delta: number): void {
+    this.loop.advance(delta, (tick) => [this.keyboard.command(tick)]);
+    this.playerRenderer.sync(this.loop);
+    this.updateTarget();
     this.updateHover();
+  }
+
+  /** Outlines the counter or station the player faces; nothing for floor and walls. */
+  private updateTarget(): void {
+    const target = targetTile(this.loop.state, LOCAL_PLAYER);
+    const next = isWorkSurface(getTile(this.map, target.x, target.y)) ? target : null;
+    const prev = this.targeted;
+    if (prev?.x === next?.x && prev?.y === next?.y) return;
+    this.targeted = next;
+
+    const g = this.targetHighlight;
+    g.clear();
+    const top = next && this.mapRenderer.blockTop(next.x, next.y);
+    g.setVisible(top !== null);
+    if (!next || !top) return;
+    g.setDepth(tileDepth(next.x, next.y) + TARGET_DEPTH_OFFSET);
+    g.fillStyle(TARGET_COLOR, 0.35);
+    g.fillPoints(vectors(top), true);
+    g.lineStyle(3, TARGET_COLOR);
+    g.strokePoints(vectors(top), true);
   }
 
   /** World-space box spanned by the map's floor and what stands on it. */
