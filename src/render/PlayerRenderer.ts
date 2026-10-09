@@ -2,10 +2,10 @@ import Phaser from 'phaser';
 import { PLAYER_RADIUS } from '../sim/balance';
 import type { PlayerId, Vec } from '../sim/state';
 import type { GameLoop } from './GameLoop';
+import { playerColor } from './playerColors';
 import { TILE_SIZE, VIEW_PITCH, tileDepth, tileToScreen } from './projection';
 
 /** Placeholder developers until the art pass: a capsule with a nose showing `facing`. */
-const PLAYER_COLORS: readonly number[] = [0xff6b6b, 0x4fc3f7, 0xffd166, 0x9ccc65];
 const OUTLINE_COLOR = 0x1a1d24;
 const SHADOW_ALPHA = 0.35;
 
@@ -30,9 +30,9 @@ export class PlayerRenderer {
 
   sync(loop: GameLoop): void {
     const seen = new Set<PlayerId>();
-    loop.state.players.forEach((player, index) => {
+    for (const player of loop.state.players) {
       const pos = loop.renderPos(player.id);
-      if (!pos) return;
+      if (!pos) continue;
       seen.add(player.id);
       let g = this.sprites.get(player.id);
       if (!g) {
@@ -41,8 +41,8 @@ export class PlayerRenderer {
       }
       const screen = tileToScreen(pos.x, pos.y);
       g.setPosition(screen.x, screen.y).setDepth(tileDepth(pos.x, pos.y) + PLAYER_DEPTH_OFFSET);
-      draw(g, PLAYER_COLORS[index % PLAYER_COLORS.length] ?? 0xffffff, player.facing);
-    });
+      draw(g, playerColor(player.id), player.facing);
+    }
 
     for (const [id, g] of this.sprites) {
       if (seen.has(id)) continue;
