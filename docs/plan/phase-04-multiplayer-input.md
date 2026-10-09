@@ -39,7 +39,7 @@ Carrying, stations, online play.
 
 ## Done when
 
-- [ ] Two players on one keyboard plus two gamepads can join and walk around at the same time
-- [ ] Pressing up on any device moves that player up on screen
-- [ ] Bumping into each other feels like a soft shove, not a wall
+- [x] Two players on one keyboard plus two gamepads can join and walk around at the same time
+- [x] Pressing up on any device moves that player up on screen
+- [x] Bumping into each other feels like a soft shove, not a wall
 - [x] `npm run check` passes
