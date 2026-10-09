@@ -1,11 +1,12 @@
 /**
  * Interact (pick up, put down, bin, ship) and stations at work: players
- * working the keyboard and test bench, and the pipeline building on its own.
+ * working the keyboard and test bench, and repairing broken pipelines.
  */
 
-import { PIPELINE_BUILD_TICKS, WORK_RATE } from './balance';
+import { WORK_RATE } from './balance';
 import { type Tile, getTile } from './level';
 import { shipTicket } from './orders';
+import { isBroken, isBuilding, repairPipeline } from './pipeline';
 import { type GameState, type PlayerId, targetTile } from './state';
 import {
   type StepKind,
@@ -49,11 +50,6 @@ export function isAtItsStation(ticket: Ticket, tile: Tile | null): boolean {
   return stationWorkStep(ticket, tile) !== undefined;
 }
 
-/** A pipeline holds on to its ticket until the build is done. */
-function isBuilding(ticket: Ticket, tile: Tile): boolean {
-  return tile === 'pipeline' && isAtItsStation(ticket, tile);
-}
-
 /**
  * One interact press by `playerId` on the tile they face. Returns whether
  * anything happened.
@@ -71,7 +67,9 @@ export function interact(state: GameState, playerId: PlayerId): boolean {
       return true;
     }
     if (tile === 'ship') return shipTicket(state, playerId, carried);
-    const fits = PUT_DOWN_ON.has(tile) || (tile === 'pipeline' && isAtItsStation(carried, tile));
+    const fits =
+      PUT_DOWN_ON.has(tile) ||
+      (tile === 'pipeline' && isAtItsStation(carried, tile) && !isBroken(state, { x, y }));
     if (fits && !onTile) {
       carried.location = { kind: 'tile', x, y };
       return true;
@@ -86,7 +84,7 @@ export function interact(state: GameState, playerId: PlayerId): boolean {
     oldest.location = { kind: 'player', playerId };
     return true;
   }
-  if (onTile && PICK_UP_FROM.has(tile) && !isBuilding(onTile, tile)) {
+  if (onTile && PICK_UP_FROM.has(tile) && !isBuilding(state, onTile)) {
     onTile.location = { kind: 'player', playerId };
     return true;
   }
@@ -96,15 +94,20 @@ export function interact(state: GameState, playerId: PlayerId): boolean {
 /**
  * Work held by `playerId` this tick. `worked` collects the tiles already
  * worked this tick (as `y * width + x`) so two players at one station don't
- * stack. Only a step that's workable now (see `workableSteps`) advances. Returns whether any
- * progress was made.
+ * stack. Only a step that's workable now (see `workableSteps`) advances; at
+ * a broken pipeline, work repairs it. Returns whether any progress was made.
  */
 export function work(state: GameState, playerId: PlayerId, worked: Set<number>): boolean {
   const { x, y } = targetTile(state, playerId);
   const tile = getTile(state.level, x, y);
-  if (tile === null || !WORKED_BY_HAND.has(tile)) return false;
   const key = y * state.level.width + x;
   if (worked.has(key)) return false;
+  if (tile === 'pipeline') {
+    if (!repairPipeline(state, x, y)) return false;
+    worked.add(key);
+    return true;
+  }
+  if (tile === null || !WORKED_BY_HAND.has(tile)) return false;
 
   const ticket = ticketOnTile(state, x, y);
   const step = ticket && stationWorkStep(ticket, tile);
@@ -112,15 +115,4 @@ export function work(state: GameState, playerId: PlayerId, worked: Set<number>):
   advanceStep(step, WORK_RATE);
   worked.add(key);
   return true;
-}
-
-/** Every ticket on a pipeline builds a little each tick, nobody needed. */
-export function updatePipelines(state: GameState): void {
-  for (const ticket of state.tickets) {
-    if (ticket.location.kind !== 'tile') continue;
-    const tile = getTile(state.level, ticket.location.x, ticket.location.y);
-    if (tile !== 'pipeline') continue;
-    const step = stationWorkStep(ticket, tile);
-    if (step) advanceStep(step, 1 / PIPELINE_BUILD_TICKS);
-  }
 }

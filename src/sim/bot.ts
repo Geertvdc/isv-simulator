@@ -3,13 +3,15 @@
  * one ticket at a time from a queue and walks it through every station
  * itself (shortest path, then work), ships it and goes back for the next.
  * Bugs first, since their timers are shorter. Bots that skip tests go
- * straight from code to pipeline and ship untested.
+ * straight from code to pipeline and ship untested. A bot whose ticket is
+ * stuck on a broken pipeline takes it out and repairs the pipeline.
  */
 
 import { isAtItsStation } from './interact';
 import { type GridPoint, type LevelMap, type Tile, getTile, isSolid } from './level';
 import type { Level } from './levels';
 import { type LevelResult, matchingOrders } from './orders';
+import { isBroken } from './pipeline';
 import {
   type GameState,
   type InputCommand,
@@ -156,7 +158,7 @@ function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | nu
   if (own?.location.kind === 'tile') {
     const tile = { x: own.location.x, y: own.location.y };
     const kind = getTile(state.level, tile.x, tile.y);
-    if (!isAtItsStation(own, kind)) return { tile, action: 'interact' };
+    if (!isAtItsStation(own, kind) || isBroken(state, tile)) return { tile, action: 'interact' };
     return { tile, action: kind === 'pipeline' ? 'wait' : 'work' };
   }
   bot.ticketId = null;
@@ -178,14 +180,25 @@ function carryGoal(state: GameState, bot: Bot, bots: readonly Bot[], ticket: Tic
     const tile = nearest(state, bot.playerId, tilesOf(state.level, where));
     return tile ? { tile, action: 'interact' } : null;
   }
-  const free = tilesOf(state.level, STEP_TILE[step.kind]).filter(
+  const empty = tilesOf(state.level, STEP_TILE[step.kind]).filter(
     (t) =>
       !state.tickets.some(
         (o) => o.location.kind === 'tile' && o.location.x === t.x && o.location.y === t.y,
-      ) && !bots.some((b) => b !== bot && samePoint(b.dropTarget, t)),
+      ),
+  );
+  const free = empty.filter(
+    (t) => !isBroken(state, t) && !bots.some((b) => b !== bot && samePoint(b.dropTarget, t)),
   );
   const tile = nearest(state, bot.playerId, free);
-  if (!tile) return null;
+  if (!tile) {
+    // Every pipeline is busy or broken: fix one, ticket in hand.
+    const broken = nearest(
+      state,
+      bot.playerId,
+      empty.filter((t) => isBroken(state, t)),
+    );
+    return broken ? { tile: broken, action: 'work' } : null;
+  }
   bot.dropTarget = tile;
   return { tile, action: 'interact' };
 }

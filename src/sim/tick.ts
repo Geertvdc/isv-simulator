@@ -1,6 +1,7 @@
-import { interact, updatePipelines, work } from './interact';
+import { interact, work } from './interact';
 import { stepPlayer } from './movement';
 import { expireOrders, updateLevelTimer, updateOrders } from './orders';
+import { updatePipelines } from './pipeline';
 import { separatePlayers } from './push';
 import type { GameState, InputCommand } from './state';
 
