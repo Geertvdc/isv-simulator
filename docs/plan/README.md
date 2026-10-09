@@ -9,7 +9,7 @@ The game started as a Theme Hospital-style management sim and pivoted to Overcoo
 | 2 Pivot cleanup and level format (done) | Auto-fit front-facing camera, garage level with stations |
 | 3 Movement (done) | One keyboard player walks around with smooth movement and collision |
 | 4 Multiplayer input (done) | 2 to 4 players on keyboard split and gamepads, join lobby |
-| 5 Carry and work | Tickets from the inbox, carry, counters, work at keyboard and test bench |
+| 5 Carry and work (done) | Tickets from the inbox, carry, counters, work at keyboard and test bench |
 | 6 Orders and scoring | Orders with timers, pipeline, ship, score, stars: **playable core loop** |
 | 7 Pipeline failure and fire | Forgotten builds catch fire, fire spreads, rollback extinguisher |
 | 8 Couch polish | Dash, throwing, review station, juice, sound, 3 levels and level select |
