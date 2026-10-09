@@ -1,159 +1,174 @@
 import Phaser from 'phaser';
-import { type BuildingMap, type Zone, getZone } from '../sim/map';
-import { type Point, TILE_H, diamondPoints, tileDepth, tileToScreen } from './iso';
+import { type LevelMap, type Tile, getTile } from '../sim/level';
+import {
+  type Point,
+  type Side,
+  TILE_SIZE,
+  blockFaces,
+  tileCorners,
+  tileDepth,
+  tileToScreen,
+} from './projection';
 
-/** Placeholder colors until the art pass. */
-const FLOOR_COLORS: Readonly<Record<Exclude<Zone, 'wall' | 'void'>, number>> = {
-  floor: 0x3a4a5c,
-  corridor: 0x5c5649,
-  entrance: 0xe8a33d,
-  locked: 0x262b33,
+/** Placeholder looks until the art pass. Floor tiles draw flat, the rest as blocks. */
+interface BlockStyle {
+  color: number;
+  height: number;
+  /** Letter drawn on top, if any. */
+  label?: string;
+}
+
+const WALL_HEIGHT = TILE_SIZE * 0.75;
+const STATION_HEIGHT = TILE_SIZE * 0.4;
+/** Walls on the camera side of the room are cut down so they never hide what's behind. */
+const FRONT_WALL_HEIGHT = TILE_SIZE * 0.2;
+
+const BLOCK_STYLES: Readonly<Record<Exclude<Tile, 'floor'>, BlockStyle>> = {
+  wall: { color: 0x9aa3b5, height: WALL_HEIGHT },
+  counter: { color: 0x8a8f99, height: STATION_HEIGHT },
+  inbox: { color: 0x4fa3e0, height: STATION_HEIGHT, label: 'I' },
+  keyboard: { color: 0x6cc070, height: STATION_HEIGHT, label: 'K' },
+  testBench: { color: 0xe0b44f, height: STATION_HEIGHT, label: 'T' },
+  review: { color: 0xb07ce0, height: STATION_HEIGHT, label: 'R' },
+  pipeline: { color: 0xe07c4f, height: STATION_HEIGHT, label: 'P' },
+  ship: { color: 0x4fe0b0, height: STATION_HEIGHT, label: 'S' },
+  bin: { color: 0x5a5a5a, height: STATION_HEIGHT, label: 'X' },
 };
+
+/** How much darker each side face is than the top. */
+const SIDE_SHADE: Readonly<Record<Side, number>> = {
+  front: 0.72,
+  left: 0.55,
+  right: 0.55,
+  back: 0.55,
+};
+
+const FLOOR_COLOR = 0x3a4a5c;
 const GRID_LINE_COLOR = 0x000000;
 const GRID_LINE_ALPHA = 0.3;
-const LOCKED_MARK_COLOR = 0x4a515e;
+const EDGE_COLOR = 0x2a2f38;
 
-const WALL_HEIGHT = TILE_H * 0.75;
-/** How far anything drawn on the map sticks up above its tile's diamond. */
+/** How far anything drawn on the map sticks up above its tile's floor. */
 export const MAP_OVERHANG = WALL_HEIGHT;
-const WALL_TOP_COLOR = 0x9aa3b5;
-const WALL_LEFT_COLOR = 0x646c7e;
-const WALL_RIGHT_COLOR = 0x4a5262;
-const WALL_EDGE_COLOR = 0x2a2f38;
 
-/** Chevron floating above entrances so front walls can't hide them. */
-const ENTRANCE_MARKER_COLOR = 0xffb547;
-const ENTRANCE_MARKER_LIFT = TILE_H * 1.4;
-const ENTRANCE_MARKER_SIZE = 8;
-
-/** Walls use `tileDepth` (>= 0); the floor sits below and overlays above all of them. */
+/** Blocks use `tileDepth`; the floor sits below and overlays above all of them. */
 export const OVERLAY_DEPTH = 1_000_000;
 const FLOOR_DEPTH = -1;
+/** Lifts a label over its own block without reaching the block in front. */
+const LABEL_DEPTH_OFFSET = 0.01;
 
-/** Phaser's polygon helpers are typed for Vector2; iso math returns plain points. */
+/** Phaser's polygon helpers are typed for Vector2; projection math returns plain points. */
 export function vectors(points: readonly Point[]): Phaser.Math.Vector2[] {
   return points.map((p) => new Phaser.Math.Vector2(p.x, p.y));
 }
 
+function shade(color: number, factor: number): number {
+  const c = Phaser.Display.Color.IntegerToColor(color);
+  return Phaser.Display.Color.GetColor(c.red * factor, c.green * factor, c.blue * factor);
+}
+
 /**
- * Draws a building map: one Graphics for all floor diamonds and one per wall
- * block so walls depth-sort by `tileDepth`.
+ * Draws a level map: one Graphics for the whole floor and one per block so
+ * blocks depth-sort by `tileDepth`. Stations get a letter on top.
  */
 export class MapRenderer {
-  private objects: Phaser.GameObjects.GameObject[] = [];
-  private debugLabels: Phaser.GameObjects.Text[] = [];
-  private debugVisible = false;
+  private readonly debugLabels: Phaser.GameObjects.Text[] = [];
 
   constructor(
     private readonly scene: Phaser.Scene,
-    private readonly map: BuildingMap,
+    private readonly map: LevelMap,
   ) {
-    this.draw();
-  }
-
-  setDebugVisible(visible: boolean): void {
-    this.debugVisible = visible;
-    for (const label of this.debugLabels) label.setVisible(visible);
-  }
-
-  private draw(): void {
-    for (const obj of this.objects) obj.destroy();
-    this.objects = [];
-    this.debugLabels = [];
     this.drawFloor();
-    this.drawWalls();
-    this.drawEntranceMarkers();
+    this.drawBlocks();
     this.createDebugLabels();
   }
 
-  private forEachTile(fn: (x: number, y: number, zone: Zone) => void): void {
+  setDebugVisible(visible: boolean): void {
+    for (const label of this.debugLabels) label.setVisible(visible);
+  }
+
+  private forEachTile(fn: (x: number, y: number, tile: Tile) => void): void {
     for (let y = 0; y < this.map.height; y++) {
-      for (let x = 0; x < this.map.width; x++) fn(x, y, getZone(this.map, x, y));
+      for (let x = 0; x < this.map.width; x++) {
+        const tile = getTile(this.map, x, y);
+        if (tile) fn(x, y, tile);
+      }
     }
   }
 
-  private graphics(depth: number): Phaser.GameObjects.Graphics {
-    const g = this.scene.add.graphics().setDepth(depth);
-    this.objects.push(g);
-    return g;
-  }
-
   private drawFloor(): void {
-    const g = this.graphics(FLOOR_DEPTH);
-    this.forEachTile((x, y, zone) => {
-      if (zone === 'void' || zone === 'wall') return;
-      const points = diamondPoints(x, y);
-      g.fillStyle(FLOOR_COLORS[zone]);
-      g.fillPoints(vectors(points), true);
-      g.lineStyle(1, GRID_LINE_COLOR, GRID_LINE_ALPHA);
-      g.strokePoints(vectors(points), true);
-      if (zone === 'locked') {
-        // An inset diamond marks plots you can't use yet.
-        const c = tileToScreen(x, y);
-        const inset = points.map((p) => ({
-          x: c.x + (p.x - c.x) * 0.5,
-          y: c.y + (p.y - c.y) * 0.5,
-        }));
-        g.lineStyle(1, LOCKED_MARK_COLOR);
-        g.strokePoints(vectors(inset), true);
+    const g = this.scene.add.graphics().setDepth(FLOOR_DEPTH);
+    this.forEachTile((x, y, tile) => {
+      // Floor runs under blocks too, so their front faces never show a gap.
+      const points = vectors(tileCorners(x, y));
+      g.fillStyle(FLOOR_COLOR);
+      g.fillPoints(points, true);
+      if (tile === 'floor') {
+        g.lineStyle(1, GRID_LINE_COLOR, GRID_LINE_ALPHA);
+        g.strokePoints(points, true);
       }
     });
   }
 
-  private drawWalls(): void {
-    this.forEachTile((x, y, zone) => {
-      if (zone !== 'wall') return;
-      const [top, right, bottom, left] = diamondPoints(x, y);
-      const up = (p: Point): Point => ({ x: p.x, y: p.y - WALL_HEIGHT });
-      const g = this.graphics(tileDepth(x, y));
+  private drawBlocks(): void {
+    this.forEachTile((x, y, tile) => {
+      if (tile === 'floor') return;
+      const style = BLOCK_STYLES[tile];
+      const { top, sides } = blockFaces(x, y, this.blockHeight(x, y, tile));
+      const depth = tileDepth(x, y);
+      const g = this.scene.add.graphics().setDepth(depth);
 
-      const leftFace = [up(left), up(bottom), bottom, left];
-      const rightFace = [up(bottom), up(right), right, bottom];
-      const topFace = [up(top), up(right), up(bottom), up(left)];
+      g.lineStyle(1, EDGE_COLOR, 0.6);
+      for (const { side, points } of sides) {
+        g.fillStyle(shade(style.color, SIDE_SHADE[side]));
+        g.fillPoints(vectors(points), true);
+        g.strokePoints(vectors(points), true);
+      }
+      g.fillStyle(style.color);
+      g.fillPoints(vectors(top), true);
+      g.strokePoints(vectors(top), true);
 
-      g.fillStyle(WALL_LEFT_COLOR);
-      g.fillPoints(vectors(leftFace), true);
-      g.fillStyle(WALL_RIGHT_COLOR);
-      g.fillPoints(vectors(rightFace), true);
-      g.fillStyle(WALL_TOP_COLOR);
-      g.fillPoints(vectors(topFace), true);
-      g.lineStyle(1, WALL_EDGE_COLOR, 0.6);
-      g.strokePoints(vectors(leftFace), true);
-      g.strokePoints(vectors(rightFace), true);
-      g.strokePoints(vectors(topFace), true);
+      if (style.label) {
+        const c = tileToScreen(x, y);
+        this.scene.add
+          .text(c.x, c.y - this.blockHeight(x, y, tile), style.label, {
+            fontFamily: 'system-ui, sans-serif',
+            fontSize: '22px',
+            fontStyle: 'bold',
+            color: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 3,
+          })
+          .setOrigin(0.5)
+          .setDepth(depth + LABEL_DEPTH_OFFSET);
+      }
     });
   }
 
-  private drawEntranceMarkers(): void {
-    const g = this.graphics(OVERLAY_DEPTH - 1);
-    this.forEachTile((x, y, zone) => {
-      if (zone !== 'entrance') return;
-      const c = tileToScreen(x, y);
-      const tipY = c.y - ENTRANCE_MARKER_LIFT;
-      const s = ENTRANCE_MARKER_SIZE;
-      g.fillStyle(ENTRANCE_MARKER_COLOR);
-      g.lineStyle(2, 0x000000, 0.5);
-      g.fillTriangle(c.x - s, tipY - s * 1.5, c.x + s, tipY - s * 1.5, c.x, tipY);
-      g.strokeTriangle(c.x - s, tipY - s * 1.5, c.x + s, tipY - s * 1.5, c.x, tipY);
-    });
+  private blockHeight(x: number, y: number, tile: Exclude<Tile, 'floor'>): number {
+    const behind = getTile(this.map, x, y - 1);
+    const onFrontEdge = y === this.map.height - 1;
+    const isFrontWall = tile === 'wall' && (onFrontEdge || (behind !== null && behind !== 'wall'));
+    return isFrontWall ? FRONT_WALL_HEIGHT : BLOCK_STYLES[tile].height;
   }
 
+  /** Grid coordinates on every tile, and the player number on spawn tiles. */
   private createDebugLabels(): void {
-    this.forEachTile((x, y, zone) => {
-      if (zone === 'void') return;
+    this.forEachTile((x, y, tile) => {
       const c = tileToScreen(x, y);
+      const spawn = this.map.spawns.findIndex((s) => s.x === x && s.y === y);
+      const lift = tile === 'floor' ? 0 : this.blockHeight(x, y, tile);
       const label = this.scene.add
-        .text(c.x, zone === 'wall' ? c.y - WALL_HEIGHT : c.y, `${x},${y}`, {
+        .text(c.x, c.y - lift, spawn >= 0 ? `P${spawn + 1}` : `${x},${y}`, {
           fontFamily: 'monospace',
           fontSize: '10px',
-          color: '#ffffff',
+          color: spawn >= 0 ? '#ffd166' : '#ffffff',
           stroke: '#000000',
           strokeThickness: 2,
         })
         .setOrigin(0.5)
         .setDepth(OVERLAY_DEPTH)
-        .setVisible(this.debugVisible);
-      this.objects.push(label);
+        .setVisible(false);
       this.debugLabels.push(label);
     });
   }

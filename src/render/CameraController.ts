@@ -6,7 +6,7 @@ import {
   CAMERA_ZOOM_SENSITIVITY,
 } from '../sim/balance';
 import { type WorldRect, fitCamera } from './cameraFit';
-import type { Point } from './iso';
+import type { Point } from './projection';
 
 /**
  * Frames the whole level and refits whenever the canvas resizes. In debug

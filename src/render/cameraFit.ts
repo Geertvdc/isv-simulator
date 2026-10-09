@@ -1,4 +1,4 @@
-import type { Point } from './iso';
+import type { Point } from './projection';
 
 export interface WorldRect {
   left: number;
