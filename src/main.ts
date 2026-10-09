@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
-import { GameScene, TILE_HOVER_EVENT } from './render/GameScene';
+import { GameScene, LOBBY_EVENT, TILE_HOVER_EVENT } from './render/GameScene';
 import { mountHud } from './ui/hud';
+import { mountLobby } from './ui/lobby';
 import './style.css';
 
 function getElement(id: string): HTMLElement {
@@ -25,3 +26,5 @@ const game = new Phaser.Game({
 
 const hud = mountHud(getElement('ui'));
 game.events.on(TILE_HOVER_EVENT, hud.setHover);
+const lobby = mountLobby(getElement('ui'));
+game.events.on(LOBBY_EVENT, lobby.render);

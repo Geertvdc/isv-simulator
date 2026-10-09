@@ -1,12 +1,15 @@
 import Phaser from 'phaser';
 import garage from '../../maps/level-01-garage.txt?raw';
+import { buildInputCommands } from '../input/commands';
+import { InputDevices } from '../input/devices';
+import { type Lobby, claimOrphanedPlayer, createLobby, updateLobby } from '../input/lobby';
 import { type LevelMap, type Tile, getTile, isWorkSurface, parseLevelMap } from '../sim/level';
-import { createGame, targetTile } from '../sim/state';
+import { type PlayerId, createGame, targetTile } from '../sim/state';
 import { CameraController } from './CameraController';
 import type { WorldRect } from './cameraFit';
 import { GameLoop } from './GameLoop';
-import { KeyboardInput } from './KeyboardInput';
 import { MAP_OVERHANG, MapRenderer, OVERLAY_DEPTH, vectors } from './MapRenderer';
+import { playerColor } from './playerColors';
 import { PlayerRenderer } from './PlayerRenderer';
 import { screenToTile, tileCorners, tileDepth } from './projection';
 
@@ -22,24 +25,34 @@ export interface TileHover {
  */
 export const TILE_HOVER_EVENT = 'tile-hover';
 
+/**
+ * Emitted on `game.events` with the `Lobby` whenever it changes, and with
+ * `null` once the game starts.
+ */
+export const LOBBY_EVENT = 'lobby';
+
 const HOVER_COLOR = 0xffffff;
-const TARGET_COLOR = 0xfff3a0;
 /** Over the target block's top, under its label. */
 const TARGET_DEPTH_OFFSET = 0.005;
 /** Fixed until levels pick their own; the sim has no randomness yet anyway. */
 const GAME_SEED = 1;
-const LOCAL_PLAYER = 1;
+
+interface TargetHighlight {
+  g: Phaser.GameObjects.Graphics;
+  tile: { x: number; y: number } | null;
+}
 
 export class GameScene extends Phaser.Scene {
   private map!: LevelMap;
   private cameraController!: CameraController;
   private mapRenderer!: MapRenderer;
   private hoverOutline!: Phaser.GameObjects.Graphics;
-  private loop!: GameLoop;
-  private keyboard!: KeyboardInput;
+  private devices!: InputDevices;
+  private lobby!: Lobby;
+  /** `null` while players are still joining in the lobby. */
+  private loop: GameLoop | null = null;
   private playerRenderer!: PlayerRenderer;
-  private targetHighlight!: Phaser.GameObjects.Graphics;
-  private targeted: { x: number; y: number } | null = null;
+  private readonly targets = new Map<PlayerId, TargetHighlight>();
   private hovered: TileHover | null = null;
   private debugVisible = false;
 
@@ -51,10 +64,14 @@ export class GameScene extends Phaser.Scene {
     this.map = parseLevelMap(garage);
     this.mapRenderer = new MapRenderer(this, this.map);
     this.hoverOutline = this.add.graphics().setDepth(OVERLAY_DEPTH).setVisible(false);
-    this.loop = new GameLoop(createGame(this.map, GAME_SEED));
-    this.keyboard = new KeyboardInput(this, LOCAL_PLAYER);
+    this.devices = new InputDevices(window);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.devices.destroy();
+    });
+    this.lobby = createLobby();
+    this.loop = null;
+    this.game.events.emit(LOBBY_EVENT, this.lobby);
     this.playerRenderer = new PlayerRenderer(this);
-    this.targetHighlight = this.add.graphics().setVisible(false);
     this.cameraController = new CameraController(this, this.mapBounds());
 
     const K = Phaser.Input.Keyboard.KeyCodes;
@@ -69,29 +86,52 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    this.loop.advance(delta, (tick) => [this.keyboard.command(tick)]);
-    this.playerRenderer.sync(this.loop);
-    this.updateTarget();
+    const frame = this.devices.poll();
+    if (!this.loop) {
+      if (updateLobby(this.lobby, frame.presses)) {
+        this.game.events.emit(LOBBY_EVENT, this.lobby.started ? null : this.lobby);
+      }
+      if (!this.lobby.started) {
+        this.updateHover();
+        return;
+      }
+      const ids = this.lobby.players.map((p) => p.playerId);
+      this.loop = new GameLoop(createGame(this.map, GAME_SEED, ids));
+    } else {
+      claimOrphanedPlayer(this.lobby.players, frame.presses, new Set(frame.readings.keys()));
+    }
+
+    const loop = this.loop;
+    loop.advance(delta, (tick) => buildInputCommands(this.lobby.players, frame.readings, tick));
+    this.playerRenderer.sync(loop);
+    for (const player of loop.state.players) this.updateTarget(loop, player.id);
     this.updateHover();
   }
 
-  /** Outlines the counter or station the player faces; nothing for floor and walls. */
-  private updateTarget(): void {
-    const target = targetTile(this.loop.state, LOCAL_PLAYER);
+  /** Outlines the counter or station a player faces, in their color; nothing for floor and walls. */
+  private updateTarget(loop: GameLoop, id: PlayerId): void {
+    let highlight = this.targets.get(id);
+    if (!highlight) {
+      highlight = { g: this.add.graphics().setVisible(false), tile: null };
+      this.targets.set(id, highlight);
+    }
+    const target = targetTile(loop.state, id);
     const next = isWorkSurface(getTile(this.map, target.x, target.y)) ? target : null;
-    const prev = this.targeted;
+    const prev = highlight.tile;
     if (prev?.x === next?.x && prev?.y === next?.y) return;
-    this.targeted = next;
+    highlight.tile = next;
 
-    const g = this.targetHighlight;
+    const g = highlight.g;
     g.clear();
     const top = next && this.mapRenderer.blockTop(next.x, next.y);
     g.setVisible(top !== null);
     if (!next || !top) return;
-    g.setDepth(tileDepth(next.x, next.y) + TARGET_DEPTH_OFFSET);
-    g.fillStyle(TARGET_COLOR, 0.35);
+    const color = playerColor(id);
+    // Later players draw slightly higher so two players targeting one block both show.
+    g.setDepth(tileDepth(next.x, next.y) + TARGET_DEPTH_OFFSET * (1 + id / 10));
+    g.fillStyle(color, 0.3);
     g.fillPoints(vectors(top), true);
-    g.lineStyle(3, TARGET_COLOR);
+    g.lineStyle(3, color);
     g.strokePoints(vectors(top), true);
   }
 
