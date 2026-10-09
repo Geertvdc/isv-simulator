@@ -29,7 +29,7 @@ All rows must have equal length. Map: `maps/startup-pit.txt`, imported with Vite
 - Camera: drag with right or middle mouse (or space + left drag), WASD/arrow keys, mouse wheel zoom 0.5x to 2x around the cursor, starts centered on the map
 - Rotation: Q/E rotate the view in 90° steps (4 views), keeping the tile at the view center in place. Visual only: the sim never sees it. Depth sorting and walls stay correct in every view
 - Hover: outline the tile under the mouse; overlay shows `x, y, zone`
-- F3 toggles a debug overlay with tile coordinates drawn on the map
+- Backtick (`` ` ``, or F3) toggles a debug overlay with tile coordinates drawn on the map
 
 ## Tests
 

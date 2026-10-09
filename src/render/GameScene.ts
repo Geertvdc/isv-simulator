@@ -44,11 +44,14 @@ export class GameScene extends Phaser.Scene {
     this.hoverOutline = this.add.graphics().setDepth(OVERLAY_DEPTH).setVisible(false);
     this.cameraController = new CameraController(this, this.mapBounds());
 
-    this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.F3).on('down', () => {
-      this.debugVisible = !this.debugVisible;
-      this.mapRenderer.setDebugVisible(this.debugVisible);
-    });
     const K = Phaser.Input.Keyboard.KeyCodes;
+    // Backtick for macOS, where F3 is taken by the OS; F3 still works elsewhere.
+    for (const code of [K.BACKTICK, K.F3]) {
+      this.input.keyboard?.addKey(code).on('down', () => {
+        this.debugVisible = !this.debugVisible;
+        this.mapRenderer.setDebugVisible(this.debugVisible);
+      });
+    }
     this.input.keyboard?.addKey(K.Q).on('down', () => {
       this.rotateView(-1);
     });
