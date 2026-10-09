@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { PIPELINE_BUILD_TICKS, WORK_RATE } from './balance';
-import { getPlayer, targetTile } from './state';
+import { PIPELINE_BUILD_TICKS, REVIEW_RATE, WORK_RATE } from './balance';
+import { parseLevelMap } from './level';
+import { levelWithMap } from './levels';
+import { type GameState, type Vec, createGame, getPlayer, targetTile } from './state';
 import {
   COL,
   addTicket,
@@ -14,6 +16,7 @@ import {
 } from './testing';
 import { tick } from './tick';
 import {
+  REVIEWED_FEATURE_STEPS,
   type StepKind,
   type Ticket,
   enqueueTicket,
@@ -173,7 +176,6 @@ describe('interact: nothing happens', () => {
     ['bug queue', COL.bugQueue],
     ['pipeline', COL.pipeline],
     ['ship', COL.ship],
-    ['review', COL.review],
     ['wall', COL.wall],
     ['floor', COL.floor],
   ] as const) {
@@ -443,5 +445,85 @@ describe('skipping tests', () => {
     standAt(state, 1, COL.testBench);
     holdWork(state, 30);
     expect(getStep(t, 'test')?.progress).toBeCloseTo(30 * WORK_RATE);
+  });
+});
+
+describe('review station', () => {
+  /** A review station at (2, 1) with room on three sides. */
+  const MAP = ['######', '#.R..#', '#1234#', '######'].join('\n');
+
+  function reviewGame(): { state: GameState; ticket: Ticket } {
+    const state = createGame(levelWithMap(parseLevelMap(MAP)), 1, [1, 2, 3]);
+    state.nextOrderTick = Number.MAX_SAFE_INTEGER;
+    const ticket = enqueueTicket(state, 'feature', 'Review me', REVIEWED_FEATURE_STEPS);
+    const code = getStep(ticket, 'code');
+    if (code) code.progress = 1;
+    ticket.location = { kind: 'tile', x: 2, y: 1 };
+    const spots: [Vec, Vec][] = [
+      [
+        { x: 1, y: 1 },
+        { x: 1, y: 0 },
+      ],
+      [
+        { x: 3, y: 1 },
+        { x: -1, y: 0 },
+      ],
+      [
+        { x: 2, y: 2 },
+        { x: 0, y: -1 },
+      ],
+    ];
+    spots.forEach(([pos, facing], i) => {
+      const p = getPlayer(state, i + 1);
+      if (!p) return;
+      p.pos = pos;
+      p.facing = facing;
+    });
+    return { state, ticket };
+  }
+
+  const review = (t: Ticket): number => getStep(t, 'review')?.progress ?? 0;
+
+  it('takes a ticket', () => {
+    const { state, ticket } = reviewGame();
+    give(1, ticket);
+    press(state);
+    expect(ticket.location).toEqual({ kind: 'tile', x: 2, y: 1 });
+  });
+
+  it('does not move with one player working', () => {
+    const { state, ticket } = reviewGame();
+    holdWork(state, 60, [1]);
+    expect(review(ticket)).toBe(0);
+  });
+
+  it('moves while two players work at once, and finishes', () => {
+    const { state, ticket } = reviewGame();
+    holdWork(state, 10, [1, 2]);
+    expect(review(ticket)).toBeCloseTo(10 * REVIEW_RATE);
+    holdWork(state, Math.ceil(1 / REVIEW_RATE), [1, 2]);
+    expect(review(ticket)).toBe(1);
+  });
+
+  it('stops when one lets go', () => {
+    const { state, ticket } = reviewGame();
+    holdWork(state, 10, [1, 2]);
+    const before = review(ticket);
+    holdWork(state, 30, [2]);
+    expect(review(ticket)).toBe(before);
+  });
+
+  it('goes no faster with three', () => {
+    const { state, ticket } = reviewGame();
+    holdWork(state, 10, [1, 2, 3]);
+    expect(review(ticket)).toBeCloseTo(10 * REVIEW_RATE);
+  });
+
+  it('waits for the code to be written first', () => {
+    const { state, ticket } = reviewGame();
+    const code = getStep(ticket, 'code');
+    if (code) code.progress = 0;
+    holdWork(state, 30, [1, 2]);
+    expect(review(ticket)).toBe(0);
   });
 });

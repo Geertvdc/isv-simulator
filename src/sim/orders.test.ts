@@ -81,6 +81,36 @@ describe('order schedule', () => {
     expect(state.orders.filter((o) => o.kind === 'feature')).toHaveLength(SCHEDULE.maxOpenOrders);
   });
 
+  it('needs a review for about reviewShare of the feature orders, ticket included', () => {
+    const state = newTestGame({
+      orderSchedule: { ...SCHEDULE, intervalTicks: 10, jitterTicks: 0, timeLimitTicks: 100_000 },
+      reviewShare: 0.5,
+    });
+    state.nextOrderTick = 0;
+    // Close every order straight away so a new one opens every 10 ticks.
+    for (let i = 0; i < 400; i++) {
+      idle(state, 1);
+      state.orders = [];
+    }
+    expect(state.tickets).toHaveLength(40);
+    const reviewed = state.tickets.filter((t) => t.steps.some((s) => s.kind === 'review'));
+    expect(reviewed.length).toBeGreaterThan(10);
+    for (const t of reviewed) {
+      expect(t.steps.map((s) => s.kind)).toEqual(['code', 'review', 'test', 'pipeline']);
+    }
+    expect(reviewed.length).toBeLessThan(30);
+  });
+
+  it('never needs a review with reviewShare 0', () => {
+    const state = newTestGame({
+      orderSchedule: { ...SCHEDULE, intervalTicks: 10, jitterTicks: 0, timeLimitTicks: 100_000 },
+      reviewShare: 0,
+    });
+    state.nextOrderTick = 0;
+    idle(state, 200);
+    expect(state.orders.every((o) => !o.steps.includes('review'))).toBe(true);
+  });
+
   it('is deterministic per seed', () => {
     const a = orderTicks(scheduledGame(7), SCHEDULE.intervalTicks * 10);
     expect(orderTicks(scheduledGame(7), SCHEDULE.intervalTicks * 10)).toEqual(a);

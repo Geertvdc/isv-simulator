@@ -6,7 +6,7 @@
 import type { Tile } from './level';
 import type { GameState, PlayerId, Vec } from './state';
 
-export type StepKind = 'code' | 'test' | 'pipeline';
+export type StepKind = 'code' | 'review' | 'test' | 'pipeline';
 
 /** Features are new work; bugs come back after shipping. */
 export type TicketKind = 'feature' | 'bug';
@@ -17,6 +17,9 @@ export const TICKET_STEPS: Readonly<Record<TicketKind, readonly StepKind[]>> = {
   // Reproduce the bug first, then the usual cycle.
   bug: ['test', 'code', 'test', 'pipeline'],
 };
+
+/** Steps of a feature order that needs a code review: two people at the review station. */
+export const REVIEWED_FEATURE_STEPS: readonly StepKind[] = ['code', 'review', 'test', 'pipeline'];
 
 /** Steps you may skip, at the price of a higher bug chance when shipping. */
 export const OPTIONAL_STEPS: ReadonlySet<StepKind> = new Set(['test']);
@@ -141,13 +144,18 @@ export function queuedTickets(state: GameState, queue: TicketKind): Ticket[] {
     .sort((a, b) => a.id - b.id);
 }
 
-/** Puts a new ticket at the back of the queue for its kind. */
-export function enqueueTicket(state: GameState, kind: TicketKind, title: string): Ticket {
+/** Puts a new ticket at the back of the queue for its kind; `steps` default to its kind's. */
+export function enqueueTicket(
+  state: GameState,
+  kind: TicketKind,
+  title: string,
+  steps: readonly StepKind[] = TICKET_STEPS[kind],
+): Ticket {
   const ticket: Ticket = {
     id: state.nextTicketId++,
     kind,
     title,
-    steps: TICKET_STEPS[kind].map((k) => ({ kind: k, progress: 0 })),
+    steps: steps.map((k) => ({ kind: k, progress: 0 })),
     location: { kind: 'queue', queue: kind },
   };
   state.tickets.push(ticket);

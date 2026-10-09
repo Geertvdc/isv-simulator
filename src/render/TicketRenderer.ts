@@ -26,6 +26,7 @@ const ICON_TODO_COLOR = 0xc9c4b5;
 /** Each step's icon takes the color of the station that does it. */
 const STEP_STATION: Readonly<Record<StepKind, Exclude<Tile, 'floor'>>> = {
   code: 'keyboard',
+  review: 'review',
   test: 'testBench',
   pipeline: 'pipeline',
 };

@@ -3,7 +3,7 @@
  */
 
 import garageMap from '../../maps/level-01-garage.txt?raw';
-import { ORDER_RATE_BY_PLAYERS, TICKS_PER_SECOND } from './balance';
+import { ORDER_RATE_BY_PLAYERS, REVIEWERS_NEEDED, TICKS_PER_SECOND } from './balance';
 import { LEVEL_NAMES } from './content';
 import { type LevelMap, parseLevelMap } from './level';
 
@@ -28,6 +28,8 @@ export interface LevelSettings {
   orderSchedule: OrderSchedule;
   /** Score needed for 1, 2 and 3 stars. */
   starThresholds: [number, number, number];
+  /** Share of feature orders that need a code review (0 to 1). Always 0 solo: a review needs two. */
+  reviewShare: number;
 }
 
 export interface Level extends LevelSettings {
@@ -51,6 +53,7 @@ const GARAGE_SETTINGS: LevelSettings = {
   // Solo numbers; `settingsForPlayers` scales them. Tuned with `npm run sim`:
   // perfect bots average ~205 solo, ~355 with two, ~510 with three, ~635 with four.
   starThresholds: [60, 120, 180],
+  reviewShare: 0,
 };
 
 export const GARAGE: Level = {
@@ -86,6 +89,7 @@ export function settingsForPlayers(level: LevelSettings, playerCount: number): L
       number,
       number,
     ],
+    reviewShare: playerCount >= REVIEWERS_NEEDED ? level.reviewShare : 0,
   };
 }
 

@@ -10,6 +10,7 @@ import { formatClock, starText } from './format';
 /** Each step shows as the letter of its station on the map, in that station's color. */
 const STEP_LABEL: Readonly<Record<StepKind, { letter: string; color: string }>> = {
   code: { letter: 'K', color: cssColor(tileColor('keyboard')) },
+  review: { letter: 'R', color: cssColor(tileColor('review')) },
   test: { letter: 'T', color: cssColor(tileColor('testBench')) },
   pipeline: { letter: 'P', color: cssColor(tileColor('pipeline')) },
 };
