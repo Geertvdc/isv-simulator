@@ -1,6 +1,6 @@
 # ISV Simulator
 
-Internal Zure game. A Theme Hospital-style management sim where you run a software vendor: customers arrive with tickets, you build rooms, hire staff, fix their problems and get paid. Isometric 2D, runs in the browser.
+Internal Zure game. An Overcooked-style couch co-op game about shipping software: 2 to 4 players on one screen each control a developer in a small office. Tickets arrive at the inbox; players carry them through stations (write code, test, pipeline) and ship them to the customer before the order timer runs out. Levels last about 3 minutes and end with a score and 1 to 3 stars. Chaos and shouting at each other is the point. Isometric 2D for now, runs in the browser.
 
 ## Stack
 
@@ -12,24 +12,26 @@ Internal Zure game. A Theme Hospital-style management sim where you run a softwa
 
 1. `src/sim/` is pure TypeScript: no Phaser, no DOM, no `Math.random`, no `Date.now`.
 2. All randomness goes through the seeded RNG in `src/sim/rng.ts`.
-3. The sim only advances via `tick(state)` with a fixed timestep (`TICKS_PER_SECOND` in `src/sim/balance.ts`).
-4. Player actions are commands: `applyCommand(state, cmd)` returns `{ ok: true }` or `{ ok: false, reason }`. Render and UI never mutate state directly.
+3. The sim only advances via `tick(state)` with a fixed timestep (`TICKS_PER_SECOND = 60` in `src/sim/balance.ts`, so movement feels responsive).
+4. All player input reaches the sim as per-tick input commands tagged with a player id: `{ playerId, tick, move: { x, y }, interact, work }`. The sim never knows whether input came from keyboard, gamepad or (later) the network. Other actions are commands: `applyCommand(state, cmd)` returns `{ ok: true }` or `{ ok: false, reason }`. Render and UI never mutate state directly.
 5. `GameState` is plain JSON-serializable data: no classes, Maps, Sets or functions.
 6. `src/render/` reads state and syncs sprites keyed by entity id. It may hold visual-only state (tweens, animation frames, interpolation).
 7. `src/ui/` reads state and dispatches commands.
 8. Every tunable number lives in `src/sim/balance.ts`.
-9. Text content (problem names, staff names) lives in `src/sim/content.ts` so anyone can add jokes.
-10. Iso math lives only in `src/render/iso.ts`.
+9. Text content (ticket names, order names, level names) lives in `src/sim/content.ts` so anyone can add jokes.
+10. Iso math lives only in `src/render/iso.ts`. The sim works in plain grid/world coordinates; switching to a top-down view must only touch `src/render/`.
+11. No Phaser physics. Movement and collision are our own code in `src/sim/`, deterministic and tested.
+12. Stick and keyboard directions are screen-relative: "up" moves up on screen, even in iso view. The input layer converts them to world directions (with a helper in `src/render/iso.ts`) before they become input commands.
 
 ## Folder layout
 
 ```
 src/
-  sim/       game state, rules, pathfinding (pure TS)
+  sim/       game state, rules, movement and collision (pure TS)
   render/    Phaser scenes, iso math, sprite sync
   ui/        DOM HUD and panels
   main.ts
-maps/        building maps as ASCII text
+maps/        level maps as ASCII text
 public/assets/
 docs/plan/   phase specs
 ```
@@ -52,9 +54,9 @@ The plan lives in `docs/plan/`. Work on one phase at a time:
 
 ## Glossary
 
-- **Ticket**: a customer with a problem (the "patient")
-- **Problem**: what the ticket has, e.g. YAML Fever (the "disease")
-- **Room**: rectangular area with a type, e.g. Dev Pit
-- **Object**: placeable item, e.g. reception desk
-- **Staff**: hired people with role, skill and salary
-- **Building**: a predefined map with zones, e.g. Startup Pit
+- **Player**: a person on the couch, controls one developer
+- **Ticket**: an item carried around, with a list of required steps and progress per step
+- **Station**: a solid tile you interact with from an adjacent tile (keyboard, test bench, pipeline, etc.)
+- **Counter**: a solid tile you can put a ticket on and pick it up from
+- **Order**: a request shown at the top with a timer; shipping a matching ticket completes it
+- **Level**: an ASCII map plus settings (duration, order schedule, star thresholds)

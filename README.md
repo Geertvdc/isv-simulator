@@ -1,6 +1,6 @@
 # ISV Simulator
 
-A Theme Hospital-style management sim where you run a software vendor: customers arrive with tickets, you build rooms, hire staff, fix their problems and get paid. Isometric 2D, runs in the browser. Internal Zure game.
+An Overcooked-style couch co-op game about shipping software. 2 to 4 players on one screen carry tickets through code, test and pipeline stations and ship them before the customer's order runs out. Runs in the browser. Internal Zure game.
 
 ## Run it
 

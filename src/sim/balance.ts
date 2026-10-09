@@ -1,7 +1,7 @@
 /** Every tunable number in the game lives here. */
 
-/** Fixed simulation timestep: how many times `tick` runs per real second at 1x speed. */
-export const TICKS_PER_SECOND = 20;
+/** Fixed simulation timestep: how many times `tick` runs per real second. High so movement feels responsive. */
+export const TICKS_PER_SECOND = 60;
 
 /** Screen pixels kept free around the level when the camera auto-fits it. */
 export const CAMERA_FIT_PADDING = 48;
