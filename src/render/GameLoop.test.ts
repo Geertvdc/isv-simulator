@@ -11,7 +11,7 @@ function newLoop(): GameLoop {
 }
 
 const right = (tick: number): InputCommand[] => [
-  { playerId: 1, tick, move: { x: 1, y: 0 }, interact: false, work: false },
+  { playerId: 1, tick, move: { x: 1, y: 0 }, interact: false, work: false, dash: false },
 ];
 
 describe('GameLoop', () => {

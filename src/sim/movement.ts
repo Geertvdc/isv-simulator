@@ -12,6 +12,9 @@
 
 import {
   CORNER_NUDGE,
+  DASH_COOLDOWN_TICKS,
+  DASH_SPEED,
+  DASH_TICKS,
   CORNER_NUDGE_MAX_SIDE_INPUT,
   PLAYER_ACCEL,
   PLAYER_DECEL,
@@ -155,15 +158,43 @@ function nudgeAroundCorner(
   return true;
 }
 
-/** Advances one player by one tick. Mutates the player. */
+export function isDashing(player: Player): boolean {
+  return player.dashTicks > 0;
+}
+
+/**
+ * Starts a dash along the move direction, or along the facing direction
+ * without input. Returns whether it started: not while cooling down.
+ */
+export function startDash(player: Player, rawMove: Vec): boolean {
+  if (player.dashCooldown > 0) return false;
+  const move = clampMove(rawMove);
+  const len = length(move);
+  if (len > EPSILON) player.facing = { x: move.x / len, y: move.y / len };
+  player.dashTicks = DASH_TICKS;
+  player.dashCooldown = DASH_COOLDOWN_TICKS;
+  return true;
+}
+
+/**
+ * Advances one player by one tick. Mutates the player. While dashing the
+ * player shoots along their facing at `DASH_SPEED` and can't steer; after
+ * the dash they slow back down to walking speed.
+ */
 export function stepPlayer(map: LevelMap, player: Player, rawMove: Vec): void {
   const move = clampMove(rawMove);
   const moving = length(move) > EPSILON;
-  const target = { x: move.x * PLAYER_MAX_SPEED, y: move.y * PLAYER_MAX_SPEED };
-  player.vel = approach(player.vel, target, (moving ? PLAYER_ACCEL : PLAYER_DECEL) * DT);
-  if (moving) {
-    const len = length(move);
-    player.facing = { x: move.x / len, y: move.y / len };
+  if (player.dashCooldown > 0) player.dashCooldown--;
+  if (isDashing(player)) {
+    player.dashTicks--;
+    player.vel = { x: player.facing.x * DASH_SPEED, y: player.facing.y * DASH_SPEED };
+  } else {
+    const target = { x: move.x * PLAYER_MAX_SPEED, y: move.y * PLAYER_MAX_SPEED };
+    player.vel = approach(player.vel, target, (moving ? PLAYER_ACCEL : PLAYER_DECEL) * DT);
+    if (moving) {
+      const len = length(move);
+      player.facing = { x: move.x / len, y: move.y / len };
+    }
   }
 
   const pos = player.pos;

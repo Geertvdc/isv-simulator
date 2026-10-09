@@ -36,6 +36,14 @@ export const CORNER_NUDGE_MAX_SIDE_INPUT = 0.3;
  * bumping into someone is a soft, squishy shove instead of a hard wall.
  */
 export const PLAYER_PUSH_STRENGTH = 0.5;
+/** Dash: a short burst at this speed (tiles per second) along the facing direction. */
+export const DASH_SPEED = 14;
+/** How long a dash lasts: ~2 tiles at `DASH_SPEED`. */
+export const DASH_TICKS = Math.round(0.15 * TICKS_PER_SECOND);
+/** Ticks from the start of one dash until the next may start. */
+export const DASH_COOLDOWN_TICKS = Math.round(0.8 * TICKS_PER_SECOND);
+/** Speed a dashing player knocks someone else away with. */
+export const DASH_SHOVE_SPEED = 15;
 /** How far in front of the player's center the target tile is picked. */
 export const INTERACT_REACH = 0.8;
 

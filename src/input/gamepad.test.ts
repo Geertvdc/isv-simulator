@@ -82,8 +82,13 @@ describe('readGamepad', () => {
       move: { x: 0, y: 0 },
       interact: false,
       work: false,
+      dash: false,
       join: false,
     });
+  });
+
+  it('maps B to dash', () => {
+    expect(readGamepad(pad([0, 0], [PAD_BUTTON.b]))).toMatchObject({ dash: true, interact: false });
   });
 });
 

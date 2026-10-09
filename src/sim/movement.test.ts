@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import garage from '../../maps/level-01-garage.txt?raw';
 import {
+  DASH_COOLDOWN_TICKS,
+  DASH_SPEED,
+  DASH_TICKS,
   PLAYER_ACCEL,
   PLAYER_DECEL,
   PLAYER_MAX_SPEED,
@@ -8,9 +11,9 @@ import {
   TICKS_PER_SECOND,
 } from './balance';
 import { type LevelMap, parseLevelMap } from './level';
-import { clampMove, maxPenetration, stepPlayer } from './movement';
+import { clampMove, isDashing, maxPenetration, startDash, stepPlayer } from './movement';
 import * as rng from './rng';
-import type { Player, Vec } from './state';
+import { type Player, type Vec, newPlayer } from './state';
 
 /** Wraps rows in a wall border, with the four spawns on an extra bottom row. */
 function level(...rows: string[]): LevelMap {
@@ -23,7 +26,7 @@ function level(...rows: string[]): LevelMap {
 const OPEN = level(...Array.from({ length: 9 }, () => '.'.repeat(30)));
 
 function player(x: number, y: number): Player {
-  return { id: 1, pos: { x, y }, vel: { x: 0, y: 0 }, facing: { x: 0, y: 1 }, interactHeld: false };
+  return newPlayer(1, { x, y });
 }
 
 function run(map: LevelMap, p: Player, move: Vec, ticks: number): void {
@@ -170,5 +173,48 @@ describe('stepPlayer: collision', () => {
     const p = player(1, 1.9);
     run(map, p, { x: 1, y: 0 }, 60);
     expect(p.pos.x).toBeLessThan(2.5);
+  });
+});
+
+describe('dash', () => {
+  it('shoots along the move direction at dash speed for its duration', () => {
+    const p = player(2, 5);
+    expect(startDash(p, { x: 1, y: 0 })).toBe(true);
+    run(OPEN, p, { x: 1, y: 0 }, DASH_TICKS);
+    expect(p.vel.x).toBeCloseTo(DASH_SPEED);
+    expect(p.pos.x).toBeCloseTo(2 + (DASH_SPEED * DASH_TICKS) / TICKS_PER_SECOND);
+    expect(isDashing(p)).toBe(false);
+  });
+
+  it('dashes along the facing direction without input, and ignores steering meanwhile', () => {
+    const p = player(10, 5);
+    p.facing = { x: -1, y: 0 };
+    startDash(p, { x: 0, y: 0 });
+    run(OPEN, p, { x: 0, y: 1 }, DASH_TICKS);
+    expect(p.pos.x).toBeLessThan(9);
+    expect(p.pos.y).toBeCloseTo(5);
+  });
+
+  it('slows back down to walking speed afterwards', () => {
+    const p = player(2, 5);
+    startDash(p, { x: 1, y: 0 });
+    run(OPEN, p, { x: 1, y: 0 }, DASH_TICKS + TICKS_PER_SECOND);
+    expect(speed(p)).toBeCloseTo(PLAYER_MAX_SPEED);
+  });
+
+  it('cools down before the next dash', () => {
+    const p = player(2, 5);
+    startDash(p, { x: 1, y: 0 });
+    run(OPEN, p, { x: 0, y: 0 }, DASH_COOLDOWN_TICKS - 1);
+    expect(startDash(p, { x: 1, y: 0 })).toBe(false);
+    run(OPEN, p, { x: 0, y: 0 }, 1);
+    expect(startDash(p, { x: 1, y: 0 })).toBe(true);
+  });
+
+  it('stops at walls', () => {
+    const p = player(29, 5);
+    startDash(p, { x: 1, y: 0 });
+    run(OPEN, p, { x: 1, y: 0 }, DASH_TICKS);
+    expect(maxPenetration(OPEN, p.pos)).toBeLessThan(1e-6);
   });
 });

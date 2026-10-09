@@ -2,7 +2,14 @@
 
 import { parseLevelMap } from './level';
 import { type LevelSettings, levelWithMap } from './levels';
-import { type GameState, type InputCommand, type PlayerId, createGame, getPlayer } from './state';
+import {
+  type GameState,
+  type InputCommand,
+  type PlayerId,
+  type Vec,
+  createGame,
+  getPlayer,
+} from './state';
 import { tick } from './tick';
 import { TICKET_STEPS, type Ticket, type TicketKind } from './tickets';
 
@@ -80,14 +87,15 @@ export function addTicket(
 export function cmd(
   state: GameState,
   playerId: PlayerId,
-  buttons: { interact?: boolean; work?: boolean },
+  buttons: { interact?: boolean; work?: boolean; dash?: boolean; move?: Vec },
 ): InputCommand {
   return {
     playerId,
     tick: state.tick,
-    move: { x: 0, y: 0 },
+    move: buttons.move ?? { x: 0, y: 0 },
     interact: buttons.interact ?? false,
     work: buttons.work ?? false,
+    dash: buttons.dash ?? false,
   };
 }
 

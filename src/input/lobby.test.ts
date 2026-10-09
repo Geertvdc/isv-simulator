@@ -132,7 +132,7 @@ describe('PressTracker', () => {
       {
         deviceId: 'pad-0',
         joinGroup: 'pad-0',
-        state: { move: { x: 0, y: 0 }, interact: join, work: false, join },
+        state: { move: { x: 0, y: 0 }, interact: join, work: false, dash: false, join },
       },
     ];
     expect(tracker.update(reading(true))).toHaveLength(1);
@@ -147,7 +147,7 @@ describe('PressTracker', () => {
       {
         deviceId: 'pad-0',
         joinGroup: 'pad-0',
-        state: { move: { x: 0, y: 0 }, interact: true, work: false, join: true },
+        state: { move: { x: 0, y: 0 }, interact: true, work: false, dash: false, join: true },
       },
     ];
     tracker.update(held);

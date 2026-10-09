@@ -65,7 +65,10 @@ export type GameEvent =
   | { type: 'levelEnded'; result: LevelResult }
   /** A finished build was left too long; `ticketId` has to be built again. */
   | { type: 'pipelineBroke'; x: number; y: number; ticketId: number }
-  | { type: 'pipelineRepaired'; x: number; y: number };
+  | { type: 'pipelineRepaired'; x: number; y: number }
+  | { type: 'dashed'; playerId: PlayerId }
+  /** A dashing player knocked `target` away. */
+  | { type: 'shoved'; by: PlayerId; target: PlayerId };
 
 /** Ticks left on an order; 0 once it's due. */
 export function ticksLeft(state: GameState, order: Order): number {

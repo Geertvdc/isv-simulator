@@ -169,7 +169,14 @@ describe('ship', () => {
     const { state } = readyToShip();
     const order = createOrder(state, 'feature', 'X');
     tick(state, [
-      { playerId: 1, tick: state.tick, move: { x: 0, y: 0 }, interact: true, work: false },
+      {
+        playerId: 1,
+        tick: state.tick,
+        move: { x: 0, y: 0 },
+        interact: true,
+        work: false,
+        dash: false,
+      },
     ]);
     const shipped = state.events.find((e) => e.type === 'orderShipped');
     expect(shipped).toEqual({
@@ -190,7 +197,14 @@ describe('ship', () => {
     standAt(state, 1, COL.ship);
     createOrder(state, 'feature', 'X');
     tick(state, [
-      { playerId: 1, tick: state.tick, move: { x: 0, y: 0 }, interact: true, work: false },
+      {
+        playerId: 1,
+        tick: state.tick,
+        move: { x: 0, y: 0 },
+        interact: true,
+        work: false,
+        dash: false,
+      },
     ]);
     expect(state.tickets).not.toContain(ticket);
     expect(state.events.find((e) => e.type === 'orderShipped')).toMatchObject({ untested: true });
@@ -212,7 +226,14 @@ describe('ship', () => {
     const feature = createOrder(state, 'feature', 'X');
     state.score = 50;
     tick(state, [
-      { playerId: 1, tick: state.tick, move: { x: 0, y: 0 }, interact: true, work: false },
+      {
+        playerId: 1,
+        tick: state.tick,
+        move: { x: 0, y: 0 },
+        interact: true,
+        work: false,
+        dash: false,
+      },
     ]);
     expect(state.tickets).not.toContain(ticket);
     expect(state.orders).toEqual([feature]);
@@ -303,7 +324,9 @@ describe('level end', () => {
     expect(state.result).toEqual({ score: 25, stars: 2 });
     expect(state.events).toContainEqual({ type: 'levelEnded', result: { score: 25, stars: 2 } });
     const frozen = structuredClone(state);
-    tick(state, [{ playerId: 1, tick: 100, move: { x: 1, y: 0 }, interact: true, work: true }]);
+    tick(state, [
+      { playerId: 1, tick: 100, move: { x: 1, y: 0 }, interact: true, work: true, dash: false },
+    ]);
     expect(state).toEqual({ ...frozen, events: [] });
   });
 

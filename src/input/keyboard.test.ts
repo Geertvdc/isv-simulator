@@ -40,6 +40,7 @@ describe('readKeyboard', () => {
       move: { x: 0, y: 0 },
       interact: false,
       work: false,
+      dash: false,
       join: false,
     });
     const arrows = held('ArrowLeft', 'ShiftRight', 'Slash');
@@ -47,13 +48,21 @@ describe('readKeyboard', () => {
       move: { x: 0, y: 0 },
       interact: false,
       work: false,
+      dash: false,
       join: false,
     });
   });
 
   it('ignores the left Shift and Ctrl for the right scheme', () => {
     const state = readKeyboard(held('ShiftLeft', 'ControlLeft'), RIGHT_KEYS);
-    expect(state).toMatchObject({ interact: false, work: false });
+    expect(state).toMatchObject({ interact: false, work: false, dash: false });
+  });
+
+  it.each([
+    [LEFT_KEYS, 'ShiftLeft'],
+    [RIGHT_KEYS, 'AltRight'],
+  ])('%#: maps dash', (scheme, dash) => {
+    expect(readKeyboard(held(dash), scheme)).toMatchObject({ dash: true, interact: false });
   });
 
   it('reports Enter as join for both schemes', () => {

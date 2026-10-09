@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DASH_COOLDOWN_TICKS } from './balance';
 import { GARAGE } from './levels';
 import { type GameState, type InputCommand, type Vec, createGame, targetTile } from './state';
 import { tick } from './tick';
@@ -8,7 +9,7 @@ function newGame(): GameState {
 }
 
 function input(state: GameState, move: Vec, playerId = 1): InputCommand {
-  return { playerId, tick: state.tick, move, interact: false, work: false };
+  return { playerId, tick: state.tick, move, interact: false, work: false, dash: false };
 }
 
 describe('createGame', () => {
@@ -69,6 +70,22 @@ describe('tick', () => {
       tick(b, [input(b, move)]);
     }
     expect(a).toEqual(b);
+  });
+});
+
+describe('tick: dash', () => {
+  it('dashes on the press only and reports it', () => {
+    const state = newGame();
+    const dash = (): InputCommand => ({ ...input(state, { x: 1, y: 0 }), dash: true });
+    tick(state, [dash()]);
+    expect(state.events).toContainEqual({ type: 'dashed', playerId: 1 });
+    for (let i = 0; i < DASH_COOLDOWN_TICKS * 2; i++) {
+      tick(state, [dash()]);
+      expect(state.events.some((e) => e.type === 'dashed')).toBe(false);
+    }
+    tick(state, [input(state, { x: 0, y: 0 })]);
+    tick(state, [dash()]);
+    expect(state.events).toContainEqual({ type: 'dashed', playerId: 1 });
   });
 });
 
