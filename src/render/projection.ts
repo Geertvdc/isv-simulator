@@ -93,3 +93,15 @@ export function blockFaces(x: number, y: number, height: number): BlockFaces {
   });
   return { top: base.map(up), sides };
 }
+
+/**
+ * World (grid) direction that moves along screen direction `dir` (screen +y is
+ * down), normalised. Zero stays zero. Keyboard input is screen-relative, so
+ * "up" always walks up on screen whatever the view angle.
+ */
+export function screenDirToGrid(dir: Point): Point {
+  const g = screenToGrid(dir.x, dir.y);
+  const len = Math.hypot(g.x, g.y);
+  // `+ 0` turns -0 into 0 so callers and tests can compare with ===.
+  return len === 0 ? { x: 0, y: 0 } : { x: g.x / len + 0, y: g.y / len + 0 };
+}
