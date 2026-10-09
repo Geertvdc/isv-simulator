@@ -26,6 +26,6 @@
 
 ## Done when
 
-- [ ] Ignoring a finished build breaks the pipeline
-- [ ] Recovering is possible but costs enough time to hurt the score
+- [x] Ignoring a finished build breaks the pipeline
+- [x] Recovering is possible but costs enough time to hurt the score
 - [x] `npm run check` passes
