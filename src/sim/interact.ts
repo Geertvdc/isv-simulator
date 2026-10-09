@@ -86,33 +86,29 @@ export function interact(state: GameState, playerId: PlayerId): boolean {
   if (carried) {
     if (tile === 'bin') {
       state.tickets = state.tickets.filter((t) => t !== carried);
+      state.events.push({ type: 'binned', playerId, ticketId: carried.id });
       return true;
     }
     if (tile === 'ship') return shipTicket(state, playerId, carried);
     if (canPutDown(state, carried, x, y)) {
       carried.location = { kind: 'tile', x, y };
+      state.events.push({ type: 'putDown', playerId, ticketId: carried.id });
       return true;
     }
     return false;
   }
 
   const queue = queueAt(tile);
-  if (queue) {
-    const oldest = queuedTickets(state, queue)[0];
-    if (!oldest) return false;
-    oldest.location = { kind: 'player', playerId };
-    return true;
-  }
-  if (onTile && PICK_UP_FROM.has(tile) && !isBuilding(state, onTile)) {
-    onTile.location = { kind: 'player', playerId };
-    return true;
-  }
-  const underfoot = ticketOnTile(state, ...standingTile(state, playerId));
-  if (underfoot) {
-    underfoot.location = { kind: 'player', playerId };
-    return true;
-  }
-  return false;
+  const pick =
+    queue !== undefined
+      ? queuedTickets(state, queue)[0]
+      : onTile && PICK_UP_FROM.has(tile) && !isBuilding(state, onTile)
+        ? onTile
+        : ticketOnTile(state, ...standingTile(state, playerId));
+  if (!pick) return false;
+  pick.location = { kind: 'player', playerId };
+  state.events.push({ type: 'pickedUp', playerId, ticketId: pick.id });
+  return true;
 }
 
 function standingTile(state: GameState, playerId: PlayerId): [number, number] {

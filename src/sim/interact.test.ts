@@ -527,3 +527,21 @@ describe('review station', () => {
     expect(review(ticket)).toBe(0);
   });
 });
+
+describe('interact events', () => {
+  it('reports picking up, putting down and binning', () => {
+    const state = newGame();
+    const t = addTicket(state, COL.counter);
+    standAt(state, 1, COL.counter);
+    tick(state, [cmd(state, 1, { interact: true })]);
+    expect(state.events).toContainEqual({ type: 'pickedUp', playerId: 1, ticketId: t.id });
+    tick(state, [cmd(state, 1, {})]);
+    tick(state, [cmd(state, 1, { interact: true })]);
+    expect(state.events).toContainEqual({ type: 'putDown', playerId: 1, ticketId: t.id });
+    tick(state, [cmd(state, 1, {})]);
+    give(1, t);
+    standAt(state, 1, COL.bin);
+    tick(state, [cmd(state, 1, { interact: true })]);
+    expect(state.events).toContainEqual({ type: 'binned', playerId: 1, ticketId: t.id });
+  });
+});
