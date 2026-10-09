@@ -12,8 +12,8 @@
 
 ### Feel (render and audio)
 
-- Screen shake on fire, failed builds and expired orders
-- Sound effects for pick up, put down, work, ship, order expired, fire, dash and level end. Every sound file goes in `CREDITS.md`
+- Screen shake on broken pipelines and expired orders
+- Sound effects for pick up, put down, work, ship, order expired, pipeline broke, dash and level end. Every sound file goes in `CREDITS.md`
 - Little popups for points earned or lost
 
 ### Content

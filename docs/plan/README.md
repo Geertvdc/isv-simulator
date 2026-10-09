@@ -10,8 +10,8 @@ The game started as a Theme Hospital-style management sim and pivoted to Overcoo
 | 3 Movement (done) | One keyboard player walks around with smooth movement and collision |
 | 4 Multiplayer input (done) | 2 to 4 players on keyboard split and gamepads, join lobby |
 | 5 Carry and work (done) | Tickets from the inbox, carry, counters, work at keyboard and test bench |
-| 6 Orders and scoring | Orders with timers, pipeline, ship, score, stars: **playable core loop** |
-| 7 Pipeline failure and fire | Forgotten builds catch fire, fire spreads, rollback extinguisher |
+| 6 Orders and scoring (done) | Orders with timers, pipeline, ship, score, stars: **playable core loop** |
+| 7 Pipeline failure | Forgotten builds break the build machine; take the ticket out, repair, rebuild |
 | 8 Couch polish | Dash, throwing, review station, juice, sound, 3 levels and level select |
 | 9 Art pass (optional) | Real office art and characters replace placeholders, can start after phase 6 |
 | 10 Online multiplayer (later) | Authoritative server, play from different machines, only after phase 8 |
@@ -31,4 +31,4 @@ Play it yourself after every phase before starting the next, ideally with someon
 
 ## Deliberately out of scope until the core loop works
 
-Fire, dash, throwing, the review station, more levels, sound, art, menus beyond the join lobby, saving progress, online play.
+Dash, throwing, the review station, more levels, sound, art, menus beyond the join lobby, saving progress, online play.
