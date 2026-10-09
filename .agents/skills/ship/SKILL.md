@@ -11,7 +11,7 @@ Run these steps in order. Stop and report if any step fails; never force anythin
 
 - `git status` must be clean (commit leftover work first, or ask).
 - `npm run check` must pass locally.
-- If the branch is behind `origin/main`, bring it up to date first (in the desktop app use the `sync_with_base_branch` tool, otherwise `git rebase origin/main`), then re-run `npm run check`.
+- If the branch is behind `origin/main`, bring it up to date first (`git fetch origin && git rebase origin/main`, or your agent's own sync tool if it has one), then re-run `npm run check`.
 
 ## 2. Create the PR
 
@@ -27,8 +27,9 @@ gh pr create --base main --title "<Phase N: short title>" --body "<summary, test
 
 CI is `.github/workflows/ci.yml` (`npm ci`, `npm run check`, `npm run build`).
 
-- In the Claude desktop app: bind the PR with the `ccd_pr` tools (`get_status`, `bind_pr` if needed) and wait for the app's CI status instead of polling yourself.
-- In a plain terminal: `gh pr checks <number> --watch --fail-fast`.
+- Default: `gh pr checks <number> --watch --fail-fast`.
+- If your agent has its own PR/CI integration (for example a PR status tool in a desktop app) and its rules say not to poll CI, use that instead.
+- Auto-merge is disabled on this repo, so you have to merge yourself once CI is green.
 
 If CI fails: read the log (`gh run view <run-id> --log-failed`), fix, commit, push, and wait again. Never merge red.
 
