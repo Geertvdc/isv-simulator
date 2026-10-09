@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { type BuildingMap, type Zone, getZone } from '../sim/map';
-import { type Point, TILE_H, diamondPoints, tileDepth, tileToScreen } from './iso';
+import { type Point, type Rotation, TILE_H, diamondPoints, tileDepth, tileToScreen } from './iso';
 
 /** Placeholder colors until the art pass. */
 const FLOOR_COLORS: Readonly<Record<Exclude<Zone, 'wall' | 'void'>, number>> = {
@@ -36,23 +36,41 @@ export function vectors(points: readonly Point[]): Phaser.Math.Vector2[] {
 
 /**
  * Draws a building map: one Graphics for all floor diamonds and one per wall
- * block so walls depth-sort by `x + y`.
+ * block so walls depth-sort by `tileDepth`. Everything is rebuilt when the
+ * view rotates; the map is small enough that this is instant.
  */
 export class MapRenderer {
-  private readonly debugLabels: Phaser.GameObjects.Text[] = [];
+  private objects: Phaser.GameObjects.GameObject[] = [];
+  private debugLabels: Phaser.GameObjects.Text[] = [];
+  private rotation: Rotation = 0;
+  private debugVisible = false;
 
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly map: BuildingMap,
   ) {
+    this.draw();
+  }
+
+  setRotation(rotation: Rotation): void {
+    if (rotation === this.rotation) return;
+    this.rotation = rotation;
+    this.draw();
+  }
+
+  setDebugVisible(visible: boolean): void {
+    this.debugVisible = visible;
+    for (const label of this.debugLabels) label.setVisible(visible);
+  }
+
+  private draw(): void {
+    for (const obj of this.objects) obj.destroy();
+    this.objects = [];
+    this.debugLabels = [];
     this.drawFloor();
     this.drawWalls();
     this.drawEntranceMarkers();
     this.createDebugLabels();
-  }
-
-  setDebugVisible(visible: boolean): void {
-    for (const label of this.debugLabels) label.setVisible(visible);
   }
 
   private forEachTile(fn: (x: number, y: number, zone: Zone) => void): void {
@@ -61,18 +79,24 @@ export class MapRenderer {
     }
   }
 
+  private graphics(depth: number): Phaser.GameObjects.Graphics {
+    const g = this.scene.add.graphics().setDepth(depth);
+    this.objects.push(g);
+    return g;
+  }
+
   private drawFloor(): void {
-    const g = this.scene.add.graphics().setDepth(FLOOR_DEPTH);
+    const g = this.graphics(FLOOR_DEPTH);
     this.forEachTile((x, y, zone) => {
       if (zone === 'void' || zone === 'wall') return;
-      const points = diamondPoints(x, y);
+      const points = diamondPoints(x, y, this.rotation);
       g.fillStyle(FLOOR_COLORS[zone]);
       g.fillPoints(vectors(points), true);
       g.lineStyle(1, GRID_LINE_COLOR, GRID_LINE_ALPHA);
       g.strokePoints(vectors(points), true);
       if (zone === 'locked') {
         // An inset diamond marks plots you can't use yet.
-        const c = tileToScreen(x, y);
+        const c = tileToScreen(x, y, this.rotation);
         const inset = points.map((p) => ({
           x: c.x + (p.x - c.x) * 0.5,
           y: c.y + (p.y - c.y) * 0.5,
@@ -86,9 +110,9 @@ export class MapRenderer {
   private drawWalls(): void {
     this.forEachTile((x, y, zone) => {
       if (zone !== 'wall') return;
-      const [top, right, bottom, left] = diamondPoints(x, y);
+      const [top, right, bottom, left] = diamondPoints(x, y, this.rotation);
       const up = (p: Point): Point => ({ x: p.x, y: p.y - WALL_HEIGHT });
-      const g = this.scene.add.graphics().setDepth(tileDepth(x, y));
+      const g = this.graphics(tileDepth(x, y, this.rotation));
 
       const leftFace = [up(left), up(bottom), bottom, left];
       const rightFace = [up(bottom), up(right), right, bottom];
@@ -108,10 +132,10 @@ export class MapRenderer {
   }
 
   private drawEntranceMarkers(): void {
-    const g = this.scene.add.graphics().setDepth(OVERLAY_DEPTH - 1);
+    const g = this.graphics(OVERLAY_DEPTH - 1);
     this.forEachTile((x, y, zone) => {
       if (zone !== 'entrance') return;
-      const c = tileToScreen(x, y);
+      const c = tileToScreen(x, y, this.rotation);
       const tipY = c.y - ENTRANCE_MARKER_LIFT;
       const s = ENTRANCE_MARKER_SIZE;
       g.fillStyle(ENTRANCE_MARKER_COLOR);
@@ -124,7 +148,7 @@ export class MapRenderer {
   private createDebugLabels(): void {
     this.forEachTile((x, y, zone) => {
       if (zone === 'void') return;
-      const c = tileToScreen(x, y);
+      const c = tileToScreen(x, y, this.rotation);
       const label = this.scene.add
         .text(c.x, zone === 'wall' ? c.y - WALL_HEIGHT : c.y, `${x},${y}`, {
           fontFamily: 'monospace',
@@ -135,7 +159,8 @@ export class MapRenderer {
         })
         .setOrigin(0.5)
         .setDepth(OVERLAY_DEPTH)
-        .setVisible(false);
+        .setVisible(this.debugVisible);
+      this.objects.push(label);
       this.debugLabels.push(label);
     });
   }

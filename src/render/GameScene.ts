@@ -2,7 +2,16 @@ import Phaser from 'phaser';
 import startupPit from '../../maps/startup-pit.txt?raw';
 import { type BuildingMap, type Zone, getZone, parseMap } from '../sim/map';
 import { CameraController } from './CameraController';
-import { TILE_H, TILE_W, diamondPoints, screenToTile, tileToScreen } from './iso';
+import {
+  type Rotation,
+  TILE_H,
+  TILE_W,
+  diamondPoints,
+  rotate,
+  screenToTile,
+  screenToTileFloat,
+  tileToScreen,
+} from './iso';
 import { MapRenderer, OVERLAY_DEPTH, vectors } from './MapRenderer';
 
 export interface TileHover {
@@ -23,6 +32,7 @@ export class GameScene extends Phaser.Scene {
   private hoverOutline!: Phaser.GameObjects.Graphics;
   private hovered: TileHover | null = null;
   private debugVisible = false;
+  private rotation: Rotation = 0;
 
   constructor() {
     super('GameScene');
@@ -38,6 +48,13 @@ export class GameScene extends Phaser.Scene {
       this.debugVisible = !this.debugVisible;
       this.mapRenderer.setDebugVisible(this.debugVisible);
     });
+    const K = Phaser.Input.Keyboard.KeyCodes;
+    this.input.keyboard?.addKey(K.Q).on('down', () => {
+      this.rotateView(-1);
+    });
+    this.input.keyboard?.addKey(K.E).on('down', () => {
+      this.rotateView(1);
+    });
   }
 
   update(_time: number, delta: number): void {
@@ -45,14 +62,35 @@ export class GameScene extends Phaser.Scene {
     this.updateHover();
   }
 
-  /** World-space box spanned by the map's diamonds. */
+  /** Turns the view by quarter turns, keeping the tile at the view center in place. */
+  private rotateView(steps: number): void {
+    const prev = this.cameraController.viewCenter;
+    const centerTile = screenToTileFloat(prev.x, prev.y, this.rotation);
+    this.rotation = rotate(this.rotation, steps);
+    this.mapRenderer.setRotation(this.rotation);
+    this.cameraController.setBounds(this.mapBounds());
+    this.cameraController.centerOn(tileToScreen(centerTile.x, centerTile.y, this.rotation));
+    // The hovered tile may be unchanged but its outline has moved.
+    this.hovered = null;
+    this.hoverOutline.clear();
+  }
+
+  /** World-space box spanned by the map's diamonds in the current rotation. */
   private mapBounds() {
     const { width, height } = this.map;
+    const corners = [
+      tileToScreen(0, 0, this.rotation),
+      tileToScreen(width - 1, 0, this.rotation),
+      tileToScreen(0, height - 1, this.rotation),
+      tileToScreen(width - 1, height - 1, this.rotation),
+    ];
+    const xs = corners.map((c) => c.x);
+    const ys = corners.map((c) => c.y);
     return {
-      left: tileToScreen(0, height - 1).x - TILE_W / 2,
-      right: tileToScreen(width - 1, 0).x + TILE_W / 2,
-      top: tileToScreen(0, 0).y - TILE_H / 2,
-      bottom: tileToScreen(width - 1, height - 1).y + TILE_H / 2,
+      left: Math.min(...xs) - TILE_W / 2,
+      right: Math.max(...xs) + TILE_W / 2,
+      top: Math.min(...ys) - TILE_H / 2,
+      bottom: Math.max(...ys) + TILE_H / 2,
     };
   }
 
@@ -63,7 +101,7 @@ export class GameScene extends Phaser.Scene {
     let next: TileHover | null = null;
     if (overCanvas) {
       const world = this.cameraController.screenToWorld(pointer.x, pointer.y);
-      const tile = screenToTile(world.x, world.y);
+      const tile = screenToTile(world.x, world.y, this.rotation);
       const zone = getZone(this.map, tile.x, tile.y);
       if (zone !== 'void') next = { ...tile, zone };
     }
@@ -76,7 +114,7 @@ export class GameScene extends Phaser.Scene {
     this.hoverOutline.setVisible(next !== null);
     if (next) {
       this.hoverOutline.lineStyle(2, HOVER_COLOR);
-      this.hoverOutline.strokePoints(vectors(diamondPoints(next.x, next.y)), true);
+      this.hoverOutline.strokePoints(vectors(diamondPoints(next.x, next.y, this.rotation)), true);
     }
     this.game.events.emit(TILE_HOVER_EVENT, next);
   }
