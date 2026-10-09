@@ -63,6 +63,10 @@ export const GAMEPAD_DEAD_ZONE = 0.2;
 
 /** Step progress gained per tick of holding work at a station: a step takes ~2.5 s. */
 export const WORK_RATE = 1 / (2.5 * TICKS_PER_SECOND);
+/** Players who must hold work at one review station at once for the review to move. */
+export const REVIEWERS_NEEDED = 2;
+/** Review progress per tick while enough players work it: a review takes ~3 s. */
+export const REVIEW_RATE = 1 / (3 * TICKS_PER_SECOND);
 /** Ticks a ticket builds in the pipeline before its pipeline step is done. */
 export const PIPELINE_BUILD_TICKS = 4 * TICKS_PER_SECOND;
 

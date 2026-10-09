@@ -3,7 +3,7 @@
  * working the keyboard and test bench, and repairing broken pipelines.
  */
 
-import { WORK_RATE } from './balance';
+import { REVIEWERS_NEEDED, REVIEW_RATE, WORK_RATE } from './balance';
 import { type Tile, getTile } from './level';
 import { shipTicket } from './orders';
 import { isBroken, isBuilding, repairPipeline } from './pipeline';
@@ -26,14 +26,16 @@ const PICK_UP_FROM: ReadonlySet<Tile> = new Set([
   'keyboard',
   'testBench',
   'pipeline',
+  'review',
   'floor',
 ]);
 /** Tiles players can put any ticket on. */
-const PUT_DOWN_ON: ReadonlySet<Tile> = new Set(['counter', 'keyboard', 'testBench']);
+const PUT_DOWN_ON: ReadonlySet<Tile> = new Set(['counter', 'keyboard', 'testBench', 'review']);
 
 /** The step each station advances. */
 const STATION_STEP: Partial<Record<Tile, StepKind>> = {
   keyboard: 'code',
+  review: 'review',
   testBench: 'test',
   pipeline: 'pipeline',
 };
@@ -118,16 +120,35 @@ function standingTile(state: GameState, playerId: PlayerId): [number, number] {
   return p ? [Math.round(p.pos.x), Math.round(p.pos.y)] : [-1, -1];
 }
 
+/** Who worked where during one tick. Tiles are keyed as `y * width + x`. */
+export interface TickWork {
+  /** Tiles already worked this tick, so two players at one station don't stack. */
+  worked: Set<number>;
+  /** Players holding work at each review station with a ticket to review. */
+  reviewers: Map<number, PlayerId[]>;
+}
+
+export function newTickWork(): TickWork {
+  return { worked: new Set(), reviewers: new Map() };
+}
+
 /**
- * Work held by `playerId` this tick. `worked` collects the tiles already
- * worked this tick (as `y * width + x`) so two players at one station don't
- * stack. Only a step that's workable now (see `workableSteps`) advances; at
- * a broken pipeline, work repairs it. Returns whether any progress was made.
+ * Work held by `playerId` this tick. Only a step that's workable now (see
+ * `workableSteps`) advances; at a broken pipeline, work repairs it. At a
+ * review station work only signs the player up: `finishReviews` advances
+ * reviews with enough players. Returns whether this player did any work.
  */
-export function work(state: GameState, playerId: PlayerId, worked: Set<number>): boolean {
+export function work(state: GameState, playerId: PlayerId, tickWork: TickWork): boolean {
   const { x, y } = targetTile(state, playerId);
   const tile = getTile(state.level, x, y);
   const key = y * state.level.width + x;
+  const { worked, reviewers } = tickWork;
+  if (tile === 'review') {
+    const ticket = ticketOnTile(state, x, y);
+    if (!ticket || !stationWorkStep(ticket, tile)) return false;
+    reviewers.set(key, [...(reviewers.get(key) ?? []), playerId]);
+    return true;
+  }
   if (worked.has(key)) return false;
   if (tile === 'pipeline') {
     if (!repairPipeline(state, x, y)) return false;
@@ -142,4 +163,17 @@ export function work(state: GameState, playerId: PlayerId, worked: Set<number>):
   advanceStep(step, WORK_RATE);
   worked.add(key);
   return true;
+}
+
+/** Advances every review that `REVIEWERS_NEEDED` players worked on this tick; more don't speed it up. */
+export function finishReviews(state: GameState, tickWork: TickWork): void {
+  const { width } = state.level;
+  for (const [key, players] of tickWork.reviewers) {
+    if (players.length < REVIEWERS_NEEDED) continue;
+    const x = key % width;
+    const y = Math.floor(key / width);
+    const ticket = ticketOnTile(state, x, y);
+    const step = ticket && stationWorkStep(ticket, 'review');
+    if (step) advanceStep(step, REVIEW_RATE);
+  }
 }

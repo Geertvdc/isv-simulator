@@ -5,11 +5,12 @@ import { createGame } from './state';
 
 describe('settingsForPlayers', () => {
   it('keeps the level settings for one player', () => {
-    const { durationTicks, orderSchedule, starThresholds } = GARAGE;
+    const { durationTicks, orderSchedule, starThresholds, reviewShare } = GARAGE;
     expect(settingsForPlayers(GARAGE, 1)).toEqual({
       durationTicks,
       orderSchedule,
       starThresholds,
+      reviewShare,
     });
   });
 
@@ -33,6 +34,13 @@ describe('settingsForPlayers', () => {
     expect(settingsForPlayers(GARAGE, 2).orderSchedule.intervalTicks).toBe(
       Math.round(GARAGE.orderSchedule.intervalTicks / rate),
     );
+  });
+
+  it('drops reviews solo, since a review needs two', () => {
+    const level = { ...GARAGE, reviewShare: 0.4 };
+    expect(settingsForPlayers(level, 1).reviewShare).toBe(0);
+    expect(settingsForPlayers(level, 2).reviewShare).toBe(0.4);
+    expect(settingsForPlayers(level, 4).reviewShare).toBe(0.4);
   });
 
   it('clamps the player count to the table', () => {

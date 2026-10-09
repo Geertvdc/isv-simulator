@@ -18,6 +18,7 @@ import { TICKET_TITLES, bugTitle } from './content';
 import * as rng from './rng';
 import type { GameState, PlayerId } from './state';
 import {
+  REVIEWED_FEATURE_STEPS,
   type StepKind,
   TICKET_STEPS,
   type Ticket,
@@ -110,19 +111,24 @@ export function matchingOrders(state: GameState, ticket: Ticket): Order[] {
     .sort((a, b) => a.expiresTick - b.expiresTick || a.id - b.id);
 }
 
-/** Opens an order and puts its ticket in the queue for its kind. */
-export function createOrder(state: GameState, kind: TicketKind, title: string): Order {
+/** Opens an order and puts its ticket in the queue for its kind; `steps` default to its kind's. */
+export function createOrder(
+  state: GameState,
+  kind: TicketKind,
+  title: string,
+  steps: readonly StepKind[] = TICKET_STEPS[kind],
+): Order {
   const { orderSchedule } = state.settings;
   const limit = kind === 'bug' ? orderSchedule.bugTimeLimitTicks : orderSchedule.timeLimitTicks;
   const order: Order = {
     id: state.nextOrderId++,
     kind,
-    steps: [...TICKET_STEPS[kind]],
+    steps: [...steps],
     createdTick: state.tick,
     expiresTick: state.tick + limit,
   };
   state.orders.push(order);
-  enqueueTicket(state, kind, title);
+  enqueueTicket(state, kind, title, steps);
   state.events.push({ type: 'orderCreated', order });
   return order;
 }
@@ -184,9 +190,18 @@ export function updateOrders(state: GameState): void {
     const [title, s1] = rng.pick(state.rngState, TICKET_TITLES);
     const [jitter, s2] = rng.int(s1, -orderSchedule.jitterTicks, orderSchedule.jitterTicks);
     state.rngState = s2;
-    createOrder(state, 'feature', title);
+    createOrder(state, 'feature', title, featureSteps(state));
     state.nextOrderTick = state.tick + orderSchedule.intervalTicks + jitter;
   }
+}
+
+/** Steps for the next feature order: with a review for `reviewShare` of them. */
+function featureSteps(state: GameState): readonly StepKind[] {
+  // No roll at all without reviews, so levels without them keep their order sequence.
+  if (state.settings.reviewShare <= 0) return TICKET_STEPS.feature;
+  const [roll, s] = rng.next(state.rngState);
+  state.rngState = s;
+  return roll < state.settings.reviewShare ? REVIEWED_FEATURE_STEPS : TICKET_STEPS.feature;
 }
 
 /** Ends the level once its duration is up. */

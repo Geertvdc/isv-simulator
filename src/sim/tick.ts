@@ -1,4 +1,4 @@
-import { interact, work } from './interact';
+import { finishReviews, interact, newTickWork, work } from './interact';
 import { startDash, stepPlayer } from './movement';
 import { expireOrders, updateLevelTimer, updateOrders } from './orders';
 import { updatePipelines } from './pipeline';
@@ -33,7 +33,7 @@ export function tick(state: GameState, inputs: readonly InputCommand[]): void {
     state.events.push({ type: 'shoved', ...shove });
   }
 
-  const worked = new Set<number>();
+  const tickWork = newTickWork();
   for (const player of state.players) {
     const input = inputs.find((i) => i.playerId === player.id);
     const held = input?.interact ?? false;
@@ -41,8 +41,9 @@ export function tick(state: GameState, inputs: readonly InputCommand[]): void {
     player.interactHeld = held;
     const pressedIdle = pressed && !interact(state, player.id);
     updateThrowCharge(state, player, held, pressedIdle);
-    if (input?.work) work(state, player.id, worked);
+    if (input?.work) work(state, player.id, tickWork);
   }
+  finishReviews(state, tickWork);
   updateFlights(state);
 
   updatePipelines(state);
