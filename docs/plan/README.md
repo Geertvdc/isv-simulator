@@ -7,8 +7,8 @@ The game started as a Theme Hospital-style management sim and pivoted to Overcoo
 | 0 Scaffold (done) | Vite + Phaser + TS app boots, tests and CI run |
 | 1 Map and camera (done) | ASCII map rendered, camera and hover (rotation and manual camera removed in phase 2) |
 | 2 Pivot cleanup and level format (done) | Auto-fit front-facing camera, garage level with stations |
-| 3 Movement | One keyboard player walks around with smooth movement and collision |
-| 4 Multiplayer input | 2 to 4 players on keyboard split and gamepads, join lobby |
+| 3 Movement (done) | One keyboard player walks around with smooth movement and collision |
+| 4 Multiplayer input (done) | 2 to 4 players on keyboard split and gamepads, join lobby |
 | 5 Carry and work | Tickets from the inbox, carry, counters, work at keyboard and test bench |
 | 6 Orders and scoring | Orders with timers, pipeline, ship, score, stars: **playable core loop** |
 | 7 Pipeline failure and fire | Forgotten builds catch fire, fire spreads, rollback extinguisher |
