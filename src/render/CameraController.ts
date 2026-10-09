@@ -1,45 +1,29 @@
 import Phaser from 'phaser';
 import {
-  CAMERA_PAN_SPEED,
+  CAMERA_FIT_PADDING,
   CAMERA_ZOOM_MAX,
   CAMERA_ZOOM_MIN,
   CAMERA_ZOOM_SENSITIVITY,
 } from '../sim/balance';
+import { type WorldRect, fitCamera } from './cameraFit';
 import type { Point } from './iso';
 
-export interface WorldRect {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-}
-
 /**
- * Pan (drag with right/middle mouse or space + left, WASD/arrows) and
- * zoom (wheel, around the cursor) for the main camera. The view center is
- * kept inside `bounds` so the map can't be lost off screen.
+ * Frames the whole level and refits whenever the canvas resizes. In debug
+ * mode the camera can also be dragged with any mouse button and zoomed with
+ * the wheel (around the cursor); leaving debug mode snaps back to the fit.
+ * There is no keyboard panning: the keyboard belongs to the players.
  */
 export class CameraController {
   private readonly camera: Phaser.Cameras.Scene2D.Camera;
-  private readonly keys: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key[]>;
-  private readonly space: Phaser.Input.Keyboard.Key;
   private dragFrom: Point | null = null;
+  private debug = false;
 
   constructor(
     scene: Phaser.Scene,
     private readonly bounds: WorldRect,
   ) {
     this.camera = scene.cameras.main;
-    const keyboard = scene.input.keyboard;
-    if (!keyboard) throw new Error('Keyboard input is not available');
-    const K = Phaser.Input.Keyboard.KeyCodes;
-    this.keys = {
-      up: [keyboard.addKey(K.W), keyboard.addKey(K.UP)],
-      down: [keyboard.addKey(K.S), keyboard.addKey(K.DOWN)],
-      left: [keyboard.addKey(K.A), keyboard.addKey(K.LEFT)],
-      right: [keyboard.addKey(K.D), keyboard.addKey(K.RIGHT)],
-    };
-    this.space = keyboard.addKey(K.SPACE);
 
     scene.input.mouse?.disableContextMenu();
     scene.input.on(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown);
@@ -52,15 +36,14 @@ export class CameraController {
       scene.scale.off(Phaser.Scale.Events.RESIZE, this.onResize);
     });
 
-    this.centerOn({
-      x: (bounds.left + bounds.right) / 2,
-      y: (bounds.top + bounds.bottom) / 2,
-    });
+    this.fit();
   }
 
-  /** True while a drag-pan is in progress (so hover/clicks can ignore it). */
-  get isDragging(): boolean {
-    return this.dragFrom !== null;
+  /** Enables free pan and zoom; disabling it refits the level. */
+  setDebug(enabled: boolean): void {
+    this.debug = enabled;
+    this.dragFrom = null;
+    if (!enabled) this.fit();
   }
 
   /**
@@ -75,20 +58,19 @@ export class CameraController {
     };
   }
 
-  update(deltaMs: number): void {
-    const held = (keys: Phaser.Input.Keyboard.Key[]) => keys.some((k) => k.isDown);
-    const dx = Number(held(this.keys.right)) - Number(held(this.keys.left));
-    const dy = Number(held(this.keys.down)) - Number(held(this.keys.up));
-    if (dx === 0 && dy === 0) return;
-    const step = (CAMERA_PAN_SPEED * deltaMs) / 1000 / this.camera.zoom;
-    const norm = Math.hypot(dx, dy);
-    this.scrollBy((dx / norm) * step, (dy / norm) * step);
+  private fit(): void {
+    const { zoom, center } = fitCamera(
+      this.bounds,
+      { width: this.camera.width, height: this.camera.height },
+      CAMERA_FIT_PADDING,
+    );
+    this.camera.setZoom(zoom);
+    this.centerOn(center);
   }
 
-  centerOn(p: Point): void {
+  private centerOn(p: Point): void {
     this.camera.scrollX = p.x - this.camera.width / 2;
     this.camera.scrollY = p.y - this.camera.height / 2;
-    this.clamp();
   }
 
   private scrollBy(dx: number, dy: number): void {
@@ -97,21 +79,16 @@ export class CameraController {
     this.clamp();
   }
 
-  /** Keeps the view center inside the map bounds. */
+  /** Keeps the view center inside the level so it can't be lost off screen. */
   private clamp(): void {
     const cam = this.camera;
     const cx = Phaser.Math.Clamp(cam.scrollX + cam.width / 2, this.bounds.left, this.bounds.right);
     const cy = Phaser.Math.Clamp(cam.scrollY + cam.height / 2, this.bounds.top, this.bounds.bottom);
-    cam.scrollX = cx - cam.width / 2;
-    cam.scrollY = cy - cam.height / 2;
+    this.centerOn({ x: cx, y: cy });
   }
 
   private readonly onPointerDown = (pointer: Phaser.Input.Pointer): void => {
-    const panButton =
-      pointer.rightButtonDown() ||
-      pointer.middleButtonDown() ||
-      (pointer.leftButtonDown() && this.space.isDown);
-    if (panButton) this.dragFrom = { x: pointer.x, y: pointer.y };
+    if (this.debug) this.dragFrom = { x: pointer.x, y: pointer.y };
   };
 
   private readonly onPointerMove = (pointer: Phaser.Input.Pointer): void => {
@@ -135,6 +112,7 @@ export class CameraController {
     _dx: number,
     deltaY: number,
   ): void => {
+    if (!this.debug) return;
     const cam = this.camera;
     const anchor = this.screenToWorld(pointer.x, pointer.y);
     const zoom = Phaser.Math.Clamp(
@@ -149,7 +127,7 @@ export class CameraController {
     this.clamp();
   };
 
-  /** Keeps the same world point at the view center when the canvas resizes. */
+  /** Refits outside debug mode; in debug mode keeps the same world point centered. */
   private readonly onResize = (
     gameSize: Phaser.Structs.Size,
     _base: unknown,
@@ -157,6 +135,10 @@ export class CameraController {
     previousWidth: number,
     previousHeight: number,
   ): void => {
-    this.scrollBy((previousWidth - gameSize.width) / 2, (previousHeight - gameSize.height) / 2);
+    if (this.debug) {
+      this.scrollBy((previousWidth - gameSize.width) / 2, (previousHeight - gameSize.height) / 2);
+    } else {
+      this.fit();
+    }
   };
 }
