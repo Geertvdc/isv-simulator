@@ -106,3 +106,8 @@ export function getTile(map: LevelMap, x: number, y: number): Tile | null {
 export function isSolid(tile: Tile | null): boolean {
   return tile !== 'floor';
 }
+
+/** Counters and stations: the tiles players will put things on and work at. */
+export function isWorkSurface(tile: Tile | null): boolean {
+  return tile !== null && tile !== 'floor' && tile !== 'wall';
+}

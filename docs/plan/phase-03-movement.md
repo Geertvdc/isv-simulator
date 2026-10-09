@@ -45,6 +45,6 @@ More than one player, gamepads, picking things up.
 ## Done when
 
 - [ ] Walking around feels responsive, with no jitter at 60 Hz and above
-- [ ] You can't walk through walls or stations, and you slide along walls without getting stuck on corners
-- [ ] The highlighted tile always matches the station you're facing
-- [ ] `npm run check` passes
+- [x] You can't walk through walls or stations, and you slide along walls without getting stuck on corners
+- [x] The highlighted tile always matches the station you're facing
+- [x] `npm run check` passes

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import garage from '../../maps/level-01-garage.txt?raw';
-import { type Tile, getTile, isSolid, parseLevelMap } from './level';
+import { type Tile, getTile, isSolid, isWorkSurface, parseLevelMap } from './level';
 
 /** Wraps rows in a wall border with the four spawns on the bottom row. */
 function level(...rows: string[]): string {
@@ -136,5 +136,16 @@ describe('isSolid', () => {
 
   it('treats out of bounds as solid', () => {
     expect(isSolid(null)).toBe(true);
+  });
+});
+
+describe('isWorkSurface', () => {
+  it('is true for counters and stations only', () => {
+    expect(isWorkSurface('counter')).toBe(true);
+    expect(isWorkSurface('keyboard')).toBe(true);
+    expect(isWorkSurface('ship')).toBe(true);
+    expect(isWorkSurface('floor')).toBe(false);
+    expect(isWorkSurface('wall')).toBe(false);
+    expect(isWorkSurface(null)).toBe(false);
   });
 });

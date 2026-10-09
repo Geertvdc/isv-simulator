@@ -87,6 +87,13 @@ export class MapRenderer {
     for (const label of this.debugLabels) label.setVisible(visible);
   }
 
+  /** Top face of the block on tile (x, y), or `null` for floor and off-map tiles. */
+  blockTop(x: number, y: number): Point[] | null {
+    const tile = getTile(this.map, x, y);
+    if (tile === null || tile === 'floor') return null;
+    return blockFaces(x, y, this.blockHeight(x, y, tile)).top;
+  }
+
   private forEachTile(fn: (x: number, y: number, tile: Tile) => void): void {
     for (let y = 0; y < this.map.height; y++) {
       for (let x = 0; x < this.map.width; x++) {
