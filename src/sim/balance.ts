@@ -58,6 +58,9 @@ export const INTERACT_REACH = 0.8;
 /** Most sim ticks run in one frame; after a long stall the game slows down instead of spiralling. */
 export const MAX_TICKS_PER_FRAME = 5;
 
+/** In menus, a stick pushed this far along an axis counts as one step that way. */
+export const MENU_STICK_THRESHOLD = 0.5;
+
 /** Stick deflection below this counts as centered; above it the stick is rescaled to 0 to 1. */
 export const GAMEPAD_DEAD_ZONE = 0.2;
 

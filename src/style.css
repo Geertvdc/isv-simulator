@@ -288,3 +288,89 @@ body {
 .end-hint {
   font-size: 20px;
 }
+
+.level-select {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  background: rgba(10, 12, 16, 0.78);
+}
+
+.level-select[hidden] {
+  display: none;
+}
+
+.level-select-title {
+  margin: 0;
+  font-size: 40px;
+}
+
+.level-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 240px);
+  gap: 20px;
+}
+
+.level-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 22px 18px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  text-align: center;
+  opacity: 0.65;
+  transition:
+    transform 0.12s,
+    opacity 0.12s;
+}
+
+.level-card.selected {
+  border-color: #ffd166;
+  background: rgba(255, 209, 102, 0.12);
+  opacity: 1;
+  transform: scale(1.06);
+}
+
+.level-card-number {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.7;
+}
+
+.level-card-name {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.level-card-blurb {
+  font-size: 14px;
+  min-height: 3em;
+}
+
+.level-card-stars {
+  font-size: 16px;
+  opacity: 0.7;
+}
+
+.level-card-stars.played {
+  font-size: 32px;
+  letter-spacing: 0.1em;
+  color: #ffd166;
+  opacity: 1;
+}
+
+.level-select-hint {
+  font-size: 20px;
+}
+
+.end-best {
+  font-size: 24px;
+  font-weight: 700;
+  color: #ffd166;
+}

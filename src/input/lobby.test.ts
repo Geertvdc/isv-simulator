@@ -5,20 +5,22 @@ import { claimOrphanedPlayer, createLobby, updateLobby } from './lobby';
 const KB = 'keyboard';
 
 /** What pressing Enter looks like: a join press on both keyboard schemes. */
+const NO_PRESS = { join: false, interact: false, dash: false, nav: { x: 0, y: 0 } };
 const enter = (): DevicePress[] => [
-  { deviceId: 'kb-left', joinGroup: KB, join: true, interact: false },
-  { deviceId: 'kb-right', joinGroup: KB, join: true, interact: false },
+  { ...NO_PRESS, deviceId: 'kb-left', joinGroup: KB, join: true },
+  { ...NO_PRESS, deviceId: 'kb-right', joinGroup: KB, join: true },
 ];
 const padA = (i: number): DevicePress => ({
+  ...NO_PRESS,
   deviceId: `pad-${i}`,
   joinGroup: `pad-${i}`,
   join: true,
   interact: true,
 });
 const interact = (deviceId: string): DevicePress => ({
+  ...NO_PRESS,
   deviceId,
   joinGroup: deviceId.startsWith('kb') ? KB : deviceId,
-  join: false,
   interact: true,
 });
 
@@ -153,6 +155,23 @@ describe('PressTracker', () => {
     tracker.update(held);
     tracker.update([]);
     expect(tracker.update(held)).toHaveLength(1);
+  });
+
+  it('reports dash presses and one menu step per push of the stick', () => {
+    const tracker = new PressTracker();
+    const reading = (x: number, dash = false) => [
+      {
+        deviceId: 'pad-0',
+        joinGroup: 'pad-0',
+        state: { move: { x, y: 0 }, interact: false, work: false, dash, join: false },
+      },
+    ];
+    expect(tracker.update(reading(0.3))).toEqual([]);
+    expect(tracker.update(reading(0.8))[0]?.nav).toEqual({ x: 1, y: 0 });
+    expect(tracker.update(reading(1))).toEqual([]);
+    expect(tracker.update(reading(-1))[0]?.nav).toEqual({ x: -1, y: 0 });
+    expect(tracker.update(reading(0))).toEqual([]);
+    expect(tracker.update(reading(0, true))[0]).toMatchObject({ dash: true, nav: { x: 0, y: 0 } });
   });
 });
 
