@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { type BuildingMap, type Zone, getZone } from '../sim/map';
-import { type Point, type Rotation, TILE_H, diamondPoints, tileDepth, tileToScreen } from './iso';
+import { type Point, TILE_H, diamondPoints, tileDepth, tileToScreen } from './iso';
 
 /** Placeholder colors until the art pass. */
 const FLOOR_COLORS: Readonly<Record<Exclude<Zone, 'wall' | 'void'>, number>> = {
@@ -24,12 +24,9 @@ const ENTRANCE_MARKER_COLOR = 0xffb547;
 const ENTRANCE_MARKER_LIFT = TILE_H * 1.4;
 const ENTRANCE_MARKER_SIZE = 8;
 
-/**
- * Walls use `tileDepth`, which goes negative in rotated views (e.g. -x - y),
- * so the floor and overlays sit far outside any tile depth on either side.
- */
+/** Walls use `tileDepth` (>= 0); the floor sits below and overlays above all of them. */
 export const OVERLAY_DEPTH = 1_000_000;
-const FLOOR_DEPTH = -OVERLAY_DEPTH;
+const FLOOR_DEPTH = -1;
 
 /** Phaser's polygon helpers are typed for Vector2; iso math returns plain points. */
 export function vectors(points: readonly Point[]): Phaser.Math.Vector2[] {
@@ -38,25 +35,17 @@ export function vectors(points: readonly Point[]): Phaser.Math.Vector2[] {
 
 /**
  * Draws a building map: one Graphics for all floor diamonds and one per wall
- * block so walls depth-sort by `tileDepth`. Everything is rebuilt when the
- * view rotates; the map is small enough that this is instant.
+ * block so walls depth-sort by `tileDepth`.
  */
 export class MapRenderer {
   private objects: Phaser.GameObjects.GameObject[] = [];
   private debugLabels: Phaser.GameObjects.Text[] = [];
-  private rotation: Rotation = 0;
   private debugVisible = false;
 
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly map: BuildingMap,
   ) {
-    this.draw();
-  }
-
-  setRotation(rotation: Rotation): void {
-    if (rotation === this.rotation) return;
-    this.rotation = rotation;
     this.draw();
   }
 
@@ -91,14 +80,14 @@ export class MapRenderer {
     const g = this.graphics(FLOOR_DEPTH);
     this.forEachTile((x, y, zone) => {
       if (zone === 'void' || zone === 'wall') return;
-      const points = diamondPoints(x, y, this.rotation);
+      const points = diamondPoints(x, y);
       g.fillStyle(FLOOR_COLORS[zone]);
       g.fillPoints(vectors(points), true);
       g.lineStyle(1, GRID_LINE_COLOR, GRID_LINE_ALPHA);
       g.strokePoints(vectors(points), true);
       if (zone === 'locked') {
         // An inset diamond marks plots you can't use yet.
-        const c = tileToScreen(x, y, this.rotation);
+        const c = tileToScreen(x, y);
         const inset = points.map((p) => ({
           x: c.x + (p.x - c.x) * 0.5,
           y: c.y + (p.y - c.y) * 0.5,
@@ -112,9 +101,9 @@ export class MapRenderer {
   private drawWalls(): void {
     this.forEachTile((x, y, zone) => {
       if (zone !== 'wall') return;
-      const [top, right, bottom, left] = diamondPoints(x, y, this.rotation);
+      const [top, right, bottom, left] = diamondPoints(x, y);
       const up = (p: Point): Point => ({ x: p.x, y: p.y - WALL_HEIGHT });
-      const g = this.graphics(tileDepth(x, y, this.rotation));
+      const g = this.graphics(tileDepth(x, y));
 
       const leftFace = [up(left), up(bottom), bottom, left];
       const rightFace = [up(bottom), up(right), right, bottom];
@@ -137,7 +126,7 @@ export class MapRenderer {
     const g = this.graphics(OVERLAY_DEPTH - 1);
     this.forEachTile((x, y, zone) => {
       if (zone !== 'entrance') return;
-      const c = tileToScreen(x, y, this.rotation);
+      const c = tileToScreen(x, y);
       const tipY = c.y - ENTRANCE_MARKER_LIFT;
       const s = ENTRANCE_MARKER_SIZE;
       g.fillStyle(ENTRANCE_MARKER_COLOR);
@@ -150,7 +139,7 @@ export class MapRenderer {
   private createDebugLabels(): void {
     this.forEachTile((x, y, zone) => {
       if (zone === 'void') return;
-      const c = tileToScreen(x, y, this.rotation);
+      const c = tileToScreen(x, y);
       const label = this.scene.add
         .text(c.x, zone === 'wall' ? c.y - WALL_HEIGHT : c.y, `${x},${y}`, {
           fontFamily: 'monospace',
