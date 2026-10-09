@@ -27,7 +27,7 @@ export class CameraController {
 
   constructor(
     scene: Phaser.Scene,
-    private readonly bounds: WorldRect,
+    private bounds: WorldRect,
   ) {
     this.camera = scene.cameras.main;
     const keyboard = scene.input.keyboard;
@@ -58,6 +58,20 @@ export class CameraController {
     });
   }
 
+  /** World point at the center of the view. */
+  get viewCenter(): Point {
+    return {
+      x: this.camera.scrollX + this.camera.width / 2,
+      y: this.camera.scrollY + this.camera.height / 2,
+    };
+  }
+
+  /** Replaces the area the view center must stay in (e.g. after rotating). */
+  setBounds(bounds: WorldRect): void {
+    this.bounds = bounds;
+    this.clamp();
+  }
+
   /** True while a drag-pan is in progress (so hover/clicks can ignore it). */
   get isDragging(): boolean {
     return this.dragFrom !== null;
@@ -85,7 +99,7 @@ export class CameraController {
     this.scrollBy((dx / norm) * step, (dy / norm) * step);
   }
 
-  private centerOn(p: Point): void {
+  centerOn(p: Point): void {
     this.camera.scrollX = p.x - this.camera.width / 2;
     this.camera.scrollY = p.y - this.camera.height / 2;
     this.clamp();
