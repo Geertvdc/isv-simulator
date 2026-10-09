@@ -44,6 +44,12 @@ docs/plan/   phase specs
 - Small commits per step.
 - Placeholder graphics are procedural (Phaser Graphics) until the art pass. Every asset pack is listed in `CREDITS.md` with its license.
 
+## Skills
+
+Reusable agent workflows live in `.agents/skills/<name>/SKILL.md` (the cross-agent location read by Codex, GitHub Copilot and OpenCode). `.claude/skills` is a symlink to it for Claude Code. Add new skills there, not in a tool-specific folder.
+
+- `ship`: open a PR, wait for CI, rebase-merge into main, pull main.
+
 ## Working on phases
 
 The plan lives in `docs/plan/`. Work on one phase at a time:
