@@ -1,98 +1,34 @@
 import { describe, expect, it } from 'vitest';
-import { WORK_RATE } from './balance';
-import { parseLevelMap } from './level';
+import { PIPELINE_BUILD_TICKS, WORK_RATE } from './balance';
+import { getPlayer, targetTile } from './state';
 import {
-  type GameState,
-  type InputCommand,
-  type PlayerId,
-  createGame,
-  getPlayer,
-  targetTile,
-} from './state';
+  COL,
+  addTicket,
+  cmd,
+  give,
+  holdWork,
+  idle,
+  newTestGame as newGame,
+  press,
+  standAt,
+} from './testing';
 import { tick } from './tick';
 import {
-  STEP_ORDER,
   type StepKind,
   type Ticket,
-  getStep,
+  enqueueTicket,
   ticketCarriedBy,
   ticketOnTile,
 } from './tickets';
 
-/**
- * Row 1 holds one of everything; players stand on row 2 facing up.
- * Columns:          1=I 2=K 3=T 4=C 5=C 6=X 7=P 8=S 9=R 10=# (wall) 11=. (floor)
- */
-const MAP = [
-  '#############',
-  '#IKTCCXPSR#.#',
-  '#...........#',
-  '#1234.......#',
-  '#############',
-].join('\n');
-const COL = { inbox: 1, keyboard: 2, testBench: 3, counter: 4, counter2: 5, bin: 6 } as const;
-
-function newGame(): GameState {
-  const state = createGame(parseLevelMap(MAP), 1, [1, 2]);
-  // No inbox spawns unless a test asks for them.
-  state.nextInboxSpawnTick = Number.MAX_SAFE_INTEGER;
-  return state;
-}
-
-/** Puts a player on row 2 under column `x`, facing up at row 1. */
-function standAt(state: GameState, playerId: PlayerId, x: number): void {
-  const p = getPlayer(state, playerId);
-  if (!p) throw new Error(`No player ${playerId}`);
-  p.pos = { x, y: 2 };
-  p.facing = { x: 0, y: -1 };
-}
-
-function addTicket(
-  state: GameState,
-  x: number,
-  progress: Partial<Record<StepKind, number>> = {},
-): Ticket {
-  const ticket: Ticket = {
-    id: state.nextTicketId++,
-    title: 'Test ticket',
-    steps: STEP_ORDER.map((kind) => ({ kind, progress: progress[kind] ?? 0 })),
-    location: { kind: 'tile', x, y: 1 },
-  };
-  state.tickets.push(ticket);
-  return ticket;
-}
-
-function cmd(
-  state: GameState,
-  playerId: PlayerId,
-  buttons: { interact?: boolean; work?: boolean },
-): InputCommand {
-  return {
-    playerId,
-    tick: state.tick,
-    move: { x: 0, y: 0 },
-    interact: buttons.interact ?? false,
-    work: buttons.work ?? false,
-  };
-}
-
-/** A full press: interact down for one tick, then released. */
-function press(state: GameState, playerId: PlayerId = 1): void {
-  tick(state, [cmd(state, playerId, { interact: true })]);
-  tick(state, [cmd(state, playerId, {})]);
-}
-
-function holdWork(state: GameState, ticks: number, playerIds: PlayerId[] = [1]): void {
-  for (let i = 0; i < ticks; i++)
-    tick(
-      state,
-      playerIds.map((id) => cmd(state, id, { work: true })),
-    );
+/** Progress of a feature ticket's step. */
+function getStep(ticket: Ticket, kind: StepKind): { progress: number } | undefined {
+  return ticket.steps.find((s) => s.kind === kind);
 }
 
 describe('interact: carrying', () => {
-  it('picks a ticket up from the inbox, a counter, a keyboard and a test bench', () => {
-    for (const x of [COL.inbox, COL.counter, COL.keyboard, COL.testBench]) {
+  it('picks a ticket up from a counter, a keyboard and a test bench', () => {
+    for (const x of [COL.counter, COL.keyboard, COL.testBench]) {
       const state = newGame();
       const t = addTicket(state, x);
       standAt(state, 1, x);
@@ -114,19 +50,10 @@ describe('interact: carrying', () => {
     }
   });
 
-  it('does not put a ticket back on the inbox', () => {
-    const state = newGame();
-    const t = addTicket(state, COL.inbox);
-    standAt(state, 1, COL.inbox);
-    press(state);
-    press(state);
-    expect(t.location).toEqual({ kind: 'player', playerId: 1 });
-  });
-
   it('hands a ticket over via a counter', () => {
     const state = newGame();
-    const t = addTicket(state, COL.inbox);
-    standAt(state, 1, COL.inbox);
+    const t = addTicket(state, COL.counter2);
+    standAt(state, 1, COL.counter2);
     press(state, 1);
     standAt(state, 1, COL.counter);
     press(state, 1);
@@ -223,10 +150,11 @@ describe('interact: nothing happens', () => {
   const cases: [string, number][] = [
     ['empty counter', COL.counter],
     ['empty inbox', COL.inbox],
-    ['pipeline', 7],
-    ['ship', 8],
-    ['review', 9],
-    ['wall', 10],
+    ['empty bug queue', COL.bugQueue],
+    ['pipeline', COL.pipeline],
+    ['ship', COL.ship],
+    ['review', COL.review],
+    ['wall', COL.wall],
     ['bin', COL.bin],
   ];
   for (const [name, x] of cases) {
@@ -241,11 +169,13 @@ describe('interact: nothing happens', () => {
   }
 
   for (const [name, x] of [
-    ['pipeline', 7],
-    ['ship', 8],
-    ['review', 9],
-    ['wall', 10],
-    ['floor', 11],
+    ['inbox', COL.inbox],
+    ['bug queue', COL.bugQueue],
+    ['pipeline', COL.pipeline],
+    ['ship', COL.ship],
+    ['review', COL.review],
+    ['wall', COL.wall],
+    ['floor', COL.floor],
   ] as const) {
     it(`carrying at the ${name}`, () => {
       const state = newGame();
@@ -254,7 +184,7 @@ describe('interact: nothing happens', () => {
       press(state);
       if (name === 'floor') {
         const p = getPlayer(state, 1);
-        if (p) p.pos = { x: 11, y: 2 };
+        if (p) p.pos = { x: COL.floor, y: 2 };
       } else {
         standAt(state, 1, x);
       }
@@ -309,7 +239,7 @@ describe('work', () => {
 
   it('blocks the test bench until code is done', () => {
     const state = newGame();
-    const t = addTicket(state, COL.testBench, { code: 0.5 });
+    const t = addTicket(state, COL.testBench, { progress: 0.5 });
     standAt(state, 1, COL.testBench);
     holdWork(state, 30);
     expect(getStep(t, 'test')?.progress).toBe(0);
@@ -358,5 +288,111 @@ describe('work', () => {
     holdWork(state, 10);
     expect(getStep(t, 'code')?.progress).toBe(0);
     expect(ticketOnTile(state, COL.keyboard, 1)).toBeUndefined();
+  });
+});
+
+describe('queues', () => {
+  it('takes the oldest ticket from the inbox, and never puts one back', () => {
+    const state = newGame();
+    const first = enqueueTicket(state, 'feature', 'First');
+    const second = enqueueTicket(state, 'feature', 'Second');
+    standAt(state, 1, COL.inbox);
+    press(state);
+    expect(first.location).toEqual({ kind: 'player', playerId: 1 });
+    expect(second.location).toEqual({ kind: 'queue', queue: 'feature' });
+    press(state);
+    expect(first.location).toEqual({ kind: 'player', playerId: 1 });
+    standAt(state, 2, COL.inbox);
+    press(state, 2);
+    expect(second.location).toEqual({ kind: 'player', playerId: 2 });
+  });
+
+  it('holds any number of tickets', () => {
+    const state = newGame();
+    for (let i = 0; i < 10; i++) enqueueTicket(state, 'feature', `T${i}`);
+    expect(state.tickets.filter((t) => t.location.kind === 'queue')).toHaveLength(10);
+  });
+
+  it('keeps bugs and features apart', () => {
+    const state = newGame();
+    const feature = enqueueTicket(state, 'feature', 'Feature');
+    const bug = enqueueTicket(state, 'bug', 'Bug');
+    standAt(state, 1, COL.bugQueue);
+    press(state);
+    expect(bug.location).toEqual({ kind: 'player', playerId: 1 });
+    expect(feature.location.kind).toBe('queue');
+  });
+});
+
+describe('steps in order', () => {
+  it('a bug is tested first, then coded, then tested again', () => {
+    const state = newGame();
+    const bug = addTicket(state, COL.keyboard, { kind: 'bug' });
+    standAt(state, 1, COL.keyboard);
+    holdWork(state, 30);
+    expect(bug.steps.map((s) => s.progress)).toEqual([0, 0, 0, 0]);
+
+    bug.location = { kind: 'tile', x: COL.testBench, y: 1 };
+    standAt(state, 1, COL.testBench);
+    holdWork(state, Math.ceil(1 / WORK_RATE) + 10);
+    expect(bug.steps.map((s) => s.progress)).toEqual([1, 0, 0, 0]);
+
+    bug.location = { kind: 'tile', x: COL.keyboard, y: 1 };
+    standAt(state, 1, COL.keyboard);
+    holdWork(state, Math.ceil(1 / WORK_RATE));
+    expect(bug.steps.map((s) => s.progress)).toEqual([1, 1, 0, 0]);
+
+    bug.location = { kind: 'tile', x: COL.testBench, y: 1 };
+    standAt(state, 1, COL.testBench);
+    holdWork(state, Math.ceil(1 / WORK_RATE));
+    expect(bug.steps.map((s) => s.progress)).toEqual([1, 1, 1, 0]);
+  });
+});
+
+describe('pipeline', () => {
+  it('refuses tickets that still need code or test', () => {
+    for (const done of [0, 1]) {
+      const state = newGame();
+      const t = addTicket(state, COL.counter, { done });
+      give(1, t);
+      standAt(state, 1, COL.pipeline);
+      press(state);
+      expect(t.location).toEqual({ kind: 'player', playerId: 1 });
+    }
+  });
+
+  it('refuses a ticket whose build is already done', () => {
+    const state = newGame();
+    const t = addTicket(state, COL.counter, { done: 3 });
+    give(1, t);
+    standAt(state, 1, COL.pipeline);
+    press(state);
+    expect(t.location).toEqual({ kind: 'player', playerId: 1 });
+  });
+
+  it('builds on its own in PIPELINE_BUILD_TICKS, then hands the ticket back', () => {
+    const state = newGame();
+    const t = addTicket(state, COL.counter, { done: 2 });
+    give(1, t);
+    standAt(state, 1, COL.pipeline);
+    press(state);
+    expect(t.location).toEqual({ kind: 'tile', x: COL.pipeline, y: 1 });
+    // The put-down tick already built once; the release tick too.
+    idle(state, PIPELINE_BUILD_TICKS - 3);
+    expect(getStep(t, 'pipeline')?.progress).toBeLessThan(1);
+    press(state);
+    expect(t.location).toEqual({ kind: 'tile', x: COL.pipeline, y: 1 });
+    idle(state, 1);
+    expect(getStep(t, 'pipeline')?.progress).toBe(1);
+    press(state);
+    expect(t.location).toEqual({ kind: 'player', playerId: 1 });
+  });
+
+  it('does not build with the work button', () => {
+    const state = newGame();
+    const t = addTicket(state, COL.pipeline, { done: 2 });
+    standAt(state, 1, COL.pipeline);
+    holdWork(state, 10);
+    expect(getStep(t, 'pipeline')?.progress).toBeCloseTo(10 / PIPELINE_BUILD_TICKS);
   });
 });

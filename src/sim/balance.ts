@@ -45,13 +45,24 @@ export const MAX_TICKS_PER_FRAME = 5;
 /** Stick deflection below this counts as centered; above it the stick is rescaled to 0 to 1. */
 export const GAMEPAD_DEAD_ZONE = 0.2;
 
-/** Average ticks between two inbox tickets. */
-export const INBOX_SPAWN_TICKS = 10 * TICKS_PER_SECOND;
-/** Each inbox interval is randomly this many ticks shorter or longer. */
-export const INBOX_SPAWN_JITTER_TICKS = 3 * TICKS_PER_SECOND;
-/** The inbox stops spawning while this many tickets sit on inbox tiles. */
-export const INBOX_MAX_TICKETS = 2;
-/** Tick of the first inbox ticket: right away, so there's something to do. */
-export const INBOX_FIRST_SPAWN_TICK = 0;
 /** Step progress gained per tick of holding work at a station: a step takes ~2.5 s. */
 export const WORK_RATE = 1 / (2.5 * TICKS_PER_SECOND);
+/** Ticks a ticket builds in the pipeline before its pipeline step is done. */
+export const PIPELINE_BUILD_TICKS = 4 * TICKS_PER_SECOND;
+
+/** Points for shipping an order, before the speed bonus. */
+export const ORDER_POINTS = 20;
+/** Extra points for shipping with the whole timer left; scales down linearly to 0. */
+export const ORDER_SPEED_BONUS_MAX = 10;
+/** Points lost when an order runs out. */
+export const EXPIRED_PENALTY = 10;
+
+/** Chance that a shipped ticket comes back as a bug. */
+export const BUG_CHANCE = 0.25;
+/** Ticks between shipping a buggy ticket and its bug arriving in the bug queue. */
+export const BUG_DELAY_TICKS = 6 * TICKS_PER_SECOND;
+
+/** Order cards flash once this few ticks are left. */
+export const ORDER_URGENT_TICKS = 10 * TICKS_PER_SECOND;
+/** The end screen ignores presses this long, so mashing at the buzzer doesn't restart. */
+export const END_SCREEN_INPUT_DELAY_MS = 1500;

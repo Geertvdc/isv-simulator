@@ -27,6 +27,7 @@ const BLOCK_STYLES: Readonly<Record<Exclude<Tile, 'floor'>, BlockStyle>> = {
   wall: { color: 0x9aa3b5, height: WALL_HEIGHT },
   counter: { color: 0x8a8f99, height: STATION_HEIGHT },
   inbox: { color: 0x4fa3e0, height: STATION_HEIGHT, label: 'I' },
+  bugQueue: { color: 0xe05a5a, height: STATION_HEIGHT, label: 'B' },
   keyboard: { color: 0x6cc070, height: STATION_HEIGHT, label: 'K' },
   testBench: { color: 0xe0b44f, height: STATION_HEIGHT, label: 'T' },
   review: { color: 0xb07ce0, height: STATION_HEIGHT, label: 'R' },
