@@ -3,6 +3,7 @@ import { startDash, stepPlayer } from './movement';
 import { expireOrders, updateLevelTimer, updateOrders } from './orders';
 import { updatePipelines } from './pipeline';
 import { separatePlayers } from './push';
+import { updateFlights, updateThrowCharge } from './throw';
 import type { GameState, InputCommand } from './state';
 
 const NO_MOVE = { x: 0, y: 0 };
@@ -35,11 +36,14 @@ export function tick(state: GameState, inputs: readonly InputCommand[]): void {
   const worked = new Set<number>();
   for (const player of state.players) {
     const input = inputs.find((i) => i.playerId === player.id);
-    const pressed = (input?.interact ?? false) && !player.interactHeld;
-    player.interactHeld = input?.interact ?? false;
-    if (pressed) interact(state, player.id);
+    const held = input?.interact ?? false;
+    const pressed = held && !player.interactHeld;
+    player.interactHeld = held;
+    const pressedIdle = pressed && !interact(state, player.id);
+    updateThrowCharge(state, player, held, pressedIdle);
     if (input?.work) work(state, player.id, worked);
   }
+  updateFlights(state);
 
   updatePipelines(state);
   updateOrders(state);

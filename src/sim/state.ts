@@ -30,6 +30,12 @@ export interface Player {
   interactHeld: boolean;
   /** Whether dash was held last tick: dash starts only on the press. */
   dashHeld: boolean;
+  /**
+   * Ticks interact has been held since a press that did nothing while
+   * carrying a ticket; the ticket is thrown once this reaches
+   * `THROW_HOLD_TICKS`. 0 when not winding up a throw.
+   */
+  throwCharge: number;
   /** Ticks of dash left; 0 when not dashing. */
   dashTicks: number;
   /** Ticks until the next dash may start. */
@@ -86,6 +92,7 @@ export function newPlayer(id: PlayerId, pos: Vec): Player {
     vel: { x: 0, y: 0 },
     facing: { ...START_FACING },
     interactHeld: false,
+    throwCharge: 0,
     dashHeld: false,
     dashTicks: 0,
     dashCooldown: 0,

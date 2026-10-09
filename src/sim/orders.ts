@@ -67,6 +67,10 @@ export type GameEvent =
   | { type: 'pipelineBroke'; x: number; y: number; ticketId: number }
   | { type: 'pipelineRepaired'; x: number; y: number }
   | { type: 'dashed'; playerId: PlayerId }
+  | { type: 'thrown'; playerId: PlayerId; ticketId: number }
+  | { type: 'caught'; playerId: PlayerId; ticketId: number }
+  /** A thrown ticket came down on tile (x, y). */
+  | { type: 'landed'; ticketId: number; x: number; y: number }
   /** A dashing player knocked `target` away. */
   | { type: 'shoved'; by: PlayerId; target: PlayerId };
 

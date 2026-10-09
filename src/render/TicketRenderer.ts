@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { stationWorkStep } from '../sim/interact';
+import { THROW_RANGE } from '../sim/balance';
 import { type Tile, getTile } from '../sim/level';
 import type { GameState } from '../sim/state';
 import {
@@ -41,6 +42,10 @@ const QUEUE_STACK_STEP = 5;
 
 /** Card bottom above the carrier's feet. */
 const CARRY_LIFT = BODY_HEIGHT + 8;
+/** Extra height at the top of a throw's arc. */
+const THROW_ARC = 24;
+/** A card lying on the floor sits this far below the tile center (half the card shows over it). */
+const FLOOR_LIFT = CARD_HEIGHT / 3;
 /** Over the block's label, under the block in front. */
 const ON_TILE_DEPTH_OFFSET = 0.015;
 /** Over the carrier. */
@@ -187,6 +192,15 @@ export class TicketRenderer {
         visible: index < QUEUE_STACK_MAX,
       };
     }
+    if (loc.kind === 'tile' && getTile(loop.state.level, loc.x, loc.y) === 'floor') {
+      const s = tileToScreen(loc.x, loc.y);
+      return {
+        x: s.x,
+        y: s.y + FLOOR_LIFT,
+        depth: tileDepth(loc.x, loc.y) + ON_TILE_DEPTH_OFFSET,
+        visible: true,
+      };
+    }
     if (loc.kind === 'tile') {
       const top = this.mapRenderer.blockTopCenter(loc.x, loc.y);
       if (!top) return null;
@@ -194,6 +208,17 @@ export class TicketRenderer {
         x: top.x,
         y: top.y + CARD_HEIGHT / 3,
         depth: tileDepth(loc.x, loc.y) + ON_TILE_DEPTH_OFFSET,
+        visible: true,
+      };
+    }
+    if (loc.kind === 'flying') {
+      const s = tileToScreen(loc.pos.x, loc.pos.y);
+      const flown = Math.hypot(loc.pos.x - loc.from.x, loc.pos.y - loc.from.y);
+      const arc = Math.sin(Math.PI * Math.min(1, flown / THROW_RANGE)) * THROW_ARC;
+      return {
+        x: s.x,
+        y: s.y - CARRY_LIFT - arc,
+        depth: tileDepth(loc.pos.x, loc.pos.y) + CARRIED_DEPTH_OFFSET,
         visible: true,
       };
     }
