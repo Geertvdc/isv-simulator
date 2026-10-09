@@ -14,6 +14,8 @@ const GRID_LINE_ALPHA = 0.3;
 const LOCKED_MARK_COLOR = 0x4a515e;
 
 const WALL_HEIGHT = TILE_H * 0.75;
+/** How far anything drawn on the map sticks up above its tile's diamond. */
+export const MAP_OVERHANG = WALL_HEIGHT;
 const WALL_TOP_COLOR = 0x9aa3b5;
 const WALL_LEFT_COLOR = 0x646c7e;
 const WALL_RIGHT_COLOR = 0x4a5262;
