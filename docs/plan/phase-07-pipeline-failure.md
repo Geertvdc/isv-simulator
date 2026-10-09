@@ -28,4 +28,4 @@
 
 - [ ] Ignoring a finished build breaks the pipeline
 - [ ] Recovering is possible but costs enough time to hurt the score
-- [ ] `npm run check` passes
+- [x] `npm run check` passes

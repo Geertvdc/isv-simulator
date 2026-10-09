@@ -20,10 +20,13 @@ export const TICKET_TITLES: readonly string[] = [
   'Migrate to the cloud',
 ];
 
-/** Level names, by level id. */
 /** Shown next to the points when a ticket ships with tests skipped. */
 export const UNTESTED_SHIP_TEXT = 'YOLO!';
 
+/** Shown when a finished build was left too long and the pipeline broke. */
+export const PIPELINE_BROKE_TEXT = 'Build server down!';
+
+/** Level names, by level id. */
 export const LEVEL_NAMES: Readonly<Record<string, string>> = {
   garage: 'The Garage',
 };

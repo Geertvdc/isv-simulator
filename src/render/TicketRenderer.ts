@@ -252,11 +252,19 @@ function draw(g: Phaser.GameObjects.Graphics, ticket: Ticket, bar: number | null
     g.strokeCircle(x, y, ICON_RADIUS);
   });
 
-  if (bar !== null) {
-    const barTop = top - BAR_GAP - BAR_HEIGHT;
-    g.fillStyle(BAR_BACK_COLOR);
-    g.fillRect(-BAR_WIDTH / 2 - 1, barTop - 1, BAR_WIDTH + 2, BAR_HEIGHT + 2);
-    g.fillStyle(BAR_FILL_COLOR);
-    g.fillRect(-BAR_WIDTH / 2, barTop, BAR_WIDTH * bar, BAR_HEIGHT);
-  }
+  if (bar !== null) drawProgressBar(g, 0, top - BAR_GAP - BAR_HEIGHT, bar);
+}
+
+/** A work progress bar centered on `x` with its top at `top`; `share` is 0 to 1. */
+export function drawProgressBar(
+  g: Phaser.GameObjects.Graphics,
+  x: number,
+  top: number,
+  share: number,
+): void {
+  const left = x - BAR_WIDTH / 2;
+  g.fillStyle(BAR_BACK_COLOR);
+  g.fillRect(left - 1, top - 1, BAR_WIDTH + 2, BAR_HEIGHT + 2);
+  g.fillStyle(BAR_FILL_COLOR);
+  g.fillRect(left, top, BAR_WIDTH * share, BAR_HEIGHT);
 }
