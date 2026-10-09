@@ -33,6 +33,16 @@ export const LEVEL_NAMES: Readonly<Record<string, string>> = {
   'scale-up': 'The Scale-Up',
 };
 
+/** One line under each level's name on the level select, by level id. */
+export const LEVEL_BLURBS: Readonly<Record<string, string>> = {
+  garage: 'Where every unicorn starts.',
+  'open-plan': 'A counter wall splits the office. Throw it over!',
+  'scale-up': 'Code reviews are mandatory. The review room is down the hall.',
+};
+
+/** Shown on the end screen when the stars beat the best so far. */
+export const NEW_BEST_TEXT = 'New best!';
+
 /** Title of the bug that comes back after shipping a ticket called `title`. */
 export function bugTitle(title: string): string {
   return `Bug: ${title.replace(/^Bug: /, '')}`;

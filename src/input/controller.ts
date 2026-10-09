@@ -3,6 +3,7 @@
  * screen-relative directions; `commands.ts` turns them into world directions.
  */
 
+import { MENU_STICK_THRESHOLD } from '../sim/balance';
 import type { Vec } from '../sim/state';
 
 /** Stable name for one input device: `kb-left`, `kb-right`, `pad-0` to `pad-3`. */
@@ -41,6 +42,21 @@ export interface DevicePress {
   joinGroup: string;
   join: boolean;
   interact: boolean;
+  dash: boolean;
+  /** A menu step: -1, 0 or 1 per screen axis, when the stick, D-pad or keys were just pushed that way. */
+  nav: Vec;
+}
+
+interface Held {
+  join: boolean;
+  interact: boolean;
+  dash: boolean;
+  nav: Vec;
+}
+
+/** -1, 0 or 1: which way `v` is pushed, if far enough to count in a menu. */
+function navStep(v: number): number {
+  return Math.abs(v) >= MENU_STICK_THRESHOLD ? Math.sign(v) : 0;
 }
 
 export const IDLE: Readonly<ControllerState> = Object.freeze({
@@ -51,19 +67,38 @@ export const IDLE: Readonly<ControllerState> = Object.freeze({
   join: false,
 });
 
-/** Turns held buttons into presses: a button counts once, on the frame it goes down. */
+/**
+ * Turns held buttons into presses: a button counts once, on the frame it goes
+ * down. Stick and D-pad directions count once per push, for menus.
+ */
 export class PressTracker {
-  private held = new Map<DeviceId, { join: boolean; interact: boolean }>();
+  private held = new Map<DeviceId, Held>();
 
   update(readings: readonly DeviceReading[]): DevicePress[] {
     const presses: DevicePress[] = [];
-    const next = new Map<DeviceId, { join: boolean; interact: boolean }>();
+    const next = new Map<DeviceId, Held>();
     for (const { deviceId, joinGroup, state } of readings) {
       const was = this.held.get(deviceId);
-      const join = state.join && !was?.join;
-      const interact = state.interact && !was?.interact;
-      next.set(deviceId, { join: state.join, interact: state.interact });
-      if (join || interact) presses.push({ deviceId, joinGroup, join, interact });
+      const now: Held = {
+        join: state.join,
+        interact: state.interact,
+        dash: state.dash,
+        nav: { x: navStep(state.move.x), y: navStep(state.move.y) },
+      };
+      const step = (axis: 'x' | 'y'): number =>
+        now.nav[axis] !== (was?.nav[axis] ?? 0) ? now.nav[axis] : 0;
+      const press: DevicePress = {
+        deviceId,
+        joinGroup,
+        join: now.join && !was?.join,
+        interact: now.interact && !was?.interact,
+        dash: now.dash && !was?.dash,
+        nav: { x: step('x'), y: step('y') },
+      };
+      next.set(deviceId, now);
+      if (press.join || press.interact || press.dash || press.nav.x !== 0 || press.nav.y !== 0) {
+        presses.push(press);
+      }
     }
     this.held = next;
     return presses;

@@ -1,11 +1,17 @@
 import type { GameFrame } from '../render/GameScene';
 import { tileColor } from '../render/MapRenderer';
 import { ORDER_URGENT_TICKS } from '../sim/balance';
-import { PIPELINE_BROKE_TEXT, UNTESTED_SHIP_TEXT } from '../sim/content';
+import {
+  LEVEL_NAMES,
+  NEW_BEST_TEXT,
+  PIPELINE_BROKE_TEXT,
+  UNTESTED_SHIP_TEXT,
+} from '../sim/content';
 import { type Order, ticksLeft } from '../sim/orders';
 import type { GameState } from '../sim/state';
 import type { StepKind } from '../sim/tickets';
 import { formatClock, starText } from './format';
+import { type StorageLike, recordStars } from './progress';
 
 /** Each step shows as the letter of its station on the map, in that station's color. */
 const STEP_LABEL: Readonly<Record<StepKind, { letter: string; color: string }>> = {
@@ -44,8 +50,11 @@ export interface GameHud {
   render: (frame: GameFrame | null) => void;
 }
 
-/** The in-game HUD: order bar on top, score and clock below, and the end screen. */
-export function mountGameHud(root: HTMLElement, levelName: string): GameHud {
+/**
+ * The in-game HUD: order bar on top, score and clock below, and the end
+ * screen, which also saves the best stars per level.
+ */
+export function mountGameHud(root: HTMLElement, storage: StorageLike | null): GameHud {
   const orders = el('div', 'orders');
   const score = el('div', 'hud-score');
   const scoreValue = el('span', 'hud-score-value', '0');
@@ -55,8 +64,10 @@ export function mountGameHud(root: HTMLElement, levelName: string): GameHud {
   const end = el('div', 'end-screen');
   const endScore = el('div', 'end-score');
   const endStars = el('div', 'end-stars');
-  const endHint = el('div', 'end-hint', 'Press A or Enter to play again');
-  end.append(el('h1', 'end-title', levelName), endStars, endScore, endHint);
+  const endBest = el('div', 'end-best', NEW_BEST_TEXT);
+  const endHint = el('div', 'end-hint', 'Interact: play again · Dash: pick a level');
+  const endTitle = el('h1', 'end-title');
+  end.append(endTitle, endStars, endScore, endBest, endHint);
 
   const parts = [orders, score, clock, end];
   for (const part of parts) part.hidden = true;
@@ -130,10 +141,14 @@ export function mountGameHud(root: HTMLElement, levelName: string): GameHud {
         }
         if (event.type === 'orderExpired' && event.penalty > 0) popup(`-${event.penalty}`, 'loss');
         if (event.type === 'pipelineBroke') popup(PIPELINE_BROKE_TEXT, 'loss');
+        if (event.type === 'levelEnded') {
+          endBest.hidden = !recordStars(storage, state.levelId, event.result.stars);
+        }
       }
 
       end.hidden = state.result === null;
       if (state.result) {
+        endTitle.textContent = LEVEL_NAMES[state.levelId] ?? state.levelId;
         endStars.textContent = starText(state.result.stars);
         endScore.textContent = `Score: ${state.result.score}`;
         endHint.style.visibility = frame.canRestart ? 'visible' : 'hidden';
