@@ -327,12 +327,7 @@ describe('queues', () => {
 describe('steps in order', () => {
   it('a bug is tested first, then coded, then tested again', () => {
     const state = newGame();
-    const bug = addTicket(state, COL.keyboard, { kind: 'bug' });
-    standAt(state, 1, COL.keyboard);
-    holdWork(state, 30);
-    expect(bug.steps.map((s) => s.progress)).toEqual([0, 0, 0, 0]);
-
-    bug.location = { kind: 'tile', x: COL.testBench, y: 1 };
+    const bug = addTicket(state, COL.testBench, { kind: 'bug' });
     standAt(state, 1, COL.testBench);
     holdWork(state, Math.ceil(1 / WORK_RATE) + 10);
     expect(bug.steps.map((s) => s.progress)).toEqual([1, 0, 0, 0]);
@@ -350,10 +345,11 @@ describe('steps in order', () => {
 });
 
 describe('pipeline', () => {
-  it('refuses tickets that still need code or test', () => {
-    for (const done of [0, 1]) {
+  it('refuses tickets that still need code', () => {
+    for (const kind of ['feature', 'bug'] as const) {
       const state = newGame();
-      const t = addTicket(state, COL.counter, { done });
+      // A bug with only its reproduction test done still needs code.
+      const t = addTicket(state, COL.counter, { kind, done: kind === 'bug' ? 1 : 0 });
       give(1, t);
       standAt(state, 1, COL.pipeline);
       press(state);
@@ -394,5 +390,46 @@ describe('pipeline', () => {
     standAt(state, 1, COL.pipeline);
     holdWork(state, 10);
     expect(getStep(t, 'pipeline')?.progress).toBeCloseTo(10 / PIPELINE_BUILD_TICKS);
+  });
+});
+
+describe('skipping tests', () => {
+  it('a feature can go from code straight to the pipeline', () => {
+    const state = newGame();
+    const t = addTicket(state, COL.counter, { done: 1 });
+    give(1, t);
+    standAt(state, 1, COL.pipeline);
+    press(state);
+    expect(t.location).toEqual({ kind: 'tile', x: COL.pipeline, y: 1 });
+    idle(state, PIPELINE_BUILD_TICKS);
+    expect(t.steps.map((s) => s.progress)).toEqual([1, 0, 1]);
+  });
+
+  it('a bug can be coded without reproducing it first', () => {
+    const state = newGame();
+    const bug = addTicket(state, COL.keyboard, { kind: 'bug' });
+    standAt(state, 1, COL.keyboard);
+    holdWork(state, Math.ceil(1 / WORK_RATE));
+    expect(bug.steps.map((s) => s.progress)).toEqual([0, 1, 0, 0]);
+  });
+
+  it('a skipped test can still be done after the pipeline', () => {
+    const state = newGame();
+    const t = addTicket(state, COL.testBench, { done: 1 });
+    const test = t.steps[1];
+    const pipeline = t.steps[2];
+    if (!test || !pipeline) throw new Error('feature has 3 steps');
+    pipeline.progress = 1;
+    standAt(state, 1, COL.testBench);
+    holdWork(state, 30);
+    expect(test.progress).toBeCloseTo(30 * WORK_RATE);
+  });
+
+  it('testing still works before the pipeline', () => {
+    const state = newGame();
+    const t = addTicket(state, COL.testBench, { done: 1 });
+    standAt(state, 1, COL.testBench);
+    holdWork(state, 30);
+    expect(getStep(t, 'test')?.progress).toBeCloseTo(30 * WORK_RATE);
   });
 });

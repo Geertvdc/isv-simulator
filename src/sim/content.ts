@@ -21,6 +21,9 @@ export const TICKET_TITLES: readonly string[] = [
 ];
 
 /** Level names, by level id. */
+/** Shown next to the points when a ticket ships with tests skipped. */
+export const UNTESTED_SHIP_TEXT = 'YOLO!';
+
 export const LEVEL_NAMES: Readonly<Record<string, string>> = {
   garage: 'The Garage',
 };

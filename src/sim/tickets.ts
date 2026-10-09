@@ -18,6 +18,9 @@ export const TICKET_STEPS: Readonly<Record<TicketKind, readonly StepKind[]>> = {
   bug: ['test', 'code', 'test', 'pipeline'],
 };
 
+/** Steps you may skip, at the price of a higher bug chance when shipping. */
+export const OPTIONAL_STEPS: ReadonlySet<StepKind> = new Set(['test']);
+
 /** The queue tile each kind of ticket waits on. */
 export const QUEUE_TILE: Readonly<Record<TicketKind, Tile>> = {
   feature: 'inbox',
@@ -66,6 +69,38 @@ export function currentStep(ticket: Ticket): TicketStep | undefined {
 
 export function isFinished(ticket: Ticket): boolean {
   return currentStep(ticket) === undefined;
+}
+
+/**
+ * Steps that can be worked on now: the unfinished steps up to and including
+ * the first unfinished required one. Optional steps (tests) can be skipped,
+ * but once a later required step is done, a skipped one stays skipped.
+ */
+export function workableSteps(ticket: Ticket): TicketStep[] {
+  const result: TicketStep[] = [];
+  for (const step of ticket.steps) {
+    if (step.progress >= 1) continue;
+    result.push(step);
+    if (!OPTIONAL_STEPS.has(step.kind)) break;
+  }
+  return result;
+}
+
+/** The step of `kind` a station can work on now, if any. */
+export function workableStep(ticket: Ticket, kind: StepKind): TicketStep | undefined {
+  return workableSteps(ticket).find((s) => s.kind === kind);
+}
+
+/** Every required step is done; optional ones may have been skipped. */
+export function isShippable(ticket: Ticket): boolean {
+  return ticket.steps.every((s) => s.progress >= 1 || OPTIONAL_STEPS.has(s.kind));
+}
+
+/** Share of the ticket's optional steps (tests) left undone: 0 when fully tested. */
+export function skippedShare(ticket: Ticket): number {
+  const optional = ticket.steps.filter((s) => OPTIONAL_STEPS.has(s.kind));
+  if (optional.length === 0) return 0;
+  return optional.filter((s) => s.progress < 1).length / optional.length;
 }
 
 /** Adds `amount` progress to a step, snapping float error so N equal parts always finish it. */

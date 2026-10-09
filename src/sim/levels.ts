@@ -48,8 +48,8 @@ const GARAGE_SETTINGS: LevelSettings = {
     timeLimitTicks: 60 * SECOND,
     bugTimeLimitTicks: 36 * SECOND,
   },
-  // Tuned with `npm run sim`: one perfect bot averages ~210, two ~440.
-  starThresholds: [120, 250, 380],
+  // Tuned with `npm run sim`: one perfect bot averages ~170, two ~355.
+  starThresholds: [100, 210, 310],
 };
 
 export const GARAGE: Level = {

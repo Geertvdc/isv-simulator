@@ -1,6 +1,7 @@
 import type { GameFrame } from '../render/GameScene';
 import { tileColor } from '../render/MapRenderer';
 import { ORDER_URGENT_TICKS } from '../sim/balance';
+import { UNTESTED_SHIP_TEXT } from '../sim/content';
 import { type Order, ticksLeft } from '../sim/orders';
 import type { GameState } from '../sim/state';
 import type { StepKind } from '../sim/tickets';
@@ -121,7 +122,10 @@ export function mountGameHud(root: HTMLElement, levelName: string): GameHud {
       scoreValue.textContent = String(state.score);
       clock.textContent = formatClock(state.settings.durationTicks - state.tick);
       for (const event of frame.events) {
-        if (event.type === 'orderShipped') popup(`+${event.points}`, 'gain');
+        if (event.type === 'orderShipped') {
+          const text = `+${event.points}`;
+          popup(event.untested ? `${text} ${UNTESTED_SHIP_TEXT}` : text, 'gain');
+        }
         if (event.type === 'orderExpired' && event.penalty > 0) popup(`-${event.penalty}`, 'loss');
       }
 

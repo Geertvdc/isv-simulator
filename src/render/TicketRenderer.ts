@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { isAtItsStation } from '../sim/interact';
+import { stationWorkStep } from '../sim/interact';
 import { type Tile, getTile } from '../sim/level';
 import type { GameState } from '../sim/state';
 import {
@@ -7,7 +7,6 @@ import {
   type StepKind,
   type Ticket,
   type TicketKind,
-  currentStep,
   queuedTickets,
 } from '../sim/tickets';
 import type { GameLoop } from './GameLoop';
@@ -87,7 +86,7 @@ export class TicketRenderer {
         ticket.location.kind === 'tile'
           ? getTile(state.level, ticket.location.x, ticket.location.y)
           : null;
-      const progress = isAtItsStation(ticket, tile) ? (currentStep(ticket)?.progress ?? 0) : 0;
+      const progress = stationWorkStep(ticket, tile)?.progress ?? 0;
       const bar = progress > 0 && progress < 1 ? progress : null;
 
       sprite.g.setPosition(placed.x, placed.y).setDepth(placed.depth);

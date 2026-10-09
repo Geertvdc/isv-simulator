@@ -7,7 +7,10 @@ import {
   currentStep,
   enqueueTicket,
   isFinished,
+  isShippable,
   queuedTickets,
+  skippedShare,
+  workableSteps,
 } from './tickets';
 
 describe('ticket steps', () => {
@@ -33,6 +36,32 @@ describe('ticket steps', () => {
     expect(step.progress).toBeLessThan(1);
     advanceStep(step, WORK_RATE);
     expect(step.progress).toBe(1);
+  });
+});
+
+describe('optional tests', () => {
+  it('workable steps run up to the first unfinished required step', () => {
+    const state = newTestGame();
+    const feature = addTicket(state, COL.counter);
+    expect(workableSteps(feature).map((s) => s.kind)).toEqual(['code']);
+    const coded = addTicket(state, COL.counter, { done: 1 });
+    expect(workableSteps(coded).map((s) => s.kind)).toEqual(['test', 'pipeline']);
+    const bug = addTicket(state, COL.counter, { kind: 'bug' });
+    expect(workableSteps(bug).map((s) => s.kind)).toEqual(['test', 'code']);
+  });
+
+  it('shippable once code and pipeline are done, tests or not', () => {
+    const state = newTestGame();
+    const t = addTicket(state, COL.counter, { done: 1 });
+    expect(isShippable(t)).toBe(false);
+    const pipeline = t.steps[2];
+    if (pipeline) pipeline.progress = 1;
+    expect(isShippable(t)).toBe(true);
+    expect(isFinished(t)).toBe(false);
+    expect(skippedShare(t)).toBe(1);
+    const test = t.steps[1];
+    if (test) test.progress = 1;
+    expect(skippedShare(t)).toBe(0);
   });
 });
 

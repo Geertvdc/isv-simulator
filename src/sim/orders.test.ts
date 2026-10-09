@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
   BUG_CHANCE,
+  BUG_CHANCE_UNTESTED,
   BUG_DELAY_TICKS,
+  BUG_EXPIRED_PENALTY,
+  BUG_ORDER_POINTS,
   EXPIRED_PENALTY,
   ORDER_POINTS,
   ORDER_SPEED_BONUS_MAX,
 } from './balance';
 import { GARAGE } from './levels';
-import { type Order, createOrder, shipPoints, starsFor } from './orders';
+import { type Order, bugChance, createOrder, shipPoints, starsFor } from './orders';
 import { createGame } from './state';
 import { COL, addTicket, give, idle, newTestGame, press, standAt } from './testing';
 import { tick } from './tick';
@@ -118,6 +121,14 @@ describe('expiry', () => {
     expect(state.score).toBe(0);
   });
 
+  it('expired bugs cost BUG_EXPIRED_PENALTY', () => {
+    const state = newTestGame();
+    state.score = 100;
+    createOrder(state, 'bug', 'Bug: x');
+    idle(state, SCHEDULE.bugTimeLimitTicks);
+    expect(state.score).toBe(100 - BUG_EXPIRED_PENALTY);
+  });
+
   it('bug orders run out faster than features', () => {
     const state = newTestGame();
     const bug = createOrder(state, 'bug', 'Bug: x');
@@ -161,10 +172,31 @@ describe('ship', () => {
       { playerId: 1, tick: state.tick, move: { x: 0, y: 0 }, interact: true, work: false },
     ]);
     const shipped = state.events.find((e) => e.type === 'orderShipped');
-    expect(shipped).toEqual({ type: 'orderShipped', order, points: state.score, playerId: 1 });
+    expect(shipped).toEqual({
+      type: 'orderShipped',
+      order,
+      points: state.score,
+      playerId: 1,
+      untested: false,
+    });
   });
 
-  it('refuses unfinished tickets', () => {
+  it('ships untested tickets, flagged as untested', () => {
+    const state = newTestGame();
+    const ticket = addTicket(state, COL.counter, { done: 1 });
+    const pipeline = ticket.steps[2];
+    if (pipeline) pipeline.progress = 1;
+    give(1, ticket);
+    standAt(state, 1, COL.ship);
+    createOrder(state, 'feature', 'X');
+    tick(state, [
+      { playerId: 1, tick: state.tick, move: { x: 0, y: 0 }, interact: true, work: false },
+    ]);
+    expect(state.tickets).not.toContain(ticket);
+    expect(state.events.find((e) => e.type === 'orderShipped')).toMatchObject({ untested: true });
+  });
+
+  it('refuses tickets that have not been through the pipeline', () => {
     const state = newTestGame();
     const ticket = addTicket(state, COL.counter, { done: 2, progress: 0.9 });
     give(1, ticket);
@@ -209,6 +241,22 @@ describe('ship', () => {
   });
 });
 
+describe('bug chance', () => {
+  it('goes from BUG_CHANCE fully tested to BUG_CHANCE_UNTESTED with every test skipped', () => {
+    const state = newTestGame();
+    const tested = addTicket(state, COL.counter, { done: 3 });
+    expect(bugChance(tested)).toBe(BUG_CHANCE);
+    const untested = addTicket(state, COL.counter, { done: 1 });
+    expect(bugChance(untested)).toBe(BUG_CHANCE_UNTESTED);
+    // A bug fix with one of its two tests skipped lands halfway.
+    const half = addTicket(state, COL.counter, { kind: 'bug', done: 4 });
+    const repro = half.steps[0];
+    if (repro) repro.progress = 0;
+    expect(bugChance(half)).toBeCloseTo((BUG_CHANCE + BUG_CHANCE_UNTESTED) / 2);
+    expect(BUG_CHANCE_UNTESTED).toBeGreaterThan(BUG_CHANCE);
+  });
+});
+
 describe('scoring', () => {
   const order: Order = { id: 1, kind: 'feature', steps: [], createdTick: 100, expiresTick: 1100 };
 
@@ -216,6 +264,12 @@ describe('scoring', () => {
     expect(shipPoints(order, 100)).toBe(ORDER_POINTS + ORDER_SPEED_BONUS_MAX);
     expect(shipPoints(order, 600)).toBe(ORDER_POINTS + Math.round(ORDER_SPEED_BONUS_MAX / 2));
     expect(shipPoints(order, 1100)).toBe(ORDER_POINTS);
+  });
+
+  it('bug fixes only earn BUG_ORDER_POINTS plus the speed bonus', () => {
+    const bug: Order = { ...order, kind: 'bug' };
+    expect(shipPoints(bug, 100)).toBe(BUG_ORDER_POINTS + ORDER_SPEED_BONUS_MAX);
+    expect(shipPoints(bug, 1100)).toBe(BUG_ORDER_POINTS);
   });
 
   it('gives a star per threshold reached', () => {

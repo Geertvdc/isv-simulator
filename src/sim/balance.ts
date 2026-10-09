@@ -56,9 +56,18 @@ export const ORDER_POINTS = 20;
 export const ORDER_SPEED_BONUS_MAX = 10;
 /** Points lost when an order runs out. */
 export const EXPIRED_PENALTY = 10;
+/**
+ * Base points for shipping a bug fix (the speed bonus comes on top). Low, so
+ * skipping tests and fixing the fallout never beats testing in the first place.
+ */
+export const BUG_ORDER_POINTS = 0;
+/** Points lost when a bug order runs out: customers hate bugs more than late features. */
+export const BUG_EXPIRED_PENALTY = 20;
 
-/** Chance that a shipped ticket comes back as a bug. */
+/** Chance that a fully tested ticket comes back as a bug after shipping. */
 export const BUG_CHANCE = 0.25;
+/** Chance for a ticket shipped with every test skipped; partly tested tickets sit in between. */
+export const BUG_CHANCE_UNTESTED = 0.75;
 /** Ticks between shipping a buggy ticket and its bug arriving in the bug queue. */
 export const BUG_DELAY_TICKS = 6 * TICKS_PER_SECOND;
 
