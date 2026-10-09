@@ -10,12 +10,13 @@ import { type GameState, type PlayerId, targetTile } from './state';
 import {
   type StepKind,
   type Ticket,
+  type TicketStep,
   advanceStep,
-  currentStep,
   queueAt,
   queuedTickets,
   ticketCarriedBy,
   ticketOnTile,
+  workableStep,
 } from './tickets';
 
 /** Tiles players can take a ticket from (queue tiles aside). */
@@ -37,10 +38,15 @@ export function stationStep(tile: Tile | null): StepKind | undefined {
   return tile === null ? undefined : STATION_STEP[tile];
 }
 
+/** The step of `ticket` that the station on `tile` can work on now, if any. */
+export function stationWorkStep(ticket: Ticket, tile: Tile | null): TicketStep | undefined {
+  const kind = stationStep(tile);
+  return kind === undefined ? undefined : workableStep(ticket, kind);
+}
+
 /** Whether a ticket sitting on a station is ready for that station's step. */
 export function isAtItsStation(ticket: Ticket, tile: Tile | null): boolean {
-  const kind = stationStep(tile);
-  return kind !== undefined && currentStep(ticket)?.kind === kind;
+  return stationWorkStep(ticket, tile) !== undefined;
 }
 
 /** A pipeline holds on to its ticket until the build is done. */
@@ -90,7 +96,7 @@ export function interact(state: GameState, playerId: PlayerId): boolean {
 /**
  * Work held by `playerId` this tick. `worked` collects the tiles already
  * worked this tick (as `y * width + x`) so two players at one station don't
- * stack. Only the ticket's current step can be worked. Returns whether any
+ * stack. Only a step that's workable now (see `workableSteps`) advances. Returns whether any
  * progress was made.
  */
 export function work(state: GameState, playerId: PlayerId, worked: Set<number>): boolean {
@@ -101,8 +107,7 @@ export function work(state: GameState, playerId: PlayerId, worked: Set<number>):
   if (worked.has(key)) return false;
 
   const ticket = ticketOnTile(state, x, y);
-  if (!ticket || !isAtItsStation(ticket, tile)) return false;
-  const step = currentStep(ticket);
+  const step = ticket && stationWorkStep(ticket, tile);
   if (!step) return false;
   advanceStep(step, WORK_RATE);
   worked.add(key);
@@ -114,8 +119,8 @@ export function updatePipelines(state: GameState): void {
   for (const ticket of state.tickets) {
     if (ticket.location.kind !== 'tile') continue;
     const tile = getTile(state.level, ticket.location.x, ticket.location.y);
-    if (tile !== 'pipeline' || !isAtItsStation(ticket, tile)) continue;
-    const step = currentStep(ticket);
+    if (tile !== 'pipeline') continue;
+    const step = stationWorkStep(ticket, tile);
     if (step) advanceStep(step, 1 / PIPELINE_BUILD_TICKS);
   }
 }

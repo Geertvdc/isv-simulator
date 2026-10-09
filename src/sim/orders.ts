@@ -6,6 +6,9 @@
 
 import {
   BUG_CHANCE,
+  BUG_EXPIRED_PENALTY,
+  BUG_ORDER_POINTS,
+  BUG_CHANCE_UNTESTED,
   BUG_DELAY_TICKS,
   EXPIRED_PENALTY,
   ORDER_POINTS,
@@ -20,8 +23,9 @@ import {
   type Ticket,
   type TicketKind,
   enqueueTicket,
-  isFinished,
+  isShippable,
   queuedTickets,
+  skippedShare,
 } from './tickets';
 
 export interface Order {
@@ -48,7 +52,14 @@ export interface LevelResult {
 
 export type GameEvent =
   | { type: 'orderCreated'; order: Order }
-  | { type: 'orderShipped'; order: Order; points: number; playerId: PlayerId }
+  | {
+      type: 'orderShipped';
+      order: Order;
+      points: number;
+      playerId: PlayerId;
+      /** Some tests were skipped. */
+      untested: boolean;
+    }
   | { type: 'orderExpired'; order: Order; penalty: number }
   | { type: 'levelEnded'; result: LevelResult };
 
@@ -57,12 +68,18 @@ export function ticksLeft(state: GameState, order: Order): number {
   return Math.max(0, order.expiresTick - state.tick);
 }
 
+/** Chance a shipped ticket comes back as a bug: higher the more of its tests were skipped. */
+export function bugChance(ticket: Ticket): number {
+  return BUG_CHANCE + (BUG_CHANCE_UNTESTED - BUG_CHANCE) * skippedShare(ticket);
+}
+
 /** Points for shipping `order` at `tick`: base points plus a bonus for the share of time left. */
 export function shipPoints(order: Order, tick: number): number {
   const limit = order.expiresTick - order.createdTick;
   const left = Math.max(0, order.expiresTick - tick);
   const share = limit > 0 ? Math.min(1, left / limit) : 0;
-  return ORDER_POINTS + Math.round(ORDER_SPEED_BONUS_MAX * share);
+  const base = order.kind === 'bug' ? BUG_ORDER_POINTS : ORDER_POINTS;
+  return base + Math.round(ORDER_SPEED_BONUS_MAX * share);
 }
 
 /** Stars for a score: one per threshold reached. */
@@ -101,12 +118,12 @@ export function createOrder(state: GameState, kind: TicketKind, title: string): 
 
 /**
  * Ships the ticket `playerId` carries: completes the matching order with the
- * least time left, scores it and maybe sends a bug back later. Refuses
- * unfinished tickets and tickets that match no order. Returns whether it
- * shipped.
+ * least time left, scores it and maybe sends a bug back later (more likely
+ * when tests were skipped). Refuses tickets missing a required step and
+ * tickets that match no order. Returns whether it shipped.
  */
 export function shipTicket(state: GameState, playerId: PlayerId, ticket: Ticket): boolean {
-  if (!isFinished(ticket)) return false;
+  if (!isShippable(ticket)) return false;
   const order = matchingOrders(state, ticket)[0];
   if (!order) return false;
 
@@ -114,11 +131,12 @@ export function shipTicket(state: GameState, playerId: PlayerId, ticket: Ticket)
   state.tickets = state.tickets.filter((t) => t !== ticket);
   state.orders = state.orders.filter((o) => o !== order);
   state.score += points;
-  state.events.push({ type: 'orderShipped', order, points, playerId });
+  const untested = skippedShare(ticket) > 0;
+  state.events.push({ type: 'orderShipped', order, points, playerId, untested });
 
   const [roll, s] = rng.next(state.rngState);
   state.rngState = s;
-  if (roll < BUG_CHANCE) {
+  if (roll < bugChance(ticket)) {
     state.pendingBugs.push({ tick: state.tick + BUG_DELAY_TICKS, title: bugTitle(ticket.title) });
   }
   return true;
@@ -132,7 +150,8 @@ export function shipTicket(state: GameState, playerId: PlayerId, ticket: Ticket)
 export function expireOrders(state: GameState): void {
   for (const order of state.orders.filter((o) => state.tick >= o.expiresTick)) {
     state.orders = state.orders.filter((o) => o !== order);
-    const penalty = Math.min(EXPIRED_PENALTY, state.score);
+    const full = order.kind === 'bug' ? BUG_EXPIRED_PENALTY : EXPIRED_PENALTY;
+    const penalty = Math.min(full, state.score);
     state.score -= penalty;
     const waiting = queuedTickets(state, order.kind)[0];
     if (waiting) state.tickets = state.tickets.filter((t) => t !== waiting);

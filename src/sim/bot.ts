@@ -2,7 +2,8 @@
  * Scripted bots for headless tuning runs and scenario tests. Each bot takes
  * one ticket at a time from a queue and walks it through every station
  * itself (shortest path, then work), ships it and goes back for the next.
- * Bugs first, since their timers are shorter.
+ * Bugs first, since their timers are shorter. Bots that skip tests go
+ * straight from code to pipeline and ship untested.
  */
 
 import { isAtItsStation } from './interact';
@@ -19,6 +20,7 @@ import {
 } from './state';
 import { tick } from './tick';
 import {
+  OPTIONAL_STEPS,
   QUEUE_TILE,
   type StepKind,
   type Ticket,
@@ -26,6 +28,7 @@ import {
   currentStep,
   queuedTickets,
   ticketCarriedBy,
+  workableSteps,
 } from './tickets';
 
 /** Where each step gets done. */
@@ -53,6 +56,7 @@ export interface Bot {
   dropTarget: GridPoint | null;
   /** Interact was sent last tick: presses need a release in between. */
   interactWas: boolean;
+  skipTests: boolean;
 }
 
 type Action = 'interact' | 'work' | 'wait';
@@ -62,8 +66,8 @@ interface Goal {
   action: Action;
 }
 
-export function createBot(playerId: PlayerId): Bot {
-  return { playerId, ticketId: null, dropTarget: null, interactWas: false };
+export function createBot(playerId: PlayerId, skipTests = false): Bot {
+  return { playerId, ticketId: null, dropTarget: null, interactWas: false, skipTests };
 }
 
 function tilesOf(map: LevelMap, tile: Tile): GridPoint[] {
@@ -166,7 +170,9 @@ function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | nu
 }
 
 function carryGoal(state: GameState, bot: Bot, bots: readonly Bot[], ticket: Ticket): Goal | null {
-  const step = currentStep(ticket);
+  const step = bot.skipTests
+    ? workableSteps(ticket).find((s) => !OPTIONAL_STEPS.has(s.kind))
+    : currentStep(ticket);
   if (!step) {
     const where = matchingOrders(state, ticket).length > 0 ? 'ship' : 'bin';
     const tile = nearest(state, bot.playerId, tilesOf(state.level, where));
@@ -231,17 +237,23 @@ export function botInput(state: GameState, bot: Bot, bots: readonly Bot[]): Inpu
 export interface BotRunSummary {
   shipped: number;
   shippedBugs: number;
+  shippedUntested: number;
   expired: number;
   expiredBugs: number;
   result: LevelResult;
 }
 
 /** Plays a whole level with `botCount` bots and reports how it went. */
-export function runBots(level: Level, seed: number, botCount: number): BotRunSummary {
+export function runBots(
+  level: Level,
+  seed: number,
+  botCount: number,
+  { skipTests = false }: { skipTests?: boolean } = {},
+): BotRunSummary {
   const ids = Array.from({ length: botCount }, (_, i) => i + 1);
   const state = createGame(level, seed, ids);
-  const bots = ids.map(createBot);
-  const summary = { shipped: 0, shippedBugs: 0, expired: 0, expiredBugs: 0 };
+  const bots = ids.map((id) => createBot(id, skipTests));
+  const summary = { shipped: 0, shippedBugs: 0, shippedUntested: 0, expired: 0, expiredBugs: 0 };
   while (!state.result) {
     tick(
       state,
@@ -251,6 +263,7 @@ export function runBots(level: Level, seed: number, botCount: number): BotRunSum
       if (e.type === 'orderShipped') {
         summary.shipped++;
         if (e.order.kind === 'bug') summary.shippedBugs++;
+        if (e.untested) summary.shippedUntested++;
       }
       if (e.type === 'orderExpired') {
         summary.expired++;

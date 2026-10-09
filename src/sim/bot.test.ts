@@ -31,6 +31,14 @@ describe('bot run on the garage', () => {
     expect(run.result.stars).toBeGreaterThanOrEqual(1);
   });
 
+  it('bots that skip tests ship untested and get more bugs', () => {
+    const tested = runBots(GARAGE, 1, 2);
+    const skipping = runBots(GARAGE, 1, 2, { skipTests: true });
+    expect(tested.shippedUntested).toBe(0);
+    expect(skipping.shippedUntested).toBe(skipping.shipped);
+    expect(skipping.shippedBugs).toBeGreaterThan(tested.shippedBugs);
+  });
+
   it('is deterministic per seed', () => {
     expect(runBots(GARAGE, 3, 2)).toEqual(runBots(GARAGE, 3, 2));
   });
