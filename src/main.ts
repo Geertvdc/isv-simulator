@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GameScene } from './render/GameScene';
+import { GameScene, TILE_HOVER_EVENT } from './render/GameScene';
 import { mountHud } from './ui/hud';
 import './style.css';
 
@@ -9,7 +9,7 @@ function getElement(id: string): HTMLElement {
   return el;
 }
 
-new Phaser.Game({
+const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: getElement('game'),
   backgroundColor: '#14161c',
@@ -23,4 +23,5 @@ new Phaser.Game({
   scene: [GameScene],
 });
 
-mountHud(getElement('ui'));
+const hud = mountHud(getElement('ui'));
+game.events.on(TILE_HOVER_EVENT, hud.setHover);
