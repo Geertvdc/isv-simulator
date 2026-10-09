@@ -28,4 +28,4 @@ Any game logic or rendering beyond the text.
 
 - [x] `npm run dev` shows the text and the overlay
 - [x] `npm run check` passes
-- [ ] CI is green
+- [x] CI is green
