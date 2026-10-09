@@ -1,0 +1,42 @@
+{
+  "pick-up": {
+    "pack": "interface-sounds",
+    "file": "select_002.ogg"
+  },
+  "put-down": {
+    "pack": "interface-sounds",
+    "file": "drop_002.ogg"
+  },
+  "work": {
+    "pack": "interface-sounds",
+    "file": "tick_002.ogg"
+  },
+  "ship": {
+    "pack": "interface-sounds",
+    "file": "confirmation_002.ogg"
+  },
+  "order-expired": {
+    "pack": "interface-sounds",
+    "file": "error_004.ogg"
+  },
+  "throw": {
+    "pack": "interface-sounds",
+    "file": "scroll_002.ogg"
+  },
+  "pipeline-broke": {
+    "pack": "impact-sounds",
+    "file": "impactMetal_heavy_001.ogg"
+  },
+  "shove": {
+    "pack": "impact-sounds",
+    "file": "impactPunch_medium_000.ogg"
+  },
+  "dash": {
+    "pack": "digital-audio",
+    "file": "phaseJump1.ogg"
+  },
+  "level-end": {
+    "pack": "digital-audio",
+    "file": "zapThreeToneUp.ogg"
+  }
+}

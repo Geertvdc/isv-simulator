@@ -1,11 +1,7 @@
 import Phaser from 'phaser';
 import type { GameEvent } from '../sim/orders';
 import type { GameState } from '../sim/state';
-import { SOUND_KEYS, type SoundKey, handWork, soundUrl, soundsFor } from './sounds';
-
-const VOLUME = 0.5;
-/** Quieter for sounds that repeat a lot. */
-const VOLUME_BY_KEY: Partial<Record<SoundKey, number>> = { work: 0.25, 'put-down': 0.4 };
+import { SOUND_KEYS, type SoundKey, handWork, soundUrl, soundVolume, soundsFor } from './sounds';
 /** While anyone works, the work tick plays this often at most. */
 const WORK_SOUND_MS = 220;
 
@@ -35,6 +31,6 @@ export class SoundPlayer {
   private sound(key: SoundKey): void {
     // Missing files (e.g. a failed load) shouldn't stop the game.
     if (!this.scene.cache.audio.exists(key)) return;
-    this.scene.sound.play(key, { volume: VOLUME_BY_KEY[key] ?? VOLUME });
+    this.scene.sound.play(key, { volume: soundVolume(key) });
   }
 }

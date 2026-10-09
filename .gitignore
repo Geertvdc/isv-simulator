@@ -24,3 +24,6 @@ Thumbs.db
 # Claude Code local state
 .claude/worktrees/
 .claude/settings.local.json
+
+# sound packs downloaded by `npm run sfx -- fetch`
+sfx-candidates/

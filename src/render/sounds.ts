@@ -26,6 +26,29 @@ export function soundUrl(key: SoundKey): string {
   return `assets/sfx/${key}.ogg`;
 }
 
+const VOLUME = 0.5;
+/** Quieter for sounds that repeat a lot. */
+const VOLUME_BY_KEY: Partial<Record<SoundKey, number>> = { work: 0.25, 'put-down': 0.4 };
+
+/** How loud a sound plays in the game, 0 to 1. */
+export function soundVolume(key: SoundKey): number {
+  return VOLUME_BY_KEY[key] ?? VOLUME;
+}
+
+/** What each sound is for, in words. */
+export const SOUND_DESCRIPTIONS: Readonly<Record<SoundKey, string>> = {
+  'pick-up': 'Pick up a ticket (and catch one)',
+  'put-down': 'Put a ticket down, a throw landing, binning',
+  work: 'Ticks while someone holds work',
+  ship: 'Shipping an order',
+  'order-expired': 'An order ran out',
+  'pipeline-broke': 'The pipeline broke',
+  dash: 'Dash',
+  shove: 'Dashing into someone',
+  throw: 'Throwing a ticket',
+  'level-end': 'Level over',
+};
+
 /** The sound for one sim event, if it has one. */
 export function soundFor(event: GameEvent): SoundKey | null {
   switch (event.type) {
