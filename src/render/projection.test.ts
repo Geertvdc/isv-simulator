@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   VIEW_YAW,
   blockFaces,
+  screenDirToGrid,
   screenToGrid,
   screenToTile,
   tileCorners,
@@ -89,6 +90,37 @@ describe('projection', () => {
         expect(sides).toContain(VIEW_YAW > 0 ? 'right' : 'left');
         expect(sides).toHaveLength(2);
       }
+    });
+  });
+
+  describe('screenDirToGrid', () => {
+    const dirs = {
+      up: { x: 0, y: -1 },
+      down: { x: 0, y: 1 },
+      left: { x: -1, y: 0 },
+      right: { x: 1, y: 0 },
+      upRight: { x: Math.SQRT1_2, y: -Math.SQRT1_2 },
+    };
+
+    it.each(Object.entries(dirs))('walks %s on screen and has unit length', (_, dir) => {
+      const g = screenDirToGrid(dir);
+      expect(Math.hypot(g.x, g.y)).toBeCloseTo(1);
+      const s = tileToScreen(g.x, g.y);
+      const len = Math.hypot(s.x, s.y);
+      expect(s.x / len).toBeCloseTo(dir.x);
+      expect(s.y / len).toBeCloseTo(dir.y);
+    });
+
+    it('maps the arrow directions onto the grid axes when the view is not turned', () => {
+      if (VIEW_YAW !== 0) return;
+      expect(screenDirToGrid(dirs.up)).toEqual({ x: 0, y: -1 });
+      expect(screenDirToGrid(dirs.down)).toEqual({ x: 0, y: 1 });
+      expect(screenDirToGrid(dirs.left)).toEqual({ x: -1, y: 0 });
+      expect(screenDirToGrid(dirs.right)).toEqual({ x: 1, y: 0 });
+    });
+
+    it('keeps no input as no input', () => {
+      expect(screenDirToGrid({ x: 0, y: 0 })).toEqual({ x: 0, y: 0 });
     });
   });
 });
