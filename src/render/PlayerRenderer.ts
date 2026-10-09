@@ -10,14 +10,14 @@ const OUTLINE_COLOR = 0x1a1d24;
 const SHADOW_ALPHA = 0.35;
 
 const BODY_WIDTH = PLAYER_RADIUS * 2 * TILE_SIZE * 0.8;
-const BODY_HEIGHT = TILE_SIZE * 0.7;
+export const BODY_HEIGHT = TILE_SIZE * 0.7;
 const NOSE_RADIUS = TILE_SIZE * 0.08;
 /** How far the nose sticks out from the body's center, in tiles. */
 const NOSE_REACH = PLAYER_RADIUS * 0.85;
 /** Height of the nose above the floor. */
 const NOSE_HEIGHT = BODY_HEIGHT * 0.72;
 /** Draws a player over a block on the same row; blocks in front still cover it. */
-const PLAYER_DEPTH_OFFSET = 0.02;
+export const PLAYER_DEPTH_OFFSET = 0.02;
 
 /**
  * Syncs one Graphics per player, keyed by player id. Positions come from the
