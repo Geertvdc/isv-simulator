@@ -4,7 +4,7 @@
 
 import { INTERACT_REACH } from './balance';
 import type { GridPoint, LevelMap } from './level';
-import type { Level, LevelSettings } from './levels';
+import { type Level, type LevelSettings, settingsForPlayers } from './levels';
 import type { GameEvent, LevelResult, Order, PendingBug } from './orders';
 import { type RngState, createRng } from './rng';
 import type { Ticket } from './tickets';
@@ -70,7 +70,7 @@ const START_FACING: Vec = { x: 0, y: 1 };
 
 /** A new game with each player standing on their own spawn: player `n` on spawn `n`. */
 export function createGame(level: Level, seed: number, playerIds: readonly PlayerId[]): GameState {
-  const { map, durationTicks, orderSchedule, starThresholds } = level;
+  const { map } = level;
   if (playerIds.length === 0) throw new Error('A game needs at least one player');
   if (new Set(playerIds).size !== playerIds.length) throw new Error('Duplicate player ids');
   const players = playerIds.map((id): Player => {
@@ -90,13 +90,13 @@ export function createGame(level: Level, seed: number, playerIds: readonly Playe
     tick: 0,
     levelId: level.id,
     level: map,
-    settings: structuredClone({ durationTicks, orderSchedule, starThresholds }),
+    settings: settingsForPlayers(level, playerIds.length),
     players,
     tickets: [],
     nextTicketId: 1,
     orders: [],
     nextOrderId: 1,
-    nextOrderTick: orderSchedule.firstOrderTick,
+    nextOrderTick: level.orderSchedule.firstOrderTick,
     pendingBugs: [],
     score: 0,
     result: null,

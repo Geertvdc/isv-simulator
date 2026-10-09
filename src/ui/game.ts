@@ -123,8 +123,9 @@ export function mountGameHud(root: HTMLElement, levelName: string): GameHud {
       clock.textContent = formatClock(state.settings.durationTicks - state.tick);
       for (const event of frame.events) {
         if (event.type === 'orderShipped') {
-          const text = `+${event.points}`;
-          popup(event.untested ? `${text} ${UNTESTED_SHIP_TEXT}` : text, 'gain');
+          const parts = event.points > 0 ? [`+${event.points}`] : [];
+          if (event.untested) parts.push(UNTESTED_SHIP_TEXT);
+          if (parts.length > 0) popup(parts.join(' '), 'gain');
         }
         if (event.type === 'orderExpired' && event.penalty > 0) popup(`-${event.penalty}`, 'loss');
       }

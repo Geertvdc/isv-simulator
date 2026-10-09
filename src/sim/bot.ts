@@ -262,7 +262,7 @@ export function runBots(
     for (const e of state.events) {
       if (e.type === 'orderShipped') {
         summary.shipped++;
-        if (e.order.kind === 'bug') summary.shippedBugs++;
+        if (e.order?.kind === 'bug') summary.shippedBugs++;
         if (e.untested) summary.shippedUntested++;
       }
       if (e.type === 'orderExpired') {

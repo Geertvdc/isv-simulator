@@ -3,7 +3,7 @@
  */
 
 import garageMap from '../../maps/level-01-garage.txt?raw';
-import { TICKS_PER_SECOND } from './balance';
+import { ORDER_RATE_BY_PLAYERS, TICKS_PER_SECOND } from './balance';
 import { LEVEL_NAMES } from './content';
 import { type LevelMap, parseLevelMap } from './level';
 
@@ -42,14 +42,15 @@ const GARAGE_SETTINGS: LevelSettings = {
   durationTicks: 180 * SECOND,
   orderSchedule: {
     firstOrderTick: 0,
-    intervalTicks: 12 * SECOND,
-    jitterTicks: 3 * SECOND,
-    maxOpenOrders: 4,
-    timeLimitTicks: 60 * SECOND,
-    bugTimeLimitTicks: 36 * SECOND,
+    intervalTicks: 20 * SECOND,
+    jitterTicks: 4 * SECOND,
+    maxOpenOrders: 3,
+    timeLimitTicks: 75 * SECOND,
+    bugTimeLimitTicks: 45 * SECOND,
   },
-  // Tuned with `npm run sim`: one perfect bot averages ~170, two ~355.
-  starThresholds: [100, 210, 310],
+  // Solo numbers; `settingsForPlayers` scales them. Tuned with `npm run sim`:
+  // perfect bots average ~205 solo, ~355 with two, ~510 with three, ~635 with four.
+  starThresholds: [60, 120, 180],
 };
 
 export const GARAGE: Level = {
@@ -59,7 +60,36 @@ export const GARAGE: Level = {
   ...GARAGE_SETTINGS,
 };
 
-/** A level around any map, with the garage's settings unless overridden. Handy for tests. */
+/** Order rate multiplier for a number of players. */
+export function orderRate(playerCount: number): number {
+  const i = Math.min(Math.max(playerCount, 1), ORDER_RATE_BY_PLAYERS.length) - 1;
+  return ORDER_RATE_BY_PLAYERS[i] ?? 1;
+}
+
+/**
+ * The level's solo settings scaled for `playerCount` players: feature orders
+ * come faster, more may be open at once and stars need more points.
+ */
+export function settingsForPlayers(level: LevelSettings, playerCount: number): LevelSettings {
+  const rate = orderRate(playerCount);
+  const { orderSchedule: s } = level;
+  return {
+    durationTicks: level.durationTicks,
+    orderSchedule: {
+      ...s,
+      intervalTicks: Math.round(s.intervalTicks / rate),
+      jitterTicks: Math.round(s.jitterTicks / rate),
+      maxOpenOrders: Math.round(s.maxOpenOrders * rate),
+    },
+    starThresholds: level.starThresholds.map((t) => Math.round((t * rate) / 10) * 10) as [
+      number,
+      number,
+      number,
+    ],
+  };
+}
+
+/** A level around any map, with the garage's solo settings unless overridden. Handy for tests. */
 export function levelWithMap(map: LevelMap, settings: Partial<LevelSettings> = {}): Level {
   return { id: 'custom', name: 'Custom', map, ...GARAGE_SETTINGS, ...settings };
 }

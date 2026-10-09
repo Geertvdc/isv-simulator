@@ -72,13 +72,18 @@ export function isFinished(ticket: Ticket): boolean {
 }
 
 /**
- * Steps that can be worked on now: the unfinished steps up to and including
- * the first unfinished required one. Optional steps (tests) can be skipped,
- * but once a later required step is done, a skipped one stays skipped.
+ * Steps that can be worked on now: from the step last worked on, the
+ * unfinished steps up to and including the first unfinished required one.
+ * Optional steps (tests) can be skipped, but once work moves past a test it
+ * stays skipped: you test in its phase or not at all.
  */
 export function workableSteps(ticket: Ticket): TicketStep[] {
+  let lastWorked = 0;
+  ticket.steps.forEach((s, i) => {
+    if (s.progress > 0) lastWorked = i;
+  });
   const result: TicketStep[] = [];
-  for (const step of ticket.steps) {
+  for (const step of ticket.steps.slice(lastWorked)) {
     if (step.progress >= 1) continue;
     result.push(step);
     if (!OPTIONAL_STEPS.has(step.kind)) break;
@@ -96,7 +101,7 @@ export function isShippable(ticket: Ticket): boolean {
   return ticket.steps.every((s) => s.progress >= 1 || OPTIONAL_STEPS.has(s.kind));
 }
 
-/** Share of the ticket's optional steps (tests) left undone: 0 when fully tested. */
+/** Share of the ticket's optional steps (tests) left unfinished: 0 when fully tested. */
 export function skippedShare(ticket: Ticket): number {
   const optional = ticket.steps.filter((s) => OPTIONAL_STEPS.has(s.kind));
   if (optional.length === 0) return 0;

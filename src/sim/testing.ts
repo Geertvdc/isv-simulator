@@ -35,7 +35,9 @@ export const COL = {
 
 /** A game on the test map with no orders unless a test opens them. */
 export function newTestGame(settings: Partial<LevelSettings> = {}): GameState {
-  const state = createGame(levelWithMap(parseLevelMap(TEST_MAP), settings), 1, [1, 2]);
+  const state = createGame(levelWithMap(parseLevelMap(TEST_MAP)), 1, [1, 2]);
+  // Overrides replace the settings as scaled for the two test players.
+  state.settings = { ...state.settings, ...settings };
   state.nextOrderTick = Number.MAX_SAFE_INTEGER;
   return state;
 }

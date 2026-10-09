@@ -413,7 +413,7 @@ describe('skipping tests', () => {
     expect(bug.steps.map((s) => s.progress)).toEqual([0, 1, 0, 0]);
   });
 
-  it('a skipped test can still be done after the pipeline', () => {
+  it('a skipped test cannot be done after the pipeline', () => {
     const state = newGame();
     const t = addTicket(state, COL.testBench, { done: 1 });
     const test = t.steps[1];
@@ -422,7 +422,19 @@ describe('skipping tests', () => {
     pipeline.progress = 1;
     standAt(state, 1, COL.testBench);
     holdWork(state, 30);
-    expect(test.progress).toBeCloseTo(30 * WORK_RATE);
+    expect(test.progress).toBe(0);
+  });
+
+  it("a bug's skipped reproduction test cannot be done after coding", () => {
+    const state = newGame();
+    const bug = addTicket(state, COL.testBench, { kind: 'bug' });
+    const [repro, code, check] = bug.steps;
+    if (!repro || !code || !check) throw new Error('bug has 4 steps');
+    code.progress = 1;
+    standAt(state, 1, COL.testBench);
+    holdWork(state, 30);
+    expect(repro.progress).toBe(0);
+    expect(check.progress).toBeCloseTo(30 * WORK_RATE);
   });
 
   it('testing still works before the pipeline', () => {
