@@ -40,7 +40,7 @@ All rows must have equal length. Map: `maps/startup-pit.txt`, imported with Vite
 ## Done when
 
 - [x] Map is visible and centered
-- [ ] Pan and zoom feel smooth
+- [x] Pan and zoom feel smooth
 - [x] All 4 rotations render correctly and hover picks the right tile in each
 - [x] Hover picks the correct tile at every zoom level, including tile edges
 - [x] `npm run check` passes
