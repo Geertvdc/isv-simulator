@@ -1,4 +1,5 @@
 import { MAX_TICKS_PER_FRAME, TICKS_PER_SECOND } from '../sim/balance';
+import type { GameEvent } from '../sim/orders';
 import type { GameState, InputCommand, PlayerId, Vec } from '../sim/state';
 import { tick } from '../sim/tick';
 
@@ -16,6 +17,8 @@ export class GameLoop {
   /** Real time not yet simulated, in ticks. */
   private accumulator = 0;
   private previous = new Map<PlayerId, Vec>();
+  /** Sim events from every tick run by the last `advance`, in order. */
+  events: GameEvent[] = [];
 
   constructor(readonly state: GameState) {
     this.snapshot();
@@ -28,9 +31,11 @@ export class GameLoop {
   advance(deltaMs: number, inputsFor: (tick: number) => InputCommand[]): number {
     this.accumulator += Math.max(0, deltaMs) / TICK_MS;
     let ran = 0;
+    this.events = [];
     while (this.accumulator >= 1 - EPSILON && ran < MAX_TICKS_PER_FRAME) {
       this.snapshot();
       tick(this.state, inputsFor(this.state.tick));
+      this.events.push(...this.state.events);
       this.accumulator = Math.max(0, this.accumulator - 1);
       ran++;
     }

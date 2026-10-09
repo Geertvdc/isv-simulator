@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
-import { GameScene, LOBBY_EVENT, TILE_HOVER_EVENT } from './render/GameScene';
+import { GAME_FRAME_EVENT, GameScene, LOBBY_EVENT, TILE_HOVER_EVENT } from './render/GameScene';
+import { GARAGE } from './sim/levels';
+import { mountGameHud } from './ui/game';
 import { mountHud } from './ui/hud';
 import { mountLobby } from './ui/lobby';
 import './style.css';
@@ -28,3 +30,5 @@ const hud = mountHud(getElement('ui'));
 game.events.on(TILE_HOVER_EVENT, hud.setHover);
 const lobby = mountLobby(getElement('ui'));
 game.events.on(LOBBY_EVENT, lobby.render);
+const gameHud = mountGameHud(getElement('ui'), GARAGE.name);
+game.events.on(GAME_FRAME_EVENT, gameHud.render);

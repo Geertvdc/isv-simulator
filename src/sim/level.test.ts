@@ -11,7 +11,7 @@ function level(...rows: string[]): string {
 
 describe('parseLevelMap', () => {
   it('parses every tile char into a row-major grid', () => {
-    const map = parseLevelMap('#.CIKTRPSX\n1234......');
+    const map = parseLevelMap('#.CIKTRPSXB\n1234.......');
     const expected: Tile[] = [
       'wall',
       'floor',
@@ -23,10 +23,11 @@ describe('parseLevelMap', () => {
       'pipeline',
       'ship',
       'bin',
+      'bugQueue',
     ];
-    expect(map.width).toBe(10);
+    expect(map.width).toBe(11);
     expect(map.height).toBe(2);
-    expect(map.tiles.slice(0, 10)).toEqual(expected);
+    expect(map.tiles.slice(0, 11)).toEqual(expected);
   });
 
   it('turns spawn digits into floor and records them per player', () => {
@@ -85,6 +86,7 @@ describe('parseLevelMap', () => {
     ]);
     expect(getTile(map, 0, 0)).toBe('wall');
     expect(getTile(map, 6, 0)).toBe('inbox');
+    expect(getTile(map, 11, 0)).toBe('bugQueue');
     expect(getTile(map, 1, 1)).toBe('bin');
     expect(getTile(map, 1, 2)).toBe('keyboard');
     expect(getTile(map, 12, 2)).toBe('testBench');

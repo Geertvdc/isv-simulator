@@ -1,10 +1,12 @@
 import Phaser from 'phaser';
-import garage from '../../maps/level-01-garage.txt?raw';
 import { buildInputCommands } from '../input/commands';
 import { InputDevices } from '../input/devices';
 import { type Lobby, claimOrphanedPlayer, createLobby, updateLobby } from '../input/lobby';
-import { type LevelMap, type Tile, getTile, isWorkSurface, parseLevelMap } from '../sim/level';
-import { type PlayerId, createGame, targetTile } from '../sim/state';
+import { END_SCREEN_INPUT_DELAY_MS } from '../sim/balance';
+import { type LevelMap, type Tile, getTile, isWorkSurface } from '../sim/level';
+import { GARAGE } from '../sim/levels';
+import type { GameEvent } from '../sim/orders';
+import { type GameState, type PlayerId, createGame, targetTile } from '../sim/state';
 import { CameraController } from './CameraController';
 import type { WorldRect } from './cameraFit';
 import { GameLoop } from './GameLoop';
@@ -32,11 +34,23 @@ export const TILE_HOVER_EVENT = 'tile-hover';
  */
 export const LOBBY_EVENT = 'lobby';
 
+export interface GameFrame {
+  state: GameState;
+  /** Sim events from the ticks run this frame. */
+  events: GameEvent[];
+  /** Whether the end screen takes a restart press yet. */
+  canRestart: boolean;
+}
+
+/** Emitted on `game.events` with a `GameFrame` every frame while a game runs. */
+export const GAME_FRAME_EVENT = 'game-frame';
+
 const HOVER_COLOR = 0xffffff;
 /** Over the target block's top, under its label. */
 const TARGET_DEPTH_OFFSET = 0.005;
-/** Fixed until levels pick their own. */
-const GAME_SEED = 1;
+/** The first round's seed; every restart moves on to the next one. */
+const FIRST_SEED = 1;
+const LEVEL = GARAGE;
 
 interface TargetHighlight {
   g: Phaser.GameObjects.Graphics;
@@ -57,13 +71,16 @@ export class GameScene extends Phaser.Scene {
   private readonly targets = new Map<PlayerId, TargetHighlight>();
   private hovered: TileHover | null = null;
   private debugVisible = false;
+  private seed = FIRST_SEED;
+  /** Scene time the current level ended, or `null` while it runs. */
+  private endedAt: number | null = null;
 
   constructor() {
     super('GameScene');
   }
 
   create(): void {
-    this.map = parseLevelMap(garage);
+    this.map = LEVEL.map;
     this.mapRenderer = new MapRenderer(this, this.map);
     this.hoverOutline = this.add.graphics().setDepth(OVERLAY_DEPTH).setVisible(false);
     this.devices = new InputDevices(window);
@@ -88,7 +105,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  update(_time: number, delta: number): void {
+  update(time: number, delta: number): void {
     const frame = this.devices.poll();
     if (!this.loop) {
       if (updateLobby(this.lobby, frame.presses)) {
@@ -98,18 +115,39 @@ export class GameScene extends Phaser.Scene {
         this.updateHover();
         return;
       }
-      const ids = this.lobby.players.map((p) => p.playerId);
-      this.loop = new GameLoop(createGame(this.map, GAME_SEED, ids));
+      this.startRound();
     } else {
       claimOrphanedPlayer(this.lobby.players, frame.presses, new Set(frame.readings.keys()));
     }
 
-    const loop = this.loop;
+    let loop = this.loop;
+    if (!loop) return;
     loop.advance(delta, (tick) => buildInputCommands(this.lobby.players, frame.readings, tick));
+    if (loop.state.result && this.endedAt === null) this.endedAt = time;
+    const canRestart = this.endedAt !== null && time - this.endedAt >= END_SCREEN_INPUT_DELAY_MS;
+    const joined = new Set(this.lobby.players.map((p) => p.deviceId));
+    if (canRestart && frame.presses.some((p) => (p.join || p.interact) && joined.has(p.deviceId))) {
+      this.seed++;
+      loop = this.startRound();
+    }
+
+    this.game.events.emit(GAME_FRAME_EVENT, {
+      state: loop.state,
+      events: loop.events,
+      canRestart,
+    } satisfies GameFrame);
     this.playerRenderer.sync(loop);
     this.ticketRenderer.sync(loop);
     for (const player of loop.state.players) this.updateTarget(loop, player.id);
     this.updateHover();
+  }
+
+  /** A fresh round of the level with everyone in the lobby. */
+  private startRound(): GameLoop {
+    const ids = this.lobby.players.map((p) => p.playerId);
+    this.loop = new GameLoop(createGame(LEVEL, this.seed, ids));
+    this.endedAt = null;
+    return this.loop;
   }
 
   /** Outlines the counter or station a player faces, in their color; nothing for floor and walls. */

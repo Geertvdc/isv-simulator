@@ -2,8 +2,10 @@
  * The game state: plain JSON-serializable data, advanced only by `tick`.
  */
 
-import { INBOX_FIRST_SPAWN_TICK, INTERACT_REACH } from './balance';
+import { INTERACT_REACH } from './balance';
 import type { GridPoint, LevelMap } from './level';
+import type { Level, LevelSettings } from './levels';
+import type { GameEvent, LevelResult, Order, PendingBug } from './orders';
 import { type RngState, createRng } from './rng';
 import type { Ticket } from './tickets';
 
@@ -44,27 +46,35 @@ export interface GameState {
   seed: number;
   rngState: RngState;
   tick: number;
+  levelId: string;
   level: LevelMap;
+  settings: LevelSettings;
   players: Player[];
   tickets: Ticket[];
   nextTicketId: number;
-  /** Tick at which the inbox next tries to spawn a ticket. */
-  nextInboxSpawnTick: number;
+  orders: Order[];
+  nextOrderId: number;
+  /** Tick from which the next feature order is due. */
+  nextOrderTick: number;
+  /** Bugs on their way back from shipped tickets. */
+  pendingBugs: PendingBug[];
+  score: number;
+  /** Set when the level ends; the sim stops advancing. */
+  result: LevelResult | null;
+  /** What happened during the last tick, for render and UI to react to. */
+  events: GameEvent[];
 }
 
 /** Players start facing the camera. */
 const START_FACING: Vec = { x: 0, y: 1 };
 
 /** A new game with each player standing on their own spawn: player `n` on spawn `n`. */
-export function createGame(
-  level: LevelMap,
-  seed: number,
-  playerIds: readonly PlayerId[],
-): GameState {
+export function createGame(level: Level, seed: number, playerIds: readonly PlayerId[]): GameState {
+  const { map, durationTicks, orderSchedule, starThresholds } = level;
   if (playerIds.length === 0) throw new Error('A game needs at least one player');
   if (new Set(playerIds).size !== playerIds.length) throw new Error('Duplicate player ids');
   const players = playerIds.map((id): Player => {
-    const spawn = Number.isInteger(id) ? level.spawns[id - 1] : undefined;
+    const spawn = Number.isInteger(id) ? map.spawns[id - 1] : undefined;
     if (!spawn) throw new Error(`Level has no spawn for player ${id}`);
     return {
       id,
@@ -78,11 +88,19 @@ export function createGame(
     seed,
     rngState: createRng(seed),
     tick: 0,
-    level,
+    levelId: level.id,
+    level: map,
+    settings: structuredClone({ durationTicks, orderSchedule, starThresholds }),
     players,
     tickets: [],
     nextTicketId: 1,
-    nextInboxSpawnTick: INBOX_FIRST_SPAWN_TICK,
+    orders: [],
+    nextOrderId: 1,
+    nextOrderTick: orderSchedule.firstOrderTick,
+    pendingBugs: [],
+    score: 0,
+    result: null,
+    events: [],
   };
 }
 

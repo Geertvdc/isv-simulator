@@ -19,3 +19,13 @@ export const TICKET_TITLES: readonly string[] = [
   'Undo the last fix',
   'Migrate to the cloud',
 ];
+
+/** Level names, by level id. */
+export const LEVEL_NAMES: Readonly<Record<string, string>> = {
+  garage: 'The Garage',
+};
+
+/** Title of the bug that comes back after shipping a ticket called `title`. */
+export function bugTitle(title: string): string {
+  return `Bug: ${title.replace(/^Bug: /, '')}`;
+}

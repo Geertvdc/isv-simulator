@@ -33,7 +33,7 @@ body {
 .hud-hover {
   position: absolute;
   left: 12px;
-  bottom: 10px;
+  bottom: 56px;
   padding: 4px 8px;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.55);
@@ -102,5 +102,189 @@ body {
 
 .lobby-hint {
   min-height: 1.4em;
+  font-size: 20px;
+}
+
+/* In-game HUD: order bar on top, score and clock in the bottom corners. */
+.orders {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  right: 60px;
+  display: flex;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.orders[hidden],
+.hud-score[hidden],
+.hud-clock[hidden],
+.end-screen[hidden] {
+  display: none;
+}
+
+.order {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 110px;
+  padding: 8px 10px;
+  border: 3px solid #f4f1e8;
+  border-radius: 10px;
+  background: rgba(20, 22, 28, 0.85);
+  animation: order-in 0.25s ease-out;
+}
+
+.order-bug {
+  border-color: #e05a5a;
+  background: rgba(70, 20, 20, 0.88);
+}
+
+.order-kind {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.order-bug .order-kind {
+  color: #ff8a80;
+}
+
+.order-steps {
+  display: flex;
+  gap: 5px;
+}
+
+.order-step {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--step-color);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  text-shadow: 0 0 3px #000;
+}
+
+.order-timer {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+
+.order-timer-fill {
+  height: 100%;
+  background: #7cf07c;
+}
+
+.order.urgent .order-timer-fill {
+  background: #ff5a4f;
+}
+
+.order.urgent {
+  animation: order-flash 0.5s steps(2, jump-none) infinite;
+}
+
+@keyframes order-in {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+}
+
+@keyframes order-flash {
+  to {
+    border-color: #ff5a4f;
+    background: rgba(140, 30, 25, 0.9);
+  }
+}
+
+.hud-score,
+.hud-clock {
+  position: absolute;
+  bottom: 8px;
+  padding: 4px 14px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.55);
+  font-size: 26px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-score {
+  left: 12px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.hud-score-label {
+  font-size: 14px;
+  opacity: 0.7;
+  text-transform: uppercase;
+}
+
+.hud-clock {
+  right: 12px;
+}
+
+.score-popup {
+  position: absolute;
+  left: 100%;
+  bottom: 6px;
+  margin-left: 10px;
+  font-size: 24px;
+  white-space: nowrap;
+  animation: popup 1.2s ease-out forwards;
+}
+
+.score-popup.gain {
+  color: #7cf07c;
+}
+
+.score-popup.loss {
+  color: #ff5a4f;
+}
+
+@keyframes popup {
+  to {
+    transform: translateY(-50px);
+    opacity: 0;
+  }
+}
+
+.end-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: rgba(10, 12, 16, 0.8);
+}
+
+.end-title {
+  margin: 0;
+  font-size: 40px;
+}
+
+.end-stars {
+  font-size: 80px;
+  letter-spacing: 0.1em;
+  color: #ffd166;
+}
+
+.end-score {
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.end-hint {
   font-size: 20px;
 }

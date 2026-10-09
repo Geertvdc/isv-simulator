@@ -1,14 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import garage from '../../maps/level-01-garage.txt?raw';
 import { MAX_TICKS_PER_FRAME, TICKS_PER_SECOND } from '../sim/balance';
-import { parseLevelMap } from '../sim/level';
+import { GARAGE } from '../sim/levels';
 import { type InputCommand, createGame } from '../sim/state';
 import { GameLoop } from './GameLoop';
 
 const TICK_MS = 1000 / TICKS_PER_SECOND;
 
 function newLoop(): GameLoop {
-  return new GameLoop(createGame(parseLevelMap(garage), 1, [1]));
+  return new GameLoop(createGame(GARAGE, 1, [1]));
 }
 
 const right = (tick: number): InputCommand[] => [
@@ -53,5 +52,14 @@ describe('GameLoop', () => {
     const pos = loop.renderPos(1);
     expect(pos?.x).toBeCloseTo(before.x + (after.x - before.x) * 0.5);
     expect(loop.renderPos(99)).toBeUndefined();
+  });
+
+  it('collects the events of every tick run in one advance', () => {
+    const loop = newLoop();
+    // The garage's first order opens on tick 0.
+    loop.advance(TICK_MS * 3, right);
+    expect(loop.events.map((e) => e.type)).toEqual(['orderCreated']);
+    loop.advance(TICK_MS, right);
+    expect(loop.events).toEqual([]);
   });
 });

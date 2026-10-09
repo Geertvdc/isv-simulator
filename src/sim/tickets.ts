@@ -1,18 +1,28 @@
 /**
- * Tickets: the items players carry around and work on, and the inbox that
- * spawns them.
+ * Tickets: the items players carry around and work on, and the queues
+ * (inbox and bug queue) they wait in.
  */
 
-import { INBOX_MAX_TICKETS, INBOX_SPAWN_JITTER_TICKS, INBOX_SPAWN_TICKS } from './balance';
-import { TICKET_TITLES } from './content';
-import { type GridPoint, getTile } from './level';
-import * as rng from './rng';
+import type { Tile } from './level';
 import type { GameState, PlayerId } from './state';
 
 export type StepKind = 'code' | 'test' | 'pipeline';
 
-/** Every ticket needs these steps, in this order. */
-export const STEP_ORDER: readonly StepKind[] = ['code', 'test', 'pipeline'];
+/** Features are new work; bugs come back after shipping. */
+export type TicketKind = 'feature' | 'bug';
+
+/** The steps each kind of ticket needs, in the order they must be done. */
+export const TICKET_STEPS: Readonly<Record<TicketKind, readonly StepKind[]>> = {
+  feature: ['code', 'test', 'pipeline'],
+  // Reproduce the bug first, then the usual cycle.
+  bug: ['test', 'code', 'test', 'pipeline'],
+};
+
+/** The queue tile each kind of ticket waits on. */
+export const QUEUE_TILE: Readonly<Record<TicketKind, Tile>> = {
+  feature: 'inbox',
+  bug: 'bugQueue',
+};
 
 export interface TicketStep {
   kind: StepKind;
@@ -21,15 +31,21 @@ export interface TicketStep {
 }
 
 export type TicketLocation =
-  { kind: 'player'; playerId: PlayerId } | { kind: 'tile'; x: number; y: number };
+  | { kind: 'player'; playerId: PlayerId }
+  | { kind: 'tile'; x: number; y: number }
+  /** Waiting in the queue for its kind; oldest (lowest id) first. */
+  | { kind: 'queue'; queue: TicketKind };
 
 export interface Ticket {
   id: number;
+  kind: TicketKind;
   /** Flavour only. */
   title: string;
   steps: TicketStep[];
   location: TicketLocation;
 }
+
+const PROGRESS_EPSILON = 1e-9;
 
 export function ticketOnTile(state: GameState, x: number, y: number): Ticket | undefined {
   return state.tickets.find(
@@ -43,51 +59,44 @@ export function ticketCarriedBy(state: GameState, playerId: PlayerId): Ticket | 
   );
 }
 
-export function getStep(ticket: Ticket, kind: StepKind): TicketStep | undefined {
-  return ticket.steps.find((s) => s.kind === kind);
+/** The step to do next: the first unfinished one, or `undefined` when the ticket is done. */
+export function currentStep(ticket: Ticket): TicketStep | undefined {
+  return ticket.steps.find((s) => s.progress < 1);
 }
 
-export function isStepDone(ticket: Ticket, kind: StepKind): boolean {
-  return (getStep(ticket, kind)?.progress ?? 0) >= 1;
+export function isFinished(ticket: Ticket): boolean {
+  return currentStep(ticket) === undefined;
 }
 
-/** All inbox tiles, row by row. */
-export function inboxTiles(state: GameState): GridPoint[] {
-  const { level } = state;
-  const result: GridPoint[] = [];
-  for (let y = 0; y < level.height; y++) {
-    for (let x = 0; x < level.width; x++) {
-      if (getTile(level, x, y) === 'inbox') result.push({ x, y });
-    }
-  }
-  return result;
+/** Adds `amount` progress to a step, snapping float error so N equal parts always finish it. */
+export function advanceStep(step: TicketStep, amount: number): void {
+  const progress = step.progress + amount;
+  step.progress = progress >= 1 - PROGRESS_EPSILON ? 1 : progress;
 }
 
-/**
- * Once the spawn timer is due, puts a new ticket on a random free inbox tile
- * and restarts the timer with seeded jitter. When the inbox already holds
- * `INBOX_MAX_TICKETS` or has no free tile, this spawn is skipped and the
- * timer restarts all the same.
- */
-export function updateInbox(state: GameState): void {
-  if (state.tick < state.nextInboxSpawnTick) return;
+/** Which queue a tile takes tickets from, if it's a queue tile. */
+export function queueAt(tile: Tile | null): TicketKind | undefined {
+  if (tile === QUEUE_TILE.feature) return 'feature';
+  if (tile === QUEUE_TILE.bug) return 'bug';
+  return undefined;
+}
 
-  const tiles = inboxTiles(state);
-  const free = tiles.filter((t) => !ticketOnTile(state, t.x, t.y));
-  const waiting = tiles.length - free.length;
-  if (free.length > 0 && waiting < INBOX_MAX_TICKETS) {
-    const [tile, s1] = rng.pick(state.rngState, free);
-    const [title, s2] = rng.pick(s1, TICKET_TITLES);
-    state.rngState = s2;
-    state.tickets.push({
-      id: state.nextTicketId++,
-      title,
-      steps: STEP_ORDER.map((kind) => ({ kind, progress: 0 })),
-      location: { kind: 'tile', x: tile.x, y: tile.y },
-    });
-  }
+/** Tickets waiting in a queue, oldest first. */
+export function queuedTickets(state: GameState, queue: TicketKind): Ticket[] {
+  return state.tickets
+    .filter((t) => t.location.kind === 'queue' && t.location.queue === queue)
+    .sort((a, b) => a.id - b.id);
+}
 
-  const [jitter, s3] = rng.int(state.rngState, -INBOX_SPAWN_JITTER_TICKS, INBOX_SPAWN_JITTER_TICKS);
-  state.rngState = s3;
-  state.nextInboxSpawnTick = state.tick + INBOX_SPAWN_TICKS + jitter;
+/** Puts a new ticket at the back of the queue for its kind. */
+export function enqueueTicket(state: GameState, kind: TicketKind, title: string): Ticket {
+  const ticket: Ticket = {
+    id: state.nextTicketId++,
+    kind,
+    title,
+    steps: TICKET_STEPS[kind].map((k) => ({ kind: k, progress: 0 })),
+    location: { kind: 'queue', queue: kind },
+  };
+  state.tickets.push(ticket);
+  return ticket;
 }

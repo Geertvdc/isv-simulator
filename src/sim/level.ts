@@ -11,6 +11,7 @@ export type Tile =
   | 'floor'
   | 'counter'
   | 'inbox'
+  | 'bugQueue'
   | 'keyboard'
   | 'testBench'
   | 'review'
@@ -39,6 +40,7 @@ const CHAR_TO_TILE: Readonly<Record<string, Tile>> = {
   '.': 'floor',
   C: 'counter',
   I: 'inbox',
+  B: 'bugQueue',
   K: 'keyboard',
   T: 'testBench',
   R: 'review',
