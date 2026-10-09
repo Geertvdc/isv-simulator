@@ -18,7 +18,7 @@
 
 ### Content
 
-- Two more levels with different layouts, e.g. one split by a counter wall so throwing matters, one where the review station is far from everything
+- Two more levels (about 14×10 so they fill a 16:9 screen) with different layouts, e.g. one split by a counter wall so throwing matters, one where the review station is far from everything
 - Level select screen after the lobby, showing the best stars per level (stored in `localStorage`)
 
 ## Tests

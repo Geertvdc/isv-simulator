@@ -74,24 +74,24 @@ describe('parseLevelMap', () => {
 
   it('parses the garage', () => {
     const map = parseLevelMap(garage);
-    expect(map.width).toBe(12);
-    expect(map.height).toBe(8);
-    expect(map.tiles).toHaveLength(12 * 8);
+    expect(map.width).toBe(14);
+    expect(map.height).toBe(10);
+    expect(map.tiles).toHaveLength(14 * 10);
     expect(map.spawns).toEqual([
-      { x: 1, y: 4 },
-      { x: 10, y: 4 },
-      { x: 4, y: 1 },
-      { x: 7, y: 1 },
+      { x: 1, y: 5 },
+      { x: 12, y: 5 },
+      { x: 5, y: 1 },
+      { x: 8, y: 1 },
     ]);
     expect(getTile(map, 0, 0)).toBe('wall');
-    expect(getTile(map, 5, 0)).toBe('inbox');
+    expect(getTile(map, 6, 0)).toBe('inbox');
     expect(getTile(map, 1, 1)).toBe('bin');
     expect(getTile(map, 1, 2)).toBe('keyboard');
-    expect(getTile(map, 10, 2)).toBe('testBench');
-    expect(getTile(map, 4, 3)).toBe('counter');
-    expect(getTile(map, 10, 5)).toBe('pipeline');
-    expect(getTile(map, 1, 6)).toBe('review');
-    expect(getTile(map, 6, 7)).toBe('ship');
+    expect(getTile(map, 12, 2)).toBe('testBench');
+    expect(getTile(map, 5, 3)).toBe('counter');
+    expect(getTile(map, 12, 6)).toBe('pipeline');
+    expect(getTile(map, 1, 8)).toBe('review');
+    expect(getTile(map, 6, 9)).toBe('ship');
   });
 });
 
