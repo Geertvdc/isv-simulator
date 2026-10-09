@@ -3,10 +3,10 @@
  *
  * The camera looks at the level from the front and above, Overcooked style:
  * grid +x runs to the right and +y toward the viewer (down on screen). The
- * floor is squashed vertically by VIEW_PITCH and turned by a small VIEW_YAW so
- * the front edge is almost horizontal while one side face of each block still
- * shows. World space is Phaser's world (camera-independent) pixel space; tile
- * (x, y) is centered at `tileToScreen(x, y)`.
+ * floor is squashed vertically by VIEW_PITCH. VIEW_YAW can turn the level a
+ * little so one side face of each block shows; at 0 the front edge is exactly
+ * horizontal and only top and front faces show. World space is Phaser's world
+ * (camera-independent) pixel space; tile (x, y) is centered at `tileToScreen(x, y)`.
  *
  * The sim never sees any of this: it works in plain grid coordinates.
  */
@@ -14,9 +14,9 @@
 /** Screen width of one tile at zero yaw. */
 export const TILE_SIZE = 64;
 /** Vertical squash of the floor: 1 is straight top-down, lower is a flatter view. */
-export const VIEW_PITCH = 0.7;
+export const VIEW_PITCH = 0.6;
 /** Clockwise turn of the level on screen, in radians. 0 makes the front edge exactly horizontal. */
-export const VIEW_YAW = (8 * Math.PI) / 180;
+export const VIEW_YAW: number = 0;
 
 const COS = Math.cos(VIEW_YAW);
 const SIN = Math.sin(VIEW_YAW);

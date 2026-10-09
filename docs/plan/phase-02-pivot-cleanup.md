@@ -9,7 +9,7 @@
 - Remove camera rotation completely: code, key bindings, state, tests
 - Auto-fit camera: frames the whole level with `CAMERA_FIT_PADDING` and refits on window resize (`src/render/cameraFit.ts`, pure and tested)
 - Pan (mouse drag), zoom (wheel) and tile hover only in debug mode (F3 or backtick); leaving debug mode refits. No keyboard panning: the keyboard belongs to the players
-- Front-facing 3/4 view, Overcooked style: grid rows run almost horizontally across the screen (`VIEW_YAW` of a few degrees), the floor is squashed by `VIEW_PITCH`, blocks show their top, front and one side face
+- Front-facing 3/4 view, Overcooked style: grid rows run horizontally across the screen (`VIEW_YAW = 0`), the floor is squashed by `VIEW_PITCH`, blocks show their top and front face. A small `VIEW_YAW` can turn the level so one side face shows too
 - All projection math in `src/render/projection.ts`; the sim only sees grid coordinates
 - Walls on the camera side of the room are drawn low so they never hide stations
 
@@ -44,7 +44,7 @@
 
 - Parser: every char, spawns, CRLF, uneven rows, unknown char, duplicate and missing spawn, the garage level
 - `getTile` out of bounds, `isSolid`
-- Projection: round trip, tile picking near corners and edges, depth follows screen position, the front edge is almost horizontal, visible block faces
+- Projection: round trip, tile picking near corners and edges, depth follows screen position, the front edge is (almost) horizontal, visible block faces
 - Camera fit: centering, width- and height-limited fits, padding
 
 ## Done when

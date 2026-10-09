@@ -79,12 +79,16 @@ describe('projection', () => {
       expect(faces.top).toEqual(base.map((p) => ({ x: p.x, y: p.y - 20 })));
     });
 
-    it('shows the front face and one side, never the back', () => {
+    it('shows the front face, a side only when the view is turned, never the back', () => {
       const sides = faces.sides.map((f) => f.side);
       expect(sides).toContain('front');
       expect(sides).not.toContain('back');
-      expect(sides).toContain(VIEW_YAW > 0 ? 'right' : 'left');
-      expect(sides).toHaveLength(2);
+      if (VIEW_YAW === 0) {
+        expect(sides).toEqual(['front']);
+      } else {
+        expect(sides).toContain(VIEW_YAW > 0 ? 'right' : 'left');
+        expect(sides).toHaveLength(2);
+      }
     });
   });
 });
