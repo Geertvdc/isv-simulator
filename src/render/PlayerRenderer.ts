@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { PLAYER_RADIUS } from '../sim/balance';
+import { isDashing } from '../sim/movement';
 import type { PlayerId, Vec } from '../sim/state';
 import type { GameLoop } from './GameLoop';
 import { playerColor } from './playerColors';
@@ -16,6 +17,8 @@ const NOSE_RADIUS = TILE_SIZE * 0.08;
 const NOSE_REACH = PLAYER_RADIUS * 0.85;
 /** Height of the nose above the floor. */
 const NOSE_HEIGHT = BODY_HEIGHT * 0.72;
+/** Body scale while dashing. */
+const DASH_SQUASH = { x: 1.2, y: 0.85 };
 /** Draws a player over a block on the same row; blocks in front still cover it. */
 export const PLAYER_DEPTH_OFFSET = 0.02;
 
@@ -41,6 +44,9 @@ export class PlayerRenderer {
       }
       const screen = tileToScreen(pos.x, pos.y);
       g.setPosition(screen.x, screen.y).setDepth(tileDepth(pos.x, pos.y) + PLAYER_DEPTH_OFFSET);
+      // Squashed flat and wide while dashing.
+      if (isDashing(player)) g.setScale(DASH_SQUASH.x, DASH_SQUASH.y);
+      else g.setScale(1);
       drawPlayer(g, playerColor(player.id), player.facing);
     }
 

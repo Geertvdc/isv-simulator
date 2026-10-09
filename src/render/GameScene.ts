@@ -10,6 +10,7 @@ import type { GameEvent } from '../sim/orders';
 import { type GameState, type PlayerId, createGame, targetTile } from '../sim/state';
 import { CameraController } from './CameraController';
 import type { WorldRect } from './cameraFit';
+import { EffectsRenderer } from './EffectsRenderer';
 import { GameLoop } from './GameLoop';
 import {
   MAP_OVERHANG,
@@ -112,6 +113,7 @@ export class GameScene extends Phaser.Scene {
   private playerRenderer!: PlayerRenderer;
   private ticketRenderer!: TicketRenderer;
   private pipelineRenderer!: PipelineRenderer;
+  private effects!: EffectsRenderer;
   private readonly targets = new Map<PlayerId, TargetHighlight>();
   private hovered: TileHover | null = null;
   private debugVisible = false;
@@ -156,6 +158,7 @@ export class GameScene extends Phaser.Scene {
     this.playerRenderer = new PlayerRenderer(this);
     this.ticketRenderer = new TicketRenderer(this, this.mapRenderer);
     this.pipelineRenderer = new PipelineRenderer(this, this.mapRenderer);
+    this.effects = new EffectsRenderer(this);
     this.cameraController = new CameraController(this, this.mapBounds());
 
     const K = Phaser.Input.Keyboard.KeyCodes;
@@ -212,6 +215,7 @@ export class GameScene extends Phaser.Scene {
     this.playerRenderer.sync(loop);
     this.ticketRenderer.sync(loop);
     this.pipelineRenderer.sync(loop.state, time);
+    this.effects.play(loop.state, loop.events);
     for (const player of loop.state.players) this.updateTarget(loop, player.id);
     this.updateHover();
   }

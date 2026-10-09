@@ -26,6 +26,12 @@ export const UNTESTED_SHIP_TEXT = 'YOLO!';
 /** Shown when a finished build was left too long and the pipeline broke. */
 export const PIPELINE_BROKE_TEXT = 'Build server down!';
 
+/** Pops up over the pipeline once it's repaired. */
+export const PIPELINE_FIXED_TEXT = 'Fixed!';
+
+/** Pops up over a player who got shoved by a dash; one is picked per shove. */
+export const SHOVE_TEXTS: readonly string[] = ['Oof!', 'Hey!', 'Rude!', 'Watch it!', 'Not cool'];
+
 /** Level names, by level id. */
 export const LEVEL_NAMES: Readonly<Record<string, string>> = {
   garage: 'The Garage',
