@@ -1,4 +1,4 @@
-# Phase 0: Scaffold
+# Phase 0: Scaffold (done)
 
 **Goal:** empty repo to a running Vite + Phaser + TypeScript app with tests and CI.
 
