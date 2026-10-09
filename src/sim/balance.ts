@@ -44,3 +44,14 @@ export const MAX_TICKS_PER_FRAME = 5;
 
 /** Stick deflection below this counts as centered; above it the stick is rescaled to 0 to 1. */
 export const GAMEPAD_DEAD_ZONE = 0.2;
+
+/** Average ticks between two inbox tickets. */
+export const INBOX_SPAWN_TICKS = 10 * TICKS_PER_SECOND;
+/** Each inbox interval is randomly this many ticks shorter or longer. */
+export const INBOX_SPAWN_JITTER_TICKS = 3 * TICKS_PER_SECOND;
+/** The inbox stops spawning while this many tickets sit on inbox tiles. */
+export const INBOX_MAX_TICKETS = 2;
+/** Tick of the first inbox ticket: right away, so there's something to do. */
+export const INBOX_FIRST_SPAWN_TICK = 0;
+/** Step progress gained per tick of holding work at a station: a step takes ~2.5 s. */
+export const WORK_RATE = 1 / (2.5 * TICKS_PER_SECOND);
