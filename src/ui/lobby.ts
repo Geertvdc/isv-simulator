@@ -12,7 +12,7 @@ export interface LobbyView {
 
 export function deviceLabel(deviceId: DeviceId): string {
   if (deviceId === LEFT_KEYS.deviceId) return 'Keyboard: WASD, E, Q';
-  if (deviceId === RIGHT_KEYS.deviceId) return 'Keyboard: arrows, right Shift, right Ctrl';
+  if (deviceId === RIGHT_KEYS.deviceId) return 'Keyboard: arrows, right Shift, /';
   if (isGamepadDevice(deviceId)) return `Gamepad ${Number(deviceId.slice(4)) + 1}`;
   return deviceId;
 }

@@ -30,7 +30,8 @@ export const RIGHT_KEYS: KeyScheme = {
   left: ['ArrowLeft'],
   right: ['ArrowRight'],
   interact: ['ShiftRight'],
-  work: ['ControlRight'],
+  // Not Ctrl: right Ctrl plus the left player's W would close the tab.
+  work: ['Slash'],
 };
 
 export const KEY_SCHEMES: readonly KeyScheme[] = [LEFT_KEYS, RIGHT_KEYS];

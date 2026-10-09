@@ -7,7 +7,7 @@
 - A `Controller` abstraction: reads a device each frame and returns a screen-relative `{ move, interact, work, join }`
 - Keyboard split:
   - Left: WASD to move, E interact, Q work
-  - Right: arrows to move, right Shift interact, right Ctrl work
+  - Right: arrows to move, right Shift interact, `/` work (not right Ctrl: Ctrl + the left player's W closes the tab)
 - Gamepads via the Gamepad API, up to 4: left stick or D-pad to move (with a dead zone), A interact, X work
 - Converts screen directions to world directions with `screenDirToGrid` and produces one `InputCommand` per joined player per tick
 - Handles gamepads connecting and disconnecting mid-game: the player stays, and stands still until a pad joins again

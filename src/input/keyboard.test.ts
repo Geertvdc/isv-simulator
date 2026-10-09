@@ -28,7 +28,7 @@ describe('readKeyboard', () => {
 
   it.each([
     [LEFT_KEYS, 'KeyE', 'KeyQ'],
-    [RIGHT_KEYS, 'ShiftRight', 'ControlRight'],
+    [RIGHT_KEYS, 'ShiftRight', 'Slash'],
   ])('%#: maps interact and work', (scheme, interact, work) => {
     expect(readKeyboard(held(interact), scheme)).toMatchObject({ interact: true, work: false });
     expect(readKeyboard(held(work), scheme)).toMatchObject({ interact: false, work: true });
@@ -42,7 +42,7 @@ describe('readKeyboard', () => {
       work: false,
       join: false,
     });
-    const arrows = held('ArrowLeft', 'ShiftRight', 'ControlRight');
+    const arrows = held('ArrowLeft', 'ShiftRight', 'Slash');
     expect(readKeyboard(arrows, LEFT_KEYS)).toEqual({
       move: { x: 0, y: 0 },
       interact: false,
