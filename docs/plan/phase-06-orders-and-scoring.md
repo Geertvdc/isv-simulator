@@ -51,7 +51,7 @@ Pipeline failure and fire, review station, dash and throwing.
 
 ## Done when
 
-- [ ] Two players can play the garage start to finish and get a score with stars
+- [x] Two players can play the garage start to finish and get a score with stars
 - [ ] A tight 3-star run needs real teamwork; a sloppy run still gets 1 star
 - [x] `npm run sim` prints sensible numbers
 - [x] `npm run check` passes
