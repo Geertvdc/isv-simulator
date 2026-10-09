@@ -9,16 +9,21 @@
 
 ## Sim
 
-- Order: `id`, `steps` (`code`, `test`, `pipeline` for now), `createdTick`, `expiresTick`
+- Order: `id`, `kind` (`feature` or `bug`), `title`, `steps`, `createdTick`, `expiresTick`
+- Steps are an ordered list and are done in order: a station only works the ticket's first unfinished step. Features need `code`, `test`, `pipeline`; bugs need `test` (reproduce), `code`, `test`, `pipeline`
+- Two queues, each holding any number of tickets. Taking from a queue tile gives the oldest ticket in that queue; tickets never go back in
+  - Inbox (`I`): every new feature order puts its ticket here (this replaces the phase 5 inbox timer)
+  - Bug queue (`B`): after each ship there is a fixed `BUG_CHANCE` (25%) that a bug comes back after `BUG_DELAY_TICKS`. It opens a bug order with a shorter timer than features and puts its ticket in the bug queue. Bugs don't count towards the feature order cap
+- When an order expires, one waiting ticket of its kind is removed from its queue (tickets already in progress stay and can serve a later order)
 - Pipeline (`P`): put a ticket in that has `code` and `test` done; it builds on its own for `PIPELINE_BUILD_TICKS` (no work button needed). Pick it up when done; `pipeline` is then complete
 - Ship (`S`): put down a ticket with all steps done to deliver it. It completes the matching order with the least time left. A ticket that matches no order, or isn't finished, is refused (stays in hand)
-- Score: `ORDER_POINTS` per order plus a speed bonus for time left; `EXPIRED_PENALTY` when an order runs out (the order is removed)
+- Score: `ORDER_POINTS` per order plus a speed bonus for time left; `EXPIRED_PENALTY` when an order runs out (the order is removed). The score never drops below 0
 - Level timer: when `durationTicks` is reached the level ends; `state.result = { score, stars }`
 - Events (`orderCreated`, `orderShipped`, `orderExpired`, `levelEnded`) for the render and UI to react to
 
 ## UI
 
-- Order bar at the top: one card per order with its steps and a draining timer bar, flashing when nearly expired
+- Order bar at the top: one card per order with its steps and a draining timer bar, flashing when nearly expired; bug orders look different
 - Score and level timer
 - End screen: score, 1 to 3 stars, restart (A or Enter)
 
@@ -31,6 +36,7 @@
 - Order creation follows the schedule; expiry removes the order and applies the penalty
 - Pipeline: refuses unfinished tickets, builds on its own timer, completes the step
 - Ship: completes the order with the least time left, refuses unfinished tickets and tickets with no matching order
+- Queues: new orders enqueue their ticket, pick-up takes the oldest; bug chance after shipping, bug order timer and steps
 - Scoring: base points and speed bonus
 - Level end at `durationTicks`, star thresholds
 - Scenario test: the bot run on the garage with a fixed seed earns at least 1 star
@@ -43,5 +49,5 @@ Pipeline failure and fire, review station, dash and throwing.
 
 - [ ] Two players can play the garage start to finish and get a score with stars
 - [ ] A tight 3-star run needs real teamwork; a sloppy run still gets 1 star
-- [ ] `npm run sim` prints sensible numbers
-- [ ] `npm run check` passes
+- [x] `npm run sim` prints sensible numbers
+- [x] `npm run check` passes
