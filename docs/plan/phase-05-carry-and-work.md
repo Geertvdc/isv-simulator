@@ -37,6 +37,6 @@ Orders, scoring, the pipeline timer, shipping.
 
 ## Done when
 
-- [ ] Players can grab tickets from the inbox, hand them over via counters and bin them
-- [ ] Holding work at `K` and then `T` fills the progress bars and the ticket shows the steps as done
+- [x] Players can grab tickets from the inbox, hand them over via counters and bin them
+- [x] Holding work at `K` and then `T` fills the progress bars and the ticket shows the steps as done
 - [x] `npm run check` passes
