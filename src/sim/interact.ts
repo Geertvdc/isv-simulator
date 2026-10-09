@@ -7,7 +7,7 @@ import { WORK_RATE } from './balance';
 import { type Tile, getTile } from './level';
 import { shipTicket } from './orders';
 import { isBroken, isBuilding, repairPipeline } from './pipeline';
-import { type GameState, type PlayerId, targetTile } from './state';
+import { type GameState, type PlayerId, getPlayer, targetTile } from './state';
 import {
   type StepKind,
   type Ticket,
@@ -21,7 +21,13 @@ import {
 } from './tickets';
 
 /** Tiles players can take a ticket from (queue tiles aside). */
-const PICK_UP_FROM: ReadonlySet<Tile> = new Set(['counter', 'keyboard', 'testBench', 'pipeline']);
+const PICK_UP_FROM: ReadonlySet<Tile> = new Set([
+  'counter',
+  'keyboard',
+  'testBench',
+  'pipeline',
+  'floor',
+]);
 /** Tiles players can put any ticket on. */
 const PUT_DOWN_ON: ReadonlySet<Tile> = new Set(['counter', 'keyboard', 'testBench']);
 
@@ -51,8 +57,22 @@ export function isAtItsStation(ticket: Ticket, tile: Tile | null): boolean {
 }
 
 /**
+ * Whether `ticket` may be put on tile (x, y): a free counter or station, or
+ * a free working pipeline it's ready for. Thrown tickets land by the same rule.
+ */
+export function canPutDown(state: GameState, ticket: Ticket, x: number, y: number): boolean {
+  const tile = getTile(state.level, x, y);
+  if (tile === null || ticketOnTile(state, x, y)) return false;
+  return (
+    PUT_DOWN_ON.has(tile) ||
+    (tile === 'pipeline' && isAtItsStation(ticket, tile) && !isBroken(state, { x, y }))
+  );
+}
+
+/**
  * One interact press by `playerId` on the tile they face. Returns whether
- * anything happened.
+ * anything happened. Empty hands also pick up a ticket lying on the floor
+ * underfoot.
  */
 export function interact(state: GameState, playerId: PlayerId): boolean {
   const { x, y } = targetTile(state, playerId);
@@ -67,10 +87,7 @@ export function interact(state: GameState, playerId: PlayerId): boolean {
       return true;
     }
     if (tile === 'ship') return shipTicket(state, playerId, carried);
-    const fits =
-      PUT_DOWN_ON.has(tile) ||
-      (tile === 'pipeline' && isAtItsStation(carried, tile) && !isBroken(state, { x, y }));
-    if (fits && !onTile) {
+    if (canPutDown(state, carried, x, y)) {
       carried.location = { kind: 'tile', x, y };
       return true;
     }
@@ -88,7 +105,17 @@ export function interact(state: GameState, playerId: PlayerId): boolean {
     onTile.location = { kind: 'player', playerId };
     return true;
   }
+  const underfoot = ticketOnTile(state, ...standingTile(state, playerId));
+  if (underfoot) {
+    underfoot.location = { kind: 'player', playerId };
+    return true;
+  }
   return false;
+}
+
+function standingTile(state: GameState, playerId: PlayerId): [number, number] {
+  const p = getPlayer(state, playerId);
+  return p ? [Math.round(p.pos.x), Math.round(p.pos.y)] : [-1, -1];
 }
 
 /**

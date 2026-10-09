@@ -44,6 +44,14 @@ export const DASH_TICKS = Math.round(0.15 * TICKS_PER_SECOND);
 export const DASH_COOLDOWN_TICKS = Math.round(0.8 * TICKS_PER_SECOND);
 /** Speed a dashing player knocks someone else away with. */
 export const DASH_SHOVE_SPEED = 15;
+/** Ticks interact must stay held after a press that did nothing before a carried ticket is thrown. */
+export const THROW_HOLD_TICKS = Math.round(0.25 * TICKS_PER_SECOND);
+/** How fast a thrown ticket flies, in tiles per second. */
+export const THROW_SPEED = 12;
+/** A thrown ticket that found nothing to land on drops on the floor after this many tiles. */
+export const THROW_RANGE = 5;
+/** An empty-handed player catches a ticket flying within this many tiles in front of them. */
+export const CATCH_RADIUS = 0.7;
 /** How far in front of the player's center the target tile is picked. */
 export const INTERACT_REACH = 0.8;
 

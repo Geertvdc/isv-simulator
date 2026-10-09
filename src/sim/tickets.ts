@@ -4,7 +4,7 @@
  */
 
 import type { Tile } from './level';
-import type { GameState, PlayerId } from './state';
+import type { GameState, PlayerId, Vec } from './state';
 
 export type StepKind = 'code' | 'test' | 'pipeline';
 
@@ -37,7 +37,19 @@ export type TicketLocation =
   | { kind: 'player'; playerId: PlayerId }
   | { kind: 'tile'; x: number; y: number }
   /** Waiting in the queue for its kind; oldest (lowest id) first. */
-  | { kind: 'queue'; queue: TicketKind };
+  | { kind: 'queue'; queue: TicketKind }
+  /**
+   * Thrown: flying from `from` along `dir` (unit), now at `pos`. `lastFloor`
+   * is the last floor tile it passed, where it drops if it hits a wall.
+   */
+  | {
+      kind: 'flying';
+      pos: Vec;
+      from: Vec;
+      dir: Vec;
+      thrownBy: PlayerId;
+      lastFloor: { x: number; y: number };
+    };
 
 export interface Ticket {
   id: number;
@@ -50,6 +62,7 @@ export interface Ticket {
 
 const PROGRESS_EPSILON = 1e-9;
 
+/** The ticket on a counter or station, or the first one lying on a floor tile. */
 export function ticketOnTile(state: GameState, x: number, y: number): Ticket | undefined {
   return state.tickets.find(
     (t) => t.location.kind === 'tile' && t.location.x === x && t.location.y === y,
