@@ -1,4 +1,6 @@
-# Phase 1: Map and camera
+# Phase 1: Map and camera (done)
+
+> **Superseded in phase 2.** After the pivot to couch co-op, camera rotation was removed and the camera now auto-fits the whole level (pan, zoom and hover only in the F3 debug mode). The diamond iso projection was replaced by a front-facing 3/4 view in `src/render/projection.ts`, and the map format below was replaced by the level format in phase 2. Kept as a record of what was built.
 
 **Goal:** load the Startup Pit from an ASCII file and render it isometric with pan, zoom, rotate and hover.
 
