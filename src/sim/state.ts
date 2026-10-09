@@ -2,9 +2,10 @@
  * The game state: plain JSON-serializable data, advanced only by `tick`.
  */
 
-import { INTERACT_REACH } from './balance';
+import { INBOX_FIRST_SPAWN_TICK, INTERACT_REACH } from './balance';
 import type { GridPoint, LevelMap } from './level';
 import { type RngState, createRng } from './rng';
+import type { Ticket } from './tickets';
 
 /** A direction or velocity in grid units. */
 export interface Vec {
@@ -22,6 +23,8 @@ export interface Player {
   vel: Vec;
   /** Unit vector the player looks along. */
   facing: Vec;
+  /** Whether interact was held last tick: interact acts only on the press. */
+  interactHeld: boolean;
 }
 
 /**
@@ -43,6 +46,10 @@ export interface GameState {
   tick: number;
   level: LevelMap;
   players: Player[];
+  tickets: Ticket[];
+  nextTicketId: number;
+  /** Tick at which the inbox next tries to spawn a ticket. */
+  nextInboxSpawnTick: number;
 }
 
 /** Players start facing the camera. */
@@ -64,9 +71,19 @@ export function createGame(
       pos: { x: spawn.x, y: spawn.y },
       vel: { x: 0, y: 0 },
       facing: { ...START_FACING },
+      interactHeld: false,
     };
   });
-  return { seed, rngState: createRng(seed), tick: 0, level, players };
+  return {
+    seed,
+    rngState: createRng(seed),
+    tick: 0,
+    level,
+    players,
+    tickets: [],
+    nextTicketId: 1,
+    nextInboxSpawnTick: INBOX_FIRST_SPAWN_TICK,
+  };
 }
 
 export function getPlayer(state: GameState, id: PlayerId): Player | undefined {

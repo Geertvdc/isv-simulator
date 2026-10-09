@@ -17,7 +17,7 @@ const OPEN = level(...Array.from({ length: 9 }, () => '.'.repeat(20)));
 const MIN_DIST = PLAYER_RADIUS * 2;
 
 function player(id: number, x: number, y: number): Player {
-  return { id, pos: { x, y }, vel: { x: 0, y: 0 }, facing: { x: 0, y: 1 } };
+  return { id, pos: { x, y }, vel: { x: 0, y: 0 }, facing: { x: 0, y: 1 }, interactHeld: false };
 }
 
 /** One sim tick for these players: everyone moves, then they push each other apart. */

@@ -23,7 +23,7 @@ function level(...rows: string[]): LevelMap {
 const OPEN = level(...Array.from({ length: 9 }, () => '.'.repeat(30)));
 
 function player(x: number, y: number): Player {
-  return { id: 1, pos: { x, y }, vel: { x: 0, y: 0 }, facing: { x: 0, y: 1 } };
+  return { id: 1, pos: { x, y }, vel: { x: 0, y: 0 }, facing: { x: 0, y: 1 }, interactHeld: false };
 }
 
 function run(map: LevelMap, p: Player, move: Vec, ticks: number): void {
