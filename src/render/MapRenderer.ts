@@ -24,10 +24,12 @@ const ENTRANCE_MARKER_COLOR = 0xffb547;
 const ENTRANCE_MARKER_LIFT = TILE_H * 1.4;
 const ENTRANCE_MARKER_SIZE = 8;
 
-/** Floor sits below everything; walls use `tileDepth`, which is >= 0. */
-const FLOOR_DEPTH = -1;
-/** Overlays draw above all tile-depth objects. */
+/**
+ * Walls use `tileDepth`, which goes negative in rotated views (e.g. -x - y),
+ * so the floor and overlays sit far outside any tile depth on either side.
+ */
 export const OVERLAY_DEPTH = 1_000_000;
+const FLOOR_DEPTH = -OVERLAY_DEPTH;
 
 /** Phaser's polygon helpers are typed for Vector2; iso math returns plain points. */
 export function vectors(points: readonly Point[]): Phaser.Math.Vector2[] {
