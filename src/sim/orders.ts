@@ -62,7 +62,10 @@ export type GameEvent =
       untested: boolean;
     }
   | { type: 'orderExpired'; order: Order; penalty: number }
-  | { type: 'levelEnded'; result: LevelResult };
+  | { type: 'levelEnded'; result: LevelResult }
+  /** A finished build was left too long; `ticketId` has to be built again. */
+  | { type: 'pipelineBroke'; x: number; y: number; ticketId: number }
+  | { type: 'pipelineRepaired'; x: number; y: number };
 
 /** Ticks left on an order; 0 once it's due. */
 export function ticksLeft(state: GameState, order: Order): number {

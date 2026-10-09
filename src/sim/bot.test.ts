@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { findPath, runBots } from './bot';
+import { PIPELINE_FAIL_TICKS, REPAIR_TICKS, TICKS_PER_SECOND } from './balance';
+import { botInput, createBot, findPath, runBots } from './bot';
 import { parseLevelMap } from './level';
 import { GARAGE } from './levels';
+import { pipelineAt } from './pipeline';
+import { COL, addTicket, idle, newTestGame } from './testing';
+import { tick } from './tick';
 
 describe('findPath', () => {
   const map = parseLevelMap(['#####', '#1.K#', '#2#.#', '#34.#', '#####'].join('\n'));
@@ -41,5 +45,23 @@ describe('bot run on the garage', () => {
 
   it('is deterministic per seed', () => {
     expect(runBots(GARAGE, 3, 2)).toEqual(runBots(GARAGE, 3, 2));
+  });
+});
+
+describe('bot and a broken pipeline', () => {
+  it('takes its ticket out, repairs the pipeline and builds again', () => {
+    const state = newTestGame();
+    const ticket = addTicket(state, COL.pipeline, { done: 3 });
+    idle(state, PIPELINE_FAIL_TICKS);
+    expect(pipelineAt(state, COL.pipeline, 1)?.broken).toBe(true);
+
+    const bot = createBot(1);
+    bot.ticketId = ticket.id;
+    for (let i = 0; i < REPAIR_TICKS + 10 * TICKS_PER_SECOND; i++) {
+      tick(state, [botInput(state, bot, [bot])]);
+      if (ticket.location.kind === 'tile' && !pipelineAt(state, COL.pipeline, 1)?.broken) break;
+    }
+    expect(pipelineAt(state, COL.pipeline, 1)?.broken).toBe(false);
+    expect(ticket.location).toEqual({ kind: 'tile', x: COL.pipeline, y: 1 });
   });
 });

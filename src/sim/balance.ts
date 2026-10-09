@@ -83,3 +83,10 @@ export const BUG_DELAY_TICKS = 6 * TICKS_PER_SECOND;
 export const ORDER_URGENT_TICKS = 10 * TICKS_PER_SECOND;
 /** The end screen ignores presses this long, so mashing at the buzzer doesn't restart. */
 export const END_SCREEN_INPUT_DELAY_MS = 1500;
+
+/** Ticks a finished build may sit in the pipeline before the pipeline breaks. */
+export const PIPELINE_FAIL_TICKS = 10 * TICKS_PER_SECOND;
+/** The pipeline flashes a warning for this many ticks before it breaks. */
+export const PIPELINE_WARN_TICKS = 4 * TICKS_PER_SECOND;
+/** Ticks of holding work at an empty broken pipeline to repair it. */
+export const REPAIR_TICKS = 3 * TICKS_PER_SECOND;
