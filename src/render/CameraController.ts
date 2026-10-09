@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import {
   CAMERA_FIT_PADDING,
+  CAMERA_HUD_BOTTOM,
+  CAMERA_HUD_TOP,
   CAMERA_ZOOM_MAX,
   CAMERA_ZOOM_MIN,
   CAMERA_ZOOM_SENSITIVITY,
@@ -9,7 +11,8 @@ import { type WorldRect, fitCamera } from './cameraFit';
 import type { Point } from './projection';
 
 /**
- * Frames the whole level and refits whenever the canvas resizes. In debug
+ * Frames the whole level between the HUD bands and refits whenever the canvas
+ * resizes. In debug
  * mode the camera can also be dragged with any mouse button and zoomed with
  * the wheel (around the cursor); leaving debug mode snaps back to the fit.
  * There is no keyboard panning: the keyboard belongs to the players.
@@ -59,10 +62,16 @@ export class CameraController {
   }
 
   private fit(): void {
+    const { width, height } = this.camera;
     const { zoom, center } = fitCamera(
       this.bounds,
-      { width: this.camera.width, height: this.camera.height },
-      CAMERA_FIT_PADDING,
+      { width, height },
+      {
+        top: CAMERA_FIT_PADDING + height * CAMERA_HUD_TOP,
+        right: CAMERA_FIT_PADDING,
+        bottom: CAMERA_FIT_PADDING + height * CAMERA_HUD_BOTTOM,
+        left: CAMERA_FIT_PADDING,
+      },
     );
     this.camera.setZoom(zoom);
     this.centerOn(center);
