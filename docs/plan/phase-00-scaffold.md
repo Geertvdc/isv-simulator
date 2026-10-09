@@ -26,6 +26,6 @@ Any game logic or rendering beyond the text.
 
 ## Done when
 
-- [ ] `npm run dev` shows the text and the overlay
-- [ ] `npm run check` passes
+- [x] `npm run dev` shows the text and the overlay
+- [x] `npm run check` passes
 - [ ] CI is green
