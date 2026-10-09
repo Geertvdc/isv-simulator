@@ -33,4 +33,4 @@
 - [ ] Throwing and dashing feel good with 2 and with 4 players
 - [ ] Review moments make players shout at each other
 - [ ] Three levels playable from a level select
-- [ ] `npm run check` passes
+- [x] `npm run check` passes
