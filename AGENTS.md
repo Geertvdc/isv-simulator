@@ -4,7 +4,7 @@ Internal Zure game. A Theme Hospital-style management sim where you run a softwa
 
 ## Stack
 
-- TypeScript (strict), Vite, Phaser 3 (latest 3.x), Vitest, ESLint, Prettier
+- TypeScript (strict), Vite, Phaser 4 (latest 4.x), Vitest, ESLint, Prettier
 - HUD and panels: plain DOM + CSS overlay on top of the canvas, no UI framework
 - No backend
 
