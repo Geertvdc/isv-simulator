@@ -31,8 +31,16 @@ export const PLAYER_RADIUS = 0.35;
 export const CORNER_NUDGE = 0.25;
 /** Corner nudging only kicks in while sideways input is below this, so it never fights the player. */
 export const CORNER_NUDGE_MAX_SIDE_INPUT = 0.3;
+/**
+ * Share of the overlap between two players removed per tick. Below 1 so
+ * bumping into someone is a soft, squishy shove instead of a hard wall.
+ */
+export const PLAYER_PUSH_STRENGTH = 0.5;
 /** How far in front of the player's center the target tile is picked. */
 export const INTERACT_REACH = 0.8;
 
 /** Most sim ticks run in one frame; after a long stall the game slows down instead of spiralling. */
 export const MAX_TICKS_PER_FRAME = 5;
+
+/** Stick deflection below this counts as centered; above it the stick is rescaled to 0 to 1. */
+export const GAMEPAD_DEAD_ZONE = 0.2;

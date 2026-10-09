@@ -1,4 +1,5 @@
 import { stepPlayer } from './movement';
+import { separatePlayers } from './push';
 import type { GameState, InputCommand } from './state';
 
 const NO_MOVE = { x: 0, y: 0 };
@@ -12,5 +13,6 @@ export function tick(state: GameState, inputs: readonly InputCommand[]): void {
     const input = inputs.find((i) => i.playerId === player.id);
     stepPlayer(state.level, player, input?.move ?? NO_MOVE);
   }
+  separatePlayers(state.level, state.players);
   state.tick++;
 }
