@@ -12,6 +12,7 @@ import { MAP_OVERHANG, MapRenderer, OVERLAY_DEPTH, vectors } from './MapRenderer
 import { playerColor } from './playerColors';
 import { PlayerRenderer } from './PlayerRenderer';
 import { screenToTile, tileCorners, tileDepth } from './projection';
+import { TicketRenderer } from './TicketRenderer';
 
 export interface TileHover {
   x: number;
@@ -34,7 +35,7 @@ export const LOBBY_EVENT = 'lobby';
 const HOVER_COLOR = 0xffffff;
 /** Over the target block's top, under its label. */
 const TARGET_DEPTH_OFFSET = 0.005;
-/** Fixed until levels pick their own; the sim has no randomness yet anyway. */
+/** Fixed until levels pick their own. */
 const GAME_SEED = 1;
 
 interface TargetHighlight {
@@ -52,6 +53,7 @@ export class GameScene extends Phaser.Scene {
   /** `null` while players are still joining in the lobby. */
   private loop: GameLoop | null = null;
   private playerRenderer!: PlayerRenderer;
+  private ticketRenderer!: TicketRenderer;
   private readonly targets = new Map<PlayerId, TargetHighlight>();
   private hovered: TileHover | null = null;
   private debugVisible = false;
@@ -72,6 +74,7 @@ export class GameScene extends Phaser.Scene {
     this.loop = null;
     this.game.events.emit(LOBBY_EVENT, this.lobby);
     this.playerRenderer = new PlayerRenderer(this);
+    this.ticketRenderer = new TicketRenderer(this, this.mapRenderer);
     this.cameraController = new CameraController(this, this.mapBounds());
 
     const K = Phaser.Input.Keyboard.KeyCodes;
@@ -104,6 +107,7 @@ export class GameScene extends Phaser.Scene {
     const loop = this.loop;
     loop.advance(delta, (tick) => buildInputCommands(this.lobby.players, frame.readings, tick));
     this.playerRenderer.sync(loop);
+    this.ticketRenderer.sync(loop);
     for (const player of loop.state.players) this.updateTarget(loop, player.id);
     this.updateHover();
   }

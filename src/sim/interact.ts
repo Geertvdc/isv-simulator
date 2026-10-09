@@ -20,6 +20,11 @@ const STATION_STEP: Partial<Record<Tile, StepKind>> = {
   testBench: 'test',
 };
 
+/** The step a station advances when worked, or `undefined` for tiles you can't work at. */
+export function stationStep(tile: Tile | null): StepKind | undefined {
+  return tile === null ? undefined : STATION_STEP[tile];
+}
+
 /** Steps that must be done before a step can be worked on. */
 const STEP_NEEDS: Partial<Record<StepKind, StepKind>> = {
   test: 'code',
@@ -64,7 +69,7 @@ export function work(state: GameState, playerId: PlayerId, worked: Set<number>):
   const { x, y } = targetTile(state, playerId);
   const tile = getTile(state.level, x, y);
   if (tile === null) return false;
-  const kind = STATION_STEP[tile];
+  const kind = stationStep(tile);
   if (!kind) return false;
   const key = y * state.level.width + x;
   if (worked.has(key)) return false;

@@ -35,6 +35,11 @@ const BLOCK_STYLES: Readonly<Record<Exclude<Tile, 'floor'>, BlockStyle>> = {
   bin: { color: 0x5a5a5a, height: STATION_HEIGHT, label: 'X' },
 };
 
+/** Placeholder color of a block, so other renderers can match it. */
+export function tileColor(tile: Exclude<Tile, 'floor'>): number {
+  return BLOCK_STYLES[tile].color;
+}
+
 /** How much darker each side face is than the top. */
 const SIDE_SHADE: Readonly<Record<Side, number>> = {
   front: 0.72,
@@ -92,6 +97,14 @@ export class MapRenderer {
     const tile = getTile(this.map, x, y);
     if (tile === null || tile === 'floor') return null;
     return blockFaces(x, y, this.blockHeight(x, y, tile)).top;
+  }
+
+  /** Center of the top face of the block on tile (x, y), or `null` for floor and off-map tiles. */
+  blockTopCenter(x: number, y: number): Point | null {
+    const tile = getTile(this.map, x, y);
+    if (tile === null || tile === 'floor') return null;
+    const c = tileToScreen(x, y);
+    return { x: c.x, y: c.y - this.blockHeight(x, y, tile) };
   }
 
   private forEachTile(fn: (x: number, y: number, tile: Tile) => void): void {
