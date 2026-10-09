@@ -1,0 +1,53 @@
+---
+name: ship
+description: Ship the current branch - open a PR, wait for CI to pass, rebase-merge it into main (fast-forward, linear history) and pull main in the main checkout. Use when the user says "ship it", "create a PR and merge it", "merge to main", or asks to finish a phase.
+---
+
+# Ship the current branch
+
+Run these steps in order. Stop and report if any step fails; never force anything.
+
+## 1. Pre-flight
+
+- `git status` must be clean (commit leftover work first, or ask).
+- `npm run check` must pass locally.
+- If the branch is behind `origin/main`, bring it up to date first (in the desktop app use the `sync_with_base_branch` tool, otherwise `git rebase origin/main`), then re-run `npm run check`.
+
+## 2. Create the PR
+
+```bash
+git push -u origin HEAD
+gh pr create --base main --title "<Phase N: short title>" --body "<summary, tests, manual checks>"
+```
+
+- Title: for phase work use `Phase N: <name>` (matches earlier PRs).
+- Body: what changed, how it was tested, which "Done when" boxes are ticked.
+
+## 3. Wait for CI
+
+CI is `.github/workflows/ci.yml` (`npm ci`, `npm run check`, `npm run build`).
+
+- In the Claude desktop app: bind the PR with the `ccd_pr` tools (`get_status`, `bind_pr` if needed) and wait for the app's CI status instead of polling yourself.
+- In a plain terminal: `gh pr checks <number> --watch --fail-fast`.
+
+If CI fails: read the log (`gh run view <run-id> --log-failed`), fix, commit, push, and wait again. Never merge red.
+
+## 4. Merge
+
+The repo only allows rebase merges (no squash, no merge commits), which keeps `main` linear like a fast-forward:
+
+```bash
+gh pr merge <number> --rebase --delete-branch=false
+```
+
+Keep the branch: the session's worktree still has it checked out.
+
+## 5. Update main
+
+The main checkout is the repo root (find it with `git worktree list`; it is the entry on `[main]`).
+
+```bash
+git -C <main-checkout> pull --ff-only
+```
+
+Only pull if that checkout is on `main` and clean; otherwise report and leave it alone. Finish by showing `git -C <main-checkout> log --oneline -5`.
