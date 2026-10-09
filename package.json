@@ -15,7 +15,7 @@
     "format": "prettier --write ."
   },
   "dependencies": {
-    "phaser": "^3.90.0"
+    "phaser": "^4.2.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
