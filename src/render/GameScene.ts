@@ -9,7 +9,7 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     this.title = this.add
-      .text(0, 0, 'Theme Software Vendor', {
+      .text(0, 0, 'ISV Simulator', {
         fontFamily: 'system-ui, sans-serif',
         fontSize: '40px',
         color: '#e6e6e6',
