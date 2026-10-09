@@ -1,6 +1,6 @@
 # ISV Simulator
 
-Internal Zure game. An Overcooked-style couch co-op game about shipping software: 2 to 4 players on one screen each control a developer in a small office. Tickets arrive at the inbox; players carry them through stations (write code, test, pipeline) and ship them to the customer before the order timer runs out. Levels last about 3 minutes and end with a score and 1 to 3 stars. Chaos and shouting at each other is the point. Isometric 2D for now, runs in the browser.
+Internal Zure game. An Overcooked-style couch co-op game about shipping software: 2 to 4 players on one screen each control a developer in a small office. Tickets arrive at the inbox; players carry them through stations (write code, test, pipeline) and ship them to the customer before the order timer runs out. Levels last about 3 minutes and end with a score and 1 to 3 stars. Chaos and shouting at each other is the point. 2D with a front-facing 3/4 view (like Overcooked), runs in the browser.
 
 ## Stack
 
@@ -19,16 +19,16 @@ Internal Zure game. An Overcooked-style couch co-op game about shipping software
 7. `src/ui/` reads state and dispatches commands.
 8. Every tunable number lives in `src/sim/balance.ts`.
 9. Text content (ticket names, order names, level names) lives in `src/sim/content.ts` so anyone can add jokes.
-10. Iso math lives only in `src/render/iso.ts`. The sim works in plain grid/world coordinates; switching to a top-down view must only touch `src/render/`.
+10. Projection math (grid to screen and back) lives only in `src/render/projection.ts`. The sim works in plain grid/world coordinates; changing the camera angle or switching views must only touch `src/render/`.
 11. No Phaser physics. Movement and collision are our own code in `src/sim/`, deterministic and tested.
-12. Stick and keyboard directions are screen-relative: "up" moves up on screen, even in iso view. The input layer converts them to world directions (with a helper in `src/render/iso.ts`) before they become input commands.
+12. Stick and keyboard directions are screen-relative: "up" moves up on screen, whatever the camera angle. The input layer converts them to world directions (with a helper in `src/render/projection.ts`) before they become input commands.
 
 ## Folder layout
 
 ```
 src/
   sim/       game state, rules, movement and collision (pure TS)
-  render/    Phaser scenes, iso math, sprite sync
+  render/    Phaser scenes, projection math, sprite sync
   ui/        DOM HUD and panels
   main.ts
 maps/        level maps as ASCII text

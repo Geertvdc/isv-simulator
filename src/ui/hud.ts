@@ -1,11 +1,11 @@
-import type { Zone } from '../sim/map';
+import type { Tile } from '../sim/level';
 
 export const VERSION = 'v0';
 
 export interface HoverInfo {
   x: number;
   y: number;
-  zone: Zone;
+  tile: Tile;
 }
 
 export interface Hud {
@@ -27,7 +27,7 @@ export function mountHud(root: HTMLElement): Hud {
   return {
     setHover: (info) => {
       hover.hidden = info === null;
-      hover.textContent = info ? `${info.x}, ${info.y}, ${info.zone}` : '';
+      hover.textContent = info ? `${info.x}, ${info.y}, ${info.tile}` : '';
     },
   };
 }
