@@ -1,7 +1,7 @@
 import type { GameFrame } from '../render/GameScene';
 import { tileColor } from '../render/MapRenderer';
 import { ORDER_URGENT_TICKS } from '../sim/balance';
-import { UNTESTED_SHIP_TEXT } from '../sim/content';
+import { PIPELINE_BROKE_TEXT, UNTESTED_SHIP_TEXT } from '../sim/content';
 import { type Order, ticksLeft } from '../sim/orders';
 import type { GameState } from '../sim/state';
 import type { StepKind } from '../sim/tickets';
@@ -128,6 +128,7 @@ export function mountGameHud(root: HTMLElement, levelName: string): GameHud {
           if (parts.length > 0) popup(parts.join(' '), 'gain');
         }
         if (event.type === 'orderExpired' && event.penalty > 0) popup(`-${event.penalty}`, 'loss');
+        if (event.type === 'pipelineBroke') popup(PIPELINE_BROKE_TEXT, 'loss');
       }
 
       end.hidden = state.result === null;
