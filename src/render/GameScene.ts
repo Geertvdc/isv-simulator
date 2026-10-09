@@ -26,6 +26,7 @@ import {
 import { playerColor } from './playerColors';
 import { PipelineRenderer } from './PipelineRenderer';
 import { PlayerRenderer } from './PlayerRenderer';
+import { SoundPlayer } from './SoundPlayer';
 import { screenToTile, tileCorners, tileDepth } from './projection';
 import { TicketRenderer } from './TicketRenderer';
 
@@ -114,6 +115,7 @@ export class GameScene extends Phaser.Scene {
   private ticketRenderer!: TicketRenderer;
   private pipelineRenderer!: PipelineRenderer;
   private effects!: EffectsRenderer;
+  private sounds!: SoundPlayer;
   private readonly targets = new Map<PlayerId, TargetHighlight>();
   private hovered: TileHover | null = null;
   private debugVisible = false;
@@ -127,6 +129,7 @@ export class GameScene extends Phaser.Scene {
 
   preload(): void {
     preloadMapSprites(this);
+    SoundPlayer.preload(this);
   }
 
   create(data: SceneData = {}): void {
@@ -159,6 +162,7 @@ export class GameScene extends Phaser.Scene {
     this.ticketRenderer = new TicketRenderer(this, this.mapRenderer);
     this.pipelineRenderer = new PipelineRenderer(this, this.mapRenderer);
     this.effects = new EffectsRenderer(this);
+    this.sounds = new SoundPlayer(this);
     this.cameraController = new CameraController(this, this.mapBounds());
 
     const K = Phaser.Input.Keyboard.KeyCodes;
@@ -216,6 +220,7 @@ export class GameScene extends Phaser.Scene {
     this.ticketRenderer.sync(loop);
     this.pipelineRenderer.sync(loop.state, time);
     this.effects.play(loop.state, loop.events);
+    this.sounds.play(loop.state, loop.events, time);
     for (const player of loop.state.players) this.updateTarget(loop, player.id);
     this.updateHover();
   }
