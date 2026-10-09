@@ -5,7 +5,7 @@ import { type GameState, type InputCommand, type Vec, createGame, targetTile } f
 import { tick } from './tick';
 
 function newGame(): GameState {
-  return createGame(parseLevelMap(garage), 42);
+  return createGame(parseLevelMap(garage), 42, [1]);
 }
 
 function input(state: GameState, move: Vec, playerId = 1): InputCommand {
@@ -21,6 +21,20 @@ describe('createGame', () => {
     expect(p?.id).toBe(1);
     expect(p?.pos).toEqual(state.level.spawns[0]);
     expect(p?.vel).toEqual({ x: 0, y: 0 });
+  });
+
+  it('spawns each player on their own spawn point', () => {
+    const state = createGame(parseLevelMap(garage), 42, [1, 3, 4, 2]);
+    expect(state.players.map((p) => p.id)).toEqual([1, 3, 4, 2]);
+    for (const p of state.players) expect(p.pos).toEqual(state.level.spawns[p.id - 1]);
+  });
+
+  it('rejects no players, duplicates and ids without a spawn', () => {
+    const level = parseLevelMap(garage);
+    expect(() => createGame(level, 1, [])).toThrow();
+    expect(() => createGame(level, 1, [1, 1])).toThrow(/Duplicate/);
+    expect(() => createGame(level, 1, [5])).toThrow(/no spawn for player 5/);
+    expect(() => createGame(level, 1, [0])).toThrow(/no spawn for player 0/);
   });
 
   it('survives a JSON round trip', () => {

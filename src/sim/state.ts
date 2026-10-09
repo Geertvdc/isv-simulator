@@ -48,19 +48,25 @@ export interface GameState {
 /** Players start facing the camera. */
 const START_FACING: Vec = { x: 0, y: 1 };
 
-/** A new game with player 1 standing on spawn `1`. */
-export function createGame(level: LevelMap, seed: number): GameState {
-  const spawn = level.spawns[0];
-  if (!spawn) throw new Error('Level has no spawn for player 1');
-  return {
-    seed,
-    rngState: createRng(seed),
-    tick: 0,
-    level,
-    players: [
-      { id: 1, pos: { x: spawn.x, y: spawn.y }, vel: { x: 0, y: 0 }, facing: { ...START_FACING } },
-    ],
-  };
+/** A new game with each player standing on their own spawn: player `n` on spawn `n`. */
+export function createGame(
+  level: LevelMap,
+  seed: number,
+  playerIds: readonly PlayerId[],
+): GameState {
+  if (playerIds.length === 0) throw new Error('A game needs at least one player');
+  if (new Set(playerIds).size !== playerIds.length) throw new Error('Duplicate player ids');
+  const players = playerIds.map((id): Player => {
+    const spawn = Number.isInteger(id) ? level.spawns[id - 1] : undefined;
+    if (!spawn) throw new Error(`Level has no spawn for player ${id}`);
+    return {
+      id,
+      pos: { x: spawn.x, y: spawn.y },
+      vel: { x: 0, y: 0 },
+      facing: { ...START_FACING },
+    };
+  });
+  return { seed, rngState: createRng(seed), tick: 0, level, players };
 }
 
 export function getPlayer(state: GameState, id: PlayerId): Player | undefined {

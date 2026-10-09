@@ -8,7 +8,7 @@ import { GameLoop } from './GameLoop';
 const TICK_MS = 1000 / TICKS_PER_SECOND;
 
 function newLoop(): GameLoop {
-  return new GameLoop(createGame(parseLevelMap(garage), 1));
+  return new GameLoop(createGame(parseLevelMap(garage), 1, [1]));
 }
 
 const right = (tick: number): InputCommand[] => [
