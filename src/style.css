@@ -1,0 +1,31 @@
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #14161c;
+  font-family: system-ui, sans-serif;
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+}
+
+/* DOM overlay for HUD and panels. Clicks fall through to the canvas
+   except on elements that opt back in with pointer-events: auto. */
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  color: #e6e6e6;
+}
+
+.hud-version {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 12px;
+  opacity: 0.6;
+}
