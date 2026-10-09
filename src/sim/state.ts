@@ -28,6 +28,12 @@ export interface Player {
   facing: Vec;
   /** Whether interact was held last tick: interact acts only on the press. */
   interactHeld: boolean;
+  /** Whether dash was held last tick: dash starts only on the press. */
+  dashHeld: boolean;
+  /** Ticks of dash left; 0 when not dashing. */
+  dashTicks: number;
+  /** Ticks until the next dash may start. */
+  dashCooldown: number;
 }
 
 /**
@@ -41,6 +47,7 @@ export interface InputCommand {
   move: Vec;
   interact: boolean;
   work: boolean;
+  dash: boolean;
 }
 
 export interface GameState {
@@ -71,6 +78,20 @@ export interface GameState {
 /** Players start facing the camera. */
 const START_FACING: Vec = { x: 0, y: 1 };
 
+/** A player standing still at `pos`, facing the camera. */
+export function newPlayer(id: PlayerId, pos: Vec): Player {
+  return {
+    id,
+    pos: { x: pos.x, y: pos.y },
+    vel: { x: 0, y: 0 },
+    facing: { ...START_FACING },
+    interactHeld: false,
+    dashHeld: false,
+    dashTicks: 0,
+    dashCooldown: 0,
+  };
+}
+
 /** A new game with each player standing on their own spawn: player `n` on spawn `n`. */
 export function createGame(level: Level, seed: number, playerIds: readonly PlayerId[]): GameState {
   const { map } = level;
@@ -79,13 +100,7 @@ export function createGame(level: Level, seed: number, playerIds: readonly Playe
   const players = playerIds.map((id): Player => {
     const spawn = Number.isInteger(id) ? map.spawns[id - 1] : undefined;
     if (!spawn) throw new Error(`Level has no spawn for player ${id}`);
-    return {
-      id,
-      pos: { x: spawn.x, y: spawn.y },
-      vel: { x: 0, y: 0 },
-      facing: { ...START_FACING },
-      interactHeld: false,
-    };
+    return newPlayer(id, spawn);
   });
   return {
     seed,

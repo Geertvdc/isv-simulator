@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { PLAYER_RADIUS } from './balance';
 import { type LevelMap, parseLevelMap } from './level';
-import { maxPenetration, stepPlayer } from './movement';
+import { isDashing, maxPenetration, startDash, stepPlayer } from './movement';
 import { separatePlayers } from './push';
-import type { Player, Vec } from './state';
+import { type Player, type Vec, newPlayer } from './state';
 
 /** Wraps rows in a wall border, with the four spawns on an extra bottom row. */
 function level(...rows: string[]): LevelMap {
@@ -17,7 +17,7 @@ const OPEN = level(...Array.from({ length: 9 }, () => '.'.repeat(20)));
 const MIN_DIST = PLAYER_RADIUS * 2;
 
 function player(id: number, x: number, y: number): Player {
-  return { id, pos: { x, y }, vel: { x: 0, y: 0 }, facing: { x: 0, y: 1 }, interactHeld: false };
+  return newPlayer(id, { x, y });
 }
 
 /** One sim tick for these players: everyone moves, then they push each other apart. */
@@ -127,6 +127,56 @@ describe('separatePlayers', () => {
         const b = players[j];
         if (a && b) expect(dist(a, b)).toBeGreaterThan(MIN_DIST - 1e-2);
       }
+    }
+  });
+});
+
+describe('dash shove', () => {
+  function dashAt(a: Player, b: Player, ticks: number): ReturnType<typeof separatePlayers> {
+    const shoves: ReturnType<typeof separatePlayers> = [];
+    startDash(a, { x: b.pos.x - a.pos.x, y: b.pos.y - a.pos.y });
+    for (let i = 0; i < ticks; i++) {
+      stepPlayer(OPEN, a, { x: 0, y: 0 });
+      stepPlayer(OPEN, b, { x: 0, y: 0 });
+      shoves.push(...separatePlayers(OPEN, [a, b]));
+    }
+    return shoves;
+  }
+
+  it('knocks a standing player away hard and ends the dash', () => {
+    const a = player(1, 3, 3);
+    const b = player(2, 4.5, 3);
+    const shoves = dashAt(a, b, 6);
+    expect(shoves).toEqual([{ by: 1, target: 2 }]);
+    expect(isDashing(a)).toBe(false);
+    expect(b.vel.x).toBeGreaterThan(0);
+    expect(dist(a, b)).toBeGreaterThanOrEqual(MIN_DIST - 1e-6);
+  });
+
+  it('sends the shoved player sliding about a tile and a half', () => {
+    const a = player(1, 3, 3);
+    const b = player(2, 4.5, 3);
+    dashAt(a, b, 6);
+    const shovedFrom = b.pos.x;
+    for (let i = 0; i < 60; i++) step(OPEN, [a, b], []);
+    expect(b.pos.x - shovedFrom).toBeGreaterThan(1);
+    expect(b.vel.x).toBeCloseTo(0);
+  });
+
+  it('works when the second player in the list is the one dashing', () => {
+    const a = player(1, 4.5, 3);
+    const b = player(2, 3, 3);
+    expect(dashAt(b, a, 6)).toEqual([{ by: 2, target: 1 }]);
+    expect(a.vel.x).toBeGreaterThan(0);
+  });
+
+  it('never shoves anyone into a wall', () => {
+    const a = player(1, 17, 5);
+    const b = player(2, 18.8, 5);
+    dashAt(a, b, 10);
+    for (let i = 0; i < 60; i++) {
+      step(OPEN, [a, b], []);
+      for (const p of [a, b]) expect(maxPenetration(OPEN, p.pos)).toBeLessThan(1e-6);
     }
   });
 });

@@ -16,6 +16,7 @@ export interface GamepadLike {
 /** Button indices in the W3C standard gamepad layout (A/X are Xbox names). */
 export const PAD_BUTTON = {
   a: 0,
+  b: 1,
   x: 2,
   dpadUp: 12,
   dpadDown: 13,
@@ -54,7 +55,7 @@ export function readGamepad(pad: GamepadLike | null | undefined): ControllerStat
   const move =
     dpad.x !== 0 || dpad.y !== 0 ? dpad : applyDeadZone(pad.axes[0] ?? 0, pad.axes[1] ?? 0);
   const a = held(PAD_BUTTON.a);
-  return { move, interact: a, work: held(PAD_BUTTON.x), join: a };
+  return { move, interact: a, work: held(PAD_BUTTON.x), dash: held(PAD_BUTTON.b), join: a };
 }
 
 export class GamepadController implements Controller {

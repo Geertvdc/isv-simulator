@@ -216,6 +216,7 @@ export function botInput(state: GameState, bot: Bot, bots: readonly Bot[]): Inpu
     move: { x: 0, y: 0 },
     interact: false,
     work: false,
+    dash: false,
   };
   const goal = chooseGoal(state, bot, bots);
   const player = getPlayer(state, bot.playerId);

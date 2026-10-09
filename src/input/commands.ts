@@ -36,6 +36,7 @@ export function buildInputCommands(
       move: state ? toWorldMove(state.move) : { x: 0, y: 0 },
       interact: state?.interact ?? false,
       work: state?.work ?? false,
+      dash: state?.dash ?? false,
     };
   });
 }

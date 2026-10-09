@@ -10,6 +10,7 @@ export interface KeyScheme {
   right: readonly string[];
   interact: readonly string[];
   work: readonly string[];
+  dash: readonly string[];
 }
 
 /** Keys are `KeyboardEvent.code` values, so they sit in the same place on any layout. */
@@ -21,6 +22,7 @@ export const LEFT_KEYS: KeyScheme = {
   right: ['KeyD'],
   interact: ['KeyE'],
   work: ['KeyQ'],
+  dash: ['ShiftLeft'],
 };
 
 export const RIGHT_KEYS: KeyScheme = {
@@ -32,6 +34,8 @@ export const RIGHT_KEYS: KeyScheme = {
   interact: ['ShiftRight'],
   // Not Ctrl: right Ctrl plus the left player's W would close the tab.
   work: ['Slash'],
+  // Option on a Mac keyboard.
+  dash: ['AltRight'],
 };
 
 export const KEY_SCHEMES: readonly KeyScheme[] = [LEFT_KEYS, RIGHT_KEYS];
@@ -42,7 +46,7 @@ export const KEYBOARD_JOIN_GROUP = 'keyboard';
 
 const GAME_KEYS = new Set(
   [
-    ...KEY_SCHEMES.flatMap((s) => [s.up, s.down, s.left, s.right, s.interact, s.work]),
+    ...KEY_SCHEMES.flatMap((s) => [s.up, s.down, s.left, s.right, s.interact, s.work, s.dash]),
     JOIN_KEYS,
   ].flat(),
 );
@@ -100,6 +104,7 @@ export function readKeyboard(keys: KeyboardState, scheme: KeyScheme): Controller
     move: { x: axis(scheme.left, scheme.right), y: axis(scheme.up, scheme.down) },
     interact: keys.anyDown(scheme.interact),
     work: keys.anyDown(scheme.work),
+    dash: keys.anyDown(scheme.dash),
     join: keys.anyDown(JOIN_KEYS),
   };
 }

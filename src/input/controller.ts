@@ -14,6 +14,7 @@ export interface ControllerState {
   move: Vec;
   interact: boolean;
   work: boolean;
+  dash: boolean;
   join: boolean;
 }
 
@@ -46,6 +47,7 @@ export const IDLE: Readonly<ControllerState> = Object.freeze({
   move: Object.freeze({ x: 0, y: 0 }),
   interact: false,
   work: false,
+  dash: false,
   join: false,
 });
 
