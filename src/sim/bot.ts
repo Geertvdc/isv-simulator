@@ -4,9 +4,13 @@
  * itself (shortest path, then work), ships it and goes back for the next.
  * Bugs first, since their timers are shorter. Bots that skip tests go
  * straight from code to pipeline and ship untested. A bot whose ticket is
- * stuck on a broken pipeline takes it out and repairs the pipeline.
+ * stuck on a broken pipeline takes it out and repairs the pipeline. A
+ * ticket waiting for review gets a second bot to help: any bot with nothing
+ * better to do (empty hands, a build running, or no free station for what
+ * it carries) goes and works the review station with the owner.
  */
 
+import { REVIEWERS_NEEDED } from './balance';
 import { isAtItsStation } from './interact';
 import { type GridPoint, type LevelMap, type Tile, getTile, isSolid } from './level';
 import type { Level } from './levels';
@@ -30,6 +34,8 @@ import {
   currentStep,
   queuedTickets,
   ticketCarriedBy,
+  ticketOnTile,
+  workableStep,
   workableSteps,
 } from './tickets';
 
@@ -57,6 +63,8 @@ export interface Bot {
   ticketId: number | null;
   /** The station this bot is about to put its ticket on, so other bots leave it free. */
   dropTarget: GridPoint | null;
+  /** The review station this bot is helping at, so no more bots than needed come. */
+  helping: GridPoint | null;
   /** Interact was sent last tick: presses need a release in between. */
   interactWas: boolean;
   skipTests: boolean;
@@ -67,10 +75,19 @@ type Action = 'interact' | 'work' | 'wait';
 interface Goal {
   tile: GridPoint;
   action: Action;
+  /** Stand next to the tile somewhere no other player stands, so two can work it. */
+  besideOthers?: boolean;
 }
 
 export function createBot(playerId: PlayerId, skipTests = false): Bot {
-  return { playerId, ticketId: null, dropTarget: null, interactWas: false, skipTests };
+  return {
+    playerId,
+    ticketId: null,
+    dropTarget: null,
+    helping: null,
+    interactWas: false,
+    skipTests,
+  };
 }
 
 function tilesOf(map: LevelMap, tile: Tile): GridPoint[] {
@@ -94,9 +111,19 @@ function standingSpots(map: LevelMap, tile: GridPoint): GridPoint[] {
  * Shortest floor path from `from` to any tile next to `target`, as a list of
  * tiles starting after `from`. Empty when already there; `null` when unreachable.
  */
-export function findPath(map: LevelMap, from: GridPoint, target: GridPoint): GridPoint[] | null {
+export function findPath(
+  map: LevelMap,
+  from: GridPoint,
+  target: GridPoint,
+  taken: readonly GridPoint[] = [],
+): GridPoint[] | null {
   const key = (p: GridPoint): number => p.y * map.width + p.x;
-  const goals = new Set(standingSpots(map, target).map(key));
+  const takenKeys = new Set(taken.map(key));
+  const goals = new Set(
+    standingSpots(map, target)
+      .map(key)
+      .filter((k) => !takenKeys.has(k)),
+  );
   if (goals.has(key(from))) return [];
   const cameFrom = new Map<number, GridPoint | null>([[key(from), null]]);
   const queue: GridPoint[] = [from];
@@ -149,10 +176,11 @@ function samePoint(a: GridPoint | null, b: GridPoint | null): boolean {
 /** What `bot` wants to do next. */
 function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | null {
   bot.dropTarget = null;
+  bot.helping = null;
   const carried = ticketCarriedBy(state, bot.playerId);
   if (carried) {
     bot.ticketId = carried.id;
-    return carryGoal(state, bot, bots, carried);
+    return carryGoal(state, bot, bots, carried) ?? reviewHelpGoal(state, bot, bots);
   }
 
   const own = state.tickets.find((t) => t.id === bot.ticketId);
@@ -160,10 +188,13 @@ function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | nu
     const tile = { x: own.location.x, y: own.location.y };
     const kind = getTile(state.level, tile.x, tile.y);
     if (!isAtItsStation(own, kind) || isBroken(state, tile)) return { tile, action: 'interact' };
-    return { tile, action: kind === 'pipeline' ? 'wait' : 'work' };
+    if (kind === 'pipeline') return reviewHelpGoal(state, bot, bots) ?? { tile, action: 'wait' };
+    return { tile, action: 'work' };
   }
   bot.ticketId = null;
 
+  const help = reviewHelpGoal(state, bot, bots);
+  if (help) return help;
   for (const queue of ['bug', 'feature'] as const satisfies readonly TicketKind[]) {
     if (queuedTickets(state, queue).length === 0) continue;
     const tile = nearest(state, bot.playerId, tilesOf(state.level, QUEUE_TILE[queue]));
@@ -204,6 +235,22 @@ function carryGoal(state: GameState, bot: Bot, bots: readonly Bot[], ticket: Tic
   return { tile, action: 'interact' };
 }
 
+/** The nearest review station with a ticket waiting for more reviewers than are on their way. */
+function reviewHelpGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | null {
+  const waiting = tilesOf(state.level, 'review').filter((t) => {
+    const ticket = ticketOnTile(state, t.x, t.y);
+    if (!ticket || !workableStep(ticket, 'review')) return false;
+    const coming = bots.filter(
+      (b) => b !== bot && (b.ticketId === ticket.id || samePoint(b.helping, t)),
+    ).length;
+    return coming < REVIEWERS_NEEDED;
+  });
+  const tile = nearest(state, bot.playerId, waiting);
+  if (!tile) return null;
+  bot.helping = tile;
+  return { tile, action: 'work', besideOthers: true };
+}
+
 function unit(x: number, y: number): { x: number; y: number } {
   const len = Math.hypot(x, y);
   return len < 1e-9 ? { x: 0, y: 0 } : { x: x / len, y: y / len };
@@ -226,7 +273,12 @@ export function botInput(state: GameState, bot: Bot, bots: readonly Bot[]): Inpu
     return input;
   }
 
-  const path = findPath(state.level, currentTile(state, bot.playerId), goal.tile);
+  const others = goal.besideOthers
+    ? state.players
+        .filter((p) => p.id !== bot.playerId)
+        .map((p) => ({ x: Math.round(p.pos.x), y: Math.round(p.pos.y) }))
+    : [];
+  const path = findPath(state.level, currentTile(state, bot.playerId), goal.tile, others);
   let wantsInteract = false;
   if (path && path.length > 0) {
     const next = path[0];
@@ -253,6 +305,8 @@ export interface BotRunSummary {
   shipped: number;
   shippedBugs: number;
   shippedUntested: number;
+  /** Shipped orders that needed a review. */
+  shippedReviewed: number;
   expired: number;
   expiredBugs: number;
   result: LevelResult;
@@ -268,7 +322,14 @@ export function runBots(
   const ids = Array.from({ length: botCount }, (_, i) => i + 1);
   const state = createGame(level, seed, ids);
   const bots = ids.map((id) => createBot(id, skipTests));
-  const summary = { shipped: 0, shippedBugs: 0, shippedUntested: 0, expired: 0, expiredBugs: 0 };
+  const summary = {
+    shipped: 0,
+    shippedBugs: 0,
+    shippedUntested: 0,
+    shippedReviewed: 0,
+    expired: 0,
+    expiredBugs: 0,
+  };
   while (!state.result) {
     tick(
       state,
@@ -279,6 +340,7 @@ export function runBots(
         summary.shipped++;
         if (e.order?.kind === 'bug') summary.shippedBugs++;
         if (e.untested) summary.shippedUntested++;
+        if (e.order?.steps.includes('review')) summary.shippedReviewed++;
       }
       if (e.type === 'orderExpired') {
         summary.expired++;
