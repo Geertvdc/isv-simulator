@@ -11,14 +11,15 @@
 
 - Order: `id`, `kind` (`feature` or `bug`), `title`, `steps`, `createdTick`, `expiresTick`
 - Steps are an ordered list and are done in order: a station only works the ticket's first unfinished step. Features need `code`, `test`, `pipeline`; bugs need `test` (reproduce), `code`, `test`, `pipeline`
-- `test` steps are optional: a station may skip past unfinished tests to the next required step, so an untested ticket can go through the pipeline and ship. Skipped tests can still be done later
+- `test` steps are optional: a station may skip past unfinished tests to the next required step, so an untested ticket can go through the pipeline and ship. Test in its phase or not at all: once a later step has been worked on, a skipped test stays skipped
 - Two queues, each holding any number of tickets. Taking from a queue tile gives the oldest ticket in that queue; tickets never go back in
   - Inbox (`I`): every new feature order puts its ticket here (this replaces the phase 5 inbox timer)
   - Bug queue (`B`): after each ship there is a chance that a bug comes back: `BUG_CHANCE` (25%) when fully tested, rising linearly with the share of skipped tests to `BUG_CHANCE_UNTESTED` (75%). The bug comes back after `BUG_DELAY_TICKS`. It opens a bug order with a shorter timer than features and puts its ticket in the bug queue. Bugs don't count towards the feature order cap
 - When an order expires, one waiting ticket of its kind is removed from its queue (tickets already in progress stay and can serve a later order)
 - Pipeline (`P`): put a ticket in that has `code` done (tested or not); it builds on its own for `PIPELINE_BUILD_TICKS` (no work button needed). Pick it up when done; `pipeline` is then complete
-- Ship (`S`): put down a ticket with all required steps done to deliver it; the `orderShipped` event says whether tests were skipped. It completes the matching order with the least time left. A ticket that matches no order, or isn't finished, is refused (stays in hand)
-- Score: `ORDER_POINTS` per feature order (`BUG_ORDER_POINTS`, 0, per bug fix, so skipping tests doesn't farm points) plus a speed bonus for time left; `EXPIRED_PENALTY` when a feature order runs out and `BUG_EXPIRED_PENALTY` for a bug (the order is removed). The score never drops below 0
+- Ship (`S`): put down a ticket with all required steps done to deliver it; the `orderShipped` event says whether tests were skipped. It completes the matching order with the least time left. A ticket whose order already expired still ships, for 0 points. A ticket missing a required step is refused (stays in hand)
+- Score: `ORDER_POINTS` per feature order plus a speed bonus for time left; bug fixes earn nothing (`BUG_ORDER_POINTS` = 0, no speed bonus), so skipping tests never pays; `EXPIRED_PENALTY` when a feature order runs out and `BUG_EXPIRED_PENALTY` for a bug (the order is removed). The score never drops below 0
+- Player count: a level's schedule and stars are for one player. `settingsForPlayers` scales them by `ORDER_RATE_BY_PLAYERS`: more players get feature orders more often, more open orders and higher star thresholds
 - Level timer: when `durationTicks` is reached the level ends; `state.result = { score, stars }`
 - Events (`orderCreated`, `orderShipped`, `orderExpired`, `levelEnded`) for the render and UI to react to
 
@@ -36,10 +37,11 @@
 
 - Order creation follows the schedule; expiry removes the order and applies the penalty
 - Pipeline: refuses unfinished tickets, builds on its own timer, completes the step
-- Ship: completes the order with the least time left, refuses unfinished tickets and tickets with no matching order
+- Ship: completes the order with the least time left, refuses unfinished tickets, ships tickets with no matching order for 0 points
 - Queues: new orders enqueue their ticket, pick-up takes the oldest; bug chance after shipping, bug order timer and steps
 - Scoring: base points and speed bonus, bug points and bug penalty
-- Optional tests: untested tickets go through the pipeline and ship; bug chance scales with skipped tests
+- Optional tests: untested tickets go through the pipeline and ship; bug chance scales with skipped tests; a skipped test can't be done later
+- Player count scaling of the schedule and stars
 - Level end at `durationTicks`, star thresholds
 - Scenario test: the bot run on the garage with a fixed seed earns at least 1 star
 

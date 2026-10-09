@@ -16,7 +16,7 @@ import { COL, addTicket, give, idle, newTestGame, press, standAt } from './testi
 import { tick } from './tick';
 import { queuedTickets } from './tickets';
 
-const SCHEDULE = GARAGE.orderSchedule;
+const SCHEDULE = newTestGame().settings.orderSchedule;
 
 /** A game whose feature orders run on the garage schedule. */
 function scheduledGame(seed = 1): ReturnType<typeof newTestGame> {
@@ -207,12 +207,20 @@ describe('ship', () => {
     expect(state.orders).toHaveLength(1);
   });
 
-  it('refuses tickets that match no order', () => {
+  it('ships tickets whose order already expired, for no points', () => {
     const { state, ticket } = readyToShip('bug');
-    createOrder(state, 'feature', 'X');
-    press(state);
-    expect(ticket.location).toEqual({ kind: 'player', playerId: 1 });
-    expect(state.score).toBe(0);
+    const feature = createOrder(state, 'feature', 'X');
+    state.score = 50;
+    tick(state, [
+      { playerId: 1, tick: state.tick, move: { x: 0, y: 0 }, interact: true, work: false },
+    ]);
+    expect(state.tickets).not.toContain(ticket);
+    expect(state.orders).toEqual([feature]);
+    expect(state.score).toBe(50);
+    expect(state.events.find((e) => e.type === 'orderShipped')).toMatchObject({
+      order: null,
+      points: 0,
+    });
   });
 
   it(`sends about ${BUG_CHANCE * 100}% of ships back as a bug after BUG_DELAY_TICKS`, () => {
@@ -266,10 +274,11 @@ describe('scoring', () => {
     expect(shipPoints(order, 1100)).toBe(ORDER_POINTS);
   });
 
-  it('bug fixes only earn BUG_ORDER_POINTS plus the speed bonus', () => {
+  it('bug fixes earn BUG_ORDER_POINTS, no speed bonus', () => {
     const bug: Order = { ...order, kind: 'bug' };
-    expect(shipPoints(bug, 100)).toBe(BUG_ORDER_POINTS + ORDER_SPEED_BONUS_MAX);
+    expect(shipPoints(bug, 100)).toBe(BUG_ORDER_POINTS);
     expect(shipPoints(bug, 1100)).toBe(BUG_ORDER_POINTS);
+    expect(BUG_ORDER_POINTS).toBe(0);
   });
 
   it('gives a star per threshold reached', () => {

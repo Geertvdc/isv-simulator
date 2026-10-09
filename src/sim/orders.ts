@@ -54,7 +54,8 @@ export type GameEvent =
   | { type: 'orderCreated'; order: Order }
   | {
       type: 'orderShipped';
-      order: Order;
+      /** `null` when its order had already expired: shipped late, for nothing. */
+      order: Order | null;
       points: number;
       playerId: PlayerId;
       /** Some tests were skipped. */
@@ -73,13 +74,13 @@ export function bugChance(ticket: Ticket): number {
   return BUG_CHANCE + (BUG_CHANCE_UNTESTED - BUG_CHANCE) * skippedShare(ticket);
 }
 
-/** Points for shipping `order` at `tick`: base points plus a bonus for the share of time left. */
+/** Points for shipping `order` at `tick`: base points plus a bonus for the share of time left. Bug fixes earn nothing. */
 export function shipPoints(order: Order, tick: number): number {
+  if (order.kind === 'bug') return BUG_ORDER_POINTS;
   const limit = order.expiresTick - order.createdTick;
   const left = Math.max(0, order.expiresTick - tick);
   const share = limit > 0 ? Math.min(1, left / limit) : 0;
-  const base = order.kind === 'bug' ? BUG_ORDER_POINTS : ORDER_POINTS;
-  return base + Math.round(ORDER_SPEED_BONUS_MAX * share);
+  return ORDER_POINTS + Math.round(ORDER_SPEED_BONUS_MAX * share);
 }
 
 /** Stars for a score: one per threshold reached. */
@@ -119,17 +120,17 @@ export function createOrder(state: GameState, kind: TicketKind, title: string): 
 /**
  * Ships the ticket `playerId` carries: completes the matching order with the
  * least time left, scores it and maybe sends a bug back later (more likely
- * when tests were skipped). Refuses tickets missing a required step and
- * tickets that match no order. Returns whether it shipped.
+ * when tests were skipped). A ticket whose order already expired still ships,
+ * for no points. Refuses tickets missing a required step. Returns whether it
+ * shipped.
  */
 export function shipTicket(state: GameState, playerId: PlayerId, ticket: Ticket): boolean {
   if (!isShippable(ticket)) return false;
-  const order = matchingOrders(state, ticket)[0];
-  if (!order) return false;
+  const order = matchingOrders(state, ticket)[0] ?? null;
 
-  const points = shipPoints(order, state.tick);
+  const points = order ? shipPoints(order, state.tick) : 0;
   state.tickets = state.tickets.filter((t) => t !== ticket);
-  state.orders = state.orders.filter((o) => o !== order);
+  if (order) state.orders = state.orders.filter((o) => o !== order);
   state.score += points;
   const untested = skippedShare(ticket) > 0;
   state.events.push({ type: 'orderShipped', order, points, playerId, untested });

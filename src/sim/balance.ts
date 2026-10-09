@@ -57,12 +57,20 @@ export const ORDER_SPEED_BONUS_MAX = 10;
 /** Points lost when an order runs out. */
 export const EXPIRED_PENALTY = 10;
 /**
- * Base points for shipping a bug fix (the speed bonus comes on top). Low, so
- * skipping tests and fixing the fallout never beats testing in the first place.
+ * Points for shipping a bug fix, speed bonus included: none, so skipping tests
+ * and fixing the fallout never beats testing in the first place. Bugs only
+ * cost points when they expire.
  */
 export const BUG_ORDER_POINTS = 0;
 /** Points lost when a bug order runs out: customers hate bugs more than late features. */
 export const BUG_EXPIRED_PENALTY = 20;
+
+/**
+ * How many times more often feature orders arrive, by number of players
+ * (index 0 = solo). The level's schedule and star thresholds are for one
+ * player; open-order cap and stars scale by the same factor.
+ */
+export const ORDER_RATE_BY_PLAYERS: readonly number[] = [1, 1.7, 2.3, 2.8];
 
 /** Chance that a fully tested ticket comes back as a bug after shipping. */
 export const BUG_CHANCE = 0.25;

@@ -50,6 +50,17 @@ describe('optional tests', () => {
     expect(workableSteps(bug).map((s) => s.kind)).toEqual(['test', 'code']);
   });
 
+  it('a test is skipped for good once a later step was worked on', () => {
+    const state = newTestGame();
+    const t = addTicket(state, COL.counter, { done: 1 });
+    const pipeline = t.steps[2];
+    if (pipeline) pipeline.progress = 0.1;
+    expect(workableSteps(t).map((s) => s.kind)).toEqual(['pipeline']);
+    // A half-done test can still be abandoned for the next step.
+    const half = addTicket(state, COL.counter, { done: 1, progress: 0.5 });
+    expect(workableSteps(half).map((s) => s.kind)).toEqual(['test', 'pipeline']);
+  });
+
   it('shippable once code and pipeline are done, tests or not', () => {
     const state = newTestGame();
     const t = addTicket(state, COL.counter, { done: 1 });
