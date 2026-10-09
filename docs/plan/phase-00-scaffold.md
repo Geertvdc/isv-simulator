@@ -8,7 +8,7 @@
 - `tsconfig` strict mode
 - npm scripts: `dev`, `build`, `test`, `lint`, `typecheck`, `check` (typecheck + lint + test)
 - Folder skeleton from `AGENTS.md`
-- Phaser boots one `GameScene` with a dark background and centered text "Theme Software Vendor"
+- Phaser boots one `GameScene` with a dark background and centered text "ISV Simulator"
 - DOM overlay `<div id="ui">` on top of the canvas showing "v0"
 - Canvas resizes with the window
 - `src/sim/rng.ts`: seeded RNG (mulberry32 or similar) with `next()`, `int(min, max)`, `pick(array)`; RNG state must be storable as a number in `GameState` later
