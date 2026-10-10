@@ -42,6 +42,6 @@
 ## Done when
 
 - [ ] Boot → title → lobby → level select → play → results → next level, all with only a gamepad, and all with only a keyboard
-- [ ] Pause works from every device in the round and the clock doesn't jump on resume
-- [ ] Progress and settings survive a reload; clearing site data starts fresh without errors
-- [ ] `npm run check` passes
+- [x] Pause works from every device in the round and the clock doesn't jump on resume
+- [x] Progress and settings survive a reload; clearing site data starts fresh without errors
+- [x] `npm run check` passes
