@@ -13,7 +13,9 @@ import './style.css';
  */
 
 const DEFAULT_SCALE = 4;
-const scale = Number(new URLSearchParams(location.search).get('scale')) || DEFAULT_SCALE;
+const params = new URLSearchParams(location.search);
+const scale = Number(params.get('scale')) || DEFAULT_SCALE;
+const labels = params.get('labels') !== '0';
 
 const hex = (color: number): string => `#${color.toString(16).padStart(6, '0')}`;
 
@@ -68,7 +70,7 @@ async function download(rendered: readonly RenderedAsset[]): Promise<void> {
   );
   const a = document.createElement('a');
   a.href = url;
-  a.download = `isv-placeholders@${scale}x.zip`;
+  a.download = `isv-placeholders@${scale}x${labels ? '' : '-no-letters'}.zip`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -107,11 +109,14 @@ function show(rendered: readonly RenderedAsset[]): void {
 
 for (const s of [1, 2, 4, 8]) {
   const link = document.createElement('a');
-  link.href = `?scale=${s}`;
+  link.href = `?scale=${s}${labels ? '' : '&labels=0'}`;
   link.textContent = `${s}x`;
   if (s === scale) link.className = 'current';
   getElement('scales').append(link);
 }
+const labelToggle = getElement('labels') as HTMLAnchorElement;
+labelToggle.href = `?scale=${scale}${labels ? '&labels=0' : ''}`;
+labelToggle.textContent = labels ? 'Hide letters' : 'Show letters';
 
 const frames = SHEET.map((a) => ({
   w: a.frame.width * (a.scale ?? scale),
@@ -124,5 +129,5 @@ new Phaser.Game({
   transparent: true,
   width: Math.ceil(Math.max(...frames.map((f) => f.w))),
   height: Math.ceil(Math.max(...frames.map((f) => f.h))),
-  scene: new AssetSheetScene(SHEET, scale, show),
+  scene: new AssetSheetScene(SHEET, scale, labels, show),
 });
