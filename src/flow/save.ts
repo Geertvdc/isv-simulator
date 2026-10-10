@@ -5,7 +5,13 @@
  * without it. Only progress and settings are saved, never a round.
  */
 
-import { DEFAULT_SFX_VOLUME, MAX_STARS, SFX_VOLUME_MAX, STARS_TO_UNLOCK } from '../sim/balance';
+import {
+  DEFAULT_MUSIC_VOLUME,
+  DEFAULT_SFX_VOLUME,
+  MAX_STARS,
+  SFX_VOLUME_MAX,
+  STARS_TO_UNLOCK,
+} from '../sim/balance';
 import type { LevelResult } from '../sim/orders';
 
 export const SAVE_KEY = 'isv-simulator.save';
@@ -29,6 +35,8 @@ export interface LevelRecord {
 export interface Settings {
   /** 0 (off) to `SFX_VOLUME_MAX`. */
   sfxVolume: number;
+  /** 0 (off) to `SFX_VOLUME_MAX`, separate from the sound effects. */
+  musicVolume: number;
   screenShake: boolean;
 }
 
@@ -37,14 +45,16 @@ export interface SaveData {
   /** By level id; levels never finished are missing. */
   levels: Record<string, LevelRecord>;
   settings: Settings;
+  /** The first-level hints were all followed once; they never show again. */
+  tutorialDone: boolean;
 }
 
 export function defaultSettings(): Settings {
-  return { sfxVolume: DEFAULT_SFX_VOLUME, screenShake: true };
+  return { sfxVolume: DEFAULT_SFX_VOLUME, musicVolume: DEFAULT_MUSIC_VOLUME, screenShake: true };
 }
 
 export function createSave(): SaveData {
-  return { version: SAVE_VERSION, levels: {}, settings: defaultSettings() };
+  return { version: SAVE_VERSION, levels: {}, settings: defaultSettings(), tutorialDone: false };
 }
 
 type Json = Record<string, unknown>;
@@ -87,10 +97,14 @@ export function parseSave(raw: unknown): SaveData {
   if (isObject(raw.settings)) {
     const volume = wholeNumber(raw.settings.sfxVolume, 0, SFX_VOLUME_MAX);
     if (volume !== null) save.settings.sfxVolume = volume;
+    // Saves from before phase 12 have no music volume: they keep the default.
+    const music = wholeNumber(raw.settings.musicVolume, 0, SFX_VOLUME_MAX);
+    if (music !== null) save.settings.musicVolume = music;
     if (typeof raw.settings.screenShake === 'boolean') {
       save.settings.screenShake = raw.settings.screenShake;
     }
   }
+  if (typeof raw.tutorialDone === 'boolean') save.tutorialDone = raw.tutorialDone;
   return save;
 }
 
@@ -145,7 +159,10 @@ export function writeSave(storage: StorageLike | null, save: SaveData): void {
     }
     const settings = { ...(isObject(base.settings) ? base.settings : {}), ...save.settings };
     const version = Math.max(save.version, wholeNumber(base.version, 1, Infinity) ?? 1);
-    storage?.setItem(SAVE_KEY, JSON.stringify({ ...base, version, levels, settings }));
+    storage?.setItem(
+      SAVE_KEY,
+      JSON.stringify({ ...base, version, levels, settings, tutorialDone: save.tutorialDone }),
+    );
   } catch {
     // Full or blocked: progress lives on in memory for this session.
   }

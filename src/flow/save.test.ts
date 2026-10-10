@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SFX_VOLUME, SFX_VOLUME_MAX, STARS_TO_UNLOCK } from '../sim/balance';
+import {
+  DEFAULT_MUSIC_VOLUME,
+  DEFAULT_SFX_VOLUME,
+  SFX_VOLUME_MAX,
+  STARS_TO_UNLOCK,
+} from '../sim/balance';
 import {
   OLD_BEST_STARS_KEY,
   SAVE_KEY,
@@ -42,7 +47,12 @@ describe('loadSave and writeSave', () => {
     expect(loadSave(memoryStorage())).toEqual({
       version: 1,
       levels: {},
-      settings: { sfxVolume: DEFAULT_SFX_VOLUME, screenShake: true },
+      settings: {
+        sfxVolume: DEFAULT_SFX_VOLUME,
+        musicVolume: DEFAULT_MUSIC_VOLUME,
+        screenShake: true,
+      },
+      tutorialDone: false,
     });
   });
 
@@ -50,7 +60,8 @@ describe('loadSave and writeSave', () => {
     const storage = memoryStorage();
     const save = createSave();
     recordResult(save, 'garage', { score: 140, stars: 2 });
-    save.settings = { sfxVolume: 3, screenShake: false };
+    save.settings = { sfxVolume: 3, musicVolume: 0, screenShake: false };
+    save.tutorialDone = true;
     writeSave(storage, save);
     expect(loadSave(storage)).toEqual(save);
   });
@@ -64,7 +75,8 @@ describe('loadSave and writeSave', () => {
         'scale-up': { bestStars: 9, bestScore: 12.4 },
         broken: 7,
       },
-      settings: { sfxVolume: 99, screenShake: 'yes' },
+      settings: { sfxVolume: 99, musicVolume: -3, screenShake: 'yes' },
+      tutorialDone: 'sure',
     });
     expect(save).toEqual({
       version: 1,
@@ -72,7 +84,36 @@ describe('loadSave and writeSave', () => {
         garage: { bestStars: 2, bestScore: 0, plays: 0 },
         'scale-up': { bestStars: 3, bestScore: 12, plays: 1 },
       },
-      settings: { sfxVolume: SFX_VOLUME_MAX, screenShake: true },
+      settings: { sfxVolume: SFX_VOLUME_MAX, musicVolume: 0, screenShake: true },
+      tutorialDone: false,
+    });
+  });
+
+  it('gives a save from before music and hints the defaults, without a version bump', () => {
+    const storage = memoryStorage();
+    storage.data.set(
+      SAVE_KEY,
+      JSON.stringify({
+        version: 1,
+        levels: { garage: { bestStars: 1, bestScore: 70, plays: 2 } },
+        settings: { sfxVolume: 4, screenShake: false },
+      }),
+    );
+    const save = loadSave(storage);
+    expect(save.version).toBe(1);
+    expect(save.settings).toEqual({
+      sfxVolume: 4,
+      musicVolume: DEFAULT_MUSIC_VOLUME,
+      screenShake: false,
+    });
+    expect(save.tutorialDone).toBe(false);
+    save.settings.musicVolume = 2;
+    save.tutorialDone = true;
+    writeSave(storage, save);
+    expect(JSON.parse(storage.data.get(SAVE_KEY) ?? '')).toMatchObject({
+      version: 1,
+      settings: { sfxVolume: 4, musicVolume: 2, screenShake: false },
+      tutorialDone: true,
     });
   });
 
@@ -115,14 +156,16 @@ describe('loadSave and writeSave', () => {
     const newer = {
       version: 3,
       levels: { garage: { bestStars: 2, bestScore: 150, plays: 4, bestTime: 99 } },
-      settings: { sfxVolume: 4, screenShake: false, musicVolume: 7 },
+      settings: { sfxVolume: 4, screenShake: false, musicVolume: 7, voiceVolume: 2 },
+      tutorialDone: true,
       achievements: ['shipped'],
     };
     storage.data.set(SAVE_KEY, JSON.stringify(newer));
     const save = loadSave(storage);
     expect(save.version).toBe(3);
     expect(save.levels.garage).toEqual({ bestStars: 2, bestScore: 150, plays: 4 });
-    expect(save.settings).toEqual({ sfxVolume: 4, screenShake: false });
+    expect(save.settings).toEqual({ sfxVolume: 4, musicVolume: 7, screenShake: false });
+    expect(save.tutorialDone).toBe(true);
 
     recordResult(save, 'garage', { score: 200, stars: 3 });
     save.settings.sfxVolume = 5;
@@ -130,7 +173,8 @@ describe('loadSave and writeSave', () => {
     expect(JSON.parse(storage.data.get(SAVE_KEY) ?? '')).toEqual({
       version: 3,
       levels: { garage: { bestStars: 3, bestScore: 200, plays: 5, bestTime: 99 } },
-      settings: { sfxVolume: 5, screenShake: false, musicVolume: 7 },
+      settings: { sfxVolume: 5, screenShake: false, musicVolume: 7, voiceVolume: 2 },
+      tutorialDone: true,
       achievements: ['shipped'],
     });
   });
