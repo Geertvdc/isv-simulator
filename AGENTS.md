@@ -28,6 +28,7 @@ Internal Zure game. An Overcooked-style couch co-op game about shipping software
 ```
 src/
   sim/       game state, rules, movement and collision (pure TS)
+  flow/      screens (title, lobby, menus, results) and save data (pure TS, same rules as sim/)
   render/    Phaser scenes, projection math, sprite sync
   input/     keyboard and gamepads to per-tick input commands
   ui/        DOM HUD and panels
