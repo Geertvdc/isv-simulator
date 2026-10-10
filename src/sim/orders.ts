@@ -17,6 +17,7 @@ import {
   ORDER_SPEED_BONUS_MAX,
 } from './balance';
 import { INCIDENT_TITLES, TICKET_TITLES, bugTitle } from './content';
+import type { Invite } from './meetings';
 import * as rng from './rng';
 import type { GameState, PlayerId } from './state';
 import {
@@ -83,7 +84,11 @@ export type GameEvent =
   /** A dashing player knocked `target` away. */
   | { type: 'shoved'; by: PlayerId; target: PlayerId }
   /** A walking manager knocked `target` away. */
-  | { type: 'managerBumped'; managerId: number; target: PlayerId };
+  | { type: 'managerBumped'; managerId: number; target: PlayerId }
+  /** A calendar invite went out to `invite.playerId`. */
+  | { type: 'inviteSent'; invite: Invite }
+  | { type: 'meetingAttended'; invite: Invite }
+  | { type: 'meetingMissed'; invite: Invite; penalty: number };
 
 /** Ticks left on an order; 0 once it's due. */
 export function ticksLeft(state: GameState, order: Order): number {

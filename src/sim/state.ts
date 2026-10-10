@@ -6,6 +6,7 @@ import { INTERACT_REACH } from './balance';
 import type { GridPoint, LevelMap } from './level';
 import { type Level, type LevelSettings, settingsForPlayers } from './levels';
 import { type Manager, createManagers } from './manager';
+import type { Invite } from './meetings';
 import type { GameEvent, LevelResult, Order, PendingBug } from './orders';
 import { type Pipeline, createPipelines } from './pipeline';
 import { type RngState, createRng } from './rng';
@@ -77,6 +78,11 @@ export interface GameState {
   nextOrderTick: number;
   /** Tick from which the next incident is due; `null` on levels without incidents. */
   nextIncidentTick: number | null;
+  /** Open calendar invites, at most one per player. */
+  invites: Invite[];
+  nextInviteId: number;
+  /** Tick from which the next invite is due; `null` on levels without meetings. */
+  nextMeetingTick: number | null;
   /** Bugs on their way back from shipped tickets. */
   pendingBugs: PendingBug[];
   score: number;
@@ -130,6 +136,9 @@ export function createGame(level: Level, seed: number, playerIds: readonly Playe
     nextOrderId: 1,
     nextOrderTick: level.orderSchedule.firstOrderTick,
     nextIncidentTick: level.incidents?.firstTick ?? null,
+    invites: [],
+    nextInviteId: 1,
+    nextMeetingTick: level.meetings?.firstTick ?? null,
     pendingBugs: [],
     score: 0,
     result: null,

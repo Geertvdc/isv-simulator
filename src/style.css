@@ -174,6 +174,59 @@ body {
   animation: incident-flash 0.8s steps(2, jump-none) infinite;
 }
 
+.hud-invites {
+  display: flex;
+  gap: 10px;
+}
+
+.invite {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 220px;
+  padding: 6px 12px;
+  border: 3px solid var(--player-color);
+  border-radius: 10px;
+  background: rgba(20, 22, 28, 0.9);
+  animation: order-in 0.25s ease-out;
+}
+
+.invite.urgent {
+  animation: order-flash 0.5s steps(2, jump-none) infinite;
+}
+
+.invite-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 800;
+}
+
+.invite-who {
+  color: var(--player-color);
+}
+
+.invite-time {
+  font-variant-numeric: tabular-nums;
+}
+
+.invite-title {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.invite-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+
+.invite-bar-fill {
+  height: 100%;
+  background: #7cf07c;
+}
+
 @keyframes incident-flash {
   to {
     background: #5c0905;
