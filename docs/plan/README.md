@@ -12,7 +12,7 @@ The game started as a Theme Hospital-style management sim and pivoted to Overcoo
 | 5 Carry and work (done) | Tickets from the inbox, carry, counters, work at keyboard and test bench |
 | 6 Orders and scoring (done) | Orders with timers, pipeline, ship, score, stars: **playable core loop** |
 | 7 Pipeline failure (done) | Forgotten builds break the build machine; take the ticket out, repair, rebuild |
-| 8 Couch polish | Dash, throwing, review station, juice, sound, 3 levels and level select |
+| 8 Couch polish (done) | Dash, throwing, review station, juice, sound, 3 levels and level select |
 | 9 Art pass (optional) | Real office art and characters replace placeholders, can start after phase 6 |
 | 10 Online multiplayer (later) | Authoritative server, play from different machines, only after phase 8 |
 
