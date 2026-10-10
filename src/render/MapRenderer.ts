@@ -37,16 +37,29 @@ export const BLOCK_STYLES: Readonly<Record<Exclude<Tile, 'floor'>, BlockStyle>> 
   bin: { color: 0x5a5a5a, height: STATION_HEIGHT, label: 'X' },
 };
 
+/** Wall looks a level can pick; each has the three pieces in `WALL_PIECES`. */
+export const WALL_THEMES = ['plaster', 'wood', 'glass'] as const;
+export type WallTheme = (typeof WALL_THEMES)[number];
+
 /**
- * Sprites in `public/assets/tiles/<key>.png`: one per block tile, plus
- * `wall-front` for the cut-down walls on the camera side and `wall-inner`
- * for walls with a wall in front. A block whose sprite is missing or fails
- * to load falls back to its colored block.
+ * `wall` shows its front face, `wall-front` is cut down on the camera side,
+ * `wall-inner` has a wall in front so only its top shows.
  */
-const TILE_SPRITES: readonly string[] = [
-  'wall',
-  'wall-front',
-  'wall-inner',
+const WALL_PIECES = ['wall', 'wall-front', 'wall-inner'] as const;
+
+/** Things hung on walls that show their front face, per theme. */
+const WALL_DECOS: Readonly<Record<WallTheme, readonly string[]>> = {
+  plaster: ['poster', 'whiteboard', 'clock', 'kanban'],
+  wood: ['poster', 'whiteboard', 'clock', 'kanban'],
+  glass: ['whiteboard', 'clock'],
+};
+/** One in this many front-facing walls gets a decoration. */
+const WALL_DECO_EVERY = 3;
+/** Decoration center above the tile center: the middle of the wall's face, over the skirting. */
+const WALL_DECO_LIFT = 12;
+
+/** Tiles drawn from `public/assets/tiles/<tile>.png`; walls come from `walls/<theme>/`. */
+const TILE_SPRITES: readonly Exclude<Tile, 'floor' | 'wall'>[] = [
   'counter',
   'inbox',
   'bugQueue',
@@ -57,22 +70,38 @@ const TILE_SPRITES: readonly string[] = [
   'ship',
   'bin',
 ];
+
+/** Every sprite as its path under `public/assets/`, without extension. */
+const SPRITE_PATHS: readonly string[] = [
+  ...TILE_SPRITES.map((tile) => `tiles/${tile}`),
+  ...WALL_THEMES.flatMap((theme) => WALL_PIECES.map((piece) => `walls/${theme}/${piece}`)),
+  ...[...new Set(Object.values(WALL_DECOS).flat())].map((deco) => `walls/deco/${deco}`),
+];
+
 /** Sprite pixel that sits on the front edge of the tile's floor, bottom center. */
 const SPRITE_ANCHOR = { x: 32, y: 80 };
 const SPRITE_SIZE = { width: 64, height: 96 };
 
-const spriteKey = (name: string): string => `tile.${name}`;
+const spriteKey = (path: string): string => `sprite.${path}`;
 
-/** Queues the tile sprites; call from a scene's `preload`. */
-export function preloadTileSprites(scene: Phaser.Scene): void {
-  for (const name of TILE_SPRITES) {
-    const key = spriteKey(name);
-    scene.load.image(key, `assets/tiles/${name}.png`);
+/**
+ * Queues every map sprite; call from a scene's `preload`. A sprite that is
+ * missing or fails to load falls back to the procedural placeholder.
+ */
+export function preloadMapSprites(scene: Phaser.Scene): void {
+  for (const path of SPRITE_PATHS) {
+    const key = spriteKey(path);
+    scene.load.image(key, `assets/${path}.png`);
     // Pixel art: keep hard pixel edges when the camera zooms.
     scene.load.once(`filecomplete-image-${key}`, () => {
       scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
     });
   }
+}
+
+/** Small deterministic hash of a tile, so decorations stay put between runs. */
+function tileHash(x: number, y: number): number {
+  return (Math.imul(x, 73856093) ^ Math.imul(y, 19349663)) >>> 0;
 }
 
 /** Placeholder color of a block, so other renderers can match it. */
@@ -122,6 +151,7 @@ export class MapRenderer {
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly map: LevelMap,
+    private readonly wallTheme: WallTheme = 'plaster',
   ) {
     this.drawFloor();
     this.drawBlocks();
@@ -168,7 +198,13 @@ export class MapRenderer {
     this.forEachTile((x, y, tile) => {
       if (tile === 'floor') return;
       const height = this.blockHeight(x, y, tile);
-      drawBlock(this.scene, x, y, tile, height, this.spriteName(x, y, tile, height));
+      if (tile !== 'wall') {
+        drawBlock(this.scene, x, y, tile, height, `tiles/${tile}`);
+        return;
+      }
+      const piece = this.wallPiece(x, y, height);
+      drawBlock(this.scene, x, y, tile, height, `walls/${this.wallTheme}/${piece}`);
+      if (piece === 'wall') this.drawWallDeco(x, y);
     });
   }
 
@@ -176,10 +212,23 @@ export class MapRenderer {
    * A full wall with another wall in front never shows its front face; where
    * that wall is cut down (the front corners), the top runs on down instead.
    */
-  private spriteName(x: number, y: number, tile: Exclude<Tile, 'floor'>, height: number): string {
-    if (tile !== 'wall') return tile;
+  private wallPiece(x: number, y: number, height: number): (typeof WALL_PIECES)[number] {
     if (height < WALL_HEIGHT) return 'wall-front';
     return getTile(this.map, x, y + 1) === 'wall' ? 'wall-inner' : 'wall';
+  }
+
+  /** Maybe hangs a decoration on the front face of the wall on tile (x, y). */
+  private drawWallDeco(x: number, y: number): void {
+    const decos = WALL_DECOS[this.wallTheme];
+    const hash = tileHash(x, y);
+    if (hash % WALL_DECO_EVERY !== 0 || decos.length === 0) return;
+    const deco = decos[Math.floor(hash / WALL_DECO_EVERY) % decos.length];
+    const key = spriteKey(`walls/deco/${deco ?? ''}`);
+    if (!this.scene.textures.exists(key)) return;
+    const c = tileToScreen(x, y);
+    this.scene.add
+      .image(c.x, c.y - WALL_DECO_LIFT, key)
+      .setDepth(tileDepth(x, y) + LABEL_DEPTH_OFFSET);
   }
 
   private blockHeight(x: number, y: number, tile: Exclude<Tile, 'floor'>): number {
@@ -229,7 +278,7 @@ export function drawFloorTile(
 
 /**
  * One block on tile (x, y), `height` pixels tall, with its letter on top if it
- * has one. Drawn as sprite `spriteName` (default: the tile's own) when loaded.
+ * has one. Drawn as the sprite at `spritePath` instead when that is loaded.
  */
 export function drawBlock(
   scene: Phaser.Scene,
@@ -237,10 +286,10 @@ export function drawBlock(
   y: number,
   tile: Exclude<Tile, 'floor'>,
   height: number,
-  spriteName: string = tile,
+  spritePath?: string,
 ): void {
   const depth = tileDepth(x, y);
-  const sprite = spriteKey(spriteName);
+  const sprite = spriteKey(spritePath ?? '');
   if (scene.textures.exists(sprite)) {
     const c = tileToScreen(x, y);
     scene.add
