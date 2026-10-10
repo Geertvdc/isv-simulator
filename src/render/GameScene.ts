@@ -14,7 +14,7 @@ import {
   MAP_OVERHANG,
   MapRenderer,
   OVERLAY_DEPTH,
-  preloadStationSprites,
+  preloadTileSprites,
   vectors,
 } from './MapRenderer';
 import { playerColor } from './playerColors';
@@ -88,7 +88,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload(): void {
-    preloadStationSprites(this);
+    preloadTileSprites(this);
   }
 
   create(): void {
