@@ -10,7 +10,13 @@ import { type GameState, type PlayerId, createGame, targetTile } from '../sim/st
 import { CameraController } from './CameraController';
 import type { WorldRect } from './cameraFit';
 import { GameLoop } from './GameLoop';
-import { MAP_OVERHANG, MapRenderer, OVERLAY_DEPTH, vectors } from './MapRenderer';
+import {
+  MAP_OVERHANG,
+  MapRenderer,
+  OVERLAY_DEPTH,
+  preloadStationSprites,
+  vectors,
+} from './MapRenderer';
 import { playerColor } from './playerColors';
 import { PipelineRenderer } from './PipelineRenderer';
 import { PlayerRenderer } from './PlayerRenderer';
@@ -79,6 +85,10 @@ export class GameScene extends Phaser.Scene {
 
   constructor() {
     super('GameScene');
+  }
+
+  preload(): void {
+    preloadStationSprites(this);
   }
 
   create(): void {

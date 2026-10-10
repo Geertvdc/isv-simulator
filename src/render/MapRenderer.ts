@@ -4,6 +4,7 @@ import {
   type Point,
   type Side,
   TILE_SIZE,
+  VIEW_PITCH,
   blockFaces,
   tileCorners,
   tileDepth,
@@ -35,6 +36,39 @@ export const BLOCK_STYLES: Readonly<Record<Exclude<Tile, 'floor'>, BlockStyle>> 
   ship: { color: 0x4fe0b0, height: STATION_HEIGHT, label: 'S' },
   bin: { color: 0x5a5a5a, height: STATION_HEIGHT, label: 'X' },
 };
+
+/**
+ * Tiles with a sprite in `public/assets/stations/<tile>.png`. A tile whose
+ * sprite is missing or fails to load falls back to its colored block.
+ */
+const STATION_SPRITES: readonly Exclude<Tile, 'floor' | 'wall'>[] = [
+  'counter',
+  'inbox',
+  'bugQueue',
+  'keyboard',
+  'testBench',
+  'review',
+  'pipeline',
+  'ship',
+  'bin',
+];
+/** Sprite pixel that sits on the front edge of the tile's floor, bottom center. */
+const SPRITE_ANCHOR = { x: 32, y: 80 };
+const SPRITE_SIZE = { width: 64, height: 96 };
+
+const spriteKey = (tile: Tile): string => `station.${tile}`;
+
+/** Queues the station sprites; call from a scene's `preload`. */
+export function preloadStationSprites(scene: Phaser.Scene): void {
+  for (const tile of STATION_SPRITES) {
+    const key = spriteKey(tile);
+    scene.load.image(key, `assets/stations/${tile}.png`);
+    // Pixel art: keep hard pixel edges when the camera zooms.
+    scene.load.once(`filecomplete-image-${key}`, () => {
+      scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    });
+  }
+}
 
 /** Placeholder color of a block, so other renderers can match it. */
 export function tileColor(tile: Exclude<Tile, 'floor'>): number {
@@ -184,9 +218,17 @@ export function drawBlock(
   tile: Exclude<Tile, 'floor'>,
   height: number,
 ): void {
+  const depth = tileDepth(x, y);
+  if (scene.textures.exists(spriteKey(tile))) {
+    const c = tileToScreen(x, y);
+    scene.add
+      .image(c.x, c.y + (TILE_SIZE * VIEW_PITCH) / 2, spriteKey(tile))
+      .setOrigin(SPRITE_ANCHOR.x / SPRITE_SIZE.width, SPRITE_ANCHOR.y / SPRITE_SIZE.height)
+      .setDepth(depth);
+    return;
+  }
   const style = BLOCK_STYLES[tile];
   const { top, sides } = blockFaces(x, y, height);
-  const depth = tileDepth(x, y);
   const g = scene.add.graphics().setDepth(depth);
 
   g.lineStyle(1, EDGE_COLOR, 0.6);
