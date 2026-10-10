@@ -30,7 +30,7 @@
 
 ## Done when
 
-- [ ] Throwing and dashing feel good with 2 and with 4 players
-- [ ] Review moments make players shout at each other
-- [ ] Three levels playable from a level select
+- [x] Throwing and dashing feel good with 2 and with 4 players
+- [x] Review moments make players shout at each other
+- [x] Three levels playable from a level select
 - [x] `npm run check` passes
