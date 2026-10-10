@@ -7,12 +7,14 @@ import {
   GAME_FRAME_EVENT,
   GameScene,
   TILE_HOVER_EVENT,
+  TOGGLE_SOUND_EVENT,
 } from './render/GameScene';
 import { mountGameHud } from './ui/game';
 import { mountHud } from './ui/hud';
 import { mountCountdown, mountIntro } from './ui/intro';
 import { mountLevelSelect } from './ui/levelSelect';
 import { mountLobby } from './ui/lobby';
+import { mountSoundToggle } from './ui/soundToggle';
 import { mountCredits, mountPause, mountResults, mountSettings, mountTitle } from './ui/screens';
 import './style.css';
 
@@ -71,7 +73,11 @@ const screens = {
   settings: mountSettings(ui),
   credits: mountCredits(ui),
 } as const;
+const soundToggle = mountSoundToggle(ui, () => {
+  game.events.emit(TOGGLE_SOUND_EVENT);
+});
 game.events.on(FLOW_EVENT, (view: FlowView) => {
+  soundToggle.render(view.save.settings);
   const screen = view.flow.screen;
   lobby.render(screen === 'lobby' ? view.flow.lobby : null);
   levelSelect.render(screen === 'levelSelect' ? view : null);

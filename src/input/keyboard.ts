@@ -79,7 +79,8 @@ export class KeyboardState {
   attach(target: Window): () => void {
     const down = (e: KeyboardEvent): void => {
       // Keeps arrows from scrolling and Enter from activating focused buttons.
-      if (GAME_KEYS.has(e.code)) e.preventDefault();
+      // Tab would move focus out of the game, which pauses the sound until a click.
+      if (GAME_KEYS.has(e.code) || e.code === 'Tab') e.preventDefault();
       this.press(e.code);
     };
     const up = (e: KeyboardEvent): void => {

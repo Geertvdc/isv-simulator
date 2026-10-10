@@ -51,6 +51,7 @@ describe('loadSave and writeSave', () => {
         sfxVolume: DEFAULT_SFX_VOLUME,
         musicVolume: DEFAULT_MUSIC_VOLUME,
         screenShake: true,
+        muted: false,
       },
       tutorialDone: false,
     });
@@ -60,7 +61,7 @@ describe('loadSave and writeSave', () => {
     const storage = memoryStorage();
     const save = createSave();
     recordResult(save, 'garage', { score: 140, stars: 2 });
-    save.settings = { sfxVolume: 3, musicVolume: 0, screenShake: false };
+    save.settings = { sfxVolume: 3, musicVolume: 0, screenShake: false, muted: true };
     save.tutorialDone = true;
     writeSave(storage, save);
     expect(loadSave(storage)).toEqual(save);
@@ -75,7 +76,7 @@ describe('loadSave and writeSave', () => {
         'scale-up': { bestStars: 9, bestScore: 12.4 },
         broken: 7,
       },
-      settings: { sfxVolume: 99, musicVolume: -3, screenShake: 'yes' },
+      settings: { sfxVolume: 99, musicVolume: -3, screenShake: 'yes', muted: 1 },
       tutorialDone: 'sure',
     });
     expect(save).toEqual({
@@ -84,7 +85,7 @@ describe('loadSave and writeSave', () => {
         garage: { bestStars: 2, bestScore: 0, plays: 0 },
         'scale-up': { bestStars: 3, bestScore: 12, plays: 1 },
       },
-      settings: { sfxVolume: SFX_VOLUME_MAX, musicVolume: 0, screenShake: true },
+      settings: { sfxVolume: SFX_VOLUME_MAX, musicVolume: 0, screenShake: true, muted: false },
       tutorialDone: false,
     });
   });
@@ -105,6 +106,7 @@ describe('loadSave and writeSave', () => {
       sfxVolume: 4,
       musicVolume: DEFAULT_MUSIC_VOLUME,
       screenShake: false,
+      muted: false,
     });
     expect(save.tutorialDone).toBe(false);
     save.settings.musicVolume = 2;
@@ -164,7 +166,12 @@ describe('loadSave and writeSave', () => {
     const save = loadSave(storage);
     expect(save.version).toBe(3);
     expect(save.levels.garage).toEqual({ bestStars: 2, bestScore: 150, plays: 4 });
-    expect(save.settings).toEqual({ sfxVolume: 4, musicVolume: 7, screenShake: false });
+    expect(save.settings).toEqual({
+      sfxVolume: 4,
+      musicVolume: 7,
+      screenShake: false,
+      muted: false,
+    });
     expect(save.tutorialDone).toBe(true);
 
     recordResult(save, 'garage', { score: 200, stars: 3 });
@@ -173,7 +180,7 @@ describe('loadSave and writeSave', () => {
     expect(JSON.parse(storage.data.get(SAVE_KEY) ?? '')).toEqual({
       version: 3,
       levels: { garage: { bestStars: 3, bestScore: 200, plays: 5, bestTime: 99 } },
-      settings: { sfxVolume: 5, screenShake: false, musicVolume: 7, voiceVolume: 2 },
+      settings: { sfxVolume: 5, screenShake: false, musicVolume: 7, voiceVolume: 2, muted: false },
       tutorialDone: true,
       achievements: ['shipped'],
     });
