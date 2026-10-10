@@ -4,7 +4,12 @@ import creditsMarkdown from '../../CREDITS.md?raw';
 import { type MenuItem, menuItems } from '../flow/flow';
 import type { Settings } from '../flow/save';
 import type { FlowView } from '../render/GameScene';
-import { SFX_VOLUME_MAX } from '../sim/balance';
+import {
+  MAX_STARS,
+  RESULTS_STAR_DELAY_MS,
+  RESULTS_STAR_INTERVAL_MS,
+  SFX_VOLUME_MAX,
+} from '../sim/balance';
 import { CHAPTERS } from '../sim/levels';
 import {
   CHAPTER_UNLOCKED_TEXT,
@@ -22,7 +27,6 @@ import {
 } from '../sim/content';
 import { parseCredits } from './credits';
 import { el } from './dom';
-import { starText } from './format';
 import { type MenuLine, createMenu } from './menu';
 
 export interface ScreenView {
@@ -106,6 +110,10 @@ export function mountResults(root: HTMLElement): ScreenView {
   const screen = panel(root, 'results-screen');
   const title = el('h1', 'screen-title');
   const stars = el('div', 'results-stars');
+  const starEls = Array.from({ length: MAX_STARS }, () => el('span', 'results-star', '★'));
+  stars.append(...starEls);
+  /** The round the stars last counted up for, so re-renders don't restart them. */
+  let counted: object | null = null;
   const score = el('div', 'results-score');
   const best = el('div', 'results-badge', NEW_BEST_TEXT);
   const unlocked = el('div', 'results-badge');
@@ -120,7 +128,17 @@ export function mountResults(root: HTMLElement): ScreenView {
       if (!view || !results) return;
       const levelId = view.levelIds[view.flow.levelIndex] ?? '';
       title.textContent = LEVEL_NAMES[levelId] ?? levelId;
-      stars.textContent = starText(results.stars);
+      if (counted !== results) {
+        counted = results;
+        // Earned stars fill in one by one; the scene plays a sound for each.
+        starEls.forEach((star, i) => {
+          star.className = 'results-star';
+          star.getBoundingClientRect();
+          if (i >= results.stars) return;
+          star.classList.add('earned');
+          star.style.animationDelay = `${RESULTS_STAR_DELAY_MS + i * RESULTS_STAR_INTERVAL_MS}ms`;
+        });
+      }
       score.textContent = `Score: ${results.score}`;
       best.hidden = !results.newBest;
       const unlockedId =

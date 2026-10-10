@@ -15,7 +15,12 @@ import {
 } from '../flow/flow';
 import { type HintId, startHints, updateHints } from '../flow/hints';
 import { type ChapterInfo, type SaveData, type StorageLike, writeSave } from '../flow/save';
-import { SFX_VOLUME_MAX } from '../sim/balance';
+import {
+  RESULTS_STAR_DELAY_MS,
+  RESULTS_STAR_INTERVAL_MS,
+  SCREEN_FADE_MS,
+  SFX_VOLUME_MAX,
+} from '../sim/balance';
 import { type LevelMap, type Tile, getTile, isWorkSurface } from '../sim/level';
 import { CHAPTERS, LEVELS } from '../sim/levels';
 import type { GameEvent } from '../sim/orders';
@@ -223,6 +228,7 @@ export class GameScene extends Phaser.Scene {
     this.hintRenderer = new HintRenderer(this, this.map, this.mapRenderer);
     this.sounds = new SoundPlayer(this);
     this.cameraController = new CameraController(this, this.mapBounds());
+    this.cameras.main.fadeIn(SCREEN_FADE_MS);
     this.applySettings();
 
     this.loop = null;
@@ -269,6 +275,7 @@ export class GameScene extends Phaser.Scene {
         if (result) {
           this.runEffects(finishRound(this.flow, result, ctx).effects);
           this.emitFlow(time);
+          this.countStars(this.flow.results?.stars ?? 0);
         }
       }
       // Paused or done: nothing new happened, so nothing to react to.
@@ -297,6 +304,15 @@ export class GameScene extends Phaser.Scene {
       ticksLeft: state ? state.settings.durationTicks - state.tick : null,
     });
     this.music.update(cue, deltaMs);
+  }
+
+  /** A chime for each star as the results screen fills them in. */
+  private countStars(stars: number): void {
+    for (let i = 0; i < stars; i++) {
+      this.time.delayedCall(RESULTS_STAR_DELAY_MS + i * RESULTS_STAR_INTERVAL_MS, () => {
+        this.sounds.sound('ship');
+      });
+    }
   }
 
   /** Drops the hints the last ticks followed; saves once all were. */
