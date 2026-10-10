@@ -23,6 +23,10 @@ h1 {
   margin-right: 8px;
 }
 
+#labels {
+  color: #9aa3b5;
+}
+
 #scales a.current {
   color: #ffd166;
   font-weight: bold;

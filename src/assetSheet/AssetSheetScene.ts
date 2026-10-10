@@ -15,6 +15,8 @@ export class AssetSheetScene extends Phaser.Scene {
   constructor(
     private readonly assets: readonly SheetAsset[],
     private readonly exportScale: number,
+    /** Keep the station letters; without them an artist or model sees only shape and color. */
+    private readonly labels: boolean,
     private readonly onDone: (rendered: RenderedAsset[]) => void,
   ) {
     super('asset-sheet');
@@ -32,7 +34,9 @@ export class AssetSheetScene extends Phaser.Scene {
       this.children.removeAll(true);
       asset.draw(this);
       for (const child of this.children.list) {
-        if (child instanceof Phaser.GameObjects.Text) child.setResolution(scale);
+        if (!(child instanceof Phaser.GameObjects.Text)) continue;
+        if (this.labels) child.setResolution(scale);
+        else child.setVisible(false);
       }
       const camera = this.cameras.main;
       camera.setSize(width * scale, height * scale).setZoom(scale);
