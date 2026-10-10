@@ -137,6 +137,49 @@ body {
   color: #ff8a80;
 }
 
+.order-incident {
+  border-color: #ff3b2f;
+  background: rgba(150, 15, 10, 0.92);
+  min-width: 130px;
+}
+
+.order-incident .order-kind {
+  color: #fff;
+  font-size: 15px;
+}
+
+.hud-alerts {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.hud-alerts[hidden],
+.hud-alerts > [hidden] {
+  display: none;
+}
+
+.hud-incident {
+  padding: 6px 16px;
+  border-radius: 8px;
+  background: #c4180e;
+  font-size: 18px;
+  font-weight: 800;
+  white-space: nowrap;
+  animation: incident-flash 0.8s steps(2, jump-none) infinite;
+}
+
+@keyframes incident-flash {
+  to {
+    background: #5c0905;
+  }
+}
+
 .order-steps {
   display: flex;
   gap: 5px;

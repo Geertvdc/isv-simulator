@@ -72,6 +72,8 @@ export interface GameState {
   nextOrderId: number;
   /** Tick from which the next feature order is due. */
   nextOrderTick: number;
+  /** Tick from which the next incident is due; `null` on levels without incidents. */
+  nextIncidentTick: number | null;
   /** Bugs on their way back from shipped tickets. */
   pendingBugs: PendingBug[];
   score: number;
@@ -123,6 +125,7 @@ export function createGame(level: Level, seed: number, playerIds: readonly Playe
     orders: [],
     nextOrderId: 1,
     nextOrderTick: level.orderSchedule.firstOrderTick,
+    nextIncidentTick: level.incidents?.firstTick ?? null,
     pendingBugs: [],
     score: 0,
     result: null,

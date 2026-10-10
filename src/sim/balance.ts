@@ -88,6 +88,11 @@ export const BUG_ORDER_POINTS = 0;
 /** Points lost when a bug order runs out: customers hate bugs more than late features. */
 export const BUG_EXPIRED_PENALTY = 20;
 
+/** Points for shipping an incident hotfix, before the usual speed bonus. */
+export const INCIDENT_POINTS = 20;
+/** Points lost when an incident runs out: production was down the whole time. */
+export const INCIDENT_EXPIRED_PENALTY = 30;
+
 /**
  * How many times more often feature orders arrive, by number of players
  * (index 0 = solo). The level's schedule and star thresholds are for one

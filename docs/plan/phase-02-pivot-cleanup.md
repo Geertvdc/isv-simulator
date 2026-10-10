@@ -15,19 +15,19 @@
 
 ### Level format
 
-| Char | Meaning |
-|---|---|
-| `#` | wall |
-| `.` | floor, walkable |
-| `C` | counter |
-| `I` | inbox: new tickets appear here |
-| `K` | keyboard station: write code (hold work button) |
-| `T` | test bench: run tests (hold work button) |
-| `R` | review station: needs two players at once (used later) |
-| `P` | pipeline: put a ticket in, it builds on a timer |
-| `S` | ship: deliver finished tickets |
-| `X` | bin: throw away a ticket |
-| `1` to `4` | player spawn points (floor) |
+| Char       | Meaning                                                |
+| ---------- | ------------------------------------------------------ |
+| `#`        | wall                                                   |
+| `.`        | floor, walkable                                        |
+| `C`        | counter                                                |
+| `I`        | inbox: new tickets appear here                         |
+| `K`        | keyboard station: write code (hold work button)        |
+| `T`        | test bench: run tests (hold work button)               |
+| `R`        | review station: needs two players at once (used later) |
+| `P`        | pipeline: put a ticket in, it builds on a timer        |
+| `S`        | ship: deliver finished tickets                         |
+| `X`        | bin: throw away a ticket                               |
+| `1` to `4` | player spawn points (floor)                            |
 
 - `parseLevelMap(text): LevelMap` with `{ width, height, tiles: Tile[], spawns }` (row-major), in `src/sim/level.ts`
 - Every level has exactly one of each spawn `1` to `4`

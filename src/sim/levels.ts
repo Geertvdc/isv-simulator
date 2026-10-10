@@ -25,6 +25,18 @@ export interface OrderSchedule {
   bugTimeLimitTicks: number;
 }
 
+/** When production incidents happen. Only one is open at a time. */
+export interface IncidentSchedule {
+  /** Tick of the first incident. */
+  firstTick: number;
+  /** Average ticks from one incident opening to the next. */
+  intervalTicks: number;
+  /** Each interval is randomly up to this many ticks shorter or longer. */
+  jitterTicks: number;
+  /** Ticks an incident order lasts. */
+  timeLimitTicks: number;
+}
+
 export interface LevelSettings {
   durationTicks: number;
   orderSchedule: OrderSchedule;
@@ -32,6 +44,8 @@ export interface LevelSettings {
   starThresholds: [number, number, number];
   /** Share of feature orders that need a code review (0 to 1). Always 0 solo: a review needs two. */
   reviewShare: number;
+  /** Production incidents, or `null` for none. The same for any number of players. */
+  incidents: IncidentSchedule | null;
 }
 
 export interface Level extends LevelSettings {
@@ -56,6 +70,7 @@ const GARAGE_SETTINGS: LevelSettings = {
   // perfect bots average ~205 solo, ~355 with two, ~510 with three, ~635 with four.
   starThresholds: [60, 120, 180],
   reviewShare: 0,
+  incidents: null,
 };
 
 export const GARAGE: Level = {
@@ -122,6 +137,7 @@ export function settingsForPlayers(level: LevelSettings, playerCount: number): L
       number,
     ],
     reviewShare: playerCount >= REVIEWERS_NEEDED ? level.reviewShare : 0,
+    incidents: level.incidents,
   };
 }
 

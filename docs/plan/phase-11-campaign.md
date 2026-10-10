@@ -46,18 +46,18 @@ Three picked from the candidate list (production incident, meetings, wandering m
 
 About 14x10 like the Garage levels, each with its own wall/floor look (`LEVEL_LOOKS` in `GameScene`).
 
-| Chapter | Level id | Name | Mechanics |
-|---|---|---|---|
-| Garage | `garage`, `open-plan`, `scale-up` | The Garage, Open Plan Office, Down the Hall | as before (the old "The Scale-Up" keeps its id for saves, renamed) |
-| Startup | `seed-round` | Seed Round | teaches incidents, calm layout |
-| | `demo-day` | Demo Day | incidents + throwing over a counter wall + reviews |
-| | `on-call` | On Call | incidents + reviews + long walks |
-| Scale-Up | `middle-management` | Middle Management | teaches the manager, calm layout |
-| | `hypergrowth` | Hypergrowth | manager + incidents |
-| | `hot-desking` | Hot Desking | two managers + incidents + reviews |
-| Enterprise | `back-to-back` | Back to Back | teaches meetings, calm layout |
-| | `synergy` | Synergy | meetings + manager + incidents |
-| | `the-reorg` | The Reorg | everything |
+| Chapter    | Level id                          | Name                                        | Mechanics                                                          |
+| ---------- | --------------------------------- | ------------------------------------------- | ------------------------------------------------------------------ |
+| Garage     | `garage`, `open-plan`, `scale-up` | The Garage, Open Plan Office, Down the Hall | as before (the old "The Scale-Up" keeps its id for saves, renamed) |
+| Startup    | `seed-round`                      | Seed Round                                  | teaches incidents, calm layout                                     |
+|            | `demo-day`                        | Demo Day                                    | incidents + throwing over a counter wall + reviews                 |
+|            | `on-call`                         | On Call                                     | incidents + reviews + long walks                                   |
+| Scale-Up   | `middle-management`               | Middle Management                           | teaches the manager, calm layout                                   |
+|            | `hypergrowth`                     | Hypergrowth                                 | manager + incidents                                                |
+|            | `hot-desking`                     | Hot Desking                                 | two managers + incidents + reviews                                 |
+| Enterprise | `back-to-back`                    | Back to Back                                | teaches meetings, calm layout                                      |
+|            | `synergy`                         | Synergy                                     | meetings + manager + incidents                                     |
+|            | `the-reorg`                       | The Reorg                                   | everything                                                         |
 
 Chapter gates (`CHAPTER_STAR_GATES`, total best stars): Garage 0, Startup 4, Scale-Up 9, Enterprise 13. Reachable with 1 to 2 stars per level. Star thresholds tuned with `npm run sim`.
 

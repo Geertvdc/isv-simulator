@@ -6,14 +6,14 @@
 
 ## Map format
 
-| Char | Zone | Meaning |
-|---|---|---|
-| `#` | wall | blocked |
-| `.` | floor | buildable, walkable |
-| `=` | corridor | walkable, not buildable for rooms |
-| `E` | entrance | where tickets arrive and leave |
-| `L` | locked | buildable after purchase (parse it, no mechanics yet) |
-| ` ` | void | outside, not drawn |
+| Char | Zone     | Meaning                                               |
+| ---- | -------- | ----------------------------------------------------- |
+| `#`  | wall     | blocked                                               |
+| `.`  | floor    | buildable, walkable                                   |
+| `=`  | corridor | walkable, not buildable for rooms                     |
+| `E`  | entrance | where tickets arrive and leave                        |
+| `L`  | locked   | buildable after purchase (parse it, no mechanics yet) |
+| ` `  | void     | outside, not drawn                                    |
 
 All rows must have equal length. Map: `maps/startup-pit.txt`, imported with Vite `?raw`.
 
