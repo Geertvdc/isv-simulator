@@ -3,6 +3,7 @@ import { isGamepadDevice } from '../input/gamepad';
 import { KEY_SCHEMES, LEFT_KEYS, RIGHT_KEYS } from '../input/keyboard';
 import type { Lobby } from '../input/lobby';
 import { playerCssColor } from '../render/playerColors';
+import { playerBadge } from './playerBadge';
 import { LOBBY_BACK_HINT } from '../sim/content';
 import { MAX_PLAYERS } from '../sim/level';
 
@@ -46,11 +47,13 @@ export function mountLobby(root: HTMLElement): LobbyView {
     slot.className = 'lobby-slot';
     const name = document.createElement('div');
     name.className = 'lobby-slot-name';
+    const label = document.createElement('span');
     const device = document.createElement('div');
     device.className = 'lobby-slot-device';
+    name.append(playerBadge(slots.children.length + 1), label);
     slot.append(name, device);
     slots.append(slot);
-    return { slot, name, device };
+    return { slot, name: label, device };
   });
 
   const hint = document.createElement('div');

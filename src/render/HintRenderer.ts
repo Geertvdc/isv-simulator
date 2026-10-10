@@ -59,6 +59,9 @@ export class HintRenderer {
   private create(id: HintId): HintSprite | null {
     const at = this.anchor(HINT_TILES[id]);
     if (!at) return null;
+    // Labels by the side walls hang inwards, so they stay on screen.
+    const side = at.tileX / Math.max(1, this.map.width - 1);
+    const originX = side < 0.25 ? 0.15 : side > 0.75 ? 0.85 : 0.5;
     const arrow = this.scene.add.graphics();
     arrow.fillStyle(COLOR);
     arrow.lineStyle(3, 0x1a1d24);
@@ -78,7 +81,7 @@ export class HintRenderer {
         backgroundColor: '#ffd166',
         padding: { x: 8, y: 4 },
       })
-      .setOrigin(0.5, 1);
+      .setOrigin(originX, 1);
     const baseY = at.y - ARROW_LIFT;
     const container = this.scene.add
       .container(at.x, baseY, [arrow, label])
@@ -87,7 +90,7 @@ export class HintRenderer {
   }
 
   /** The middle of the top of the first group of `tile` blocks on the map. */
-  private anchor(tile: Tile): { x: number; y: number } | null {
+  private anchor(tile: Tile): { x: number; y: number; tileX: number } | null {
     const first = this.findFirst(tile);
     if (!first) return null;
     const group = [first];
@@ -104,6 +107,7 @@ export class HintRenderer {
     const tops = group.flatMap((p) => this.mapRenderer.blockTopCenter(p.x, p.y) ?? []);
     if (tops.length === 0) return null;
     return {
+      tileX: first.x,
       x: tops.reduce((sum, p) => sum + p.x, 0) / tops.length,
       y: Math.min(...tops.map((p) => p.y)),
     };
