@@ -43,7 +43,7 @@ export const SOUND_DESCRIPTIONS: Readonly<Record<SoundKey, string>> = {
   work: 'Ticks while someone holds work',
   ship: 'Shipping an order',
   'order-expired': 'An order ran out',
-  'pipeline-broke': 'The pipeline broke',
+  'pipeline-broke': 'The pipeline broke, a production incident',
   'build-done': 'A pipeline finished its build',
   dash: 'Dash',
   shove: 'Dashing into someone',
@@ -67,6 +67,9 @@ export function soundFor(event: GameEvent): SoundKey | null {
       return 'order-expired';
     case 'pipelineBroke':
       return 'pipeline-broke';
+    // The closest thing to an alarm we have.
+    case 'orderCreated':
+      return event.order.kind === 'incident' ? 'pipeline-broke' : null;
     case 'buildDone':
       return 'build-done';
     case 'dashed':

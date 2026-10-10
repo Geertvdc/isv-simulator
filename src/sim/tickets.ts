@@ -8,14 +8,19 @@ import type { GameState, PlayerId, Vec } from './state';
 
 export type StepKind = 'code' | 'review' | 'test' | 'pipeline';
 
-/** Features are new work; bugs come back after shipping. */
-export type TicketKind = 'feature' | 'bug';
+/** Features are new work; bugs come back after shipping; incidents are production on fire. */
+export type TicketKind = 'feature' | 'bug' | 'incident';
+
+/** The queues tickets wait in: the inbox and the bug queue. */
+export type QueueKind = 'feature' | 'bug';
 
 /** The steps each kind of ticket needs, in the order they must be done. */
 export const TICKET_STEPS: Readonly<Record<TicketKind, readonly StepKind[]>> = {
   feature: ['code', 'test', 'pipeline'],
   // Reproduce the bug first, then the usual cycle.
   bug: ['test', 'code', 'test', 'pipeline'],
+  // A hotfix: no time to test, straight to production.
+  incident: ['code', 'pipeline'],
 };
 
 /** Steps of a feature order that needs a code review: two people at the review station. */
@@ -24,11 +29,21 @@ export const REVIEWED_FEATURE_STEPS: readonly StepKind[] = ['code', 'review', 't
 /** Steps you may skip, at the price of a higher bug chance when shipping. */
 export const OPTIONAL_STEPS: ReadonlySet<StepKind> = new Set(['test']);
 
-/** The queue tile each kind of ticket waits on. */
-export const QUEUE_TILE: Readonly<Record<TicketKind, Tile>> = {
+/** The tile each queue sits on. */
+export const QUEUE_TILE: Readonly<Record<QueueKind, Tile>> = {
   feature: 'inbox',
   bug: 'bugQueue',
 };
+
+/** The queue each kind of ticket waits in: hotfixes land in the bug queue. */
+export const QUEUE_OF: Readonly<Record<TicketKind, QueueKind>> = {
+  feature: 'feature',
+  bug: 'bug',
+  incident: 'bug',
+};
+
+/** Within a queue, lower goes first: incidents jump the line. */
+const QUEUE_PRIORITY: Readonly<Record<TicketKind, number>> = { incident: 0, bug: 1, feature: 1 };
 
 export interface TicketStep {
   kind: StepKind;
@@ -39,8 +54,8 @@ export interface TicketStep {
 export type TicketLocation =
   | { kind: 'player'; playerId: PlayerId }
   | { kind: 'tile'; x: number; y: number }
-  /** Waiting in the queue for its kind; oldest (lowest id) first. */
-  | { kind: 'queue'; queue: TicketKind }
+  /** Waiting in a queue; incidents first, then oldest (lowest id) first. */
+  | { kind: 'queue'; queue: QueueKind }
   /**
    * Thrown: flying from `from` along `dir` (unit), now at `pos`. `lastFloor`
    * is the last floor tile it passed, where it drops if it hits a wall.
@@ -131,20 +146,20 @@ export function advanceStep(step: TicketStep, amount: number): void {
 }
 
 /** Which queue a tile takes tickets from, if it's a queue tile. */
-export function queueAt(tile: Tile | null): TicketKind | undefined {
+export function queueAt(tile: Tile | null): QueueKind | undefined {
   if (tile === QUEUE_TILE.feature) return 'feature';
   if (tile === QUEUE_TILE.bug) return 'bug';
   return undefined;
 }
 
-/** Tickets waiting in a queue, oldest first. */
-export function queuedTickets(state: GameState, queue: TicketKind): Ticket[] {
+/** Tickets waiting in a queue, the one handed out next first: incidents, then oldest. */
+export function queuedTickets(state: GameState, queue: QueueKind): Ticket[] {
   return state.tickets
     .filter((t) => t.location.kind === 'queue' && t.location.queue === queue)
-    .sort((a, b) => a.id - b.id);
+    .sort((a, b) => QUEUE_PRIORITY[a.kind] - QUEUE_PRIORITY[b.kind] || a.id - b.id);
 }
 
-/** Puts a new ticket at the back of the queue for its kind; `steps` default to its kind's. */
+/** Puts a new ticket in the queue for its kind; `steps` default to its kind's. */
 export function enqueueTicket(
   state: GameState,
   kind: TicketKind,
@@ -156,7 +171,7 @@ export function enqueueTicket(
     kind,
     title,
     steps: steps.map((k) => ({ kind: k, progress: 0 })),
-    location: { kind: 'queue', queue: kind },
+    location: { kind: 'queue', queue: QUEUE_OF[kind] },
   };
   state.tickets.push(ticket);
   return ticket;

@@ -11,10 +11,12 @@ import {
   BUG_CHANCE_UNTESTED,
   BUG_DELAY_TICKS,
   EXPIRED_PENALTY,
+  INCIDENT_EXPIRED_PENALTY,
+  INCIDENT_POINTS,
   ORDER_POINTS,
   ORDER_SPEED_BONUS_MAX,
 } from './balance';
-import { TICKET_TITLES, bugTitle } from './content';
+import { INCIDENT_TITLES, TICKET_TITLES, bugTitle } from './content';
 import * as rng from './rng';
 import type { GameState, PlayerId } from './state';
 import {
@@ -23,6 +25,7 @@ import {
   TICKET_STEPS,
   type Ticket,
   type TicketKind,
+  QUEUE_OF,
   enqueueTicket,
   isShippable,
   queuedTickets,
@@ -90,13 +93,37 @@ export function bugChance(ticket: Ticket): number {
   return BUG_CHANCE + (BUG_CHANCE_UNTESTED - BUG_CHANCE) * skippedShare(ticket);
 }
 
-/** Points for shipping `order` at `tick`: base points plus a bonus for the share of time left. Bug fixes earn nothing. */
+/**
+ * Points for shipping `order` at `tick`: base points plus a bonus for the
+ * share of time left. Bug fixes earn nothing; hotfixes earn incident points.
+ */
 export function shipPoints(order: Order, tick: number): number {
   if (order.kind === 'bug') return BUG_ORDER_POINTS;
   const limit = order.expiresTick - order.createdTick;
   const left = Math.max(0, order.expiresTick - tick);
   const share = limit > 0 ? Math.min(1, left / limit) : 0;
-  return ORDER_POINTS + Math.round(ORDER_SPEED_BONUS_MAX * share);
+  const base = order.kind === 'incident' ? INCIDENT_POINTS : ORDER_POINTS;
+  return base + Math.round(ORDER_SPEED_BONUS_MAX * share);
+}
+
+/** Points lost when an order of `kind` runs out. */
+export function expiredPenalty(kind: TicketKind): number {
+  if (kind === 'bug') return BUG_EXPIRED_PENALTY;
+  if (kind === 'incident') return INCIDENT_EXPIRED_PENALTY;
+  return EXPIRED_PENALTY;
+}
+
+/** Ticks an order of `kind` lasts on this level. */
+function timeLimit(state: GameState, kind: TicketKind): number {
+  const { orderSchedule, incidents } = state.settings;
+  if (kind === 'bug') return orderSchedule.bugTimeLimitTicks;
+  if (kind === 'incident') return incidents?.timeLimitTicks ?? orderSchedule.bugTimeLimitTicks;
+  return orderSchedule.timeLimitTicks;
+}
+
+/** The open incident order, if production is on fire. */
+export function openIncident(state: GameState): Order | undefined {
+  return state.orders.find((o) => o.kind === 'incident');
 }
 
 /** Stars for a score: one per threshold reached. */
@@ -123,8 +150,7 @@ export function createOrder(
   title: string,
   steps: readonly StepKind[] = TICKET_STEPS[kind],
 ): Order {
-  const { orderSchedule } = state.settings;
-  const limit = kind === 'bug' ? orderSchedule.bugTimeLimitTicks : orderSchedule.timeLimitTicks;
+  const limit = timeLimit(state, kind);
   const order: Order = {
     id: state.nextOrderId++,
     kind,
@@ -172,22 +198,28 @@ export function shipTicket(state: GameState, playerId: PlayerId, ticket: Ticket)
 export function expireOrders(state: GameState): void {
   for (const order of state.orders.filter((o) => state.tick >= o.expiresTick)) {
     state.orders = state.orders.filter((o) => o !== order);
-    const full = order.kind === 'bug' ? BUG_EXPIRED_PENALTY : EXPIRED_PENALTY;
-    const penalty = Math.min(full, state.score);
+    const penalty = Math.min(expiredPenalty(order.kind), state.score);
     state.score -= penalty;
-    const waiting = queuedTickets(state, order.kind)[0];
+    const waiting = queuedTickets(state, QUEUE_OF[order.kind]).find((t) => t.kind === order.kind);
     if (waiting) state.tickets = state.tickets.filter((t) => t !== waiting);
     state.events.push({ type: 'orderExpired', order, penalty });
   }
 }
 
-/** Per tick: lands due bugs, and opens the next feature order once it's due and there's room. */
+/**
+ * Per tick: lands due bugs, opens an incident when one is due, and opens the
+ * next feature order once it's due and there's room, unless an incident is open.
+ */
 export function updateOrders(state: GameState): void {
   const due = state.pendingBugs.filter((b) => state.tick >= b.tick);
   if (due.length > 0) {
     state.pendingBugs = state.pendingBugs.filter((b) => state.tick < b.tick);
     for (const bug of due) createOrder(state, 'bug', bug.title);
   }
+
+  updateIncidents(state);
+  // Production is down: no new features until the hotfix ships (or the incident runs out).
+  if (openIncident(state)) return;
 
   const { orderSchedule } = state.settings;
   const openFeatures = state.orders.filter((o) => o.kind === 'feature').length;
@@ -198,6 +230,25 @@ export function updateOrders(state: GameState): void {
     createOrder(state, 'feature', title, featureSteps(state));
     state.nextOrderTick = state.tick + orderSchedule.intervalTicks + jitter;
   }
+}
+
+/**
+ * Opens an incident once it's due and none is open. Never with less than its
+ * time limit left in the level: that would be a penalty nobody can avoid.
+ */
+function updateIncidents(state: GameState): void {
+  const schedule = state.settings.incidents;
+  if (!schedule || state.nextIncidentTick === null || state.tick < state.nextIncidentTick) return;
+  if (openIncident(state)) return;
+  if (state.settings.durationTicks - state.tick < schedule.timeLimitTicks) {
+    state.nextIncidentTick = null;
+    return;
+  }
+  const [title, s1] = rng.pick(state.rngState, INCIDENT_TITLES);
+  const [jitter, s2] = rng.int(s1, -schedule.jitterTicks, schedule.jitterTicks);
+  state.rngState = s2;
+  createOrder(state, 'incident', title);
+  state.nextIncidentTick = state.tick + schedule.intervalTicks + jitter;
 }
 
 /** Steps for the next feature order: with a review for `reviewShare` of them. */

@@ -5,6 +5,7 @@ import { type Tile, getTile } from '../sim/level';
 import type { GameState } from '../sim/state';
 import {
   QUEUE_TILE,
+  type QueueKind,
   type StepKind,
   type Ticket,
   type TicketKind,
@@ -18,8 +19,16 @@ import { tileDepth, tileToScreen } from './projection';
 /** Placeholder ticket cards until the art pass. */
 const CARD_MIN_WIDTH = 34;
 const CARD_HEIGHT = 24;
-const CARD_COLOR: Readonly<Record<TicketKind, number>> = { feature: 0xf4f1e8, bug: 0xf6c4bd };
-const OUTLINE_COLOR: Readonly<Record<TicketKind, number>> = { feature: 0x1a1d24, bug: 0xb02a2a };
+const CARD_COLOR: Readonly<Record<TicketKind, number>> = {
+  feature: 0xf4f1e8,
+  bug: 0xf6c4bd,
+  incident: 0xff6b57,
+};
+const OUTLINE_COLOR: Readonly<Record<TicketKind, number>> = {
+  feature: 0x1a1d24,
+  bug: 0xb02a2a,
+  incident: 0x5c0000,
+};
 const ICON_SPACING = 11;
 const ICON_RADIUS = 4.5;
 const ICON_TODO_COLOR = 0xc9c4b5;
@@ -66,8 +75,8 @@ interface TicketSprite {
  */
 export class TicketRenderer {
   private readonly sprites = new Map<number, TicketSprite>();
-  private readonly queueCounts = new Map<TicketKind, Phaser.GameObjects.Text>();
-  private readonly anchors = new Map<TicketKind, { x: number; y: number; depth: number } | null>();
+  private readonly queueCounts = new Map<QueueKind, Phaser.GameObjects.Text>();
+  private readonly anchors = new Map<QueueKind, { x: number; y: number; depth: number } | null>();
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -149,7 +158,7 @@ export class TicketRenderer {
   /** Bottom center of a queue's stack: the middle of its queue tiles. */
   private queueAnchor(
     state: GameState,
-    queue: TicketKind,
+    queue: QueueKind,
   ): { x: number; y: number; depth: number } | null {
     const cached = this.anchors.get(queue);
     if (cached !== undefined) return cached;

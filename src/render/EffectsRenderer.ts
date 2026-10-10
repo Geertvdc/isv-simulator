@@ -53,6 +53,10 @@ export class EffectsRenderer {
         case 'orderExpired':
           this.shake(SHAKE_ORDER_EXPIRED);
           break;
+        // Production is down: everybody should notice.
+        case 'orderCreated':
+          if (event.order.kind === 'incident') this.shake(SHAKE_PIPELINE_BROKE);
+          break;
         case 'dashed': {
           const player = getPlayer(state, event.playerId);
           if (player) this.puff(player.pos, player.facing);

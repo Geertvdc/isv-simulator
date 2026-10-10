@@ -2,22 +2,22 @@
 
 The game started as a Theme Hospital-style management sim and pivoted to Overcooked-style couch co-op after phase 1. Each phase ends in something you can run and play.
 
-| Phase | Result |
-|---|---|
-| 0 Scaffold (done) | Vite + Phaser + TS app boots, tests and CI run |
-| 1 Map and camera (done) | ASCII map rendered, camera and hover (rotation and manual camera removed in phase 2) |
-| 2 Pivot cleanup and level format (done) | Auto-fit front-facing camera, garage level with stations |
-| 3 Movement (done) | One keyboard player walks around with smooth movement and collision |
-| 4 Multiplayer input (done) | 2 to 4 players on keyboard split and gamepads, join lobby |
-| 5 Carry and work (done) | Tickets from the inbox, carry, counters, work at keyboard and test bench |
-| 6 Orders and scoring (done) | Orders with timers, pipeline, ship, score, stars: **playable core loop** |
-| 7 Pipeline failure (done) | Forgotten builds break the build machine; take the ticket out, repair, rebuild |
-| 8 Couch polish (done) | Dash, throwing, review station, juice, sound, 3 levels and level select |
-| 9 Art pass (optional) | Real office art and characters replace placeholders, can start after phase 6 |
-| 10 Game flow and save data | Title screen, pause, results with next level, settings, unlocks, versioned local save |
-| 11 Campaign | About 12 levels in chapters (Garage to Enterprise), one new mechanic per chapter |
-| 12 Music and onboarding | Music, level intro cards, first-level hints, countdown and transitions |
-| 13 Online multiplayer (later) | Authoritative server, play from different machines, only after phase 11 |
+| Phase                                   | Result                                                                                |
+| --------------------------------------- | ------------------------------------------------------------------------------------- |
+| 0 Scaffold (done)                       | Vite + Phaser + TS app boots, tests and CI run                                        |
+| 1 Map and camera (done)                 | ASCII map rendered, camera and hover (rotation and manual camera removed in phase 2)  |
+| 2 Pivot cleanup and level format (done) | Auto-fit front-facing camera, garage level with stations                              |
+| 3 Movement (done)                       | One keyboard player walks around with smooth movement and collision                   |
+| 4 Multiplayer input (done)              | 2 to 4 players on keyboard split and gamepads, join lobby                             |
+| 5 Carry and work (done)                 | Tickets from the inbox, carry, counters, work at keyboard and test bench              |
+| 6 Orders and scoring (done)             | Orders with timers, pipeline, ship, score, stars: **playable core loop**              |
+| 7 Pipeline failure (done)               | Forgotten builds break the build machine; take the ticket out, repair, rebuild        |
+| 8 Couch polish (done)                   | Dash, throwing, review station, juice, sound, 3 levels and level select               |
+| 9 Art pass (optional)                   | Real office art and characters replace placeholders, can start after phase 6          |
+| 10 Game flow and save data              | Title screen, pause, results with next level, settings, unlocks, versioned local save |
+| 11 Campaign                             | About 12 levels in chapters (Garage to Enterprise), one new mechanic per chapter      |
+| 12 Music and onboarding                 | Music, level intro cards, first-level hints, countdown and transitions                |
+| 13 Online multiplayer (later)           | Authoritative server, play from different machines, only after phase 11               |
 
 ## How to feed a phase to Claude Code
 

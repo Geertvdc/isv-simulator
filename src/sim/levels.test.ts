@@ -6,12 +6,13 @@ import { createGame } from './state';
 
 describe('settingsForPlayers', () => {
   it('keeps the level settings for one player', () => {
-    const { durationTicks, orderSchedule, starThresholds, reviewShare } = GARAGE;
+    const { durationTicks, orderSchedule, starThresholds, reviewShare, incidents } = GARAGE;
     expect(settingsForPlayers(GARAGE, 1)).toEqual({
       durationTicks,
       orderSchedule,
       starThresholds,
       reviewShare,
+      incidents,
     });
   });
 

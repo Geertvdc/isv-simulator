@@ -20,6 +20,23 @@ export const TICKET_TITLES: readonly string[] = [
   'Migrate to the cloud',
 ];
 
+/** Titles for production incidents; one is picked per incident. */
+export const INCIDENT_TITLES: readonly string[] = [
+  'Prod is down',
+  'Database on fire',
+  'Certificate expired',
+  "It's DNS",
+  'Disk full',
+  'Login loop',
+  'Memory leak',
+  'Pager going off',
+  'Checkout broken',
+  'Leaked API key',
+];
+
+/** Over the order bar while an incident is open. */
+export const INCIDENT_BANNER_TEXT = 'INCIDENT! New features on hold until the hotfix ships';
+
 /** Shown next to the points when a ticket ships with tests skipped. */
 export const UNTESTED_SHIP_TEXT = 'YOLO!';
 

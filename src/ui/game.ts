@@ -1,8 +1,13 @@
 import type { GameFrame } from '../render/GameScene';
 import { tileColor } from '../render/MapRenderer';
 import { ORDER_URGENT_TICKS } from '../sim/balance';
-import { PAUSE_HINT, PIPELINE_BROKE_TEXT, UNTESTED_SHIP_TEXT } from '../sim/content';
-import { type Order, ticksLeft } from '../sim/orders';
+import {
+  INCIDENT_BANNER_TEXT,
+  PAUSE_HINT,
+  PIPELINE_BROKE_TEXT,
+  UNTESTED_SHIP_TEXT,
+} from '../sim/content';
+import { type Order, openIncident, ticksLeft } from '../sim/orders';
 import type { GameState } from '../sim/state';
 import type { StepKind } from '../sim/tickets';
 import { formatClock } from './format';
@@ -18,6 +23,7 @@ const STEP_LABEL: Readonly<Record<StepKind, { letter: string; color: string }>> 
 const ORDER_KIND_LABEL: Readonly<Record<Order['kind'], string>> = {
   feature: 'Feature',
   bug: 'Bug',
+  incident: 'Incident!',
 };
 
 /** How long a "+25" or "-10" floats by the score. */
@@ -55,8 +61,12 @@ export function mountGameHud(root: HTMLElement): GameHud {
   score.append(el('span', 'hud-score-label', 'Score'), scoreValue);
   const clock = el('div', 'hud-clock');
   const pauseHint = el('div', 'hud-pause-hint', PAUSE_HINT);
+  /** Bottom center, over the pause hint: incident banner and meeting invites. */
+  const alerts = el('div', 'hud-alerts');
+  const incidentBanner = el('div', 'hud-incident', INCIDENT_BANNER_TEXT);
+  alerts.append(incidentBanner);
 
-  const parts = [orders, score, clock, pauseHint];
+  const parts = [orders, score, clock, pauseHint, alerts];
   for (const part of parts) part.hidden = true;
   root.append(...parts);
 
@@ -121,6 +131,7 @@ export function mountGameHud(root: HTMLElement): GameHud {
       scoreValue.textContent = String(state.score);
       clock.textContent = formatClock(state.settings.durationTicks - state.tick);
       pauseHint.hidden = state.result !== null;
+      incidentBanner.hidden = openIncident(state) === undefined;
       for (const event of frame.events) {
         if (event.type === 'orderShipped') {
           const parts = event.points > 0 ? [`+${event.points}`] : [];
