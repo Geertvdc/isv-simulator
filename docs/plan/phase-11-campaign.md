@@ -91,6 +91,6 @@ Everything new follows the architecture rules, so phase 13 (online) stays possib
 
 ## Done when
 
-- [ ] All chapters playable from the level select, each new mechanic taught by its first level
+- [x] All chapters playable from the level select, each new mechanic taught by its first level
 - [ ] A group of 3 to 4 colleagues plays through a chapter and wants to keep going
-- [ ] `npm run check` passes
+- [x] `npm run check` passes
