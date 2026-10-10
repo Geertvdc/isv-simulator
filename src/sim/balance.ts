@@ -138,6 +138,12 @@ export const REPAIR_TICKS = 3 * TICKS_PER_SECOND;
 
 /** Stars needed on a level to unlock the next one. The first level is always open. */
 export const STARS_TO_UNLOCK = 1;
+/**
+ * Best stars over all levels needed to open each chapter (Garage, Startup,
+ * Scale-Up, Enterprise), on top of the previous level's star. Reachable
+ * with 1 to 2 stars per level.
+ */
+export const CHAPTER_STAR_GATES: readonly number[] = [0, 4, 9, 13];
 /** Sound volume setting runs from 0 (off) to this, in whole steps. */
 export const SFX_VOLUME_MAX = 10;
 /** Sound volume on a fresh save. */

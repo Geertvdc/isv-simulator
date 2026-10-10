@@ -8,6 +8,9 @@
  * ticket waiting for review gets a second bot to help: any bot with nothing
  * better to do (empty hands, a build running, or no free station for what
  * it carries) goes and works the review station with the owner.
+ * Incident hotfixes come first in the bug queue, so bots take them first.
+ * Bots plan their walks around managers, and an invited bot drops
+ * everything (but keeps carrying) and stands in the meeting room.
  */
 
 import { REVIEWERS_NEEDED } from './balance';
@@ -15,7 +18,9 @@ import { isAtItsStation } from './interact';
 import { type GridPoint, type LevelMap, type Tile, getTile, isSolid } from './level';
 import type { Level } from './levels';
 import { type LevelResult, matchingOrders } from './orders';
-import { NEIGHBOURS, searchPath } from './path';
+import { managerTiles } from './manager';
+import { inviteFor } from './meetings';
+import { NEIGHBOURS, pathTo, searchPath } from './path';
 import { isBroken } from './pipeline';
 import {
   type GameState,
@@ -64,7 +69,8 @@ export interface Bot {
   skipTests: boolean;
 }
 
-type Action = 'interact' | 'work' | 'wait';
+/** `stand` means: stand on the tile itself (a meeting room tile), not next to it. */
+type Action = 'interact' | 'work' | 'wait' | 'stand';
 
 interface Goal {
   tile: GridPoint;
@@ -153,6 +159,11 @@ function samePoint(a: GridPoint | null, b: GridPoint | null): boolean {
 function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | null {
   bot.dropTarget = null;
   bot.helping = null;
+  // A calendar invite beats everything: off to the meeting room, ticket and all.
+  if (inviteFor(state, bot.playerId)) {
+    const room = meetingGoal(state, bot);
+    if (room) return room;
+  }
   const carried = ticketCarriedBy(state, bot.playerId);
   if (carried) {
     bot.ticketId = carried.id;
@@ -177,6 +188,25 @@ function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | nu
     if (tile) return { tile, action: 'interact' };
   }
   return null;
+}
+
+/** The nearest meeting tile nobody else stands on. */
+function meetingGoal(state: GameState, bot: Bot): Goal | null {
+  const from = currentTile(state, bot.playerId);
+  const others = state.players
+    .filter((p) => p.id !== bot.playerId)
+    .map((p) => ({ x: Math.round(p.pos.x), y: Math.round(p.pos.y) }));
+  const free = state.level.meetingTiles.filter((t) => !others.some((o) => samePoint(o, t)));
+  let best: Goal | null = null;
+  let bestLength = Infinity;
+  for (const tile of free.length > 0 ? free : state.level.meetingTiles) {
+    const path = pathTo(state.level, from, tile);
+    if (path && path.length < bestLength) {
+      best = { tile, action: 'stand' };
+      bestLength = path.length;
+    }
+  }
+  return best;
 }
 
 function carryGoal(state: GameState, bot: Bot, bots: readonly Bot[], ticket: Ticket): Goal | null {
@@ -249,12 +279,25 @@ export function botInput(state: GameState, bot: Bot, bots: readonly Bot[]): Inpu
     return input;
   }
 
+  const from = currentTile(state, bot.playerId);
+  // Walk around managers when there is a way around; otherwise wait for them to move on.
+  const blocked = managerTiles(state);
+  if (goal.action === 'stand') {
+    const walk =
+      pathTo(state.level, from, goal.tile, blocked) ?? pathTo(state.level, from, goal.tile);
+    const next = walk?.[0];
+    if (next) input.move = unit(next.x - player.pos.x, next.y - player.pos.y);
+    bot.interactWas = false;
+    return input;
+  }
   const others = goal.besideOthers
     ? state.players
         .filter((p) => p.id !== bot.playerId)
         .map((p) => ({ x: Math.round(p.pos.x), y: Math.round(p.pos.y) }))
     : [];
-  const path = findPath(state.level, currentTile(state, bot.playerId), goal.tile, others);
+  const path =
+    findPath(state.level, from, goal.tile, others, blocked) ??
+    findPath(state.level, from, goal.tile, others);
   let wantsInteract = false;
   if (path && path.length > 0) {
     const next = path[0];
@@ -283,8 +326,13 @@ export interface BotRunSummary {
   shippedUntested: number;
   /** Shipped orders that needed a review. */
   shippedReviewed: number;
+  shippedIncidents: number;
   expired: number;
   expiredBugs: number;
+  expiredIncidents: number;
+  meetingsAttended: number;
+  meetingsMissed: number;
+  managerBumps: number;
   result: LevelResult;
 }
 
@@ -303,8 +351,13 @@ export function runBots(
     shippedBugs: 0,
     shippedUntested: 0,
     shippedReviewed: 0,
+    shippedIncidents: 0,
     expired: 0,
     expiredBugs: 0,
+    expiredIncidents: 0,
+    meetingsAttended: 0,
+    meetingsMissed: 0,
+    managerBumps: 0,
   };
   while (!state.result) {
     tick(
@@ -317,11 +370,16 @@ export function runBots(
         if (e.order?.kind === 'bug') summary.shippedBugs++;
         if (e.untested) summary.shippedUntested++;
         if (e.order?.steps.includes('review')) summary.shippedReviewed++;
+        if (e.order?.kind === 'incident') summary.shippedIncidents++;
       }
       if (e.type === 'orderExpired') {
         summary.expired++;
         if (e.order.kind === 'bug') summary.expiredBugs++;
+        if (e.order.kind === 'incident') summary.expiredIncidents++;
       }
+      if (e.type === 'meetingAttended') summary.meetingsAttended++;
+      if (e.type === 'meetingMissed') summary.meetingsMissed++;
+      if (e.type === 'managerBumped') summary.managerBumps++;
     }
   }
   return { ...summary, result: state.result };
