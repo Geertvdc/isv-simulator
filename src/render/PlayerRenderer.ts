@@ -3,7 +3,7 @@ import { PLAYER_RADIUS } from '../sim/balance';
 import { isDashing } from '../sim/movement';
 import type { PlayerId, Vec } from '../sim/state';
 import type { GameLoop } from './GameLoop';
-import { playerColor } from './playerColors';
+import { type PlayerShape, playerColor, playerShape, shapePoints } from './playerColors';
 import { TILE_SIZE, VIEW_PITCH, tileDepth, tileToScreen } from './projection';
 
 /** Placeholder developers until the art pass: a capsule with a nose showing `facing`. */
@@ -17,6 +17,9 @@ const NOSE_RADIUS = TILE_SIZE * 0.08;
 const NOSE_REACH = PLAYER_RADIUS * 0.85;
 /** Height of the nose above the floor. */
 const NOSE_HEIGHT = BODY_HEIGHT * 0.72;
+/** The hat: a white shape per player on top of the head. */
+const HAT_SIZE = TILE_SIZE * 0.24;
+const HAT_COLOR = 0xfdfdf6;
 /** Body scale while dashing. */
 const DASH_SQUASH = { x: 1.2, y: 0.85 };
 /** Draws a player over a block on the same row; blocks in front still cover it. */
@@ -47,7 +50,7 @@ export class PlayerRenderer {
       // Squashed flat and wide while dashing.
       if (isDashing(player)) g.setScale(DASH_SQUASH.x, DASH_SQUASH.y);
       else g.setScale(1);
-      drawPlayer(g, playerColor(player.id), player.facing);
+      drawPlayer(g, playerColor(player.id), player.facing, playerShape(player.id));
     }
 
     for (const [id, g] of this.sprites) {
@@ -59,7 +62,12 @@ export class PlayerRenderer {
 }
 
 /** A developer with its feet at (0, 0), facing grid direction `facing`. */
-export function drawPlayer(g: Phaser.GameObjects.Graphics, color: number, facing: Vec): void {
+export function drawPlayer(
+  g: Phaser.GameObjects.Graphics,
+  color: number,
+  facing: Vec,
+  hat: PlayerShape,
+): void {
   g.clear();
 
   const shadowW = PLAYER_RADIUS * 2 * TILE_SIZE;
@@ -82,4 +90,20 @@ export function drawPlayer(g: Phaser.GameObjects.Graphics, color: number, facing
   g.fillRoundedRect(-BODY_WIDTH / 2, -BODY_HEIGHT, BODY_WIDTH, BODY_HEIGHT, BODY_WIDTH / 2 - 1);
   g.strokeRoundedRect(-BODY_WIDTH / 2, -BODY_HEIGHT, BODY_WIDTH, BODY_HEIGHT, BODY_WIDTH / 2 - 1);
   if (!noseBehind) drawNose();
+  drawHat(g, hat);
+}
+
+/** The player's hat, sitting on the top of the body. */
+function drawHat(g: Phaser.GameObjects.Graphics, hat: PlayerShape): void {
+  const y = -BODY_HEIGHT - HAT_SIZE * 0.3;
+  g.fillStyle(HAT_COLOR);
+  g.lineStyle(2, OUTLINE_COLOR);
+  if (hat === 'circle') {
+    g.fillCircle(0, y, HAT_SIZE / 2);
+    g.strokeCircle(0, y, HAT_SIZE / 2);
+    return;
+  }
+  const points = shapePoints(hat, HAT_SIZE).map((p) => new Phaser.Math.Vector2(p.x, p.y + y));
+  g.fillPoints(points, true);
+  g.strokePoints(points, true);
 }

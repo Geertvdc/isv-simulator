@@ -13,7 +13,7 @@ import {
   drawFloorTile,
 } from '../render/MapRenderer';
 import { drawPipelineState } from '../render/PipelineRenderer';
-import { PLAYER_COLORS } from '../render/playerColors';
+import { PLAYER_COLORS, playerShape } from '../render/playerColors';
 import { PLAYER_DEPTH_OFFSET, drawPlayer } from '../render/PlayerRenderer';
 import { TILE_SIZE, VIEW_PITCH, blockFaces, tileDepth, tileToScreen } from '../render/projection';
 import { drawProgressBar, drawTicketCard } from '../render/TicketRenderer';
@@ -142,7 +142,7 @@ function levelAsset(): SheetAsset {
         const s = tileToScreen(spawn.x, spawn.y);
         const depth = tileDepth(spawn.x, spawn.y) + PLAYER_DEPTH_OFFSET;
         const g = scene.add.graphics().setPosition(s.x, s.y).setDepth(depth);
-        drawPlayer(g, PLAYER_COLORS[i] ?? 0xffffff, { x: 0, y: 1 });
+        drawPlayer(g, PLAYER_COLORS[i] ?? 0xffffff, { x: 0, y: 1 }, playerShape(i + 1));
       });
     },
   };
@@ -187,10 +187,10 @@ export const SHEET: readonly SheetAsset[] = [
   ...PLAYER_COLORS.flatMap((color, i) =>
     FACINGS.map(({ name, facing }) => ({
       name: `players/player${i + 1}-${name}`,
-      notes: `Player ${i + 1} developer facing ${name}. The white nose shows the facing direction. Needs idle, walk, carry and work animations later.`,
+      notes: `Player ${i + 1} developer facing ${name}. The white nose shows the facing direction; the white hat shape (${playerShape(i + 1)}) tells players apart without color. Needs idle, walk, carry and work animations later.`,
       frame: PLAYER_FRAME,
       draw: (scene: Phaser.Scene) => {
-        drawPlayer(scene.add.graphics(), color, facing);
+        drawPlayer(scene.add.graphics(), color, facing, playerShape(i + 1));
       },
     })),
   ),

@@ -15,6 +15,7 @@ import type { GameState } from '../sim/state';
 import type { StepKind } from '../sim/tickets';
 import { playerCssColor } from '../render/playerColors';
 import { formatClock } from './format';
+import { playerBadge } from './playerBadge';
 
 /** Each step shows as the letter of its station on the map, in that station's color. */
 export const STEP_LABEL: Readonly<Record<StepKind, { letter: string; color: string }>> = {
@@ -73,7 +74,9 @@ function createInviteCard(invite: Invite): InviteCard {
   card.style.setProperty('--player-color', playerCssColor(invite.playerId));
   const head = el('div', 'invite-head');
   const time = el('span', 'invite-time');
-  head.append(el('span', 'invite-who', inviteText(invite.playerId)), time);
+  const who = el('span', 'invite-who', inviteText(invite.playerId));
+  who.prepend(playerBadge(invite.playerId));
+  head.append(who, time);
   const bar = el('div', 'invite-bar');
   const fill = el('div', 'invite-bar-fill');
   bar.append(fill);
