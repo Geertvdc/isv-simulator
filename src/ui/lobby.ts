@@ -21,7 +21,7 @@ export function deviceLabel(deviceId: DeviceId): string {
 export function startHint(lobby: Lobby): string | null {
   const first = lobby.players[0];
   if (!first) return null;
-  if (isGamepadDevice(first.deviceId)) return 'Player 1: press A to start';
+  if (isGamepadDevice(first.deviceId)) return 'Player 1: press A on your gamepad to start';
   const keyboardsFull = KEY_SCHEMES.every((s) =>
     lobby.players.some((p) => p.deviceId === s.deviceId),
   );
@@ -36,7 +36,7 @@ export function mountLobby(root: HTMLElement): LobbyView {
 
   const title = document.createElement('h1');
   title.className = 'lobby-title';
-  title.textContent = 'Press A or Enter to join';
+  title.textContent = 'Press Enter or gamepad A to join';
 
   const slots = document.createElement('div');
   slots.className = 'lobby-slots';
@@ -68,7 +68,7 @@ export function mountLobby(root: HTMLElement): LobbyView {
         el.slot.classList.toggle('joined', player !== undefined);
         el.slot.style.setProperty('--player-color', playerCssColor(id));
         el.name.textContent = `Player ${id}`;
-        el.device.textContent = player ? deviceLabel(player.deviceId) : 'Press A or Enter';
+        el.device.textContent = player ? deviceLabel(player.deviceId) : 'Enter or gamepad A';
       });
       hint.textContent = startHint(lobby) ?? '';
     },
