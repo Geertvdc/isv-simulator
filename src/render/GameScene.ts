@@ -105,6 +105,18 @@ const LEVEL_LOOKS: Readonly<Record<string, MapLook>> = {
   garage: { walls: 'plaster', floor: 'concrete' },
   'open-plan': { walls: 'glass', floor: 'carpet' },
   'scale-up': { walls: 'wood', floor: 'parquet' },
+  // Startup: a loft, warm wood.
+  'seed-round': { walls: 'wood', floor: 'concrete' },
+  'demo-day': { walls: 'plaster', floor: 'parquet' },
+  'on-call': { walls: 'wood', floor: 'carpet' },
+  // Scale-Up: glass walls go in.
+  'middle-management': { walls: 'glass', floor: 'concrete' },
+  hypergrowth: { walls: 'glass', floor: 'parquet' },
+  'hot-desking': { walls: 'plaster', floor: 'carpet' },
+  // Enterprise: carpet and glass as far as the eye can see.
+  'back-to-back': { walls: 'glass', floor: 'carpet' },
+  synergy: { walls: 'plaster', floor: 'concrete' },
+  'the-reorg': { walls: 'glass', floor: 'carpet' },
 };
 
 /** The level's look, with `?walls=` and `?floor=` overriding it to preview others. */

@@ -89,7 +89,17 @@ export const MEETING_MISSED_TEXT = 'Missed the meeting';
 export const LEVEL_NAMES: Readonly<Record<string, string>> = {
   garage: 'The Garage',
   'open-plan': 'Open Plan Office',
-  'scale-up': 'The Scale-Up',
+  // Id from before the Scale-Up chapter; kept so saves still count.
+  'scale-up': 'Down the Hall',
+  'seed-round': 'Seed Round',
+  'demo-day': 'Demo Day',
+  'on-call': 'On Call',
+  'middle-management': 'Middle Management',
+  hypergrowth: 'Hypergrowth',
+  'hot-desking': 'Hot Desking',
+  'back-to-back': 'Back to Back',
+  synergy: 'Synergy',
+  'the-reorg': 'The Reorg',
 };
 
 /** One line under each level's name on the level select, by level id. */
@@ -97,6 +107,31 @@ export const LEVEL_BLURBS: Readonly<Record<string, string>> = {
   garage: 'Where every unicorn starts.',
   'open-plan': 'A counter wall splits the office. Throw it over!',
   'scale-up': 'Code reviews are mandatory. The review room is down the hall.',
+  'seed-round': 'Real customers! Production breaks. Hotfixes jump the bug queue.',
+  'demo-day': 'A counter wall, a demo to give, and prod on fire.',
+  'on-call': 'The long way round, with the pager on.',
+  'middle-management': 'Meet your new manager. Mind the walking status update.',
+  hypergrowth: 'Two rooms, two doors, one manager standing in them.',
+  'hot-desking': 'Rows of desks and two managers in the aisles.',
+  'back-to-back': 'Calendar invites! Go sit in the meeting room or lose points.',
+  synergy: 'Meetings, a manager and incidents. Lots of synergy.',
+  'the-reorg': 'Everything, everywhere, all at once.',
+};
+
+/** Chapter names, by chapter id. */
+export const CHAPTER_NAMES: Readonly<Record<string, string>> = {
+  garage: 'Garage',
+  startup: 'Startup',
+  'scale-up': 'Scale-Up',
+  enterprise: 'Enterprise',
+};
+
+/** One line under each chapter's name: its new mechanic. */
+export const CHAPTER_BLURBS: Readonly<Record<string, string>> = {
+  garage: 'Two founders and a dream.',
+  startup: 'New: production incidents',
+  'scale-up': 'New: the wandering manager',
+  enterprise: 'New: meetings',
 };
 
 /** Shown on the results when the score beats the best so far. */
