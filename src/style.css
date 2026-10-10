@@ -646,5 +646,44 @@ body {
 }
 
 .screen.level-select {
-  gap: 16px;
+  gap: 12px;
+  padding: 12px 24px;
+}
+
+.level-select .screen-title {
+  font-size: 36px;
+}
+
+.level-select .level-select-total {
+  margin-top: -8px;
+  font-size: 22px;
+}
+
+.level-select .level-card-score:empty {
+  display: none;
+}
+
+/* Small screens: tighter cards, so all twelve still fit. */
+@media (max-height: 800px) {
+  .level-select .level-card {
+    gap: 2px;
+    padding: 6px 12px;
+  }
+
+  .level-select .level-card-name {
+    font-size: 18px;
+  }
+
+  .level-select .level-card-blurb {
+    font-size: 12px;
+  }
+
+  .level-select .level-card-stars.played {
+    font-size: 20px;
+  }
+
+  .level-select .chapter {
+    gap: 8px;
+    padding: 6px;
+  }
 }
