@@ -113,3 +113,12 @@ export const PIPELINE_FAIL_TICKS = 10 * TICKS_PER_SECOND;
 export const PIPELINE_WARN_TICKS = 4 * TICKS_PER_SECOND;
 /** Ticks of holding work at an empty broken pipeline to repair it. */
 export const REPAIR_TICKS = 3 * TICKS_PER_SECOND;
+
+/** Stars needed on a level to unlock the next one. The first level is always open. */
+export const STARS_TO_UNLOCK = 1;
+/** Sound volume setting runs from 0 (off) to this, in whole steps. */
+export const SFX_VOLUME_MAX = 10;
+/** Sound volume on a fresh save. */
+export const DEFAULT_SFX_VOLUME = 10;
+/** Most stars a round can give. */
+export const MAX_STARS = 3;
