@@ -38,10 +38,13 @@ export const BLOCK_STYLES: Readonly<Record<Exclude<Tile, 'floor'>, BlockStyle>> 
 };
 
 /**
- * Tiles with a sprite in `public/assets/stations/<tile>.png`. A tile whose
+ * Sprites in `public/assets/tiles/<key>.png`: one per block tile, plus
+ * `wall-front` for the cut-down walls on the camera side. A block whose
  * sprite is missing or fails to load falls back to its colored block.
  */
-const STATION_SPRITES: readonly Exclude<Tile, 'floor' | 'wall'>[] = [
+const TILE_SPRITES: readonly string[] = [
+  'wall',
+  'wall-front',
   'counter',
   'inbox',
   'bugQueue',
@@ -56,13 +59,13 @@ const STATION_SPRITES: readonly Exclude<Tile, 'floor' | 'wall'>[] = [
 const SPRITE_ANCHOR = { x: 32, y: 80 };
 const SPRITE_SIZE = { width: 64, height: 96 };
 
-const spriteKey = (tile: Tile): string => `station.${tile}`;
+const spriteKey = (name: string): string => `tile.${name}`;
 
-/** Queues the station sprites; call from a scene's `preload`. */
-export function preloadStationSprites(scene: Phaser.Scene): void {
-  for (const tile of STATION_SPRITES) {
-    const key = spriteKey(tile);
-    scene.load.image(key, `assets/stations/${tile}.png`);
+/** Queues the tile sprites; call from a scene's `preload`. */
+export function preloadTileSprites(scene: Phaser.Scene): void {
+  for (const name of TILE_SPRITES) {
+    const key = spriteKey(name);
+    scene.load.image(key, `assets/tiles/${name}.png`);
     // Pixel art: keep hard pixel edges when the camera zooms.
     scene.load.once(`filecomplete-image-${key}`, () => {
       scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
@@ -219,10 +222,11 @@ export function drawBlock(
   height: number,
 ): void {
   const depth = tileDepth(x, y);
-  if (scene.textures.exists(spriteKey(tile))) {
+  const sprite = spriteKey(tile === 'wall' && height < WALL_HEIGHT ? 'wall-front' : tile);
+  if (scene.textures.exists(sprite)) {
     const c = tileToScreen(x, y);
     scene.add
-      .image(c.x, c.y + (TILE_SIZE * VIEW_PITCH) / 2, spriteKey(tile))
+      .image(c.x, c.y + (TILE_SIZE * VIEW_PITCH) / 2, sprite)
       .setOrigin(SPRITE_ANCHOR.x / SPRITE_SIZE.width, SPRITE_ANCHOR.y / SPRITE_SIZE.height)
       .setDepth(depth);
     return;
