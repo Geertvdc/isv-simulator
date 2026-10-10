@@ -5,7 +5,7 @@ import { claimOrphanedPlayer, createLobby, updateLobby } from './lobby';
 const KB = 'keyboard';
 
 /** What pressing Enter looks like: a join press on both keyboard schemes. */
-const NO_PRESS = { join: false, interact: false, dash: false, nav: { x: 0, y: 0 } };
+const NO_PRESS = { join: false, interact: false, dash: false, menu: false, nav: { x: 0, y: 0 } };
 const enter = (): DevicePress[] => [
   { ...NO_PRESS, deviceId: 'kb-left', joinGroup: KB, join: true },
   { ...NO_PRESS, deviceId: 'kb-right', joinGroup: KB, join: true },
@@ -134,7 +134,14 @@ describe('PressTracker', () => {
       {
         deviceId: 'pad-0',
         joinGroup: 'pad-0',
-        state: { move: { x: 0, y: 0 }, interact: join, work: false, dash: false, join },
+        state: {
+          move: { x: 0, y: 0 },
+          interact: join,
+          work: false,
+          dash: false,
+          join,
+          menu: false,
+        },
       },
     ];
     expect(tracker.update(reading(true))).toHaveLength(1);
@@ -149,7 +156,14 @@ describe('PressTracker', () => {
       {
         deviceId: 'pad-0',
         joinGroup: 'pad-0',
-        state: { move: { x: 0, y: 0 }, interact: true, work: false, dash: false, join: true },
+        state: {
+          move: { x: 0, y: 0 },
+          interact: true,
+          work: false,
+          dash: false,
+          join: true,
+          menu: false,
+        },
       },
     ];
     tracker.update(held);
@@ -163,7 +177,7 @@ describe('PressTracker', () => {
       {
         deviceId: 'pad-0',
         joinGroup: 'pad-0',
-        state: { move: { x, y: 0 }, interact: false, work: false, dash, join: false },
+        state: { move: { x, y: 0 }, interact: false, work: false, dash, join: false, menu: false },
       },
     ];
     expect(tracker.update(reading(0.3))).toEqual([]);
@@ -172,6 +186,28 @@ describe('PressTracker', () => {
     expect(tracker.update(reading(-1))[0]?.nav).toEqual({ x: -1, y: 0 });
     expect(tracker.update(reading(0))).toEqual([]);
     expect(tracker.update(reading(0, true))[0]).toMatchObject({ dash: true, nav: { x: 0, y: 0 } });
+  });
+
+  it('reports a menu press once per push', () => {
+    const tracker = new PressTracker();
+    const reading = (menu: boolean) => [
+      {
+        deviceId: 'kb-left',
+        joinGroup: KB,
+        state: {
+          move: { x: 0, y: 0 },
+          interact: false,
+          work: false,
+          dash: false,
+          join: false,
+          menu,
+        },
+      },
+    ];
+    expect(tracker.update(reading(true))[0]).toMatchObject({ menu: true, join: false });
+    expect(tracker.update(reading(true))).toEqual([]);
+    tracker.update(reading(false));
+    expect(tracker.update(reading(true))).toHaveLength(1);
   });
 });
 

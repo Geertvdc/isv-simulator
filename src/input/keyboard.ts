@@ -43,11 +43,14 @@ export const KEY_SCHEMES: readonly KeyScheme[] = [LEFT_KEYS, RIGHT_KEYS];
 /** Shared by both schemes: joins the left one first, then the right one. */
 export const JOIN_KEYS: readonly string[] = ['Enter', 'NumpadEnter'];
 export const KEYBOARD_JOIN_GROUP = 'keyboard';
+/** Shared by both schemes, like the join keys: pause and back in menus. */
+export const MENU_KEYS: readonly string[] = ['Escape'];
 
 const GAME_KEYS = new Set(
   [
     ...KEY_SCHEMES.flatMap((s) => [s.up, s.down, s.left, s.right, s.interact, s.work, s.dash]),
     JOIN_KEYS,
+    MENU_KEYS,
   ].flat(),
 );
 
@@ -106,6 +109,7 @@ export function readKeyboard(keys: KeyboardState, scheme: KeyScheme): Controller
     work: keys.anyDown(scheme.work),
     dash: keys.anyDown(scheme.dash),
     join: keys.anyDown(JOIN_KEYS),
+    menu: keys.anyDown(MENU_KEYS),
   };
 }
 

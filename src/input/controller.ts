@@ -17,6 +17,8 @@ export interface ControllerState {
   work: boolean;
   dash: boolean;
   join: boolean;
+  /** Escape or Start: pause, and back in menus. */
+  menu: boolean;
 }
 
 export interface Controller {
@@ -43,6 +45,7 @@ export interface DevicePress {
   join: boolean;
   interact: boolean;
   dash: boolean;
+  menu: boolean;
   /** A menu step: -1, 0 or 1 per screen axis, when the stick, D-pad or keys were just pushed that way. */
   nav: Vec;
 }
@@ -51,6 +54,7 @@ interface Held {
   join: boolean;
   interact: boolean;
   dash: boolean;
+  menu: boolean;
   nav: Vec;
 }
 
@@ -65,6 +69,7 @@ export const IDLE: Readonly<ControllerState> = Object.freeze({
   work: false,
   dash: false,
   join: false,
+  menu: false,
 });
 
 /**
@@ -83,6 +88,7 @@ export class PressTracker {
         join: state.join,
         interact: state.interact,
         dash: state.dash,
+        menu: state.menu,
         nav: { x: navStep(state.move.x), y: navStep(state.move.y) },
       };
       const step = (axis: 'x' | 'y'): number =>
@@ -93,10 +99,18 @@ export class PressTracker {
         join: now.join && !was?.join,
         interact: now.interact && !was?.interact,
         dash: now.dash && !was?.dash,
+        menu: now.menu && !was?.menu,
         nav: { x: step('x'), y: step('y') },
       };
       next.set(deviceId, now);
-      if (press.join || press.interact || press.dash || press.nav.x !== 0 || press.nav.y !== 0) {
+      if (
+        press.join ||
+        press.interact ||
+        press.dash ||
+        press.menu ||
+        press.nav.x !== 0 ||
+        press.nav.y !== 0
+      ) {
         presses.push(press);
       }
     }

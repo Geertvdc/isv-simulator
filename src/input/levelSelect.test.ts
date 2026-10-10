@@ -9,6 +9,7 @@ function press(deviceId: string, extra: Partial<DevicePress> = {}): DevicePress 
     deviceId,
     joinGroup: deviceId,
     join: false,
+    menu: false,
     interact: false,
     dash: false,
     nav: { x: 0, y: 0 },

@@ -42,6 +42,7 @@ describe('readKeyboard', () => {
       work: false,
       dash: false,
       join: false,
+      menu: false,
     });
     const arrows = held('ArrowLeft', 'ShiftRight', 'Slash');
     expect(readKeyboard(arrows, LEFT_KEYS)).toEqual({
@@ -50,6 +51,7 @@ describe('readKeyboard', () => {
       work: false,
       dash: false,
       join: false,
+      menu: false,
     });
   });
 
@@ -68,6 +70,12 @@ describe('readKeyboard', () => {
   it('reports Enter as join for both schemes', () => {
     expect(readKeyboard(held('Enter'), LEFT_KEYS).join).toBe(true);
     expect(readKeyboard(held('NumpadEnter'), RIGHT_KEYS).join).toBe(true);
+  });
+
+  it('reports Escape as menu for both schemes, and only Escape', () => {
+    expect(readKeyboard(held('Escape'), LEFT_KEYS)).toMatchObject({ menu: true, join: false });
+    expect(readKeyboard(held('Escape'), RIGHT_KEYS).menu).toBe(true);
+    expect(readKeyboard(held('Enter', 'KeyE', 'ShiftLeft'), LEFT_KEYS).menu).toBe(false);
   });
 
   it('forgets released keys and everything on clear', () => {
