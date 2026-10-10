@@ -148,5 +148,7 @@ export const CHAPTER_STAR_GATES: readonly number[] = [0, 4, 9, 13];
 export const SFX_VOLUME_MAX = 10;
 /** Sound volume on a fresh save. */
 export const DEFAULT_SFX_VOLUME = 10;
+/** Music volume for a new save, on the same scale as sound; a bit under the effects. */
+export const DEFAULT_MUSIC_VOLUME = 6;
 /** Most stars a round can give. */
 export const MAX_STARS = 3;
