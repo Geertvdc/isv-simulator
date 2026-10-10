@@ -27,3 +27,6 @@ Thumbs.db
 
 # sound packs downloaded by `npm run sfx -- fetch`
 sfx-candidates/
+
+# music downloaded while picking tracks (see CREDITS.md for the sources)
+music-candidates/

@@ -155,5 +155,13 @@ export const COUNTDOWN_STEPS = 3;
 export const COUNTDOWN_STEP_MS = 700;
 /** How long "Ship it!" stays up once the round starts. */
 export const SHIP_IT_BANNER_MS = 900;
+/** In the last this many ticks of a round the level music speeds up. */
+export const MUSIC_HURRY_TICKS = 30 * TICKS_PER_SECOND;
+/** Playback rate of the level music in the last seconds. */
+export const MUSIC_HURRY_RATE = 1.15;
+/** Music volume share while the game is paused. */
+export const MUSIC_PAUSE_DUCK = 0.3;
+/** How long one track fades into the next, and volume changes glide. */
+export const MUSIC_FADE_MS = 600;
 /** Most stars a round can give. */
 export const MAX_STARS = 3;

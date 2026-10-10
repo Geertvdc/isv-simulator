@@ -23,3 +23,15 @@ All in `public/assets/sfx/`, renamed after what they're for. Made by [Kenney](ht
 | `shove.ogg`          | [Impact Sounds](https://kenney.nl/assets/impact-sounds)       | `impactPunch_medium_000.ogg` |
 | `dash.ogg`           | [Digital Audio](https://kenney.nl/assets/digital-audio)       | `phaseJump1.ogg`             |
 | `level-end.ogg`      | [Digital Audio](https://kenney.nl/assets/digital-audio)       | `zapThreeToneUp.ogg`         |
+
+## Music
+
+All in `public/assets/music/`, renamed after where they play. Every track is licensed [CC0 1.0](http://creativecommons.org/publicdomain/zero/1.0/), from [OpenGameArt](https://opengameart.org).
+
+| File             | Plays              | Track                                                                                                         | By            |
+| ---------------- | ------------------ | ------------------------------------------------------------------------------------------------------------- | ------------- |
+| `menu.ogg`       | Menus and results  | [NES chiptune "Swingshot" (Swing Jazz)](https://opengameart.org/content/nes-chiptune-swingshot-swing-jazz)    | Haley Halcyon |
+| `garage.ogg`     | Garage chapter     | [Keep your dream alive! (seamless loop)](https://opengameart.org/content/keep-your-dream-alive-seamless-loop) | congusbongus  |
+| `startup.ogg`    | Startup chapter    | [Upbeat Chiptune Theme](https://opengameart.org/content/upbeat-chiptune-theme)                                | nihilocrat    |
+| `scale-up.ogg`   | Scale-Up chapter   | `Utopia.ogg` from [Chiptune Loops](https://opengameart.org/content/chiptune-loops-0)                          | MatiasVME     |
+| `enterprise.ogg` | Enterprise chapter | `March.ogg` from [Chiptune Loops](https://opengameart.org/content/chiptune-loops-0)                           | MatiasVME     |
