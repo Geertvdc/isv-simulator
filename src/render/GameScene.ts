@@ -14,7 +14,9 @@ import {
   MAP_OVERHANG,
   MapRenderer,
   OVERLAY_DEPTH,
-  preloadTileSprites,
+  WALL_THEMES,
+  type WallTheme,
+  preloadMapSprites,
   vectors,
 } from './MapRenderer';
 import { playerColor } from './playerColors';
@@ -58,6 +60,15 @@ const TARGET_DEPTH_OFFSET = 0.005;
 /** The first round's seed; every restart moves on to the next one. */
 const FIRST_SEED = 1;
 const LEVEL = GARAGE;
+/** Wall look per level id; levels not listed get plaster. */
+const LEVEL_WALL_THEMES: Readonly<Record<string, WallTheme>> = { garage: 'plaster' };
+
+/** The level's wall theme, or the one in `?walls=` to preview another. */
+function wallTheme(levelId: string): WallTheme {
+  const override = new URLSearchParams(window.location.search).get('walls');
+  const preview = WALL_THEMES.find((theme) => theme === override);
+  return preview ?? LEVEL_WALL_THEMES[levelId] ?? 'plaster';
+}
 
 interface TargetHighlight {
   g: Phaser.GameObjects.Graphics;
@@ -88,12 +99,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload(): void {
-    preloadTileSprites(this);
+    preloadMapSprites(this);
   }
 
   create(): void {
     this.map = LEVEL.map;
-    this.mapRenderer = new MapRenderer(this, this.map);
+    this.mapRenderer = new MapRenderer(this, this.map, wallTheme(LEVEL.id));
     this.hoverOutline = this.add.graphics().setDepth(OVERLAY_DEPTH).setVisible(false);
     this.devices = new InputDevices(window);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
