@@ -5,6 +5,7 @@
 import { INTERACT_REACH } from './balance';
 import type { GridPoint, LevelMap } from './level';
 import { type Level, type LevelSettings, settingsForPlayers } from './levels';
+import { type Manager, createManagers } from './manager';
 import type { GameEvent, LevelResult, Order, PendingBug } from './orders';
 import { type Pipeline, createPipelines } from './pipeline';
 import { type RngState, createRng } from './rng';
@@ -64,6 +65,8 @@ export interface GameState {
   level: LevelMap;
   settings: LevelSettings;
   players: Player[];
+  /** Wandering managers, if the level has any. */
+  managers: Manager[];
   tickets: Ticket[];
   /** One per pipeline tile: whether it's broken and how long its build has waited. */
   pipelines: Pipeline[];
@@ -119,6 +122,7 @@ export function createGame(level: Level, seed: number, playerIds: readonly Playe
     level: map,
     settings: settingsForPlayers(level, playerIds.length),
     players,
+    managers: createManagers(map),
     tickets: [],
     pipelines: createPipelines(map),
     nextTicketId: 1,

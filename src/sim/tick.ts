@@ -1,4 +1,5 @@
 import { finishReviews, interact, newTickWork, work } from './interact';
+import { updateManagers } from './manager';
 import { startDash, stepPlayer } from './movement';
 import { expireOrders, updateLevelTimer, updateOrders } from './orders';
 import { updatePipelines } from './pipeline';
@@ -32,6 +33,7 @@ export function tick(state: GameState, inputs: readonly InputCommand[]): void {
   for (const shove of separatePlayers(state.level, state.players)) {
     state.events.push({ type: 'shoved', ...shove });
   }
+  updateManagers(state);
 
   const tickWork = newTickWork();
   for (const player of state.players) {

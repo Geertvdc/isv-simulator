@@ -30,6 +30,10 @@ export interface LevelMap {
   tiles: Tile[];
   /** Spawn point per player: `spawns[0]` is player 1. */
   spawns: GridPoint[];
+  /** Where each wandering manager starts (`M`, a floor tile). */
+  managerSpawns: GridPoint[];
+  /** Meeting room tiles (`m`): floor that invited players must stand on. */
+  meetingTiles: GridPoint[];
 }
 
 /** Every level has a spawn for each of up to 4 players. */
@@ -49,9 +53,16 @@ const CHAR_TO_TILE: Readonly<Record<string, Tile>> = {
   X: 'bin',
 };
 
+/** Floor tiles with something extra on them. */
+const MARKED_FLOOR: Readonly<Record<string, 'managerSpawns' | 'meetingTiles'>> = {
+  M: 'managerSpawns',
+  m: 'meetingTiles',
+};
+
 /**
  * Parses an ASCII level map. The digits 1 to 4 are floor tiles that mark the
- * player spawn points; each must appear exactly once. Throws with line and
+ * player spawn points; each must appear exactly once. `M` is a floor tile
+ * where a manager starts, `m` a meeting room floor tile. Throws with line and
  * column info for unknown chars, uneven rows and duplicate spawns.
  */
 export function parseLevelMap(text: string): LevelMap {
@@ -67,6 +78,10 @@ export function parseLevelMap(text: string): LevelMap {
   const width = firstLine.length;
   const tiles: Tile[] = [];
   const spawns: (GridPoint | undefined)[] = [];
+  const marked: Pick<LevelMap, 'managerSpawns' | 'meetingTiles'> = {
+    managerSpawns: [],
+    meetingTiles: [],
+  };
   lines.forEach((line, y) => {
     if (line.length !== width) {
       throw new Error(`Map line ${y + 1} has length ${line.length}, expected ${width}`);
@@ -78,6 +93,12 @@ export function parseLevelMap(text: string): LevelMap {
       if (Number.isInteger(player) && player >= 1 && player <= MAX_PLAYERS) {
         if (spawns[player - 1]) throw new Error(`Duplicate spawn ${player} ${where}`);
         spawns[player - 1] = { x, y };
+        tiles.push('floor');
+        continue;
+      }
+      const mark = MARKED_FLOOR[char];
+      if (mark) {
+        marked[mark].push({ x, y });
         tiles.push('floor');
         continue;
       }
@@ -94,7 +115,7 @@ export function parseLevelMap(text: string): LevelMap {
     result.push(spawn);
   }
 
-  return { width, height: lines.length, tiles, spawns: result };
+  return { width, height: lines.length, tiles, spawns: result, ...marked };
 }
 
 /** Returns the tile at (x, y), or `null` when out of bounds or not on the grid. */

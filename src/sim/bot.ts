@@ -15,6 +15,7 @@ import { isAtItsStation } from './interact';
 import { type GridPoint, type LevelMap, type Tile, getTile, isSolid } from './level';
 import type { Level } from './levels';
 import { type LevelResult, matchingOrders } from './orders';
+import { NEIGHBOURS, searchPath } from './path';
 import { isBroken } from './pipeline';
 import {
   type GameState,
@@ -46,13 +47,6 @@ const STEP_TILE: Readonly<Record<StepKind, Tile>> = {
   test: 'testBench',
   pipeline: 'pipeline',
 };
-
-const NEIGHBOURS: readonly GridPoint[] = [
-  { x: 1, y: 0 },
-  { x: -1, y: 0 },
-  { x: 0, y: 1 },
-  { x: 0, y: -1 },
-];
 
 /** How far off a tile's center line a bot may stand before it recenters to face a station. */
 const CENTER_SLACK = 0.2;
@@ -109,43 +103,25 @@ function standingSpots(map: LevelMap, tile: GridPoint): GridPoint[] {
 
 /**
  * Shortest floor path from `from` to any tile next to `target`, as a list of
- * tiles starting after `from`. Empty when already there; `null` when unreachable.
+ * tiles starting after `from`. Empty when already there; `null` when
+ * unreachable. Spots in `taken` don't count as next to it; tiles in
+ * `blocked` (where a manager walks) are walked around.
  */
 export function findPath(
   map: LevelMap,
   from: GridPoint,
   target: GridPoint,
   taken: readonly GridPoint[] = [],
+  blocked: readonly GridPoint[] = [],
 ): GridPoint[] | null {
   const key = (p: GridPoint): number => p.y * map.width + p.x;
-  const takenKeys = new Set(taken.map(key));
+  const takenKeys = new Set([...taken, ...blocked].map(key));
   const goals = new Set(
     standingSpots(map, target)
       .map(key)
       .filter((k) => !takenKeys.has(k)),
   );
-  if (goals.has(key(from))) return [];
-  const cameFrom = new Map<number, GridPoint | null>([[key(from), null]]);
-  const queue: GridPoint[] = [from];
-  for (let i = 0; i < queue.length; i++) {
-    const at = queue[i];
-    if (!at) break;
-    for (const d of NEIGHBOURS) {
-      const next = { x: at.x + d.x, y: at.y + d.y };
-      if (isSolid(getTile(map, next.x, next.y)) || cameFrom.has(key(next))) continue;
-      cameFrom.set(key(next), at);
-      if (goals.has(key(next))) {
-        const path: GridPoint[] = [];
-        for (let p: GridPoint | null | undefined = next; p && key(p) !== key(from);) {
-          path.unshift(p);
-          p = cameFrom.get(key(p));
-        }
-        return path;
-      }
-      queue.push(next);
-    }
-  }
-  return null;
+  return searchPath(map, from, (p) => goals.has(key(p)), blocked);
 }
 
 function currentTile(state: GameState, playerId: PlayerId): GridPoint {

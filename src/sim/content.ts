@@ -49,6 +49,17 @@ export const PIPELINE_FIXED_TEXT = 'Fixed!';
 /** Pops up over a player who got shoved by a dash; one is picked per shove. */
 export const SHOVE_TEXTS: readonly string[] = ['Oof!', 'Hey!', 'Rude!', 'Watch it!', 'Not cool'];
 
+/** Pops up over a player the manager walks into; one is picked per bump. */
+export const MANAGER_BUMP_TEXTS: readonly string[] = [
+  'Got a minute?',
+  'Quick sync?',
+  "Let's circle back!",
+  'Per my last email...',
+  'Is it done yet?',
+  'Small favour...',
+  'Synergy!',
+];
+
 /** Level names, by level id. */
 export const LEVEL_NAMES: Readonly<Record<string, string>> = {
   garage: 'The Garage',
