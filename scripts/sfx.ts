@@ -91,6 +91,8 @@ function apply(choicesPath: string): void {
   const credits = readFileSync(CREDITS, 'utf8');
   const updated = credits.replace(/## Sound effects\n[\s\S]*?(?=\n## |$)/, creditsSection(sources));
   writeFileSync(CREDITS, updated);
+  // Keeps the table aligned the way `prettier --check` wants it.
+  execFileSync('npx', ['prettier', '--write', CREDITS, SOURCES], { cwd: ROOT });
 }
 
 const [command, arg] = process.argv.slice(2);
