@@ -39,12 +39,14 @@ export const BLOCK_STYLES: Readonly<Record<Exclude<Tile, 'floor'>, BlockStyle>> 
 
 /**
  * Sprites in `public/assets/tiles/<key>.png`: one per block tile, plus
- * `wall-front` for the cut-down walls on the camera side. A block whose
- * sprite is missing or fails to load falls back to its colored block.
+ * `wall-front` for the cut-down walls on the camera side and `wall-inner`
+ * for walls with a wall in front. A block whose sprite is missing or fails
+ * to load falls back to its colored block.
  */
 const TILE_SPRITES: readonly string[] = [
   'wall',
   'wall-front',
+  'wall-inner',
   'counter',
   'inbox',
   'bugQueue',
@@ -164,8 +166,20 @@ export class MapRenderer {
 
   private drawBlocks(): void {
     this.forEachTile((x, y, tile) => {
-      if (tile !== 'floor') drawBlock(this.scene, x, y, tile, this.blockHeight(x, y, tile));
+      if (tile === 'floor') return;
+      const height = this.blockHeight(x, y, tile);
+      drawBlock(this.scene, x, y, tile, height, this.spriteName(x, y, tile, height));
     });
+  }
+
+  /**
+   * A full wall with another wall in front never shows its front face; where
+   * that wall is cut down (the front corners), the top runs on down instead.
+   */
+  private spriteName(x: number, y: number, tile: Exclude<Tile, 'floor'>, height: number): string {
+    if (tile !== 'wall') return tile;
+    if (height < WALL_HEIGHT) return 'wall-front';
+    return getTile(this.map, x, y + 1) === 'wall' ? 'wall-inner' : 'wall';
   }
 
   private blockHeight(x: number, y: number, tile: Exclude<Tile, 'floor'>): number {
@@ -213,16 +227,20 @@ export function drawFloorTile(
   }
 }
 
-/** One block on tile (x, y), `height` pixels tall, with its letter on top if it has one. */
+/**
+ * One block on tile (x, y), `height` pixels tall, with its letter on top if it
+ * has one. Drawn as sprite `spriteName` (default: the tile's own) when loaded.
+ */
 export function drawBlock(
   scene: Phaser.Scene,
   x: number,
   y: number,
   tile: Exclude<Tile, 'floor'>,
   height: number,
+  spriteName: string = tile,
 ): void {
   const depth = tileDepth(x, y);
-  const sprite = spriteKey(tile === 'wall' && height < WALL_HEIGHT ? 'wall-front' : tile);
+  const sprite = spriteKey(spriteName);
   if (scene.textures.exists(sprite)) {
     const c = tileToScreen(x, y);
     scene.add
