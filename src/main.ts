@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { loadSave, type StorageLike } from './flow/save';
 import { SCREEN_FADE_MS } from './sim/balance';
+import { sceneById } from './sim/scenes';
 import {
   FLOW_EVENT,
   type FlowView,
@@ -33,12 +34,18 @@ function browserStorage(): StorageLike | null {
   }
 }
 
-const storage = browserStorage();
+const params = new URLSearchParams(window.location.search);
+const sceneId = params.get('scene');
+const shownScene = sceneId === null ? null : (sceneById(sceneId) ?? null);
+if (sceneId !== null && !shownScene) console.warn(`No scene '${sceneId}'`);
+// A scene never touches the save.
+const storage = shownScene ? null : browserStorage();
 const scene = new GameScene({
   storage,
   save: loadSave(storage),
   // For testing: every level open, without touching the save.
-  unlockAll: new URLSearchParams(window.location.search).has('unlockAll'),
+  unlockAll: params.has('unlockAll'),
+  scene: shownScene,
 });
 
 const game = new Phaser.Game({
