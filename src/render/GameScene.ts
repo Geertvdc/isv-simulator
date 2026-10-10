@@ -14,8 +14,10 @@ import {
   MAP_OVERHANG,
   MapRenderer,
   OVERLAY_DEPTH,
+  DEFAULT_LOOK,
+  FLOOR_THEMES,
+  type MapLook,
   WALL_THEMES,
-  type WallTheme,
   preloadMapSprites,
   vectors,
 } from './MapRenderer';
@@ -60,14 +62,19 @@ const TARGET_DEPTH_OFFSET = 0.005;
 /** The first round's seed; every restart moves on to the next one. */
 const FIRST_SEED = 1;
 const LEVEL = GARAGE;
-/** Wall look per level id; levels not listed get plaster. */
-const LEVEL_WALL_THEMES: Readonly<Record<string, WallTheme>> = { garage: 'plaster' };
+/** Map look per level id; levels not listed get `DEFAULT_LOOK`. */
+const LEVEL_LOOKS: Readonly<Record<string, MapLook>> = {
+  garage: { walls: 'plaster', floor: 'concrete' },
+};
 
-/** The level's wall theme, or the one in `?walls=` to preview another. */
-function wallTheme(levelId: string): WallTheme {
-  const override = new URLSearchParams(window.location.search).get('walls');
-  const preview = WALL_THEMES.find((theme) => theme === override);
-  return preview ?? LEVEL_WALL_THEMES[levelId] ?? 'plaster';
+/** The level's look, with `?walls=` and `?floor=` overriding it to preview others. */
+function mapLook(levelId: string): MapLook {
+  const params = new URLSearchParams(window.location.search);
+  const look = LEVEL_LOOKS[levelId] ?? DEFAULT_LOOK;
+  return {
+    walls: WALL_THEMES.find((t) => t === params.get('walls')) ?? look.walls,
+    floor: FLOOR_THEMES.find((t) => t === params.get('floor')) ?? look.floor,
+  };
 }
 
 interface TargetHighlight {
@@ -104,7 +111,7 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     this.map = LEVEL.map;
-    this.mapRenderer = new MapRenderer(this, this.map, wallTheme(LEVEL.id));
+    this.mapRenderer = new MapRenderer(this, this.map, mapLook(LEVEL.id));
     this.hoverOutline = this.add.graphics().setDepth(OVERLAY_DEPTH).setVisible(false);
     this.devices = new InputDevices(window);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {

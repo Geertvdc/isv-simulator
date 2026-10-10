@@ -41,6 +41,18 @@ export const BLOCK_STYLES: Readonly<Record<Exclude<Tile, 'floor'>, BlockStyle>> 
 export const WALL_THEMES = ['plaster', 'wood', 'glass'] as const;
 export type WallTheme = (typeof WALL_THEMES)[number];
 
+/** Floor looks a level can pick, from `public/assets/floors/<theme>.png` (one 64x32 tile). */
+export const FLOOR_THEMES = ['concrete', 'carpet', 'parquet'] as const;
+export type FloorTheme = (typeof FLOOR_THEMES)[number];
+
+/** How a level's map looks. */
+export interface MapLook {
+  walls: WallTheme;
+  floor: FloorTheme;
+}
+
+export const DEFAULT_LOOK: MapLook = { walls: 'plaster', floor: 'concrete' };
+
 /**
  * `wall` shows its front face, `wall-front` is cut down on the camera side,
  * `wall-inner` has a wall in front so only its top shows.
@@ -49,9 +61,9 @@ const WALL_PIECES = ['wall', 'wall-front', 'wall-inner'] as const;
 
 /** Things hung on walls that show their front face, per theme. */
 const WALL_DECOS: Readonly<Record<WallTheme, readonly string[]>> = {
-  plaster: ['poster', 'whiteboard', 'clock', 'kanban'],
-  wood: ['poster', 'whiteboard', 'clock', 'kanban'],
-  glass: ['whiteboard', 'clock'],
+  plaster: ['poster', 'whiteboard', 'clock', 'kanban', 'dashboard', 'plants'],
+  wood: ['poster', 'whiteboard', 'clock', 'kanban', 'dashboard', 'plants'],
+  glass: ['whiteboard', 'clock', 'dashboard'],
 };
 /** One in this many front-facing walls gets a decoration. */
 const WALL_DECO_EVERY = 3;
@@ -76,6 +88,7 @@ const SPRITE_PATHS: readonly string[] = [
   ...TILE_SPRITES.map((tile) => `tiles/${tile}`),
   ...WALL_THEMES.flatMap((theme) => WALL_PIECES.map((piece) => `walls/${theme}/${piece}`)),
   ...[...new Set(Object.values(WALL_DECOS).flat())].map((deco) => `walls/deco/${deco}`),
+  ...FLOOR_THEMES.map((theme) => `floors/${theme}`),
 ];
 
 /** Sprite pixel that sits on the front edge of the tile's floor, bottom center. */
@@ -151,7 +164,7 @@ export class MapRenderer {
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly map: LevelMap,
-    private readonly wallTheme: WallTheme = 'plaster',
+    private readonly look: MapLook = DEFAULT_LOOK,
   ) {
     this.drawFloor();
     this.drawBlocks();
@@ -187,6 +200,15 @@ export class MapRenderer {
   }
 
   private drawFloor(): void {
+    const sprite = spriteKey(`floors/${this.look.floor}`);
+    if (this.scene.textures.exists(sprite)) {
+      // Floor runs under blocks too, so their front faces never show a gap.
+      this.forEachTile((x, y) => {
+        const c = tileToScreen(x, y);
+        this.scene.add.image(c.x, c.y, sprite).setDepth(FLOOR_DEPTH);
+      });
+      return;
+    }
     const g = this.scene.add.graphics().setDepth(FLOOR_DEPTH);
     // Floor runs under blocks too, so their front faces never show a gap.
     this.forEachTile((x, y, tile) => {
@@ -203,7 +225,7 @@ export class MapRenderer {
         return;
       }
       const piece = this.wallPiece(x, y, height);
-      drawBlock(this.scene, x, y, tile, height, `walls/${this.wallTheme}/${piece}`);
+      drawBlock(this.scene, x, y, tile, height, `walls/${this.look.walls}/${piece}`);
       if (piece === 'wall') this.drawWallDeco(x, y);
     });
   }
@@ -219,7 +241,7 @@ export class MapRenderer {
 
   /** Maybe hangs a decoration on the front face of the wall on tile (x, y). */
   private drawWallDeco(x: number, y: number): void {
-    const decos = WALL_DECOS[this.wallTheme];
+    const decos = WALL_DECOS[this.look.walls];
     const hash = tileHash(x, y);
     if (hash % WALL_DECO_EVERY !== 0 || decos.length === 0) return;
     const deco = decos[Math.floor(hash / WALL_DECO_EVERY) % decos.length];
