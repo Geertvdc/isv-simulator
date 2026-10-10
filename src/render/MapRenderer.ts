@@ -18,12 +18,12 @@ interface BlockStyle {
   label?: string;
 }
 
-const WALL_HEIGHT = TILE_SIZE * 0.75;
-const STATION_HEIGHT = TILE_SIZE * 0.4;
+export const WALL_HEIGHT = TILE_SIZE * 0.75;
+export const STATION_HEIGHT = TILE_SIZE * 0.4;
 /** Walls on the camera side of the room are cut down so they never hide what's behind. */
-const FRONT_WALL_HEIGHT = TILE_SIZE * 0.2;
+export const FRONT_WALL_HEIGHT = TILE_SIZE * 0.2;
 
-const BLOCK_STYLES: Readonly<Record<Exclude<Tile, 'floor'>, BlockStyle>> = {
+export const BLOCK_STYLES: Readonly<Record<Exclude<Tile, 'floor'>, BlockStyle>> = {
   wall: { color: 0x9aa3b5, height: WALL_HEIGHT },
   counter: { color: 0x8a8f99, height: STATION_HEIGHT },
   inbox: { color: 0x4fa3e0, height: STATION_HEIGHT, label: 'I' },
@@ -68,7 +68,7 @@ export function vectors(points: readonly Point[]): Phaser.Math.Vector2[] {
   return points.map((p) => new Phaser.Math.Vector2(p.x, p.y));
 }
 
-function shade(color: number, factor: number): number {
+export function shade(color: number, factor: number): number {
   const c = Phaser.Display.Color.IntegerToColor(color);
   return Phaser.Display.Color.GetColor(c.red * factor, c.green * factor, c.blue * factor);
 }
@@ -119,50 +119,15 @@ export class MapRenderer {
 
   private drawFloor(): void {
     const g = this.scene.add.graphics().setDepth(FLOOR_DEPTH);
+    // Floor runs under blocks too, so their front faces never show a gap.
     this.forEachTile((x, y, tile) => {
-      // Floor runs under blocks too, so their front faces never show a gap.
-      const points = vectors(tileCorners(x, y));
-      g.fillStyle(FLOOR_COLOR);
-      g.fillPoints(points, true);
-      if (tile === 'floor') {
-        g.lineStyle(1, GRID_LINE_COLOR, GRID_LINE_ALPHA);
-        g.strokePoints(points, true);
-      }
+      drawFloorTile(g, x, y, tile === 'floor');
     });
   }
 
   private drawBlocks(): void {
     this.forEachTile((x, y, tile) => {
-      if (tile === 'floor') return;
-      const style = BLOCK_STYLES[tile];
-      const { top, sides } = blockFaces(x, y, this.blockHeight(x, y, tile));
-      const depth = tileDepth(x, y);
-      const g = this.scene.add.graphics().setDepth(depth);
-
-      g.lineStyle(1, EDGE_COLOR, 0.6);
-      for (const { side, points } of sides) {
-        g.fillStyle(shade(style.color, SIDE_SHADE[side]));
-        g.fillPoints(vectors(points), true);
-        g.strokePoints(vectors(points), true);
-      }
-      g.fillStyle(style.color);
-      g.fillPoints(vectors(top), true);
-      g.strokePoints(vectors(top), true);
-
-      if (style.label) {
-        const c = tileToScreen(x, y);
-        this.scene.add
-          .text(c.x, c.y - this.blockHeight(x, y, tile), style.label, {
-            fontFamily: 'system-ui, sans-serif',
-            fontSize: '22px',
-            fontStyle: 'bold',
-            color: '#ffffff',
-            stroke: '#000000',
-            strokeThickness: 3,
-          })
-          .setOrigin(0.5)
-          .setDepth(depth + LABEL_DEPTH_OFFSET);
-      }
+      if (tile !== 'floor') drawBlock(this.scene, x, y, tile, this.blockHeight(x, y, tile));
     });
   }
 
@@ -192,5 +157,60 @@ export class MapRenderer {
         .setVisible(false);
       this.debugLabels.push(label);
     });
+  }
+}
+
+/** One floor tile into `g`; `gridLines` outlines it like open floor. */
+export function drawFloorTile(
+  g: Phaser.GameObjects.Graphics,
+  x: number,
+  y: number,
+  gridLines: boolean,
+): void {
+  const points = vectors(tileCorners(x, y));
+  g.fillStyle(FLOOR_COLOR);
+  g.fillPoints(points, true);
+  if (gridLines) {
+    g.lineStyle(1, GRID_LINE_COLOR, GRID_LINE_ALPHA);
+    g.strokePoints(points, true);
+  }
+}
+
+/** One block on tile (x, y), `height` pixels tall, with its letter on top if it has one. */
+export function drawBlock(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  tile: Exclude<Tile, 'floor'>,
+  height: number,
+): void {
+  const style = BLOCK_STYLES[tile];
+  const { top, sides } = blockFaces(x, y, height);
+  const depth = tileDepth(x, y);
+  const g = scene.add.graphics().setDepth(depth);
+
+  g.lineStyle(1, EDGE_COLOR, 0.6);
+  for (const { side, points } of sides) {
+    g.fillStyle(shade(style.color, SIDE_SHADE[side]));
+    g.fillPoints(vectors(points), true);
+    g.strokePoints(vectors(points), true);
+  }
+  g.fillStyle(style.color);
+  g.fillPoints(vectors(top), true);
+  g.strokePoints(vectors(top), true);
+
+  if (style.label) {
+    const c = tileToScreen(x, y);
+    scene.add
+      .text(c.x, c.y - height, style.label, {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '22px',
+        fontStyle: 'bold',
+        color: '#ffffff',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setDepth(depth + LABEL_DEPTH_OFFSET);
   }
 }

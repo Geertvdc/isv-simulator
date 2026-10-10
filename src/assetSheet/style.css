@@ -1,0 +1,92 @@
+body {
+  margin: 0;
+  padding: 16px 24px 48px;
+  background: #14161c;
+  color: #e6e6e6;
+  font-family: system-ui, sans-serif;
+}
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+
+h1 {
+  font-size: 20px;
+  margin: 0;
+}
+
+#scales a {
+  color: #9aa3b5;
+  margin-right: 8px;
+}
+
+#scales a.current {
+  color: #ffd166;
+  font-weight: bold;
+}
+
+#status {
+  opacity: 0.7;
+}
+
+button {
+  font: inherit;
+  padding: 6px 14px;
+}
+
+/* The render canvas only exists to crop from; keep it out of sight. */
+#stage {
+  position: fixed;
+  left: -100000px;
+  top: 0;
+}
+
+h2 {
+  margin: 32px 0 8px;
+  font-size: 16px;
+  text-transform: capitalize;
+}
+
+#sheet {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+#sheet h2 {
+  flex-basis: 100%;
+}
+
+figure {
+  margin: 0;
+  padding: 10px;
+  max-width: 240px;
+  border-radius: 6px;
+  /* Checkerboard so transparency shows. */
+  background: repeating-conic-gradient(#2a2e38 0% 25%, #22252d 0% 50%) 0 0 / 16px 16px;
+}
+
+figure img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  font-size: 12px;
+  background: #14161ccc;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+figcaption small {
+  opacity: 0.6;
+}

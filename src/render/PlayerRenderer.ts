@@ -41,7 +41,7 @@ export class PlayerRenderer {
       }
       const screen = tileToScreen(pos.x, pos.y);
       g.setPosition(screen.x, screen.y).setDepth(tileDepth(pos.x, pos.y) + PLAYER_DEPTH_OFFSET);
-      draw(g, playerColor(player.id), player.facing);
+      drawPlayer(g, playerColor(player.id), player.facing);
     }
 
     for (const [id, g] of this.sprites) {
@@ -52,7 +52,8 @@ export class PlayerRenderer {
   }
 }
 
-function draw(g: Phaser.GameObjects.Graphics, color: number, facing: Vec): void {
+/** A developer with its feet at (0, 0), facing grid direction `facing`. */
+export function drawPlayer(g: Phaser.GameObjects.Graphics, color: number, facing: Vec): void {
   g.clear();
 
   const shadowW = PLAYER_RADIUS * 2 * TILE_SIZE;
