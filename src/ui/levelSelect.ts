@@ -43,6 +43,8 @@ export function mountLevelSelect(root: HTMLElement): LevelSelectView {
   const entries: LevelEntry[] = [];
   CHAPTERS.forEach((chapter, c) => {
     const column = el('div', 'chapter');
+    // Picks the chapter's accent color in the CSS.
+    column.dataset.chapter = chapter.id;
     const gate = el('div', 'chapter-gate');
     column.append(
       el('div', 'chapter-name', chapter.name),
