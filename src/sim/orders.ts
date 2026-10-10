@@ -67,6 +67,8 @@ export type GameEvent =
   /** A finished build was left too long; `ticketId` has to be built again. */
   | { type: 'pipelineBroke'; x: number; y: number; ticketId: number }
   | { type: 'pipelineRepaired'; x: number; y: number }
+  /** The pipeline at (x, y) finished building `ticketId`: come and get it. */
+  | { type: 'buildDone'; x: number; y: number; ticketId: number }
   | { type: 'pickedUp'; playerId: PlayerId; ticketId: number }
   | { type: 'putDown'; playerId: PlayerId; ticketId: number }
   | { type: 'binned'; playerId: PlayerId; ticketId: number }

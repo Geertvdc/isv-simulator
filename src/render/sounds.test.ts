@@ -29,3 +29,9 @@ describe('sounds', () => {
     expect(handWork(createGame(GARAGE, 1, [1]))).toBe(0);
   });
 });
+
+describe('build done sound', () => {
+  it('plays when a pipeline finishes', () => {
+    expect(soundFor({ type: 'buildDone', x: 1, y: 1, ticketId: 1 })).toBe('build-done');
+  });
+});

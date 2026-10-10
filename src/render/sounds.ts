@@ -14,6 +14,7 @@ export const SOUND_KEYS = [
   'ship',
   'order-expired',
   'pipeline-broke',
+  'build-done',
   'dash',
   'shove',
   'throw',
@@ -43,6 +44,7 @@ export const SOUND_DESCRIPTIONS: Readonly<Record<SoundKey, string>> = {
   ship: 'Shipping an order',
   'order-expired': 'An order ran out',
   'pipeline-broke': 'The pipeline broke',
+  'build-done': 'A pipeline finished its build',
   dash: 'Dash',
   shove: 'Dashing into someone',
   throw: 'Throwing a ticket',
@@ -65,6 +67,8 @@ export function soundFor(event: GameEvent): SoundKey | null {
       return 'order-expired';
     case 'pipelineBroke':
       return 'pipeline-broke';
+    case 'buildDone':
+      return 'build-done';
     case 'dashed':
       return 'dash';
     case 'shoved':

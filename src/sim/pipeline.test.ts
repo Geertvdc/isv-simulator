@@ -196,3 +196,18 @@ describe('pipeline repair', () => {
     });
   });
 });
+
+describe('build done', () => {
+  it('is reported once, on the tick the build finishes', () => {
+    const state = newGame();
+    const ticket = addTicket(state, COL.pipeline, { done: 2 });
+    const done: number[] = [];
+    for (let i = 0; i < PIPELINE_BUILD_TICKS * 2; i++) {
+      tick(state, []);
+      if (state.events.some((e) => e.type === 'buildDone')) done.push(state.tick);
+    }
+    expect(done).toEqual([PIPELINE_BUILD_TICKS]);
+    expect(buildProgress(ticket)).toBe(1);
+    expect(state.events).not.toContainEqual(expect.objectContaining({ type: 'buildDone' }));
+  });
+});

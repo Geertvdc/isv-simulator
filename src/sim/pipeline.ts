@@ -71,6 +71,9 @@ export function updatePipelines(state: GameState): void {
     if (step) {
       advanceStep(step, 1 / PIPELINE_BUILD_TICKS);
       pipeline.doneTicks = 0;
+      if (step.progress >= 1) {
+        state.events.push({ type: 'buildDone', x: pipeline.x, y: pipeline.y, ticketId: ticket.id });
+      }
       continue;
     }
     pipeline.doneTicks++;

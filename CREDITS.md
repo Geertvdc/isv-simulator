@@ -19,6 +19,7 @@ All in `public/assets/sfx/`, renamed after what they're for. Made by [Kenney](ht
 | `order-expired.ogg`  | [Interface Sounds](https://kenney.nl/assets/interface-sounds) | `error_004.ogg`              |
 | `throw.ogg`          | [Impact Sounds](https://kenney.nl/assets/impact-sounds)       | `impactWood_light_003.ogg`   |
 | `pipeline-broke.ogg` | [Impact Sounds](https://kenney.nl/assets/impact-sounds)       | `impactMetal_heavy_001.ogg`  |
+| `build-done.ogg`     | [Interface Sounds](https://kenney.nl/assets/interface-sounds) | `bong_001.ogg`               |
 | `shove.ogg`          | [Impact Sounds](https://kenney.nl/assets/impact-sounds)       | `impactPunch_medium_000.ogg` |
 | `dash.ogg`           | [Digital Audio](https://kenney.nl/assets/digital-audio)       | `phaseJump1.ogg`             |
 | `level-end.ogg`      | [Digital Audio](https://kenney.nl/assets/digital-audio)       | `zapThreeToneUp.ogg`         |
