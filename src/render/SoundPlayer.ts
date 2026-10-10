@@ -9,6 +9,8 @@ const WORK_SOUND_MS = 220;
 export class SoundPlayer {
   private lastHandWork = 0;
   private lastWorkSound = -Infinity;
+  /** 0 to 1, from the settings; applied per sound so it leaves the music alone. */
+  volume = 1;
 
   constructor(private readonly scene: Phaser.Scene) {}
 
@@ -28,9 +30,10 @@ export class SoundPlayer {
     this.lastHandWork = work;
   }
 
-  private sound(key: SoundKey): void {
+  /** Plays one sound effect at the set volume. */
+  sound(key: SoundKey): void {
     // Missing files (e.g. a failed load) shouldn't stop the game.
-    if (!this.scene.cache.audio.exists(key)) return;
-    this.scene.sound.play(key, { volume: soundVolume(key) });
+    if (!this.scene.cache.audio.exists(key) || this.volume <= 0) return;
+    this.scene.sound.play(key, { volume: soundVolume(key) * this.volume });
   }
 }

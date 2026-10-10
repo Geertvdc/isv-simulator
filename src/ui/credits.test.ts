@@ -49,6 +49,7 @@ describe('parseCredits', () => {
     expect(lines.filter((l) => l.kind === 'heading').map((l) => l.text)).toEqual([
       'Art',
       'Sound effects',
+      'Music',
     ]);
     expect(lines.some((l) => l.kind === 'row' && l.text.startsWith('pick-up.ogg'))).toBe(true);
     expect(lines.every((l) => !/[[\]*`|]/.test(l.text))).toBe(true);

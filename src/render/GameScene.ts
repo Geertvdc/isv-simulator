@@ -38,6 +38,8 @@ import { ManagerRenderer } from './ManagerRenderer';
 import { MeetingRenderer } from './MeetingRenderer';
 import { PipelineRenderer } from './PipelineRenderer';
 import { PlayerRenderer } from './PlayerRenderer';
+import { MusicPlayer } from './MusicPlayer';
+import { musicCue } from './music';
 import { SoundPlayer } from './SoundPlayer';
 import { screenToTile, tileCorners, tileDepth } from './projection';
 import { TicketRenderer } from './TicketRenderer';
@@ -105,6 +107,12 @@ const CHAPTER_INFO: readonly ChapterInfo[] = CHAPTERS.map((c) => ({
   starGate: c.starGate,
 }));
 
+/** The id of the chapter holding level `index`, if any. */
+function chapterIdOf(index: number): string | null {
+  const id = LEVEL_IDS[index];
+  return CHAPTERS.find((c) => c.levels.some((l) => l.id === id))?.id ?? null;
+}
+
 /** The first round's seed; every restart moves on to the next one. */
 const FIRST_SEED = 1;
 /** Map look per level id; levels not listed get `DEFAULT_LOOK`. */
@@ -152,6 +160,8 @@ export class GameScene extends Phaser.Scene {
    * presses.
    */
   private devices: InputDevices | null = null;
+  /** The music; kept across scene restarts so it plays on. */
+  private music: MusicPlayer | null = null;
   /** The screens; kept across scene restarts. */
   private readonly flow: Flow = createFlow();
   /** The level whose map is loaded. */
@@ -179,6 +189,7 @@ export class GameScene extends Phaser.Scene {
   preload(): void {
     preloadMapSprites(this);
     SoundPlayer.preload(this);
+    MusicPlayer.preload(this);
   }
 
   create(data: SceneData = {}): void {
@@ -192,6 +203,7 @@ export class GameScene extends Phaser.Scene {
     this.mapRenderer = new MapRenderer(this, this.map, mapLook(level.id));
     this.hoverOutline = this.add.graphics().setDepth(OVERLAY_DEPTH).setVisible(false);
     this.devices ??= new InputDevices(window);
+    this.music ??= new MusicPlayer(this.game);
     this.playerRenderer = new PlayerRenderer(this);
     this.managerRenderer = new ManagerRenderer(this);
     this.meetingRenderer = new MeetingRenderer(this, this.map);
@@ -255,7 +267,18 @@ export class GameScene extends Phaser.Scene {
       this.sounds.play(loop.state, events, time);
       for (const player of loop.state.players) this.updateTarget(loop, player.id);
     }
+    this.updateMusic(delta);
     this.updateHover();
+  }
+
+  private updateMusic(deltaMs: number): void {
+    if (!this.music) return;
+    const state = this.loop?.state;
+    const cue = musicCue(this.flow, {
+      chapterId: chapterIdOf(this.flow.levelIndex),
+      ticksLeft: state ? state.settings.durationTicks - state.tick : null,
+    });
+    this.music.update(cue, deltaMs);
   }
 
   private flowContext(nowMs: number): FlowContext {
@@ -313,10 +336,11 @@ export class GameScene extends Phaser.Scene {
     return false;
   }
 
-  /** Sound volume and screen shake from the save, applied right away. */
+  /** Sound and music volume and screen shake from the save, applied right away. */
   private applySettings(): void {
-    const { sfxVolume, screenShake } = this.options.save.settings;
-    this.sound.volume = sfxVolume / SFX_VOLUME_MAX;
+    const { sfxVolume, musicVolume, screenShake } = this.options.save.settings;
+    this.sounds.volume = sfxVolume / SFX_VOLUME_MAX;
+    if (this.music) this.music.volume = musicVolume / SFX_VOLUME_MAX;
     this.effects.shakeEnabled = screenShake;
   }
 
