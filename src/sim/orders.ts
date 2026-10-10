@@ -81,7 +81,9 @@ export type GameEvent =
   /** A thrown ticket came down on tile (x, y). */
   | { type: 'landed'; ticketId: number; x: number; y: number }
   /** A dashing player knocked `target` away. */
-  | { type: 'shoved'; by: PlayerId; target: PlayerId };
+  | { type: 'shoved'; by: PlayerId; target: PlayerId }
+  /** A walking manager knocked `target` away. */
+  | { type: 'managerBumped'; managerId: number; target: PlayerId };
 
 /** Ticks left on an order; 0 once it's due. */
 export function ticksLeft(state: GameState, order: Order): number {

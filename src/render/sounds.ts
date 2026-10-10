@@ -46,7 +46,7 @@ export const SOUND_DESCRIPTIONS: Readonly<Record<SoundKey, string>> = {
   'pipeline-broke': 'The pipeline broke, a production incident',
   'build-done': 'A pipeline finished its build',
   dash: 'Dash',
-  shove: 'Dashing into someone',
+  shove: 'Dashing into someone, a manager bumping into you',
   throw: 'Throwing a ticket',
   'level-end': 'Level over',
 };
@@ -75,6 +75,7 @@ export function soundFor(event: GameEvent): SoundKey | null {
     case 'dashed':
       return 'dash';
     case 'shoved':
+    case 'managerBumped':
       return 'shove';
     case 'thrown':
       return 'throw';

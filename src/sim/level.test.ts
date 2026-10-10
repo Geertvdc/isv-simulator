@@ -60,6 +60,21 @@ describe('parseLevelMap', () => {
     expect(() => parseLevelMap(level('.0.'))).toThrow("Unknown map char '0'");
   });
 
+  it('reads manager spawns (M) and meeting tiles (m) as floor', () => {
+    const map = parseLevelMap('1M2\nmm.\n34M');
+    expect(map.managerSpawns).toEqual([
+      { x: 1, y: 0 },
+      { x: 2, y: 2 },
+    ]);
+    expect(map.meetingTiles).toEqual([
+      { x: 0, y: 1 },
+      { x: 1, y: 1 },
+    ]);
+    expect(getTile(map, 1, 0)).toBe('floor');
+    expect(getTile(map, 0, 1)).toBe('floor');
+    expect(parseLevelMap('12\n34')).toMatchObject({ managerSpawns: [], meetingTiles: [] });
+  });
+
   it('rejects a duplicate spawn with line and column', () => {
     expect(() => parseLevelMap('12.\n341')).toThrow('Duplicate spawn 1 at line 2, column 3');
   });

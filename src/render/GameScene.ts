@@ -34,6 +34,7 @@ import {
   vectors,
 } from './MapRenderer';
 import { playerColor } from './playerColors';
+import { ManagerRenderer } from './ManagerRenderer';
 import { PipelineRenderer } from './PipelineRenderer';
 import { PlayerRenderer } from './PlayerRenderer';
 import { SoundPlayer } from './SoundPlayer';
@@ -138,6 +139,7 @@ export class GameScene extends Phaser.Scene {
   /** The round on screen, or `null` in menus outside a round. */
   private loop: GameLoop | null = null;
   private playerRenderer!: PlayerRenderer;
+  private managerRenderer!: ManagerRenderer;
   private ticketRenderer!: TicketRenderer;
   private pipelineRenderer!: PipelineRenderer;
   private effects!: EffectsRenderer;
@@ -170,6 +172,7 @@ export class GameScene extends Phaser.Scene {
     this.hoverOutline = this.add.graphics().setDepth(OVERLAY_DEPTH).setVisible(false);
     this.devices ??= new InputDevices(window);
     this.playerRenderer = new PlayerRenderer(this);
+    this.managerRenderer = new ManagerRenderer(this);
     this.ticketRenderer = new TicketRenderer(this, this.mapRenderer);
     this.pipelineRenderer = new PipelineRenderer(this, this.mapRenderer);
     this.effects = new EffectsRenderer(this);
@@ -222,6 +225,7 @@ export class GameScene extends Phaser.Scene {
       const events = running ? loop.events : [];
       this.game.events.emit(GAME_FRAME_EVENT, { state: loop.state, events } satisfies GameFrame);
       this.playerRenderer.sync(loop);
+      this.managerRenderer.sync(loop, time);
       this.ticketRenderer.sync(loop);
       this.pipelineRenderer.sync(loop.state, time);
       this.effects.play(loop.state, events);

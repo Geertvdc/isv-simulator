@@ -55,6 +55,20 @@ export const CATCH_RADIUS = 0.7;
 /** How far in front of the player's center the target tile is picked. */
 export const INTERACT_REACH = 0.8;
 
+/** Wandering manager: walking speed in tiles per second, slower than a player. */
+export const MANAGER_SPEED = 2.2;
+/** Managers collide with players as a circle of this radius. Players can't push them. */
+export const MANAGER_RADIUS = 0.4;
+/** After reaching a spot a manager stands there for between these many ticks. */
+export const MANAGER_PAUSE_MIN_TICKS = 1 * TICKS_PER_SECOND;
+export const MANAGER_PAUSE_MAX_TICKS = 3 * TICKS_PER_SECOND;
+/** Speed a walking manager knocks a player away with. */
+export const MANAGER_SHOVE_SPEED = 9;
+/** A manager shoves someone at most once per this many ticks. */
+export const MANAGER_BUMP_COOLDOWN_TICKS = 1 * TICKS_PER_SECOND;
+/** A manager blocked (a player pinned against a wall) this long gives up and walks somewhere else. */
+export const MANAGER_STUCK_TICKS = Math.round(1.5 * TICKS_PER_SECOND);
+
 /** Most sim ticks run in one frame; after a long stall the game slows down instead of spiralling. */
 export const MAX_TICKS_PER_FRAME = 5;
 

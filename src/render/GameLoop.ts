@@ -17,6 +17,7 @@ export class GameLoop {
   /** Real time not yet simulated, in ticks. */
   private accumulator = 0;
   private previous = new Map<PlayerId, Vec>();
+  private previousManagers = new Map<number, Vec>();
   /** Sim events from every tick run by the last `advance`, in order. */
   events: GameEvent[] = [];
 
@@ -63,15 +64,22 @@ export class GameLoop {
   renderPos(id: PlayerId): Vec | undefined {
     const player = this.state.players.find((p) => p.id === id);
     if (!player) return undefined;
-    const prev = this.previous.get(id) ?? player.pos;
-    const t = this.alpha;
-    return {
-      x: prev.x + (player.pos.x - prev.x) * t,
-      y: prev.y + (player.pos.y - prev.y) * t,
-    };
+    return lerp(this.previous.get(id) ?? player.pos, player.pos, this.alpha);
+  }
+
+  /** A manager's position interpolated between the last two ticks. */
+  renderManagerPos(id: number): Vec | undefined {
+    const manager = this.state.managers.find((m) => m.id === id);
+    if (!manager) return undefined;
+    return lerp(this.previousManagers.get(id) ?? manager.pos, manager.pos, this.alpha);
   }
 
   private snapshot(): void {
     this.previous = new Map(this.state.players.map((p) => [p.id, { ...p.pos }]));
+    this.previousManagers = new Map(this.state.managers.map((m) => [m.id, { ...m.pos }]));
   }
+}
+
+function lerp(from: Vec, to: Vec, t: number): Vec {
+  return { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
 }
