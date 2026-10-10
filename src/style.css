@@ -339,17 +339,59 @@ body {
   }
 }
 
-.level-cards {
+.chapters {
   display: grid;
-  grid-template-columns: repeat(3, 240px);
-  gap: 20px;
+  grid-template-columns: repeat(4, minmax(0, 250px));
+  gap: 18px;
+}
+
+.chapter {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 2px solid transparent;
+}
+
+.chapter.selected {
+  border-color: rgba(255, 209, 102, 0.4);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.chapter-name {
+  font-size: 26px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.chapter-blurb {
+  font-size: 14px;
+  text-align: center;
+  opacity: 0.75;
+  min-height: 1.3em;
+}
+
+.chapter-gate {
+  font-size: 14px;
+  text-align: center;
+  color: #ffd166;
+}
+
+.chapter-gate[hidden] {
+  display: none;
+}
+
+.chapter.locked .chapter-name,
+.chapter.locked .chapter-blurb {
+  opacity: 0.45;
 }
 
 .level-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 22px 18px;
+  gap: 4px;
+  padding: 10px 14px;
   border: 3px solid rgba(255, 255, 255, 0.2);
   border-radius: 12px;
   text-align: center;
@@ -363,7 +405,7 @@ body {
   border-color: #ffd166;
   background: rgba(255, 209, 102, 0.12);
   opacity: 1;
-  transform: scale(1.06);
+  transform: scale(1.04);
 }
 
 .level-card-number {
@@ -374,13 +416,13 @@ body {
 }
 
 .level-card-name {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 700;
 }
 
 .level-card-blurb {
-  font-size: 14px;
-  min-height: 3em;
+  font-size: 13px;
+  min-height: 2.6em;
 }
 
 .level-card-stars {
@@ -389,7 +431,7 @@ body {
 }
 
 .level-card-stars.played {
-  font-size: 32px;
+  font-size: 24px;
   letter-spacing: 0.1em;
   color: #ffd166;
   opacity: 1;
@@ -601,4 +643,8 @@ body {
   to {
     transform: translateY(var(--overflow));
   }
+}
+
+.screen.level-select {
+  gap: 16px;
 }

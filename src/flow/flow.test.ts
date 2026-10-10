@@ -5,6 +5,7 @@ import {
   type Flow,
   type FlowContext,
   type MenuItem,
+  chapterCursor,
   createFlow,
   finishRound,
   isRoundRunning,
@@ -15,9 +16,18 @@ import {
 import { createSave } from './save';
 
 const IDS = ['garage', 'open-plan', 'scale-up'];
+/** One level per chapter, all open: left and right walk the levels like a plain list. */
+const FLAT = IDS.map((id) => ({ levelIds: [id], starGate: 0 }));
 
 function ctx(extra: Partial<FlowContext> = {}): FlowContext {
-  return { save: createSave(), levelIds: IDS, unlockAll: false, nowMs: 0, ...extra };
+  return {
+    save: createSave(),
+    levelIds: IDS,
+    chapters: FLAT,
+    unlockAll: false,
+    nowMs: 0,
+    ...extra,
+  };
 }
 
 function press(deviceId: string, extra: Partial<DevicePress> = {}): DevicePress {
@@ -311,6 +321,76 @@ describe('settings', () => {
     updateFlow(flow, back('pad-3'), c);
     expect(flow.screen).toBe('settings');
     expect(c.save.settings.sfxVolume).toBe(SFX_VOLUME_MAX);
+  });
+});
+
+describe('chapter view', () => {
+  const CHAPTER_IDS = ['a1', 'a2', 'a3', 'b1', 'b2', 'b3', 'c1', 'c2'];
+  const CHAPTERS = [
+    { levelIds: ['a1', 'a2', 'a3'], starGate: 0 },
+    { levelIds: ['b1', 'b2', 'b3'], starGate: 3 },
+    { levelIds: ['c1', 'c2'], starGate: 6 },
+  ];
+  const chapterCtx = (extra: Partial<FlowContext> = {}): FlowContext =>
+    ctx({ levelIds: CHAPTER_IDS, chapters: CHAPTERS, ...extra });
+
+  it('moves up and down within a chapter, and stops at its ends', () => {
+    const c = chapterCtx();
+    expect(chapterCursor(c, 0, 0, 1)).toBe(1);
+    expect(chapterCursor(c, 1, 0, 1)).toBe(2);
+    expect(chapterCursor(c, 2, 0, 1)).toBe(2);
+    expect(chapterCursor(c, 0, 0, -1)).toBe(0);
+    expect(chapterCursor(c, 4, 0, -1)).toBe(3);
+  });
+
+  it('moves left and right to the same row of the next chapter, or its last level', () => {
+    const c = chapterCtx();
+    expect(chapterCursor(c, 1, 1, 0)).toBe(4);
+    expect(chapterCursor(c, 4, -1, 0)).toBe(1);
+    expect(chapterCursor(c, 5, 1, 0)).toBe(7);
+    expect(chapterCursor(c, 7, 1, 0)).toBe(7);
+    expect(chapterCursor(c, 0, -1, 0)).toBe(0);
+  });
+
+  it('drives the level select cursor, locked chapters included', () => {
+    const c = chapterCtx();
+    const flow = atLevelSelect(c);
+    updateFlow(flow, down(), c);
+    updateFlow(flow, right(), c);
+    expect(flow.levelIndex).toBe(4);
+    updateFlow(flow, right(), c);
+    expect(flow.levelIndex).toBe(7);
+    expect(updateFlow(flow, confirm(), c).effects).toEqual([]);
+  });
+
+  it('starts the first level of a chapter once its gate is met', () => {
+    const c = chapterCtx();
+    const flow = atLevelSelect(c);
+    flow.levelIndex = 3;
+    c.save.levels.a1 = { bestStars: 1, bestScore: 1, plays: 1 };
+    c.save.levels.a2 = { bestStars: 1, bestScore: 1, plays: 1 };
+    c.save.levels.a3 = { bestStars: 1, bestScore: 1, plays: 1 };
+    expect(updateFlow(flow, confirm(), c).effects).toEqual([{ type: 'startLevel', levelIndex: 3 }]);
+  });
+
+  it('the results say when a round opened a chapter, and offer it as next level', () => {
+    const c = chapterCtx();
+    c.save.levels.a1 = { bestStars: 1, bestScore: 1, plays: 1 };
+    c.save.levels.a2 = { bestStars: 1, bestScore: 1, plays: 1 };
+    const flow = atLevelSelect(c);
+    flow.levelIndex = 2;
+    updateFlow(flow, confirm(), c);
+    finishRound(flow, { score: 60, stars: 1 }, c);
+    expect(flow.results).toMatchObject({ unlockedChapter: 1, unlockedIndex: 3, canGoNext: true });
+  });
+
+  it('a chapter opened by stars on another level still shows as opened', () => {
+    const c = chapterCtx();
+    c.save.levels.a1 = { bestStars: 1, bestScore: 1, plays: 1 };
+    const flow = atLevelSelect(c);
+    updateFlow(flow, confirm(), c);
+    finishRound(flow, { score: 180, stars: 3 }, c);
+    expect(flow.results).toMatchObject({ unlockedChapter: 1, unlockedIndex: null });
   });
 });
 

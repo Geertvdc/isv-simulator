@@ -12,10 +12,10 @@ import {
   resultsReady,
   updateFlow,
 } from '../flow/flow';
-import { type SaveData, type StorageLike, writeSave } from '../flow/save';
+import { type ChapterInfo, type SaveData, type StorageLike, writeSave } from '../flow/save';
 import { SFX_VOLUME_MAX } from '../sim/balance';
 import { type LevelMap, type Tile, getTile, isWorkSurface } from '../sim/level';
-import { LEVELS } from '../sim/levels';
+import { CHAPTERS, LEVELS } from '../sim/levels';
 import type { GameEvent } from '../sim/orders';
 import { type GameState, type PlayerId, createGame, targetTile } from '../sim/state';
 import { CameraController } from './CameraController';
@@ -72,6 +72,7 @@ export interface FlowView {
   flow: Flow;
   save: SaveData;
   levelIds: readonly string[];
+  chapters: readonly ChapterInfo[];
   unlockAll: boolean;
   /** On the results screen: presses count now. */
   resultsReady: boolean;
@@ -98,6 +99,12 @@ interface SceneData {
 const HOVER_COLOR = 0xffffff;
 /** Over the target block's top, under its label. */
 const TARGET_DEPTH_OFFSET = 0.005;
+const LEVEL_IDS: readonly string[] = LEVELS.map((l) => l.id);
+const CHAPTER_INFO: readonly ChapterInfo[] = CHAPTERS.map((c) => ({
+  levelIds: c.levels.map((l) => l.id),
+  starGate: c.starGate,
+}));
+
 /** The first round's seed; every restart moves on to the next one. */
 const FIRST_SEED = 1;
 /** Map look per level id; levels not listed get `DEFAULT_LOOK`. */
@@ -254,7 +261,8 @@ export class GameScene extends Phaser.Scene {
   private flowContext(nowMs: number): FlowContext {
     return {
       save: this.options.save,
-      levelIds: LEVELS.map((l) => l.id),
+      levelIds: LEVEL_IDS,
+      chapters: CHAPTER_INFO,
       unlockAll: this.options.unlockAll,
       nowMs,
     };
@@ -265,7 +273,8 @@ export class GameScene extends Phaser.Scene {
     this.game.events.emit(FLOW_EVENT, {
       flow: this.flow,
       save: this.options.save,
-      levelIds: LEVELS.map((l) => l.id),
+      levelIds: LEVEL_IDS,
+      chapters: CHAPTER_INFO,
       unlockAll: this.options.unlockAll,
       resultsReady: this.shownResultsReady,
     } satisfies FlowView);

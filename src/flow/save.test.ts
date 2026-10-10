@@ -4,7 +4,9 @@ import {
   OLD_BEST_STARS_KEY,
   SAVE_KEY,
   type StorageLike,
+  chapterIndexOf,
   createSave,
+  isChapterOpen,
   isUnlocked,
   loadSave,
   parseSave,
@@ -181,5 +183,51 @@ describe('unlocking', () => {
     recordResult(save, 'scale-up', { score: 0, stars: 3 });
     recordResult(save, 'removed-level', { score: 0, stars: 3 });
     expect(totalStars(save, IDS)).toBe(5);
+  });
+});
+
+describe('chapter gates', () => {
+  const IDS = ['a1', 'a2', 'b1', 'b2', 'c1'];
+  const CHAPTERS = [
+    { levelIds: ['a1', 'a2'], starGate: 0 },
+    { levelIds: ['b1', 'b2'], starGate: 3 },
+    { levelIds: ['c1'], starGate: 5 },
+  ];
+  const record = (bestStars: number) => ({ bestStars, bestScore: 0, plays: 1 });
+
+  it('finds the chapter of a level', () => {
+    expect(chapterIndexOf(CHAPTERS, 'b2')).toBe(1);
+    expect(chapterIndexOf(CHAPTERS, 'nope')).toBe(-1);
+  });
+
+  it('open a chapter once the total of best stars meets its gate', () => {
+    const save = createSave();
+    expect(isChapterOpen(save, IDS, CHAPTERS, 0)).toBe(true);
+    expect(isChapterOpen(save, IDS, CHAPTERS, 1)).toBe(false);
+    save.levels.a1 = record(1);
+    save.levels.a2 = record(2);
+    expect(isChapterOpen(save, IDS, CHAPTERS, 1)).toBe(true);
+    expect(isChapterOpen(save, IDS, CHAPTERS, 2)).toBe(false);
+    expect(isChapterOpen(save, IDS, CHAPTERS, 2, true)).toBe(true);
+    expect(isChapterOpen(save, IDS, CHAPTERS, 3, true)).toBe(false);
+  });
+
+  it('keep the first level of a locked chapter shut even with the level before it starred', () => {
+    const save = createSave();
+    save.levels.a1 = record(1);
+    save.levels.a2 = record(1);
+    expect(isUnlocked(save, IDS, 2, false, CHAPTERS)).toBe(false);
+    save.levels.a1 = record(2);
+    expect(isUnlocked(save, IDS, 2, false, CHAPTERS)).toBe(true);
+    // The per-level rule still holds inside an open chapter.
+    expect(isUnlocked(save, IDS, 3, false, CHAPTERS)).toBe(false);
+    expect(isUnlocked(save, IDS, 2, true, CHAPTERS)).toBe(true);
+  });
+
+  it('a chapter open by stars still needs the level before', () => {
+    const save = createSave();
+    save.levels.a1 = record(3);
+    expect(isChapterOpen(save, IDS, CHAPTERS, 1)).toBe(true);
+    expect(isUnlocked(save, IDS, 2, false, CHAPTERS)).toBe(false);
   });
 });
