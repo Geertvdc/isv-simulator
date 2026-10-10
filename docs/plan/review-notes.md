@@ -2,6 +2,26 @@
 
 Open questions, decisions made without you, and issues found while the phases were built by agents. Review these with the PRs.
 
+## How to review this stack
+
+Three stacked PRs, each on top of the one before:
+
+1. #14 Phase 10: game flow and save data (base `main`)
+2. #15 Phase 11: campaign (base `phase-10-game-flow`)
+3. Phase 12: music, onboarding and transitions (base `phase-11-campaign`)
+
+Merge in that order, rebase-merge only (no squash, no merge commits). After #14 merges, GitHub retargets #15 to `main`; after #15, the phase 12 PR. If a retarget doesn't happen by itself, change the base to `main` before merging.
+
+What to playtest (all on phase 12, which has everything):
+
+- From a fresh save (clear site data): title → lobby with two keyboards (Enter twice) → Garage. Does the intro card make sense, can someone new get through the first level with only the card and the hints? (The one box left unticked.)
+- Listen: menu music after the first key press, Garage track in the round, faster in the last 30 s, quieter in the pause menu, menu track on the results. Sound and music volume in the settings, after a reload.
+- Countdown "3, 2, 1, Ship it!": try pressing buttons or pausing during it (nothing should happen).
+- Results: stars filling in one by one with a chime (needs a round with stars).
+- On the TV: text size at 1080p, player hats readable from the couch.
+- With a gamepad (never tested by the agents): menus, joining, playing, and whether music starts without touching the keyboard.
+- Campaign (phase 11): a chapter or two with colleagues; balance of the new mechanics.
+
 ## Decisions made without you
 
 - Phases 10, 11 and 12 were built back to back by subagents as stacked PRs (10 → main, 11 → 10, 12 → 11). Online multiplayer (13) is not started.
@@ -71,3 +91,27 @@ Issues / not verified:
 - With only 9 wall/floor combinations, some of the 12 levels share a look.
 
 ## Phase 12
+
+Decisions:
+
+- Music: CC0 tracks from OpenGameArt (Kenney has no music loops, only jingles). Menu "Swingshot" (Haley Halcyon), Garage "Keep your dream alive!" (congusbongus), Startup "Upbeat Chiptune Theme" (nihilocrat), Scale-Up "Utopia" and Enterprise "March" from MatiasVME's Chiptune Loops. All .ogg as published, 4.6 MB together; listed in `CREDITS.md` (which also shows on the credits screen). Picked by name, description and length: **the agent could not listen to them**, so swap any that don't fit. The candidates are downloaded into the git-ignored `music-candidates/` (re-download from the pages in `CREDITS.md`).
+- "Swingshot" has an intro: its page gives a loop point at 11.36 s. We loop the whole file, so the intro plays again every loop. Looping from the loop point needs Web Audio `loopStart`, which Phaser's sound API doesn't expose.
+- Music plays: nothing on the title until a button press (browsers unlock audio on a gesture), the menu track on menus and the results, the chapter's track from the intro card to the end of the round, ducked to 30 % while paused (also in the settings opened from the pause menu). In the last 30 s the level track plays at 1.15x (Phaser `setRate`, so the pitch goes up too, arcade style). Tracks cross-fade over 0.6 s. All numbers in `balance.ts` (`MUSIC_*`); per-track loudness in `src/render/music.ts`, like the sound volumes in `sounds.ts`.
+- Music and sound volume are independent: the sound volume is now applied per effect instead of on Phaser's global volume. Music volume 0–10, default 6, in the save as `settings.musicVolume`. Saves without it (or without `tutorialDone`) get the defaults; `SAVE_VERSION` stays 1, nothing else was migrated.
+- All music is preloaded with the rest at boot, so the first load waits for 4.6 MB more. Fine on localhost; on a slow connection the title shows a few seconds later. Lazy loading per chapter is possible later.
+- New flow screens `intro` and `countdown` before `playing`. The intro shows when a level is picked (level select, Next level); Restart and Retry skip it and go straight to the countdown. Any joined player skips it with confirm; back on the intro returns to the level select. The countdown is 3 × 0.7 s and ignores every press, including pause; the round starts on "Ship it!", which then fades over the map. The round is created behind the intro card (the map, players and clock at 3:00 show through) but doesn't tick.
+- Intro card: chapter and level ("Garage · Level 1-1"), name, blurb, the recipes for this level and player count (Feature, Feature with review when reviews apply, Bug fix, Hotfix on incident levels) as station letters in their colors, and for the levels that teach something (The Garage: basics; Open Plan: throwing; Down the Hall: reviews; Seed Round: incidents; Middle Management: the manager; Back to Back: meetings) one line and a procedural SVG picture. The Garage card also lists the buttons for keyboard and gamepad. Texts in `content.ts`.
+- First-level hints: labels with bobbing arrows over the inbox, the keyboard and the ship hatch, all at once, on the Garage only, while `tutorialDone` is false. Each goes once used: inbox on the first pickup (`pickedUp` event), keyboard on any code progress (there's no work event, so this reads the state), ship on the first `orderShipped`. When all three are used, `tutorialDone` is saved and they never show again. Leaving the round earlier shows all three again next time. Pure in `src/flow/hints.ts`.
+- Transitions: every screen fades in (CSS, 250 ms), the map fades in from black when a scene (re)starts. No fade-out before a screen goes: that would need the flow to wait for animations.
+- Results stars: empty stars fill in gold one by one (0.45 s, then every 0.4 s) with the `ship` chime for each.
+- Accessibility: each player wears a white hat on top of their capsule: 1 circle, 2 cone, 3 square, 4 diamond. The lobby slots and meeting invite cards show the same shape on the player's color. The UI scales with the window height (root font size 16px at 720p, 24px at 1080p, all CSS sizes in rem); the smallest texts went up a step (order kind, invite title, lobby device, chapter blurbs, pause hint). The tight level select layout from phase 11 (was only for screens under 800px high) now always applies, since with the scaling every screen has the room of a 720p one.
+
+Issues / not verified:
+
+- "Someone who has never played gets through the first level without being told what to do" is left for you.
+- The agent can't hear: music was checked through the network panel (all five tracks load) and by hooking Phaser's sound calls in devtools: the Garage track plays in the round and switches to 1.15x at 0:30, the menu track takes over on the results, the volume drops to 30 % in the pause menu and follows the music volume setting. Whether the tracks sound good, loop cleanly, or are balanced against each other is untested.
+- The hat is hidden behind a carried ticket (tickets are drawn over the head), so while carrying, only the color and the target outline tell players apart.
+- Gamepad-only: browsers don't count gamepad buttons as a user gesture, so with only a gamepad the audio context stays locked (no music or sound) until someone clicks or presses a key. Same as phase 10.
+- Browser checks ran with the pane hidden (`requestAnimationFrame` throttled), using a `setTimeout` shim and synthetic key events from devtools; nothing in the code. Checked at 1280x720 and 1920x1080: title → lobby (badges) → level select → Garage intro card → countdown 3/2/1/Ship it! → hints over inbox, keyboard and ship hatch; picking up a ticket removed the inbox hint and coding removed the keyboard hint; pause ducks the music; settings music volume persisted after a reload; Retry skipped the intro; Back to Back intro and an invite card with the player badge. The results stars were checked by setting a round result from devtools (3 stars filled in with three chimes). Shipping a ticket to finish the hints and `tutorialDone` was only covered by tests.
+- No console errors from the game; only the Vite dev server reconnect noise.
+- `npm run sim -- --level=all` gives the same scores as before phase 12.
