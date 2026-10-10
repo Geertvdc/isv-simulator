@@ -163,5 +163,10 @@ export const MUSIC_HURRY_RATE = 1.15;
 export const MUSIC_PAUSE_DUCK = 0.3;
 /** How long one track fades into the next, and volume changes glide. */
 export const MUSIC_FADE_MS = 600;
+/** The results screen: the first star fills in after this, then one star per interval. */
+export const RESULTS_STAR_DELAY_MS = 450;
+export const RESULTS_STAR_INTERVAL_MS = 400;
+/** Screens and the map fade in this long. */
+export const SCREEN_FADE_MS = 250;
 /** Most stars a round can give. */
 export const MAX_STARS = 3;

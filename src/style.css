@@ -487,6 +487,17 @@ body {
   display: none;
 }
 
+/* Every screen fades in when it shows (display: none → flex restarts it). */
+.screen {
+  animation: screen-fade var(--screen-fade, 250ms) ease-out;
+}
+
+@keyframes screen-fade {
+  from {
+    opacity: 0;
+  }
+}
+
 .screen-title {
   margin: 0;
   font-size: 48px;
@@ -582,9 +593,33 @@ body {
 }
 
 .results-stars {
+  display: flex;
+  gap: 0.1em;
   font-size: 96px;
-  letter-spacing: 0.1em;
-  color: #ffd166;
+}
+
+.results-star {
+  color: #4a5060;
+}
+
+.results-star.earned {
+  animation: star-earn 0.45s ease-out both;
+}
+
+/* Starts as an empty star (also during its delay), then pops in gold. */
+@keyframes star-earn {
+  from {
+    color: #4a5060;
+    transform: scale(1);
+  }
+  50% {
+    color: #ffd166;
+    transform: scale(1.45);
+  }
+  to {
+    color: #ffd166;
+    transform: scale(1);
+  }
 }
 
 .results-score {

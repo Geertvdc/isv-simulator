@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { loadSave, type StorageLike } from './flow/save';
+import { SCREEN_FADE_MS } from './sim/balance';
 import {
   FLOW_EVENT,
   type FlowView,
@@ -53,6 +54,7 @@ const game = new Phaser.Game({
 });
 
 const ui = getElement('ui');
+ui.style.setProperty('--screen-fade', `${SCREEN_FADE_MS}ms`);
 const hud = mountHud(ui);
 game.events.on(TILE_HOVER_EVENT, hud.setHover);
 const gameHud = mountGameHud(ui);
