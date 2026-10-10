@@ -27,6 +27,10 @@
     "pack": "impact-sounds",
     "file": "impactMetal_heavy_001.ogg"
   },
+  "build-done": {
+    "pack": "interface-sounds",
+    "file": "bong_001.ogg"
+  },
   "shove": {
     "pack": "impact-sounds",
     "file": "impactPunch_medium_000.ogg"
