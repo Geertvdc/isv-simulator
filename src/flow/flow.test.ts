@@ -5,7 +5,9 @@ import {
   type Flow,
   type FlowContext,
   type MenuItem,
+  COUNTDOWN_MS,
   chapterCursor,
+  countdownNumber,
   createFlow,
   finishRound,
   isRoundRunning,
@@ -75,10 +77,19 @@ function atLevelSelect(c = ctx()): Flow {
   return flow;
 }
 
+/** From the level select: picks the highlighted level, skips its intro and waits out the countdown. */
+function play(flow: Flow, c: FlowContext): void {
+  updateFlow(flow, confirm(), c);
+  expect(flow.screen).toBe('intro');
+  updateFlow(flow, confirm(), c);
+  expect(flow.screen).toBe('countdown');
+  updateFlow(flow, [], { ...c, nowMs: c.nowMs + COUNTDOWN_MS });
+  expect(flow.screen).toBe('playing');
+}
+
 function playing(c = ctx()): Flow {
   const flow = atLevelSelect(c);
-  updateFlow(flow, confirm(), c);
-  expect(flow.screen).toBe('playing');
+  play(flow, c);
   return flow;
 }
 
@@ -183,7 +194,7 @@ describe('level select', () => {
     expect(flow.screen).toBe('levelSelect');
     c.save.levels.garage = { bestStars: STARS_TO_UNLOCK, bestScore: 60, plays: 1 };
     expect(updateFlow(flow, confirm(), c).effects).toEqual([{ type: 'startLevel', levelIndex: 1 }]);
-    expect(flow.screen).toBe('playing');
+    expect(flow.screen).toBe('intro');
   });
 
   it('starts anything with unlockAll', () => {
@@ -209,6 +220,75 @@ describe('level select', () => {
       expect(updateFlow(flow, presses, ctx()).changed).toBe(false);
     }
     expect(flow).toEqual(before);
+  });
+});
+
+describe('intro and countdown', () => {
+  function atIntro(c = ctx()): Flow {
+    const flow = atLevelSelect(c);
+    updateFlow(flow, confirm(), c);
+    expect(flow.screen).toBe('intro');
+    return flow;
+  }
+
+  it('shows the intro card first; the round does not run under it', () => {
+    const flow = atIntro();
+    expect(isRoundRunning(flow)).toBe(false);
+    expect(menuItems(flow)).toEqual([]);
+  });
+
+  it('any joined player skips the intro, others cannot', () => {
+    const c = ctx({ nowMs: 500 });
+    for (const id of ['pad-0', 'kb-left']) {
+      const flow = atIntro(c);
+      updateFlow(flow, confirm('pad-3'), c);
+      updateFlow(flow, confirm('kb-right'), c);
+      expect(flow.screen).toBe('intro');
+      expect(updateFlow(flow, confirm(id), c).changed).toBe(true);
+      expect(flow).toMatchObject({ screen: 'countdown', countdownStartMs: 500 });
+    }
+  });
+
+  it('goes back to the level select from the intro, dropping the round', () => {
+    const flow = atIntro();
+    expect(updateFlow(flow, back(), ctx()).effects).toEqual([{ type: 'stopRound' }]);
+    expect(flow.screen).toBe('levelSelect');
+  });
+
+  it('counts down 3, 2, 1, then the round runs', () => {
+    const c = ctx({ nowMs: 1000 });
+    const flow = atIntro(c);
+    updateFlow(flow, confirm(), c);
+    const at = (ms: number): FlowContext => ({ ...c, nowMs: 1000 + ms });
+    expect(countdownNumber(flow, 1000)).toBe(3);
+    expect(countdownNumber(flow, 1000 + COUNTDOWN_MS / 3)).toBe(2);
+    expect(countdownNumber(flow, 1000 + COUNTDOWN_MS - 1)).toBe(1);
+    updateFlow(flow, [], at(COUNTDOWN_MS - 1));
+    expect(isRoundRunning(flow)).toBe(false);
+    expect(updateFlow(flow, [], at(COUNTDOWN_MS)).changed).toBe(true);
+    expect(flow.screen).toBe('playing');
+    expect(isRoundRunning(flow)).toBe(true);
+    expect(countdownNumber(flow, 1000 + COUNTDOWN_MS)).toBeNull();
+  });
+
+  it('ignores every press during the countdown, pause and back included', () => {
+    const c = ctx();
+    const flow = atIntro(c);
+    updateFlow(flow, confirm(), c);
+    for (const presses of [confirm(), back(), menu(), right(), down(), enter(), menu('kb-left')]) {
+      const update = updateFlow(flow, presses, { ...c, nowMs: 100 });
+      expect(update).toEqual({ changed: false, effects: [] });
+      expect(flow.screen).toBe('countdown');
+      expect(isRoundRunning(flow)).toBe(false);
+    }
+  });
+
+  it('Restart skips the intro and counts down again', () => {
+    const c = ctx();
+    const flow = playing(c);
+    updateFlow(flow, menu(), c);
+    pick(flow, 'restart', { ...c, nowMs: 7000 });
+    expect(flow).toMatchObject({ screen: 'countdown', countdownStartMs: 7000 });
   });
 });
 
@@ -240,7 +320,7 @@ describe('pause', () => {
 
   it('restarts, or leaves the round for the level select, lobby or title', () => {
     const cases: [MenuItem, Partial<Flow>, string][] = [
-      ['restart', { screen: 'playing' }, 'startLevel'],
+      ['restart', { screen: 'countdown' }, 'startLevel'],
       ['levelSelect', { screen: 'levelSelect' }, 'stopRound'],
       ['changePlayers', { screen: 'lobby' }, 'stopRound'],
       ['quit', { screen: 'title', menuIndex: 0 }, 'stopRound'],
@@ -295,9 +375,24 @@ describe('settings', () => {
     expect(c.save.settings.sfxVolume).toBe(0);
   });
 
+  it('changes the music volume on its own line, apart from the sound volume', () => {
+    const c = ctx();
+    const flow = fromPause(c);
+    updateFlow(flow, down(), c);
+    expect(menuItems(flow)[flow.menuIndex]).toBe('music');
+    const before = c.save.settings.musicVolume;
+    const update = updateFlow(flow, left(), c);
+    expect(update.effects.map((e) => e.type).sort()).toEqual(['saveChanged', 'settingsChanged']);
+    expect(c.save.settings.musicVolume).toBe(before - 1);
+    expect(c.save.settings.sfxVolume).toBe(SFX_VOLUME_MAX);
+    for (let i = 0; i < SFX_VOLUME_MAX + 3; i++) updateFlow(flow, right(), c);
+    expect(c.save.settings.musicVolume).toBe(SFX_VOLUME_MAX);
+  });
+
   it('toggles screen shake with left, right or confirm', () => {
     const c = ctx();
     const flow = fromPause(c);
+    updateFlow(flow, down(), c);
     updateFlow(flow, down(), c);
     updateFlow(flow, right(), c);
     expect(c.save.settings.screenShake).toBe(false);
@@ -379,7 +474,7 @@ describe('chapter view', () => {
     c.save.levels.a2 = { bestStars: 1, bestScore: 1, plays: 1 };
     const flow = atLevelSelect(c);
     flow.levelIndex = 2;
-    updateFlow(flow, confirm(), c);
+    play(flow, c);
     finishRound(flow, { score: 60, stars: 1 }, c);
     expect(flow.results).toMatchObject({ unlockedChapter: 1, unlockedIndex: 3, canGoNext: true });
   });
@@ -388,7 +483,7 @@ describe('chapter view', () => {
     const c = chapterCtx();
     c.save.levels.a1 = { bestStars: 1, bestScore: 1, plays: 1 };
     const flow = atLevelSelect(c);
-    updateFlow(flow, confirm(), c);
+    play(flow, c);
     finishRound(flow, { score: 180, stars: 3 }, c);
     expect(flow.results).toMatchObject({ unlockedChapter: 1, unlockedIndex: null });
   });
@@ -398,7 +493,7 @@ describe('results', () => {
   function finished(stars: number, c = ctx(), levelIndex = 0): Flow {
     const flow = atLevelSelect(c);
     flow.levelIndex = levelIndex;
-    updateFlow(flow, confirm(), c);
+    play(flow, c);
     c.nowMs = 1000;
     const update = finishRound(flow, { score: stars * 60, stars }, c);
     expect(update.effects).toEqual([{ type: 'saveChanged' }]);
@@ -440,7 +535,7 @@ describe('results', () => {
     c.nowMs += 1;
     expect(resultsReady(flow, c.nowMs)).toBe(true);
     expect(updateFlow(flow, confirm(), c).effects).toEqual([{ type: 'startLevel', levelIndex: 1 }]);
-    expect(flow).toMatchObject({ screen: 'playing', levelIndex: 1, results: null });
+    expect(flow).toMatchObject({ screen: 'intro', levelIndex: 1, results: null });
   });
 
   it('retries, or goes to the level select', () => {
@@ -448,6 +543,8 @@ describe('results', () => {
     const flow = finished(3, c);
     c.nowMs = 10_000;
     expect(pick(flow, 'retry', c).effects).toEqual([{ type: 'startLevel', levelIndex: 0 }]);
+    // Same level again: no intro card, straight to the countdown.
+    expect(flow).toMatchObject({ screen: 'countdown', countdownStartMs: 10_000 });
     const other = finished(3, c);
     c.nowMs = 20_000;
     expect(updateFlow(other, back(), c).effects).toEqual([{ type: 'stopRound' }]);

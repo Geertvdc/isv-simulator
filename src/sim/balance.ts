@@ -150,5 +150,10 @@ export const SFX_VOLUME_MAX = 10;
 export const DEFAULT_SFX_VOLUME = 10;
 /** Music volume for a new save, on the same scale as sound; a bit under the effects. */
 export const DEFAULT_MUSIC_VOLUME = 6;
+/** The countdown before a round: "3, 2, 1", each number this long. */
+export const COUNTDOWN_STEPS = 3;
+export const COUNTDOWN_STEP_MS = 700;
+/** How long "Ship it!" stays up once the round starts. */
+export const SHIP_IT_BANNER_MS = 900;
 /** Most stars a round can give. */
 export const MAX_STARS = 3;

@@ -159,6 +159,7 @@ export const MENU_LABELS = {
   next: 'Next level',
   retry: 'Retry',
   volume: 'Sound volume',
+  music: 'Music volume',
   shake: 'Screen shake',
   back: 'Back',
 } as const;
