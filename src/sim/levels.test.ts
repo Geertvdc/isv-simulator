@@ -83,15 +83,7 @@ describe('levels', () => {
   for (const level of LEVELS) {
     it(`${level.name} parses with a spawn per player and one of each must-have tile`, () => {
       expect(level.map.spawns).toHaveLength(MAX_PLAYERS);
-      for (const tile of [
-        'inbox',
-        'bugQueue',
-        'keyboard',
-        'testBench',
-        'pipeline',
-        'ship',
-        'bin',
-      ]) {
+      for (const tile of ['inbox', 'bugQueue', 'keyboard', 'testBench', 'pipeline', 'ship']) {
         expect(level.map.tiles).toContain(tile);
       }
       expect(level.map.width).toBe(14);

@@ -94,21 +94,26 @@ describe('parseLevelMap', () => {
     expect(map.height).toBe(10);
     expect(map.tiles).toHaveLength(14 * 10);
     expect(map.spawns).toEqual([
-      { x: 1, y: 5 },
-      { x: 12, y: 5 },
-      { x: 5, y: 1 },
-      { x: 8, y: 1 },
+      { x: 3, y: 3 },
+      { x: 10, y: 3 },
+      { x: 3, y: 6 },
+      { x: 10, y: 6 },
     ]);
     expect(getTile(map, 0, 0)).toBe('wall');
-    expect(getTile(map, 6, 0)).toBe('inbox');
-    expect(getTile(map, 11, 0)).toBe('bugQueue');
-    expect(getTile(map, 1, 1)).toBe('bin');
-    expect(getTile(map, 1, 2)).toBe('keyboard');
-    expect(getTile(map, 12, 2)).toBe('testBench');
-    expect(getTile(map, 5, 3)).toBe('counter');
+    expect(getTile(map, 2, 0)).toBe('inbox');
+    expect(getTile(map, 7, 0)).toBe('bugQueue');
+    expect(getTile(map, 1, 1)).toBe('keyboard');
+    expect(getTile(map, 3, 1)).toBe('keyboard');
+    expect(getTile(map, 9, 1)).toBe('testBench');
+    expect(getTile(map, 11, 1)).toBe('testBench');
+    expect(getTile(map, 5, 4)).toBe('counter');
     expect(getTile(map, 12, 6)).toBe('pipeline');
     expect(getTile(map, 1, 8)).toBe('counter');
     expect(getTile(map, 6, 9)).toBe('ship');
+    // Room to stand below every desk.
+    for (const x of [1, 3, 9, 11]) expect(getTile(map, x, 2)).toBe('floor');
+    expect(getTile(map, 12, 7)).toBe('floor');
+    expect(map.tiles).not.toContain('bin');
   });
 });
 

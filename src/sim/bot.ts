@@ -214,7 +214,9 @@ function carryGoal(state: GameState, bot: Bot, bots: readonly Bot[], ticket: Tic
     ? workableSteps(ticket).find((s) => !OPTIONAL_STEPS.has(s.kind))
     : currentStep(ticket);
   if (!step) {
-    const where = matchingOrders(state, ticket).length > 0 ? 'ship' : 'bin';
+    // Without a bin, a ticket whose order expired still ships, for nothing.
+    const hasBin = state.level.tiles.includes('bin');
+    const where = matchingOrders(state, ticket).length > 0 || !hasBin ? 'ship' : 'bin';
     const tile = nearest(state, bot.playerId, tilesOf(state.level, where));
     return tile ? { tile, action: 'interact' } : null;
   }
