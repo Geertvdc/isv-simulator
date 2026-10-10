@@ -1,17 +1,11 @@
 import type { GameFrame } from '../render/GameScene';
 import { tileColor } from '../render/MapRenderer';
 import { ORDER_URGENT_TICKS } from '../sim/balance';
-import {
-  LEVEL_NAMES,
-  NEW_BEST_TEXT,
-  PIPELINE_BROKE_TEXT,
-  UNTESTED_SHIP_TEXT,
-} from '../sim/content';
+import { PAUSE_HINT, PIPELINE_BROKE_TEXT, UNTESTED_SHIP_TEXT } from '../sim/content';
 import { type Order, ticksLeft } from '../sim/orders';
 import type { GameState } from '../sim/state';
 import type { StepKind } from '../sim/tickets';
-import { formatClock, starText } from './format';
-import { type StorageLike, recordStars } from './progress';
+import { formatClock } from './format';
 
 /** Each step shows as the letter of its station on the map, in that station's color. */
 const STEP_LABEL: Readonly<Record<StepKind, { letter: string; color: string }>> = {
@@ -51,25 +45,18 @@ export interface GameHud {
 }
 
 /**
- * The in-game HUD: order bar on top, score and clock below, and the end
- * screen, which also saves the best stars per level.
+ * The in-game HUD: order bar on top, score and clock below. The results
+ * screen is its own view.
  */
-export function mountGameHud(root: HTMLElement, storage: StorageLike | null): GameHud {
+export function mountGameHud(root: HTMLElement): GameHud {
   const orders = el('div', 'orders');
   const score = el('div', 'hud-score');
   const scoreValue = el('span', 'hud-score-value', '0');
   score.append(el('span', 'hud-score-label', 'Score'), scoreValue);
   const clock = el('div', 'hud-clock');
+  const pauseHint = el('div', 'hud-pause-hint', PAUSE_HINT);
 
-  const end = el('div', 'end-screen');
-  const endScore = el('div', 'end-score');
-  const endStars = el('div', 'end-stars');
-  const endBest = el('div', 'end-best', NEW_BEST_TEXT);
-  const endHint = el('div', 'end-hint', 'Interact: play again · Dash: pick a level');
-  const endTitle = el('h1', 'end-title');
-  end.append(endTitle, endStars, endScore, endBest, endHint);
-
-  const parts = [orders, score, clock, end];
+  const parts = [orders, score, clock, pauseHint];
   for (const part of parts) part.hidden = true;
   root.append(...parts);
 
@@ -133,6 +120,7 @@ export function mountGameHud(root: HTMLElement, storage: StorageLike | null): Ga
       syncOrders(state);
       scoreValue.textContent = String(state.score);
       clock.textContent = formatClock(state.settings.durationTicks - state.tick);
+      pauseHint.hidden = state.result !== null;
       for (const event of frame.events) {
         if (event.type === 'orderShipped') {
           const parts = event.points > 0 ? [`+${event.points}`] : [];
@@ -141,17 +129,6 @@ export function mountGameHud(root: HTMLElement, storage: StorageLike | null): Ga
         }
         if (event.type === 'orderExpired' && event.penalty > 0) popup(`-${event.penalty}`, 'loss');
         if (event.type === 'pipelineBroke') popup(PIPELINE_BROKE_TEXT, 'loss');
-        if (event.type === 'levelEnded') {
-          endBest.hidden = !recordStars(storage, state.levelId, event.result.stars);
-        }
-      }
-
-      end.hidden = state.result === null;
-      if (state.result) {
-        endTitle.textContent = LEVEL_NAMES[state.levelId] ?? state.levelId;
-        endStars.textContent = starText(state.result.stars);
-        endScore.textContent = `Score: ${state.result.score}`;
-        endHint.style.visibility = frame.canRestart ? 'visible' : 'hidden';
       }
     },
   };

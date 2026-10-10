@@ -1,11 +1,21 @@
 import Phaser from 'phaser';
 import { buildInputCommands } from '../input/commands';
-import { type InputFrame, InputDevices } from '../input/devices';
-import { type LevelSelect, createLevelSelect, updateLevelSelect } from '../input/levelSelect';
-import { type Lobby, claimOrphanedPlayer, createLobby, updateLobby } from '../input/lobby';
-import { END_SCREEN_INPUT_DELAY_MS } from '../sim/balance';
+import { InputDevices } from '../input/devices';
+import { claimOrphanedPlayer } from '../input/lobby';
+import {
+  type Flow,
+  type FlowContext,
+  type FlowEffect,
+  createFlow,
+  finishRound,
+  isRoundRunning,
+  resultsReady,
+  updateFlow,
+} from '../flow/flow';
+import { type SaveData, type StorageLike, writeSave } from '../flow/save';
+import { SFX_VOLUME_MAX } from '../sim/balance';
 import { type LevelMap, type Tile, getTile, isWorkSurface } from '../sim/level';
-import { LEVELS, type Level } from '../sim/levels';
+import { LEVELS } from '../sim/levels';
 import type { GameEvent } from '../sim/orders';
 import { type GameState, type PlayerId, createGame, targetTile } from '../sim/state';
 import { CameraController } from './CameraController';
@@ -42,33 +52,45 @@ export interface TileHover {
  */
 export const TILE_HOVER_EVENT = 'tile-hover';
 
-/**
- * Emitted on `game.events` with the `Lobby` whenever it changes, and with
- * `null` once the game starts.
- */
-export const LOBBY_EVENT = 'lobby';
-
 export interface GameFrame {
   state: GameState;
   /** Sim events from the ticks run this frame. */
   events: GameEvent[];
-  /** Whether the end screen takes a restart press yet. */
-  canRestart: boolean;
 }
 
 /**
- * Emitted on `game.events` with a `GameFrame` every frame while a game runs,
- * and with `null` when it stops for the level select.
+ * Emitted on `game.events` with a `GameFrame` every frame while a round is
+ * on screen (also while paused or on the results), and with `null` when
+ * there is no round.
  */
 export const GAME_FRAME_EVENT = 'game-frame';
 
-/** Emitted on `game.events` with the `LevelSelect` whenever it changes, and with `null` once a level starts. */
-export const LEVEL_SELECT_EVENT = 'level-select';
+/** What the menus show: the flow plus what it is read with. */
+export interface FlowView {
+  flow: Flow;
+  save: SaveData;
+  levelIds: readonly string[];
+  unlockAll: boolean;
+  /** On the results screen: presses count now. */
+  resultsReady: boolean;
+}
 
-/** What the scene is restarted with when the level changes. */
+/** Emitted on `game.events` with a `FlowView` whenever the screens change. */
+export const FLOW_EVENT = 'flow';
+
+/** Handed to the scene once, at boot. */
+export interface GameSceneOptions {
+  storage: StorageLike | null;
+  save: SaveData;
+  /** `?unlockAll`: every level is open. */
+  unlockAll: boolean;
+}
+
+/** What the scene is restarted with when the level changes or a round is dropped. */
 interface SceneData {
-  lobby?: Lobby;
   levelIndex?: number;
+  /** Start a round right away. */
+  startRound?: boolean;
 }
 
 const HOVER_COLOR = 0xffffff;
@@ -103,13 +125,17 @@ export class GameScene extends Phaser.Scene {
   private cameraController!: CameraController;
   private mapRenderer!: MapRenderer;
   private hoverOutline!: Phaser.GameObjects.Graphics;
-  private devices!: InputDevices;
-  private lobby!: Lobby;
-  private level!: Level;
-  private levelIndex = 0;
-  /** Set while players pick a level, after the lobby or between rounds. */
-  private levelSelect: LevelSelect | null = null;
-  /** `null` while players are still joining in the lobby or picking a level. */
+  /**
+   * Kept for the whole game, across scene restarts: new devices would see
+   * buttons still held from the menu press that restarted the scene as new
+   * presses.
+   */
+  private devices: InputDevices | null = null;
+  /** The screens; kept across scene restarts. */
+  private readonly flow: Flow = createFlow();
+  /** The level whose map is loaded. */
+  private mapLevelIndex = 0;
+  /** The round on screen, or `null` in menus outside a round. */
   private loop: GameLoop | null = null;
   private playerRenderer!: PlayerRenderer;
   private ticketRenderer!: TicketRenderer;
@@ -120,10 +146,10 @@ export class GameScene extends Phaser.Scene {
   private hovered: TileHover | null = null;
   private debugVisible = false;
   private seed = FIRST_SEED;
-  /** Scene time the current level ended, or `null` while it runs. */
-  private endedAt: number | null = null;
+  /** What the last `FLOW_EVENT` said about the results taking presses. */
+  private shownResultsReady = false;
 
-  constructor() {
+  constructor(private readonly options: GameSceneOptions) {
     super('GameScene');
   }
 
@@ -133,37 +159,28 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(data: SceneData = {}): void {
-    this.levelIndex = data.levelIndex ?? this.levelIndex;
-    const level = LEVELS[this.levelIndex];
-    if (!level) throw new Error(`No level ${this.levelIndex}`);
-    this.level = level;
+    this.mapLevelIndex = data.levelIndex ?? this.mapLevelIndex;
+    const level = LEVELS[this.mapLevelIndex];
+    if (!level) throw new Error(`No level ${this.mapLevelIndex}`);
     this.map = level.map;
     // Restarts reuse this object; the old sprites went with the old scene.
     this.targets.clear();
     this.hovered = null;
-    this.endedAt = null;
     this.mapRenderer = new MapRenderer(this, this.map, mapLook(level.id));
     this.hoverOutline = this.add.graphics().setDepth(OVERLAY_DEPTH).setVisible(false);
-    this.devices = new InputDevices(window);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.devices.destroy();
-    });
-    this.loop = null;
-    this.levelSelect = null;
-    if (data.lobby) {
-      // Back from picking a different level: straight into a round.
-      this.lobby = data.lobby;
-      this.startRound();
-    } else {
-      this.lobby = createLobby();
-      this.game.events.emit(LOBBY_EVENT, this.lobby);
-    }
+    this.devices ??= new InputDevices(window);
     this.playerRenderer = new PlayerRenderer(this);
     this.ticketRenderer = new TicketRenderer(this, this.mapRenderer);
     this.pipelineRenderer = new PipelineRenderer(this, this.mapRenderer);
     this.effects = new EffectsRenderer(this);
     this.sounds = new SoundPlayer(this);
     this.cameraController = new CameraController(this, this.mapBounds());
+    this.applySettings();
+
+    this.loop = null;
+    if (data.startRound) this.startRound();
+    else this.game.events.emit(GAME_FRAME_EVENT, null);
+    this.emitFlow(0);
 
     const K = Phaser.Input.Keyboard.KeyCodes;
     // Backtick for macOS, where F3 is taken by the OS; F3 still works elsewhere.
@@ -177,87 +194,109 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number): void {
+    if (!this.devices) return;
     const frame = this.devices.poll();
-    const joined = new Set(this.lobby.players.map((p) => p.deviceId));
-    if (!this.lobby.started) {
-      this.updateLobby(frame.presses);
-      this.updateHover();
-      return;
+    const { players } = this.flow.lobby;
+    if (this.flow.lobby.started) {
+      claimOrphanedPlayer(players, frame.presses, new Set(frame.readings.keys()));
     }
-    claimOrphanedPlayer(this.lobby.players, frame.presses, new Set(frame.readings.keys()));
 
-    const select = this.levelSelect;
-    if (select) {
-      if (updateLevelSelect(select, frame.presses, joined, LEVELS.length)) {
-        this.game.events.emit(LEVEL_SELECT_EVENT, select);
+    const ctx = this.flowContext(time);
+    const update = updateFlow(this.flow, frame.presses, ctx);
+    if (this.runEffects(update.effects)) return;
+    const ready = resultsReady(this.flow, time);
+    if (update.changed || ready !== this.shownResultsReady) this.emitFlow(time);
+
+    const loop = this.loop;
+    if (loop) {
+      const running = isRoundRunning(this.flow);
+      if (running) {
+        loop.advance(delta, (tick) => buildInputCommands(players, frame.readings, tick));
+        const result = loop.state.result;
+        if (result) {
+          this.runEffects(finishRound(this.flow, result, ctx).effects);
+          this.emitFlow(time);
+        }
       }
-      if (select.chosen) this.playLevel(select.index);
-      this.updateHover();
-      return;
+      // Paused or done: nothing new happened, so nothing to react to.
+      const events = running ? loop.events : [];
+      this.game.events.emit(GAME_FRAME_EVENT, { state: loop.state, events } satisfies GameFrame);
+      this.playerRenderer.sync(loop);
+      this.ticketRenderer.sync(loop);
+      this.pipelineRenderer.sync(loop.state, time);
+      this.effects.play(loop.state, events);
+      this.sounds.play(loop.state, events, time);
+      for (const player of loop.state.players) this.updateTarget(loop, player.id);
     }
-
-    let loop = this.loop;
-    if (!loop) return;
-    loop.advance(delta, (tick) => buildInputCommands(this.lobby.players, frame.readings, tick));
-    if (loop.state.result && this.endedAt === null) this.endedAt = time;
-    const canRestart = this.endedAt !== null && time - this.endedAt >= END_SCREEN_INPUT_DELAY_MS;
-    const ownPresses = frame.presses.filter((p) => joined.has(p.deviceId));
-    if (canRestart && ownPresses.some((p) => p.dash)) {
-      this.openLevelSelect();
-      return;
-    }
-    if (canRestart && ownPresses.some((p) => p.join || p.interact)) {
-      this.seed++;
-      loop = this.startRound();
-    }
-
-    this.game.events.emit(GAME_FRAME_EVENT, {
-      state: loop.state,
-      events: loop.events,
-      canRestart,
-    } satisfies GameFrame);
-    this.playerRenderer.sync(loop);
-    this.ticketRenderer.sync(loop);
-    this.pipelineRenderer.sync(loop.state, time);
-    this.effects.play(loop.state, loop.events);
-    this.sounds.play(loop.state, loop.events, time);
-    for (const player of loop.state.players) this.updateTarget(loop, player.id);
     this.updateHover();
   }
 
-  /** Joins and starts in the lobby; once it starts, on to the level select. */
-  private updateLobby(presses: InputFrame['presses']): void {
-    if (!updateLobby(this.lobby, presses)) return;
-    this.game.events.emit(LOBBY_EVENT, this.lobby.started ? null : this.lobby);
-    if (this.lobby.started) this.openLevelSelect();
+  private flowContext(nowMs: number): FlowContext {
+    return {
+      save: this.options.save,
+      levelIds: LEVELS.map((l) => l.id),
+      unlockAll: this.options.unlockAll,
+      nowMs,
+    };
   }
 
-  /** A fresh round of the level with everyone in the lobby. */
-  private startRound(): GameLoop {
-    const ids = this.lobby.players.map((p) => p.playerId);
-    this.loop = new GameLoop(createGame(this.level, this.seed, ids));
-    this.endedAt = null;
-    return this.loop;
+  private emitFlow(nowMs: number): void {
+    this.shownResultsReady = resultsReady(this.flow, nowMs);
+    this.game.events.emit(FLOW_EVENT, {
+      flow: this.flow,
+      save: this.options.save,
+      levelIds: LEVELS.map((l) => l.id),
+      unlockAll: this.options.unlockAll,
+      resultsReady: this.shownResultsReady,
+    } satisfies FlowView);
   }
 
-  /** Stops any round and lets the players pick a level, starting on the current one. */
-  private openLevelSelect(): void {
-    this.loop = null;
-    this.levelSelect = createLevelSelect(this.levelIndex);
-    this.game.events.emit(GAME_FRAME_EVENT, null);
-    this.game.events.emit(LEVEL_SELECT_EVENT, this.levelSelect);
-  }
-
-  /** Starts the picked level: on this map right away, or after rebuilding the scene for another. */
-  private playLevel(index: number): void {
-    this.levelSelect = null;
-    this.game.events.emit(LEVEL_SELECT_EVENT, null);
-    this.seed++;
-    if (index === this.levelIndex) {
-      this.startRound();
-      return;
+  /** Runs what the flow asked for. Returns whether the scene is restarting. */
+  private runEffects(effects: readonly FlowEffect[]): boolean {
+    for (const effect of effects) {
+      switch (effect.type) {
+        case 'startLevel':
+          this.seed++;
+          if (effect.levelIndex === this.mapLevelIndex) {
+            this.startRound();
+            break;
+          }
+          this.scene.restart({
+            levelIndex: effect.levelIndex,
+            startRound: true,
+          } satisfies SceneData);
+          return true;
+        case 'resumeRound':
+          this.loop?.resetTime();
+          break;
+        case 'stopRound':
+          // A fresh scene on the same map: no players or tickets left standing around.
+          this.scene.restart({ levelIndex: this.mapLevelIndex } satisfies SceneData);
+          return true;
+        case 'saveChanged':
+          writeSave(this.options.storage, this.options.save);
+          break;
+        case 'settingsChanged':
+          this.applySettings();
+          break;
+      }
     }
-    this.scene.restart({ lobby: this.lobby, levelIndex: index } satisfies SceneData);
+    return false;
+  }
+
+  /** Sound volume and screen shake from the save, applied right away. */
+  private applySettings(): void {
+    const { sfxVolume, screenShake } = this.options.save.settings;
+    this.sound.volume = sfxVolume / SFX_VOLUME_MAX;
+    this.effects.shakeEnabled = screenShake;
+  }
+
+  /** A fresh round of the loaded level with everyone in the lobby. */
+  private startRound(): void {
+    const level = LEVELS[this.mapLevelIndex];
+    if (!level) return;
+    const ids = this.flow.lobby.players.map((p) => p.playerId);
+    this.loop = new GameLoop(createGame(level, this.seed, ids));
   }
 
   /** Outlines the counter or station a player faces, in their color; nothing for floor and walls. */

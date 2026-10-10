@@ -3,6 +3,7 @@ import { isGamepadDevice } from '../input/gamepad';
 import { KEY_SCHEMES, LEFT_KEYS, RIGHT_KEYS } from '../input/keyboard';
 import type { Lobby } from '../input/lobby';
 import { playerCssColor } from '../render/playerColors';
+import { LOBBY_BACK_HINT } from '../sim/content';
 import { MAX_PLAYERS } from '../sim/level';
 
 export interface LobbyView {
@@ -31,7 +32,7 @@ export function startHint(lobby: Lobby): string | null {
 
 export function mountLobby(root: HTMLElement): LobbyView {
   const panel = document.createElement('div');
-  panel.className = 'lobby';
+  panel.className = 'screen lobby';
   panel.hidden = true;
 
   const title = document.createElement('h1');
@@ -55,7 +56,11 @@ export function mountLobby(root: HTMLElement): LobbyView {
   const hint = document.createElement('div');
   hint.className = 'lobby-hint';
 
-  panel.append(title, slots, hint);
+  const back = document.createElement('div');
+  back.className = 'screen-hint';
+  back.textContent = LOBBY_BACK_HINT;
+
+  panel.append(title, slots, hint, back);
   root.append(panel);
 
   return {

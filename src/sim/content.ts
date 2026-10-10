@@ -46,10 +46,56 @@ export const LEVEL_BLURBS: Readonly<Record<string, string>> = {
   'scale-up': 'Code reviews are mandatory. The review room is down the hall.',
 };
 
-/** Shown on the end screen when the stars beat the best so far. */
+/** Shown on the results when the score beats the best so far. */
 export const NEW_BEST_TEXT = 'New best!';
+
+/** Shown on the results when the round opened the next level. */
+export const LEVEL_UNLOCKED_TEXT = 'Level unlocked!';
+
+/** The big name on the title screen. */
+export const GAME_TITLE = 'ISV Simulator';
+export const GAME_TAGLINE = 'Ship it before the customer notices.';
+/** On the title screen until someone presses a button. */
+export const PRESS_ANY_BUTTON_TEXT = 'Press any button';
+
+/** Menu lines, by the flow's menu item. */
+export const MENU_LABELS = {
+  play: 'Play',
+  settings: 'Settings',
+  credits: 'Credits',
+  resume: 'Resume',
+  restart: 'Restart',
+  levelSelect: 'Level select',
+  changePlayers: 'Change players',
+  quit: 'Quit to title',
+  next: 'Next level',
+  retry: 'Retry',
+  volume: 'Sound volume',
+  shake: 'Screen shake',
+  back: 'Back',
+} as const;
+
+export const PAUSED_TITLE = 'Paused';
+export const SETTINGS_TITLE = 'Settings';
+export const CREDITS_TITLE = 'Credits';
+export const LEVEL_SELECT_TITLE = 'Pick a level';
+
+/** On a locked level's card: what it takes to open it. */
+export function unlockHint(stars: number, previousLevel: string): string {
+  return `Get ${stars} ★ on ${previousLevel}`;
+}
 
 /** Title of the bug that comes back after shipping a ticket called `title`. */
 export function bugTitle(title: string): string {
   return `Bug: ${title.replace(/^Bug: /, '')}`;
 }
+
+/** Under every menu: which buttons do what. */
+export const MENU_HINT = 'Enter, E or gamepad A: choose · Esc or gamepad B: back';
+/** Under the level select. */
+export const LEVEL_SELECT_HINT =
+  'Left or right to pick · Enter, E or gamepad A: play · Esc or gamepad B: change players';
+/** Under the lobby. */
+export const LOBBY_BACK_HINT = 'Esc or gamepad B: back to the title';
+/** In the round, bottom center for a moment: how to pause. */
+export const PAUSE_HINT = 'Esc or Start: pause';
