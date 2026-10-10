@@ -37,4 +37,37 @@ Issues / not verified:
 
 ## Phase 11
 
+Decisions:
+
+- Mechanics: production incident (Startup), wandering manager (Scale-Up), meetings (Enterprise). The plan section in `phase-11-campaign.md` has the details and numbers.
+- Incidents: the hotfix ticket (code, pipeline; no test step) lands in the existing bug queue and is handed out before any bug, so no new map letter. While an incident order is open no new feature orders open; the feature timer waits and a due feature opens right after. Bugs still land. Scoring: `INCIDENT_POINTS` 20 plus the normal speed bonus, `INCIDENT_EXPIRED_PENALTY` 30. Shipping a hotfix rolls for a bug like any ship. One incident schedule for any number of players (not scaled).
+- Ticket locations in a queue now name the queue (`feature` / `bug`) instead of the ticket kind (`QueueKind`, `QUEUE_OF`), since incidents share the bug queue.
+- Manager: map letter `M`. Wanders to random floor tiles (seeded), stands 1-3 s, walks at 2.2 tiles/s. Can't be pushed; a walking manager shoves players at most once per second (`managerBumped` event, "Got a minute?" popups, reuses the shove sound). A dash into it stops dead. A pinned player stops it; it gives up after 1.5 s. Its position is interpolated like players (`GameLoop.renderManagerPos`).
+- Meetings: map letter `m` (meeting room floor, plain floor in `tiles`, listed in `LevelMap.meetingTiles`). Invites go to a random player without one; 4 s in the room within 20-25 s; time sat counts across stepping out (kinder in the chaos; easy to change to a reset). Missed: -15 (`MEETING_MISSED_PENALTY`), attended: 0 points (like bug fixes, only the miss costs). Invite interval scales with the order rate for the player count.
+- Incidents and meetings never start with less than their time limit left in the level, so the last seconds don't hand out unavoidable penalties.
+- Levels without incidents, managers or meetings never roll the RNG for them, so the Garage levels' order sequences are unchanged.
+- The old "The Scale-Up" level is renamed "Down the Hall" but keeps the id `scale-up` so existing saves still count; no save migration needed. Chapter ids live in a separate namespace from level ids.
+- Chapter gates `CHAPTER_STAR_GATES` = 0 / 4 / 9 / 13 total best stars, on top of the 1-star-on-the-previous-level rule (which now also runs across chapters: Level 2-1 needs a star on 1-3 and 4 stars in total).
+- Chapter view: four columns. Left/right keeps the row (clamped to the shorter chapter), up/down stays inside the chapter. Cards are "Level 2-1" etc. Locked chapters show "Needs N ★ in total (you have M)". Results show "Chapter unlocked!" when a round met a gate.
+- `FlowContext.chapters` is required; flow tests use one level per chapter where the old flat behaviour was tested.
+- `npm run sim -- <bots> <runs> --level=all` prints one line per level; star thresholds printed are now the ones scaled for the bot count.
+- `findPath` in the bot moved its BFS to `src/sim/path.ts` (shared with the manager).
+- The HUD's bottom center holds the incident banner and invite cards (`.hud-alerts`).
+
+Balance (perfect bots, `npm run sim`, 5 seeds; thresholds are the solo numbers, scaled per player count as before):
+
+- New levels' 3-star thresholds sit at about 0.85x the perfect-bot average, like the Garage. With 1 bot the worst seed still gets 2 stars on every level; 2 to 4 bots get 2 to 3 stars everywhere. The Garage and Open Plan numbers did not change.
+- Bots handle the new mechanics without much loss (no incident or meeting expired in the runs I looked at), so the mechanics mostly cost humans, not bots. Thresholds may be too high or too low for real players; worth tuning after a playtest.
+- The Reorg (everything at once) scores about the same as the other late levels for bots. It is the finale, so it may want a lower 3-star bar after a playtest.
+
+Issues / not verified:
+
+- "A group of colleagues plays through a chapter" is left for you.
+- Gamepad play was not tested.
+- Browser checks ran with the pane hidden, so `requestAnimationFrame` was paused; I re-ran the page with a `setTimeout` shim and synthetic key events from devtools (nothing in the code). Checked: the chapter view at 1280x720 (locked chapters with gate hints, cursor left/right/up/down, confirming a locked level does nothing), Seed Round (incident card, red hotfix in the bug queue, banner), Middle Management (manager walks, blocks), Back to Back (invite card and calendar icon, walking into the room fills the bar and closes the invite), and every new level loads and renders. No console errors from the game (only Vite reconnect noise while the dev server reloaded).
+- A manager bump popup and the "Chapter unlocked!" results badge were only checked by tests, not seen in the browser.
+- The bottom-center alerts (incident banner, invite cards) can overlap the bottom row of the map a little on 16:9 screens; the camera only keeps 6% free at the bottom.
+- No real art for the manager or the meeting room: procedural placeholders (suit and tie capsule, purple rug with a label). The incident reuses the pipeline-broke sound, invites the build-done sound; new sounds would help.
+- With only 9 wall/floor combinations, some of the 12 levels share a look.
+
 ## Phase 12
