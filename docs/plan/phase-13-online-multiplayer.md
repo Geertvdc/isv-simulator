@@ -1,6 +1,6 @@
-# Phase 10: Online multiplayer (later)
+# Phase 13: Online multiplayer (later)
 
-**Goal:** play together from different machines. Only start after phase 8.
+**Goal:** play together from different machines. Only start after phase 11 (phase 12 can come before or after).
 
 ## Scope
 
@@ -8,6 +8,8 @@
 - Browsers send their per-tick `InputCommand`s; the server applies them and broadcasts state snapshots (or deltas) at a lower rate
 - Clients render snapshots with interpolation, a little behind real time
 - Lobby with a join code: one player creates a room, others enter the code. Couch players on one machine can still join together as several local players
+- `Host online` and `Join online` on the title screen; the phase 10 flow runs on the host, and remote players drive menus like joined local devices
+- Progress is saved on the host's machine only
 - Handling for late joins, disconnects and reconnects
 - Client-side prediction is a separate follow-up, only if it feels laggy
 
