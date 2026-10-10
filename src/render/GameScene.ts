@@ -93,6 +93,9 @@ export interface FlowView {
 /** Emitted on `game.events` with a `FlowView` whenever the screens change. */
 export const FLOW_EVENT = 'flow';
 
+/** Emitted on `game.events` by the speaker button: turns all sound off or back on. */
+export const TOGGLE_SOUND_EVENT = 'toggle-sound';
+
 /** Handed to the scene once, at boot. */
 export interface GameSceneOptions {
   storage: StorageLike | null;
@@ -218,7 +221,23 @@ export class GameScene extends Phaser.Scene {
     this.mapRenderer = new MapRenderer(this, this.map, mapLook(level.id));
     this.hoverOutline = this.add.graphics().setDepth(OVERLAY_DEPTH).setVisible(false);
     this.devices ??= new InputDevices(window);
-    this.music ??= new MusicPlayer(this.game);
+    if (!this.music) {
+      this.music = new MusicPlayer(this.game);
+      // Phaser pauses sound whenever the window loses focus (e.g. after Tab or a click
+      // in the address bar) and waits for a click to bring it back. Only pause while
+      // the page is actually hidden, which also stops the game loop.
+      this.game.sound.pauseOnBlur = false;
+      this.game.events.on(Phaser.Core.Events.HIDDEN, () => {
+        this.game.sound.pauseAll();
+      });
+      this.game.events.on(Phaser.Core.Events.VISIBLE, () => {
+        this.game.sound.resumeAll();
+      });
+    }
+    this.game.events.off(TOGGLE_SOUND_EVENT);
+    this.game.events.on(TOGGLE_SOUND_EVENT, () => {
+      this.toggleSound();
+    });
     this.playerRenderer = new PlayerRenderer(this);
     this.managerRenderer = new ManagerRenderer(this);
     this.meetingRenderer = new MeetingRenderer(this, this.map);
@@ -239,6 +258,9 @@ export class GameScene extends Phaser.Scene {
 
     const K = Phaser.Input.Keyboard.KeyCodes;
     // Backtick for macOS, where F3 is taken by the OS; F3 still works elsewhere.
+    this.input.keyboard?.addKey(K.M).on('down', () => {
+      this.toggleSound();
+    });
     for (const code of [K.BACKTICK, K.F3]) {
       this.input.keyboard?.addKey(code).on('down', () => {
         this.debugVisible = !this.debugVisible;
@@ -382,9 +404,19 @@ export class GameScene extends Phaser.Scene {
     return false;
   }
 
-  /** Sound and music volume and screen shake from the save, applied right away. */
+  /** Turns all sound and music off or back on, and remembers it. */
+  private toggleSound(): void {
+    const { settings } = this.options.save;
+    settings.muted = !settings.muted;
+    writeSave(this.options.storage, this.options.save);
+    this.applySettings();
+    this.emitFlow(this.time.now);
+  }
+
+  /** Sound and music volume, mute and screen shake from the save, applied right away. */
   private applySettings(): void {
-    const { sfxVolume, musicVolume, screenShake } = this.options.save.settings;
+    const { sfxVolume, musicVolume, screenShake, muted } = this.options.save.settings;
+    this.game.sound.mute = muted;
     this.sounds.volume = sfxVolume / SFX_VOLUME_MAX;
     if (this.music) this.music.volume = musicVolume / SFX_VOLUME_MAX;
     this.effects.shakeEnabled = screenShake;

@@ -115,3 +115,10 @@ Issues / not verified:
 - Browser checks ran with the pane hidden (`requestAnimationFrame` throttled), using a `setTimeout` shim and synthetic key events from devtools; nothing in the code. Checked at 1280x720 and 1920x1080: title → lobby (badges) → level select → Garage intro card → countdown 3/2/1/Ship it! → hints over inbox, keyboard and ship hatch; picking up a ticket removed the inbox hint and coding removed the keyboard hint; pause ducks the music; settings music volume persisted after a reload; Retry skipped the intro; Back to Back intro and an invite card with the player badge. The results stars were checked by setting a round result from devtools (3 stars filled in with three chimes). Shipping a ticket to finish the hints and `tutorialDone` was only covered by tests.
 - No console errors from the game; only the Vite dev server reconnect noise.
 - `npm run sim -- --level=all` gives the same scores as before phase 12.
+
+## After your first playtest
+
+- **Garage redone**: only what a ticket needs (1 inbox, 2 code desks, 2 test benches, 1 pipeline, 1 ship hatch) plus the bug queue; the bin is gone. Desks stand against the back wall with a free tile in front of each. Orders come every 15 s instead of 20 with up to 4 open (Garage only), and stars are at 80/150/220 solo (scaled up for more players). Bots that hold a ticket whose order expired now ship it for 0 points when there's no bin.
+- **Sound after Tab**: Tab no longer moves focus out of the game, and sound now only pauses while the browser tab is hidden (not on every focus loss).
+- **Sound toggle**: a speaker button in the top right corner, or M, turns all sound and music off and on; remembered in the save (`settings.muted`). Clicking it also counts as the gesture browsers need before playing audio.
+- Checked in the browser: new map renders, speaker button and M toggle and save, Tab is swallowed. Not heard by ear.

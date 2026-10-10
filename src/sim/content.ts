@@ -140,6 +140,9 @@ export const NEW_BEST_TEXT = 'New best!';
 /** Shown on the results when the round opened the next level. */
 export const LEVEL_UNLOCKED_TEXT = 'Level unlocked!';
 
+/** The speaker button in the corner: what clicking it (or pressing M) does. */
+export const SOUND_TOGGLE_TITLE = { mute: 'Sound off (M)', unmute: 'Sound on (M)' } as const;
+
 /** The big name on the title screen. */
 export const GAME_TITLE = 'ISV Simulator';
 export const GAME_TAGLINE = 'Ship it before the customer notices.';

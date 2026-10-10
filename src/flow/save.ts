@@ -38,6 +38,8 @@ export interface Settings {
   /** 0 (off) to `SFX_VOLUME_MAX`, separate from the sound effects. */
   musicVolume: number;
   screenShake: boolean;
+  /** All sound and music off, from the speaker button or M. */
+  muted: boolean;
 }
 
 export interface SaveData {
@@ -50,7 +52,7 @@ export interface SaveData {
 }
 
 export function defaultSettings(): Settings {
-  return { sfxVolume: DEFAULT_SFX_VOLUME, musicVolume: DEFAULT_MUSIC_VOLUME, screenShake: true };
+  return { sfxVolume: DEFAULT_SFX_VOLUME, musicVolume: DEFAULT_MUSIC_VOLUME, screenShake: true, muted: false };
 }
 
 export function createSave(): SaveData {
@@ -103,6 +105,7 @@ export function parseSave(raw: unknown): SaveData {
     if (typeof raw.settings.screenShake === 'boolean') {
       save.settings.screenShake = raw.settings.screenShake;
     }
+    if (typeof raw.settings.muted === 'boolean') save.settings.muted = raw.settings.muted;
   }
   if (typeof raw.tutorialDone === 'boolean') save.tutorialDone = raw.tutorialDone;
   return save;
