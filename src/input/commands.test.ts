@@ -4,7 +4,7 @@ import { type PlayerBinding, buildInputCommands, toWorldMove } from './commands'
 import type { ControllerState } from './controller';
 
 function state(move = { x: 0, y: 0 }, extra: Partial<ControllerState> = {}): ControllerState {
-  return { move, interact: false, work: false, dash: false, join: false, ...extra };
+  return { move, interact: false, work: false, dash: false, join: false, menu: false, ...extra };
 }
 
 const BINDINGS: PlayerBinding[] = [

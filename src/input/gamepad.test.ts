@@ -73,6 +73,7 @@ describe('readGamepad', () => {
     expect(readGamepad(pad([0, 0], [PAD_BUTTON.x]))).toMatchObject({
       interact: false,
       join: false,
+      menu: false,
       work: true,
     });
   });
@@ -84,7 +85,17 @@ describe('readGamepad', () => {
       work: false,
       dash: false,
       join: false,
+      menu: false,
     });
+  });
+
+  it('maps Start to menu', () => {
+    expect(readGamepad(pad([0, 0], [PAD_BUTTON.start]))).toMatchObject({
+      menu: true,
+      join: false,
+      interact: false,
+    });
+    expect(readGamepad(pad([0, 0], [PAD_BUTTON.a, PAD_BUTTON.b]))?.menu).toBe(false);
   });
 
   it('maps B to dash', () => {
