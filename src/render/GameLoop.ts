@@ -44,6 +44,16 @@ export class GameLoop {
     return ran;
   }
 
+  /**
+   * Forgets real time not yet simulated and the last frame's events. Call
+   * when the round carries on after a pause, so it doesn't catch up on the
+   * time spent paused.
+   */
+  resetTime(): void {
+    this.accumulator = 0;
+    this.events = [];
+  }
+
   /** How far real time is into the next tick, 0 to 1. */
   get alpha(): number {
     return Math.min(this.accumulator, 1);

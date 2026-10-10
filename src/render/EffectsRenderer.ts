@@ -27,6 +27,9 @@ const PUFF_COLOR = 0xd9d4c7;
  * popups in the world and dash puffs. Visual only; nothing here touches state.
  */
 export class EffectsRenderer {
+  /** The screen shake setting: off keeps the camera still. */
+  shakeEnabled = true;
+
   constructor(private readonly scene: Phaser.Scene) {}
 
   /** Reacts to the events from the ticks run this frame. */
@@ -69,6 +72,7 @@ export class EffectsRenderer {
   }
 
   private shake({ ms, intensity }: { ms: number; intensity: number }): void {
+    if (!this.shakeEnabled) return;
     this.scene.cameras.main.shake(ms, intensity);
   }
 

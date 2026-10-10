@@ -62,4 +62,18 @@ describe('GameLoop', () => {
     loop.advance(TICK_MS, right);
     expect(loop.events).toEqual([]);
   });
+
+  it('resumes after a pause without catching up on the paused time', () => {
+    const loop = newLoop();
+    loop.advance(TICK_MS * 2.9, right);
+    expect(loop.state.tick).toBe(2);
+    // Paused: the scene stops calling advance, however long the pause lasts.
+    loop.resetTime();
+    expect(loop.events).toEqual([]);
+    expect(loop.alpha).toBe(0);
+    // The first frame after the pause runs only its own time, not the leftover 0.9 tick.
+    expect(loop.advance(TICK_MS * 0.5, right)).toBe(0);
+    expect(loop.advance(TICK_MS * 0.5, right)).toBe(1);
+    expect(loop.state.tick).toBe(3);
+  });
 });

@@ -1,16 +1,17 @@
 import Phaser from 'phaser';
+import { loadSave, type StorageLike } from './flow/save';
 import {
+  FLOW_EVENT,
+  type FlowView,
   GAME_FRAME_EVENT,
   GameScene,
-  LEVEL_SELECT_EVENT,
-  LOBBY_EVENT,
   TILE_HOVER_EVENT,
 } from './render/GameScene';
 import { mountGameHud } from './ui/game';
 import { mountHud } from './ui/hud';
 import { mountLevelSelect } from './ui/levelSelect';
 import { mountLobby } from './ui/lobby';
-import { browserStorage } from './ui/progress';
+import { mountCredits, mountPause, mountResults, mountSettings, mountTitle } from './ui/screens';
 import './style.css';
 
 function getElement(id: string): HTMLElement {
@@ -18,6 +19,23 @@ function getElement(id: string): HTMLElement {
   if (!el) throw new Error(`Missing #${id} in index.html`);
   return el;
 }
+
+/** The browser's `localStorage`, or `null` where touching it throws. */
+function browserStorage(): StorageLike | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+const storage = browserStorage();
+const scene = new GameScene({
+  storage,
+  save: loadSave(storage),
+  // For testing: every level open, without touching the save.
+  unlockAll: new URLSearchParams(window.location.search).has('unlockAll'),
+});
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -30,15 +48,29 @@ const game = new Phaser.Game({
     // WebGL fails on a 0x0 framebuffer (e.g. booting in a hidden or collapsed view).
     min: { width: 320, height: 240 },
   },
-  scene: [GameScene],
+  scene: [scene],
 });
 
-const hud = mountHud(getElement('ui'));
+const ui = getElement('ui');
+const hud = mountHud(ui);
 game.events.on(TILE_HOVER_EVENT, hud.setHover);
-const lobby = mountLobby(getElement('ui'));
-game.events.on(LOBBY_EVENT, lobby.render);
-const storage = browserStorage();
-const gameHud = mountGameHud(getElement('ui'), storage);
+const gameHud = mountGameHud(ui);
 game.events.on(GAME_FRAME_EVENT, gameHud.render);
-const levelSelect = mountLevelSelect(getElement('ui'), storage);
-game.events.on(LEVEL_SELECT_EVENT, levelSelect.render);
+
+const lobby = mountLobby(ui);
+const levelSelect = mountLevelSelect(ui);
+const screens = {
+  title: mountTitle(ui),
+  paused: mountPause(ui),
+  results: mountResults(ui),
+  settings: mountSettings(ui),
+  credits: mountCredits(ui),
+} as const;
+game.events.on(FLOW_EVENT, (view: FlowView) => {
+  const screen = view.flow.screen;
+  lobby.render(screen === 'lobby' ? view.flow.lobby : null);
+  levelSelect.render(screen === 'levelSelect' ? view : null);
+  for (const [name, mounted] of Object.entries(screens)) {
+    mounted.render(name === screen ? view : null);
+  }
+});
