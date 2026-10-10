@@ -13,6 +13,10 @@ npm run check    # typecheck + lint + tests (what CI runs)
 npm run build    # production build into dist/
 ```
 
+## How to play
+
+The game docs, with screenshots of every screen, station, event and level: [`docs/game/`](docs/game/README.md).
+
 ## Working on it
 
 - Architecture rules and conventions: [`AGENTS.md`](AGENTS.md)
