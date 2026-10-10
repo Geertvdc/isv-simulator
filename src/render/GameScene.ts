@@ -24,6 +24,7 @@ import {
 import { type LevelMap, type Tile, getTile, isWorkSurface } from '../sim/level';
 import { CHAPTERS, LEVELS } from '../sim/levels';
 import type { GameEvent } from '../sim/orders';
+import { type Scene, sceneDone, sceneInputs, sceneState } from '../sim/scenes';
 import { type GameState, type PlayerId, createGame, targetTile } from '../sim/state';
 import { CameraController } from './CameraController';
 import type { WorldRect } from './cameraFit';
@@ -102,6 +103,16 @@ export interface GameSceneOptions {
   save: SaveData;
   /** `?unlockAll`: every level is open. */
   unlockAll: boolean;
+  /** `?scene=<id>`: shows that scene (see `src/sim/scenes.ts`) instead of the menus. */
+  scene: Scene | null;
+}
+
+/**
+ * Set on `window.isvScene` while a scene shows: `done` once it froze, so a
+ * script (`scripts/screenshots.ts`) knows when to take the picture.
+ */
+export interface SceneHandle {
+  done: boolean;
 }
 
 /** What the scene is restarted with when the level changes or a round is dropped. */
@@ -199,9 +210,16 @@ export class GameScene extends Phaser.Scene {
   private shownResultsReady = false;
   /** The countdown number the last `FLOW_EVENT` showed. */
   private shownCountdown: number | null = null;
+  /** Ticks the scene from `?scene=` has run, and whether it froze. */
+  private sceneTicks = 0;
+  /** When the scene's map started fading in. */
+  private sceneStartMs = 0;
+  private readonly sceneHandle: SceneHandle = { done: false };
 
   constructor(private readonly options: GameSceneOptions) {
     super('GameScene');
+    const id = options.scene?.levelId;
+    if (id) this.mapLevelIndex = Math.max(0, LEVEL_IDS.indexOf(id));
   }
 
   preload(): void {
@@ -252,7 +270,8 @@ export class GameScene extends Phaser.Scene {
 
     this.loop = null;
     this.hints = [];
-    if (data.startRound) this.startRound();
+    if (this.options.scene) this.startScene(this.options.scene);
+    else if (data.startRound) this.startRound();
     else this.game.events.emit(GAME_FRAME_EVENT, null);
     this.emitFlow(0);
 
@@ -291,7 +310,9 @@ export class GameScene extends Phaser.Scene {
     if (loop) {
       const running = isRoundRunning(this.flow);
       if (running) {
-        loop.advance(delta, (tick) => buildInputCommands(players, frame.readings, tick));
+        const scene = this.options.scene;
+        if (scene) this.advanceScene(scene, loop, delta, time);
+        else loop.advance(delta, (tick) => buildInputCommands(players, frame.readings, tick));
         this.followHints(loop);
         const result = loop.state.result;
         if (result) {
@@ -429,6 +450,41 @@ export class GameScene extends Phaser.Scene {
     const ids = this.flow.lobby.players.map((p) => p.playerId);
     this.loop = new GameLoop(createGame(level, this.seed, ids));
     this.hints = startHints(level.id, this.options.save);
+  }
+
+  /** The scene from `?scene=` as a round already playing: no title, lobby or countdown. */
+  private startScene(scene: Scene): void {
+    const ids = Array.from({ length: scene.players }, (_, i) => i + 1);
+    this.flow.lobby = {
+      players: ids.map((playerId) => ({ playerId, deviceId: `scene-${playerId}` })),
+      started: true,
+    };
+    this.flow.levelIndex = this.mapLevelIndex;
+    this.flow.screen = 'playing';
+    this.loop = new GameLoop(sceneState(scene));
+    this.sceneStartMs = this.time.now;
+    (window as unknown as { isvScene?: SceneHandle }).isvScene = this.sceneHandle;
+  }
+
+  /** Plays the scene's ticks in real time, so effects show as in a round, then freezes. */
+  private advanceScene(scene: Scene, loop: GameLoop, deltaMs: number, nowMs: number): void {
+    // Wait for the fade-in, so the scene's moment shows in full.
+    if (this.sceneHandle.done || nowMs < this.sceneStartMs + SCREEN_FADE_MS) {
+      loop.resetTime();
+      return;
+    }
+    // Checked before every tick, against the last tick's events: a frame may run a few.
+    const done = () => {
+      if (!this.sceneHandle.done)
+        this.sceneHandle.done = sceneDone(scene, loop.state, this.sceneTicks);
+      return this.sceneHandle.done;
+    };
+    loop.advance(deltaMs, () => {
+      if (done()) return [];
+      this.sceneTicks++;
+      return sceneInputs(scene, loop.state);
+    });
+    done();
   }
 
   /** Outlines the counter or station a player faces, in their color; nothing for floor and walls. */
