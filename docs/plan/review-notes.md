@@ -122,3 +122,4 @@ Issues / not verified:
 - **Sound after Tab**: Tab no longer moves focus out of the game, and sound now only pauses while the browser tab is hidden (not on every focus loss).
 - **Sound toggle**: a speaker button in the top right corner, or M, turns all sound and music off and on; remembered in the save (`settings.muted`). Clicking it also counts as the gesture browsers need before playing audio.
 - Checked in the browser: new map renders, speaker button and M toggle and save, Tab is swallowed. Not heard by ear.
+- **Solid menus**: menu screens no longer show the game through a see-through layer. They have a solid dark background with a faint blueprint grid, solid panels for menus and chapters (each chapter with its own accent color), and muted text colors instead of faded opacity. Locked level cards are flat and dashed but readable.

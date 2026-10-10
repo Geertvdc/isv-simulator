@@ -27,6 +27,16 @@ body {
   inset: 0;
   pointer-events: none;
   color: #e6e6e6;
+  /* Menu palette: solid colors, no see-through panels, so text stays readable. */
+  --menu-bg: #161a26;
+  --menu-grid: #1d2232;
+  --panel: #222839;
+  --panel-raised: #2b3247;
+  --panel-border: #39415a;
+  --text-muted: #aeb5c8;
+  --text-faint: #767e95;
+  --gold: #ffd166;
+  --gold-panel: #3d3622;
 }
 
 .hud-version {
@@ -69,16 +79,17 @@ body {
   flex-direction: column;
   gap: 0.5rem;
   padding: 1.25rem 1rem;
-  border: 3px dashed rgba(255, 255, 255, 0.25);
+  border: 3px dashed var(--panel-border);
   border-radius: 0.75rem;
+  background: var(--panel);
+  color: var(--text-faint);
   text-align: center;
-  opacity: 0.6;
 }
 
 .lobby-slot.joined {
   border: 3px solid var(--player-color);
-  background: color-mix(in srgb, var(--player-color) 22%, transparent);
-  opacity: 1;
+  background: color-mix(in srgb, var(--player-color) 22%, var(--panel));
+  color: #e6e6e6;
 }
 
 .lobby-slot-name {
@@ -358,24 +369,44 @@ body {
   gap: 0.625rem;
   padding: 0.625rem;
   border-radius: 0.875rem;
-  border: 2px solid transparent;
+  border: 2px solid var(--panel-border);
+  border-top: 0.375rem solid var(--chapter-color, var(--panel-border));
+  background: var(--panel);
+  box-shadow: 0 0.375rem 1rem rgba(0, 0, 0, 0.35);
+}
+
+.chapter[data-chapter='garage'] {
+  --chapter-color: #d98b3a;
+}
+
+.chapter[data-chapter='startup'] {
+  --chapter-color: #4fbf74;
+}
+
+.chapter[data-chapter='scale-up'] {
+  --chapter-color: #4f8fe0;
+}
+
+.chapter[data-chapter='enterprise'] {
+  --chapter-color: #a46ad8;
 }
 
 .chapter.selected {
-  border-color: rgba(255, 209, 102, 0.4);
-  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--chapter-color);
+  border-top-color: var(--chapter-color);
 }
 
 .chapter-name {
   font-size: 1.625rem;
   font-weight: 800;
   text-align: center;
+  color: var(--chapter-color, #e6e6e6);
 }
 
 .chapter-blurb {
   font-size: 0.9375rem;
   text-align: center;
-  opacity: 0.75;
+  color: var(--text-muted);
   min-height: 1.3em;
 }
 
@@ -391,7 +422,7 @@ body {
 
 .chapter.locked .chapter-name,
 .chapter.locked .chapter-blurb {
-  opacity: 0.45;
+  color: var(--text-faint);
 }
 
 .level-card {
@@ -399,27 +430,27 @@ body {
   flex-direction: column;
   gap: 0.25rem;
   padding: 0.625rem 0.875rem;
-  border: 3px solid rgba(255, 255, 255, 0.2);
+  border: 3px solid var(--panel-border);
   border-radius: 0.75rem;
+  background: var(--panel-raised);
   text-align: center;
-  opacity: 0.65;
   transition:
     transform 0.12s,
-    opacity 0.12s;
+    background 0.12s;
 }
 
 .level-card.selected {
-  border-color: #ffd166;
-  background: rgba(255, 209, 102, 0.12);
-  opacity: 1;
+  border-color: var(--gold);
+  background: var(--gold-panel);
   transform: scale(1.04);
+  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.45);
 }
 
 .level-card-number {
   font-size: 0.875rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  opacity: 0.7;
+  color: var(--text-muted);
 }
 
 .level-card-name {
@@ -430,33 +461,42 @@ body {
 .level-card-blurb {
   font-size: 0.8125rem;
   min-height: 2.6em;
+  color: var(--text-muted);
 }
 
 .level-card-stars {
   font-size: 1rem;
-  opacity: 0.7;
+  color: var(--text-muted);
 }
 
 .level-card-stars.played {
   font-size: 1.5rem;
   letter-spacing: 0.1em;
-  color: #ffd166;
-  opacity: 1;
+  color: var(--gold);
 }
 
+/* Locked: a flat, darker card with grey text, still readable. */
 .level-card.locked {
-  opacity: 0.35;
-  filter: grayscale(1);
+  background: var(--menu-bg);
+  border-style: dashed;
+  color: var(--text-faint);
+}
+
+.level-card.locked .level-card-number,
+.level-card.locked .level-card-blurb,
+.level-card.locked .level-card-stars {
+  color: var(--text-faint);
 }
 
 .level-card.locked.selected {
-  opacity: 0.6;
+  border-color: var(--text-faint);
+  background: var(--panel);
 }
 
 .level-card-score {
   min-height: 1.3em;
   font-size: 1rem;
-  opacity: 0.8;
+  color: var(--text-muted);
 }
 
 .level-select-total {
@@ -487,7 +527,17 @@ body {
   gap: 1.75rem;
   padding: 1.5rem;
   box-sizing: border-box;
-  background: rgba(10, 12, 16, 0.8);
+  /* Solid, with a faint blueprint grid and a lighter middle: the game behind
+     doesn't show through, so the text stays easy to read. */
+  background-color: var(--menu-bg);
+  background-image:
+    radial-gradient(ellipse at 50% 35%, rgba(70, 82, 120, 0.35), transparent 70%),
+    linear-gradient(var(--menu-grid) 2px, transparent 2px),
+    linear-gradient(90deg, var(--menu-grid) 2px, transparent 2px);
+  background-size:
+    100% 100%,
+    2.5rem 2.5rem,
+    2.5rem 2.5rem;
 }
 
 .screen[hidden] {
@@ -513,11 +563,7 @@ body {
 
 .screen-hint {
   font-size: 1.125rem;
-  opacity: 0.7;
-}
-
-.title-screen {
-  background: radial-gradient(circle at 50% 40%, rgba(40, 46, 62, 0.85), rgba(10, 12, 16, 0.95));
+  color: var(--text-muted);
 }
 
 .title-name {
@@ -532,7 +578,7 @@ body {
 .title-tagline {
   margin-top: -0.75rem;
   font-size: 1.625rem;
-  opacity: 0.85;
+  color: var(--text-muted);
 }
 
 .title-press {
@@ -557,7 +603,11 @@ body {
   gap: 0.625rem;
   min-width: 22.5rem;
   margin: 0;
-  padding: 0;
+  padding: 1rem;
+  border: 2px solid var(--panel-border);
+  border-radius: 1rem;
+  background: var(--panel);
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.4);
   list-style: none;
 }
 
@@ -567,8 +617,8 @@ body {
   display: none;
 }
 
-.menu.disabled {
-  opacity: 0.4;
+.menu.disabled .menu-item {
+  color: var(--text-faint);
 }
 
 .menu-item {
@@ -580,13 +630,13 @@ body {
   border-radius: 0.75rem;
   font-size: 2rem;
   font-weight: 700;
-  opacity: 0.7;
+  color: var(--text-muted);
 }
 
 .menu-item.selected {
-  border-color: #ffd166;
-  background: rgba(255, 209, 102, 0.12);
-  opacity: 1;
+  border-color: var(--gold);
+  background: var(--gold-panel);
+  color: #fff;
 }
 
 .menu-item.selected .menu-label::before {
@@ -674,7 +724,7 @@ body {
 
 .credits-row {
   font-size: 1rem;
-  opacity: 0.8;
+  color: var(--text-muted);
 }
 
 .credits-roll.rolling {
@@ -741,9 +791,10 @@ body {
   gap: 0.875rem;
   max-width: 47.5rem;
   padding: 1.5rem 2.5rem;
-  border: 3px solid #ffd166;
+  border: 3px solid var(--gold);
   border-radius: 1.125rem;
-  background: rgba(20, 22, 28, 0.95);
+  background: var(--panel);
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.4);
   text-align: center;
   animation: card-in 0.35s ease-out;
 }
@@ -771,7 +822,7 @@ body {
 
 .intro-blurb {
   font-size: 1.25rem;
-  opacity: 0.85;
+  color: var(--text-muted);
 }
 
 .intro-tip {
@@ -808,7 +859,7 @@ body {
   grid-column: 1 / -1;
   margin: 0;
   font-size: 1.125rem;
-  opacity: 0.7;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -847,7 +898,7 @@ body {
 
 .intro-control-keys {
   text-align: left;
-  opacity: 0.8;
+  color: var(--text-muted);
 }
 
 /* "3, 2, 1, Ship it!" over the map. */
