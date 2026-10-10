@@ -37,6 +37,20 @@ export interface IncidentSchedule {
   timeLimitTicks: number;
 }
 
+/** When calendar invites go out. Players have one invite at most. */
+export interface MeetingSchedule {
+  /** Tick of the first invite. */
+  firstTick: number;
+  /** Average ticks between two invites, solo; more players get them more often. */
+  intervalTicks: number;
+  /** Each interval is randomly up to this many ticks shorter or longer. */
+  jitterTicks: number;
+  /** Ticks an invite lasts before it's missed. */
+  timeLimitTicks: number;
+  /** Ticks the invited player must stand in the meeting room. */
+  attendTicks: number;
+}
+
 export interface LevelSettings {
   durationTicks: number;
   orderSchedule: OrderSchedule;
@@ -46,6 +60,8 @@ export interface LevelSettings {
   reviewShare: number;
   /** Production incidents, or `null` for none. The same for any number of players. */
   incidents: IncidentSchedule | null;
+  /** Calendar invites, or `null` for none. Needs meeting tiles (`m`) on the map. */
+  meetings: MeetingSchedule | null;
 }
 
 export interface Level extends LevelSettings {
@@ -71,6 +87,7 @@ const GARAGE_SETTINGS: LevelSettings = {
   starThresholds: [60, 120, 180],
   reviewShare: 0,
   incidents: null,
+  meetings: null,
 };
 
 export const GARAGE: Level = {
@@ -138,6 +155,11 @@ export function settingsForPlayers(level: LevelSettings, playerCount: number): L
     ],
     reviewShare: playerCount >= REVIEWERS_NEEDED ? level.reviewShare : 0,
     incidents: level.incidents,
+    meetings: level.meetings && {
+      ...level.meetings,
+      intervalTicks: Math.round(level.meetings.intervalTicks / rate),
+      jitterTicks: Math.round(level.meetings.jitterTicks / rate),
+    },
   };
 }
 

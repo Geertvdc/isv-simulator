@@ -6,13 +6,15 @@ import { createGame } from './state';
 
 describe('settingsForPlayers', () => {
   it('keeps the level settings for one player', () => {
-    const { durationTicks, orderSchedule, starThresholds, reviewShare, incidents } = GARAGE;
+    const { durationTicks, orderSchedule, starThresholds, reviewShare, incidents, meetings } =
+      GARAGE;
     expect(settingsForPlayers(GARAGE, 1)).toEqual({
       durationTicks,
       orderSchedule,
       starThresholds,
       reviewShare,
       incidents,
+      meetings,
     });
   });
 
@@ -43,6 +45,22 @@ describe('settingsForPlayers', () => {
     expect(settingsForPlayers(level, 1).reviewShare).toBe(0);
     expect(settingsForPlayers(level, 2).reviewShare).toBe(0.4);
     expect(settingsForPlayers(level, 4).reviewShare).toBe(0.4);
+  });
+
+  it('sends meeting invites more often with more players', () => {
+    const meetings = {
+      firstTick: 0,
+      intervalTicks: 2800,
+      jitterTicks: 280,
+      timeLimitTicks: 1200,
+      attendTicks: 240,
+    };
+    const level = { ...GARAGE, meetings };
+    expect(settingsForPlayers(level, 1).meetings).toEqual(meetings);
+    const four = settingsForPlayers(level, 4).meetings;
+    expect(four?.intervalTicks).toBe(Math.round(2800 / orderRate(4)));
+    expect(four?.timeLimitTicks).toBe(1200);
+    expect(four?.attendTicks).toBe(240);
   });
 
   it('clamps the player count to the table', () => {

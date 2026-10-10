@@ -1,5 +1,6 @@
 import { finishReviews, interact, newTickWork, work } from './interact';
 import { updateManagers } from './manager';
+import { expireInvites, updateMeetings } from './meetings';
 import { startDash, stepPlayer } from './movement';
 import { expireOrders, updateLevelTimer, updateOrders } from './orders';
 import { updatePipelines } from './pipeline';
@@ -50,7 +51,9 @@ export function tick(state: GameState, inputs: readonly InputCommand[]): void {
 
   updatePipelines(state);
   updateOrders(state);
+  updateMeetings(state);
   state.tick++;
   expireOrders(state);
+  expireInvites(state);
   updateLevelTimer(state);
 }

@@ -69,6 +69,9 @@ export const MANAGER_BUMP_COOLDOWN_TICKS = 1 * TICKS_PER_SECOND;
 /** A manager blocked (a player pinned against a wall) this long gives up and walks somewhere else. */
 export const MANAGER_STUCK_TICKS = Math.round(1.5 * TICKS_PER_SECOND);
 
+/** Points lost when a calendar invite runs out before its player sat the meeting. */
+export const MEETING_MISSED_PENALTY = 15;
+
 /** Most sim ticks run in one frame; after a long stall the game slows down instead of spiralling. */
 export const MAX_TICKS_PER_FRAME = 5;
 

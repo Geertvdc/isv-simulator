@@ -1,5 +1,10 @@
 import Phaser from 'phaser';
-import { MANAGER_BUMP_TEXTS, PIPELINE_FIXED_TEXT, SHOVE_TEXTS } from '../sim/content';
+import {
+  MANAGER_BUMP_TEXTS,
+  MEETING_DONE_TEXT,
+  PIPELINE_FIXED_TEXT,
+  SHOVE_TEXTS,
+} from '../sim/content';
 import type { GameEvent } from '../sim/orders';
 import { type GameState, getPlayer } from '../sim/state';
 import { OVERLAY_DEPTH } from './MapRenderer';
@@ -67,6 +72,11 @@ export class EffectsRenderer {
           const text = SHOVE_TEXTS[(state.tick + event.target) % SHOVE_TEXTS.length] ?? '';
           if (target) this.popup(target.pos, text, POPUP_INFO_COLOR);
           this.shake(SHAKE_SHOVE);
+          break;
+        }
+        case 'meetingAttended': {
+          const player = getPlayer(state, event.invite.playerId);
+          if (player) this.popup(player.pos, MEETING_DONE_TEXT, POPUP_GAIN_COLOR);
           break;
         }
         case 'managerBumped': {

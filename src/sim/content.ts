@@ -60,6 +60,31 @@ export const MANAGER_BUMP_TEXTS: readonly string[] = [
   'Synergy!',
 ];
 
+/** Calendar invite subjects; one is picked per invite. */
+export const MEETING_TITLES: readonly string[] = [
+  'Sync about the sync',
+  'Quarterly alignment',
+  'Mandatory fun',
+  'Retro of the retro',
+  'All hands',
+  'Quick 1:1',
+  'Roadmap brainstorm',
+  'Process improvement',
+  'Synergy workshop',
+  'Kick-off kick-off',
+];
+
+/** Over a meeting room. */
+export const MEETING_ROOM_TEXT = 'Meeting room';
+/** On a player's invite card in the HUD. */
+export function inviteText(playerNumber: number): string {
+  return `P${playerNumber}: to the meeting room!`;
+}
+/** Pops up when a meeting was sat out in time. */
+export const MEETING_DONE_TEXT = 'Meeting over!';
+/** Pops up when an invite ran out. */
+export const MEETING_MISSED_TEXT = 'Missed the meeting';
+
 /** Level names, by level id. */
 export const LEVEL_NAMES: Readonly<Record<string, string>> = {
   garage: 'The Garage',
