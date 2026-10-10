@@ -687,3 +687,189 @@ body {
     padding: 6px;
   }
 }
+
+/* Level intro card: before the clock starts. */
+.intro-screen {
+  gap: 16px;
+}
+
+.intro-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 760px;
+  padding: 24px 40px;
+  border: 3px solid #ffd166;
+  border-radius: 18px;
+  background: rgba(20, 22, 28, 0.95);
+  text-align: center;
+  animation: card-in 0.35s ease-out;
+}
+
+@keyframes card-in {
+  from {
+    transform: translateY(24px) scale(0.96);
+    opacity: 0;
+  }
+}
+
+.intro-place {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffd166;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.intro-name {
+  margin: -6px 0 0;
+  font-size: 52px;
+  font-weight: 900;
+}
+
+.intro-blurb {
+  font-size: 20px;
+  opacity: 0.85;
+}
+
+.intro-tip {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: rgba(255, 209, 102, 0.1);
+  text-align: left;
+}
+
+.intro-picture {
+  flex: none;
+  width: 240px;
+  height: 90px;
+  color: #ffd166;
+}
+
+.intro-tip-text {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.intro-recipes {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 8px 18px;
+  align-items: center;
+}
+
+.intro-section {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 18px;
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.intro-recipe {
+  display: contents;
+}
+
+.intro-recipe-name {
+  font-size: 20px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.intro-recipe .order-step {
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+}
+
+.intro-controls {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 4px 18px;
+  font-size: 17px;
+}
+
+.intro-control {
+  display: contents;
+}
+
+.intro-control-action {
+  text-align: right;
+  font-weight: 700;
+}
+
+.intro-control-keys {
+  text-align: left;
+  opacity: 0.8;
+}
+
+/* "3, 2, 1, Ship it!" over the map. */
+.countdown {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 160px;
+  font-weight: 900;
+  color: #ffd166;
+  text-shadow:
+    0 8px 0 #8a5a00,
+    0 0 30px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+}
+
+.countdown[hidden] {
+  display: none;
+}
+
+.countdown.count {
+  animation: count-pop 0.7s ease-out both;
+}
+
+.countdown.go {
+  font-size: 120px;
+  color: #4fe0b0;
+  text-shadow:
+    0 8px 0 #1b7a5c,
+    0 0 30px rgba(0, 0, 0, 0.8);
+  animation: go-pop 0.9s ease-out both;
+}
+
+@keyframes count-pop {
+  from {
+    transform: translate(-50%, -50%) scale(1.8);
+    opacity: 0;
+  }
+  30% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(0.9);
+    opacity: 0.6;
+  }
+}
+
+@keyframes go-pop {
+  from {
+    transform: translate(-50%, -50%) scale(0.6);
+    opacity: 0;
+  }
+  25% {
+    transform: translate(-50%, -50%) scale(1.1);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 0;
+  }
+}

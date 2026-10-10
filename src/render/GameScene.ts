@@ -6,12 +6,14 @@ import {
   type Flow,
   type FlowContext,
   type FlowEffect,
+  countdownNumber,
   createFlow,
   finishRound,
   isRoundRunning,
   resultsReady,
   updateFlow,
 } from '../flow/flow';
+import { type HintId, startHints, updateHints } from '../flow/hints';
 import { type ChapterInfo, type SaveData, type StorageLike, writeSave } from '../flow/save';
 import { SFX_VOLUME_MAX } from '../sim/balance';
 import { type LevelMap, type Tile, getTile, isWorkSurface } from '../sim/level';
@@ -21,6 +23,7 @@ import { type GameState, type PlayerId, createGame, targetTile } from '../sim/st
 import { CameraController } from './CameraController';
 import type { WorldRect } from './cameraFit';
 import { EffectsRenderer } from './EffectsRenderer';
+import { HintRenderer } from './HintRenderer';
 import { GameLoop } from './GameLoop';
 import {
   MAP_OVERHANG,
@@ -78,6 +81,8 @@ export interface FlowView {
   unlockAll: boolean;
   /** On the results screen: presses count now. */
   resultsReady: boolean;
+  /** During the countdown: the number showing (3, 2, 1). */
+  countdown: number | null;
 }
 
 /** Emitted on `game.events` with a `FlowView` whenever the screens change. */
@@ -174,6 +179,9 @@ export class GameScene extends Phaser.Scene {
   private ticketRenderer!: TicketRenderer;
   private pipelineRenderer!: PipelineRenderer;
   private effects!: EffectsRenderer;
+  private hintRenderer!: HintRenderer;
+  /** First-level hints still showing in this round. */
+  private hints: HintId[] = [];
   private sounds!: SoundPlayer;
   private readonly targets = new Map<PlayerId, TargetHighlight>();
   private hovered: TileHover | null = null;
@@ -181,6 +189,8 @@ export class GameScene extends Phaser.Scene {
   private seed = FIRST_SEED;
   /** What the last `FLOW_EVENT` said about the results taking presses. */
   private shownResultsReady = false;
+  /** The countdown number the last `FLOW_EVENT` showed. */
+  private shownCountdown: number | null = null;
 
   constructor(private readonly options: GameSceneOptions) {
     super('GameScene');
@@ -210,11 +220,13 @@ export class GameScene extends Phaser.Scene {
     this.ticketRenderer = new TicketRenderer(this, this.mapRenderer);
     this.pipelineRenderer = new PipelineRenderer(this, this.mapRenderer);
     this.effects = new EffectsRenderer(this);
+    this.hintRenderer = new HintRenderer(this, this.map, this.mapRenderer);
     this.sounds = new SoundPlayer(this);
     this.cameraController = new CameraController(this, this.mapBounds());
     this.applySettings();
 
     this.loop = null;
+    this.hints = [];
     if (data.startRound) this.startRound();
     else this.game.events.emit(GAME_FRAME_EVENT, null);
     this.emitFlow(0);
@@ -242,13 +254,17 @@ export class GameScene extends Phaser.Scene {
     const update = updateFlow(this.flow, frame.presses, ctx);
     if (this.runEffects(update.effects)) return;
     const ready = resultsReady(this.flow, time);
-    if (update.changed || ready !== this.shownResultsReady) this.emitFlow(time);
+    const countdown = countdownNumber(this.flow, time);
+    if (update.changed || ready !== this.shownResultsReady || countdown !== this.shownCountdown) {
+      this.emitFlow(time);
+    }
 
     const loop = this.loop;
     if (loop) {
       const running = isRoundRunning(this.flow);
       if (running) {
         loop.advance(delta, (tick) => buildInputCommands(players, frame.readings, tick));
+        this.followHints(loop);
         const result = loop.state.result;
         if (result) {
           this.runEffects(finishRound(this.flow, result, ctx).effects);
@@ -266,6 +282,8 @@ export class GameScene extends Phaser.Scene {
       this.effects.play(loop.state, events);
       this.sounds.play(loop.state, events, time);
       for (const player of loop.state.players) this.updateTarget(loop, player.id);
+      const screen = this.flow.screen;
+      this.hintRenderer.sync(this.hints, screen === 'countdown' || screen === 'playing', time);
     }
     this.updateMusic(delta);
     this.updateHover();
@@ -281,6 +299,16 @@ export class GameScene extends Phaser.Scene {
     this.music.update(cue, deltaMs);
   }
 
+  /** Drops the hints the last ticks followed; saves once all were. */
+  private followHints(loop: GameLoop): void {
+    if (this.hints.length === 0) return;
+    const { open, finished } = updateHints(this.hints, loop.events, loop.state);
+    this.hints = open;
+    if (!finished) return;
+    this.options.save.tutorialDone = true;
+    writeSave(this.options.storage, this.options.save);
+  }
+
   private flowContext(nowMs: number): FlowContext {
     return {
       save: this.options.save,
@@ -293,6 +321,7 @@ export class GameScene extends Phaser.Scene {
 
   private emitFlow(nowMs: number): void {
     this.shownResultsReady = resultsReady(this.flow, nowMs);
+    this.shownCountdown = countdownNumber(this.flow, nowMs);
     this.game.events.emit(FLOW_EVENT, {
       flow: this.flow,
       save: this.options.save,
@@ -300,6 +329,7 @@ export class GameScene extends Phaser.Scene {
       chapters: CHAPTER_INFO,
       unlockAll: this.options.unlockAll,
       resultsReady: this.shownResultsReady,
+      countdown: this.shownCountdown,
     } satisfies FlowView);
   }
 
@@ -350,6 +380,7 @@ export class GameScene extends Phaser.Scene {
     if (!level) return;
     const ids = this.flow.lobby.players.map((p) => p.playerId);
     this.loop = new GameLoop(createGame(level, this.seed, ids));
+    this.hints = startHints(level.id, this.options.save);
   }
 
   /** Outlines the counter or station a player faces, in their color; nothing for floor and walls. */
