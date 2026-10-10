@@ -17,7 +17,7 @@ import { playerCssColor } from '../render/playerColors';
 import { formatClock } from './format';
 
 /** Each step shows as the letter of its station on the map, in that station's color. */
-const STEP_LABEL: Readonly<Record<StepKind, { letter: string; color: string }>> = {
+export const STEP_LABEL: Readonly<Record<StepKind, { letter: string; color: string }>> = {
   code: { letter: 'K', color: cssColor(tileColor('keyboard')) },
   review: { letter: 'R', color: cssColor(tileColor('review')) },
   test: { letter: 'T', color: cssColor(tileColor('testBench')) },
@@ -42,6 +42,18 @@ function el(tag: string, className: string, text = ''): HTMLElement {
   node.className = className;
   node.textContent = text;
   return node;
+}
+
+/** A row of station letters in their colors, like on the order cards. */
+export function stepChips(steps: readonly StepKind[]): HTMLElement {
+  const row = el('div', 'order-steps');
+  for (const step of steps) {
+    const label = STEP_LABEL[step];
+    const icon = el('span', 'order-step', label.letter);
+    icon.style.setProperty('--step-color', label.color);
+    row.append(icon);
+  }
+  return row;
 }
 
 interface OrderCard {
@@ -122,13 +134,7 @@ export function mountGameHud(root: HTMLElement): GameHud {
   function createCard(order: Order): OrderCard {
     const card = el('div', `order order-${order.kind}`);
     card.append(el('div', 'order-kind', ORDER_KIND_LABEL[order.kind]));
-    const steps = el('div', 'order-steps');
-    for (const step of order.steps) {
-      const label = STEP_LABEL[step];
-      const icon = el('span', 'order-step', label.letter);
-      icon.style.setProperty('--step-color', label.color);
-      steps.append(icon);
-    }
+    const steps = stepChips(order.steps);
     const timer = el('div', 'order-timer');
     const fill = el('div', 'order-timer-fill');
     timer.append(fill);

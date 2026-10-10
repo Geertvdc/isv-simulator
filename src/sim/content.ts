@@ -201,3 +201,63 @@ export const LEVEL_SELECT_HINT =
 export const LOBBY_BACK_HINT = 'Esc or gamepad B: back to the title';
 /** In the round, bottom center for a moment: how to pause. */
 export const PAUSE_HINT = 'Esc or Start: pause';
+
+/** The picture on a level's intro card that shows its new mechanic. */
+export type IntroPicture = 'basics' | 'throw' | 'review' | 'incident' | 'manager' | 'meeting';
+
+/** On the intro card of a level that teaches something new: one line and a picture. */
+export const LEVEL_INTRO_TIPS: Readonly<Record<string, { text: string; picture: IntroPicture }>> = {
+  garage: {
+    picture: 'basics',
+    text: 'Grab a ticket from the inbox, work it at each station in order, then ship it before the customer gives up.',
+  },
+  'open-plan': {
+    picture: 'throw',
+    text: 'Nowhere to put it down? Hold pick-up to throw the ticket. A teammate facing it catches it.',
+  },
+  'scale-up': {
+    picture: 'review',
+    text: 'With two or more of you, some features need a code review: two players work the R station together.',
+  },
+  'seed-round': {
+    picture: 'incident',
+    text: 'Production incident! The red hotfix jumps the bug queue: code it, build it, ship it. No new features until it ships.',
+  },
+  'middle-management': {
+    picture: 'manager',
+    text: 'The manager wanders the office and walks right into you. Go around.',
+  },
+  'back-to-back': {
+    picture: 'meeting',
+    text: 'Calendar invites: the invited player sits in the meeting room for a few seconds, or you lose points.',
+  },
+};
+
+/** On the first level's intro card: every button. */
+export const INTRO_CONTROLS: readonly { action: string; keys: string }[] = [
+  { action: 'Move', keys: 'WASD · arrows · stick' },
+  { action: 'Pick up / put down', keys: 'E · right Shift · A' },
+  { action: 'Work (hold)', keys: 'Q · / · X' },
+  { action: 'Dash', keys: 'left Shift · right Alt · B' },
+];
+
+/** Over the recipes on the intro card. */
+export const INTRO_ORDERS_TITLE = 'Orders';
+/** Names of the recipes on the intro card, by ticket kind. */
+export const INTRO_RECIPE_NAMES = {
+  feature: 'Feature',
+  reviewed: 'Feature with review',
+  bug: 'Bug fix',
+  incident: 'Hotfix',
+} as const;
+/** Under the intro card. */
+export const INTRO_HINT = 'Enter, E or gamepad A: start · Esc or gamepad B: back';
+/** The last word of the countdown, as the round starts. */
+export const COUNTDOWN_GO_TEXT = 'Ship it!';
+
+/** First-level hints over the map, by hint id. */
+export const HINT_TEXTS = {
+  inbox: 'Grab a ticket here',
+  keyboard: 'Hold work here to code',
+  ship: 'Ship it here!',
+} as const;

@@ -9,6 +9,7 @@ import {
 } from './render/GameScene';
 import { mountGameHud } from './ui/game';
 import { mountHud } from './ui/hud';
+import { mountCountdown, mountIntro } from './ui/intro';
 import { mountLevelSelect } from './ui/levelSelect';
 import { mountLobby } from './ui/lobby';
 import { mountCredits, mountPause, mountResults, mountSettings, mountTitle } from './ui/screens';
@@ -59,6 +60,8 @@ game.events.on(GAME_FRAME_EVENT, gameHud.render);
 
 const lobby = mountLobby(ui);
 const levelSelect = mountLevelSelect(ui);
+const intro = mountIntro(ui);
+const countdown = mountCountdown(ui);
 const screens = {
   title: mountTitle(ui),
   paused: mountPause(ui),
@@ -70,6 +73,8 @@ game.events.on(FLOW_EVENT, (view: FlowView) => {
   const screen = view.flow.screen;
   lobby.render(screen === 'lobby' ? view.flow.lobby : null);
   levelSelect.render(screen === 'levelSelect' ? view : null);
+  intro.render(view);
+  countdown.render(view);
   for (const [name, mounted] of Object.entries(screens)) {
     mounted.render(name === screen ? view : null);
   }
