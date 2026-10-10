@@ -98,7 +98,7 @@ export class TicketRenderer {
       const key = `${ticket.steps.map((s) => s.progress >= 1).join()}|${bar ?? ''}`;
       if (key !== sprite.drawn) {
         sprite.drawn = key;
-        draw(sprite.g, ticket, bar);
+        drawTicketCard(sprite.g, ticket, bar);
       }
     }
 
@@ -226,7 +226,11 @@ export class TicketRenderer {
 }
 
 /** Draws the card with its bottom center at (0, 0), and the progress bar above it if any. */
-function draw(g: Phaser.GameObjects.Graphics, ticket: Ticket, bar: number | null): void {
+export function drawTicketCard(
+  g: Phaser.GameObjects.Graphics,
+  ticket: Pick<Ticket, 'kind' | 'steps'>,
+  bar: number | null,
+): void {
   g.clear();
   const width = Math.max(CARD_MIN_WIDTH, (ticket.steps.length + 1) * ICON_SPACING);
   const left = -width / 2;

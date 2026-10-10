@@ -21,3 +21,7 @@ Our view is a front-facing 3/4 view (Overcooked style), not 2:1 isometric. Pre-r
 - Players must stay easy to tell apart: color is the main signal, a hat or shape is a nice second one
 - Record every pack in `CREDITS.md`
 - Never use assets from Overcooked, Theme Hospital or other commercial games
+
+## Placeholder export
+
+To brief an artist (or an image model), export the current procedural placeholders: run `npm run dev` and open `/assets.html`. Every tile, station state, player direction and ticket card is drawn alone on a transparent frame. Pick a scale (default 4x) and click **Download zip**: one PNG per asset plus `manifest.json` with view angle, block heights, colors, and each asset's 1x frame size and anchor. All tile assets share one frame (80×112 at 1x, tile center at 40,92) so replacements line up. The catalog lives in `src/assetSheet/catalog.ts`.
