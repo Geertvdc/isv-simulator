@@ -17,7 +17,7 @@ All in `public/assets/sfx/`, renamed after what they're for. Made by [Kenney](ht
 | `work.ogg`           | [Interface Sounds](https://kenney.nl/assets/interface-sounds) | `tick_002.ogg`               |
 | `ship.ogg`           | [Interface Sounds](https://kenney.nl/assets/interface-sounds) | `confirmation_002.ogg`       |
 | `order-expired.ogg`  | [Interface Sounds](https://kenney.nl/assets/interface-sounds) | `error_004.ogg`              |
-| `throw.ogg`          | [Interface Sounds](https://kenney.nl/assets/interface-sounds) | `scroll_002.ogg`             |
+| `throw.ogg`          | [Impact Sounds](https://kenney.nl/assets/impact-sounds)       | `impactWood_light_003.ogg`   |
 | `pipeline-broke.ogg` | [Impact Sounds](https://kenney.nl/assets/impact-sounds)       | `impactMetal_heavy_001.ogg`  |
 | `shove.ogg`          | [Impact Sounds](https://kenney.nl/assets/impact-sounds)       | `impactPunch_medium_000.ogg` |
 | `dash.ogg`           | [Digital Audio](https://kenney.nl/assets/digital-audio)       | `phaseJump1.ogg`             |

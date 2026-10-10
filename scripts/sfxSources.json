@@ -20,8 +20,8 @@
     "file": "error_004.ogg"
   },
   "throw": {
-    "pack": "interface-sounds",
-    "file": "scroll_002.ogg"
+    "pack": "impact-sounds",
+    "file": "impactWood_light_003.ogg"
   },
   "pipeline-broke": {
     "pack": "impact-sounds",
