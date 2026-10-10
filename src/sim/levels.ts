@@ -111,7 +111,17 @@ function level(id: string, mapText: string, settings: LevelSettings): Level {
 
 // ---- Garage ----
 
-export const GARAGE: Level = level('garage', garageMap, GARAGE_SETTINGS);
+/**
+ * Only the stations a ticket needs, one pipeline for everyone, and orders
+ * coming faster than in the other Garage levels so it isn't a walk in the park.
+ */
+export const GARAGE: Level = level('garage', garageMap, {
+  ...GARAGE_SETTINGS,
+  orderSchedule: { ...GARAGE_SETTINGS.orderSchedule, intervalTicks: 15 * SECOND, maxOpenOrders: 4 },
+  // Tuned with `npm run sim`: perfect bots average ~220 solo, ~435 with two, ~540 with three,
+  // ~650 with four. Three stars ask for about the perfect-bot score.
+  starThresholds: [80, 150, 220],
+});
 
 /** Split down the middle by a counter wall: code on the left, test and ship on the right. */
 export const OPEN_PLAN: Level = level('open-plan', openPlanMap, {

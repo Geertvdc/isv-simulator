@@ -106,9 +106,12 @@ describe('targetTile', () => {
 
   it('picks the counter a player is pressed against', () => {
     const state = newGame();
-    // Spawn 1 is at (1, 5) with a counter right behind it at (1, 4).
-    for (let i = 0; i < 60; i++) tick(state, [input(state, { x: 0, y: -1 })]);
-    expect(targetTile(state, 1)).toEqual({ x: 1, y: 4 });
-    expect(state.level.tiles[4 * state.level.width + 1]).toBe('counter');
+    // Above the counter island at (5..8, 4).
+    const player = state.players[0];
+    if (!player) throw new Error('no player');
+    player.pos = { x: 6, y: 3 };
+    for (let i = 0; i < 60; i++) tick(state, [input(state, { x: 0, y: 1 })]);
+    expect(targetTile(state, 1)).toEqual({ x: 6, y: 4 });
+    expect(state.level.tiles[4 * state.level.width + 6]).toBe('counter');
   });
 });
