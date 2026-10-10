@@ -40,6 +40,7 @@ function volumeText(volume: number): string {
 function menuLine(item: MenuItem, settings: Settings): MenuLine {
   const label = MENU_LABELS[item];
   if (item === 'volume') return { label, value: `◀ ${volumeText(settings.sfxVolume)} ▶` };
+  if (item === 'music') return { label, value: `◀ ${volumeText(settings.musicVolume)} ▶` };
   if (item === 'shake') return { label, value: settings.screenShake ? 'On' : 'Off' };
   return { label };
 }

@@ -1,6 +1,7 @@
 /**
  * The screens around a round, as a plain-data state machine: title, lobby,
- * level select, the round itself, pause, results, settings and credits.
+ * level select, the level intro card and countdown, the round itself,
+ * pause, results, settings and credits.
  * `updateFlow` turns this frame's button presses into a new screen and a
  * list of effects for the scene to run (start a round, save, ...). Like the
  * sim it never touches Phaser or the DOM, and time only comes in as an
@@ -9,7 +10,12 @@
 
 import type { DevicePress } from '../input/controller';
 import { type Lobby, createLobby, updateLobby } from '../input/lobby';
-import { END_SCREEN_INPUT_DELAY_MS, SFX_VOLUME_MAX } from '../sim/balance';
+import {
+  COUNTDOWN_STEPS,
+  COUNTDOWN_STEP_MS,
+  END_SCREEN_INPUT_DELAY_MS,
+  SFX_VOLUME_MAX,
+} from '../sim/balance';
 import type { LevelResult } from '../sim/orders';
 import {
   type ChapterInfo,
@@ -21,7 +27,18 @@ import {
 } from './save';
 
 export type Screen =
-  'title' | 'lobby' | 'levelSelect' | 'playing' | 'paused' | 'results' | 'settings' | 'credits';
+  | 'title'
+  | 'lobby'
+  | 'levelSelect'
+  /** The level card before a round: name, recipes, what's new. */
+  | 'intro'
+  /** "3, 2, 1" before the round; the round waits and presses are ignored. */
+  | 'countdown'
+  | 'playing'
+  | 'paused'
+  | 'results'
+  | 'settings'
+  | 'credits';
 
 /** One line in a vertical menu. */
 export type MenuItem =
@@ -36,6 +53,7 @@ export type MenuItem =
   | 'next'
   | 'retry'
   | 'volume'
+  | 'music'
   | 'shake'
   | 'back';
 
@@ -70,6 +88,8 @@ export interface Flow {
   settingsFrom: SettingsFrom;
   /** Set on the results screen. */
   results: Results | null;
+  /** When the countdown started, in the caller's clock. */
+  countdownStartMs: number;
 }
 
 export interface FlowContext {
@@ -112,6 +132,7 @@ export function createFlow(): Flow {
     menuIndex: 0,
     settingsFrom: 'title',
     results: null,
+    countdownStartMs: 0,
   };
 }
 
@@ -125,7 +146,7 @@ export function menuItems(flow: Flow): MenuItem[] {
     case 'results':
       return flow.results?.canGoNext ? ['next', 'retry', 'levelSelect'] : ['retry', 'levelSelect'];
     case 'settings':
-      return ['volume', 'shake', 'back'];
+      return ['volume', 'music', 'shake', 'back'];
     case 'credits':
       return ['back'];
     default:
@@ -136,6 +157,16 @@ export function menuItems(flow: Flow): MenuItem[] {
 /** Whether the round should advance this frame. */
 export function isRoundRunning(flow: Flow): boolean {
   return flow.screen === 'playing';
+}
+
+/** How long the whole countdown lasts, in ms. */
+export const COUNTDOWN_MS = COUNTDOWN_STEPS * COUNTDOWN_STEP_MS;
+
+/** The number the countdown shows now (3, 2, 1), or `null` outside the countdown. */
+export function countdownNumber(flow: Flow, nowMs: number): number | null {
+  if (flow.screen !== 'countdown') return null;
+  const step = Math.floor(Math.max(0, nowMs - flow.countdownStartMs) / COUNTDOWN_STEP_MS);
+  return Math.max(1, COUNTDOWN_STEPS - step);
 }
 
 /** Whether the results screen takes presses yet. */
@@ -191,6 +222,12 @@ export function updateFlow(
 ): FlowUpdate {
   const update: FlowUpdate = { changed: false, effects: [] };
   if (flow.screen === 'lobby') return updateLobbyScreen(flow, presses);
+  // Nobody can do anything during the countdown, not even pause: it only waits.
+  if (flow.screen === 'countdown') {
+    if (ctx.nowMs - flow.countdownStartMs < COUNTDOWN_MS) return update;
+    goTo(flow, 'playing');
+    return { changed: true, effects: [] };
+  }
   const joined = new Set(flow.lobby.players.map((p) => p.deviceId));
   const own = flow.lobby.started ? presses.filter((p) => joined.has(p.deviceId)) : presses;
   if (own.length === 0) return update;
@@ -253,10 +290,11 @@ function navigate(flow: Flow, press: DevicePress, ctx: FlowContext, update: Flow
   }
   const item = items[flow.menuIndex];
   const settings = ctx.save.settings;
-  if (item === 'volume') {
-    const volume = clamp(settings.sfxVolume + x, 0, SFX_VOLUME_MAX);
-    if (volume === settings.sfxVolume) return false;
-    settings.sfxVolume = volume;
+  if (item === 'volume' || item === 'music') {
+    const key = item === 'volume' ? 'sfxVolume' : 'musicVolume';
+    const volume = clamp(settings[key] + x, 0, SFX_VOLUME_MAX);
+    if (volume === settings[key]) return false;
+    settings[key] = volume;
     update.effects.push({ type: 'settingsChanged' }, { type: 'saveChanged' });
     return true;
   }
@@ -299,6 +337,10 @@ function back(flow: Flow, update: FlowUpdate): void {
     case 'levelSelect':
       changePlayers(flow);
       return;
+    case 'intro':
+      update.effects.push({ type: 'stopRound' });
+      goTo(flow, 'levelSelect');
+      return;
     case 'paused':
       goTo(flow, 'playing');
       update.effects.push({ type: 'resumeRound' });
@@ -324,17 +366,37 @@ function closeSettings(flow: Flow): void {
   flow.menuIndex = menuItems(flow).indexOf('settings');
 }
 
-function startLevel(flow: Flow, levelIndex: number, update: FlowUpdate): void {
+/**
+ * A fresh round of `levelIndex`. A level picked from the menus first shows
+ * its intro card; Restart and Retry go straight to the countdown.
+ */
+function startLevel(
+  flow: Flow,
+  levelIndex: number,
+  ctx: FlowContext,
+  update: FlowUpdate,
+  intro: boolean,
+): void {
   flow.levelIndex = levelIndex;
-  goTo(flow, 'playing');
+  if (intro) goTo(flow, 'intro');
+  else startCountdown(flow, ctx);
   update.effects.push({ type: 'startLevel', levelIndex });
+}
+
+function startCountdown(flow: Flow, ctx: FlowContext): void {
+  goTo(flow, 'countdown');
+  flow.countdownStartMs = ctx.nowMs;
 }
 
 function confirm(flow: Flow, ctx: FlowContext, update: FlowUpdate): void {
   if (flow.screen === 'levelSelect') {
     if (isUnlocked(ctx.save, ctx.levelIds, flow.levelIndex, ctx.unlockAll, ctx.chapters)) {
-      startLevel(flow, flow.levelIndex, update);
+      startLevel(flow, flow.levelIndex, ctx, update, true);
     }
+    return;
+  }
+  if (flow.screen === 'intro') {
+    startCountdown(flow, ctx);
     return;
   }
   const item = menuItems(flow)[flow.menuIndex];
@@ -356,10 +418,10 @@ function confirm(flow: Flow, ctx: FlowContext, update: FlowUpdate): void {
       return;
     case 'restart':
     case 'retry':
-      startLevel(flow, flow.levelIndex, update);
+      startLevel(flow, flow.levelIndex, ctx, update, false);
       return;
     case 'next':
-      startLevel(flow, flow.levelIndex + 1, update);
+      startLevel(flow, flow.levelIndex + 1, ctx, update, true);
       return;
     case 'levelSelect':
       update.effects.push({ type: 'stopRound' });
@@ -380,6 +442,7 @@ function confirm(flow: Flow, ctx: FlowContext, update: FlowUpdate): void {
       back(flow, update);
       return;
     case 'volume':
+    case 'music':
     case undefined:
       return;
   }
