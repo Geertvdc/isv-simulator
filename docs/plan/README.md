@@ -14,7 +14,10 @@ The game started as a Theme Hospital-style management sim and pivoted to Overcoo
 | 7 Pipeline failure (done) | Forgotten builds break the build machine; take the ticket out, repair, rebuild |
 | 8 Couch polish (done) | Dash, throwing, review station, juice, sound, 3 levels and level select |
 | 9 Art pass (optional) | Real office art and characters replace placeholders, can start after phase 6 |
-| 10 Online multiplayer (later) | Authoritative server, play from different machines, only after phase 8 |
+| 10 Game flow and save data | Title screen, pause, results with next level, settings, unlocks, versioned local save |
+| 11 Campaign | About 12 levels in chapters (Garage to Enterprise), one new mechanic per chapter |
+| 12 Music and onboarding | Music, level intro cards, first-level hints, countdown and transitions |
+| 13 Online multiplayer (later) | Authoritative server, play from different machines, only after phase 11 |
 
 ## How to feed a phase to Claude Code
 
@@ -29,6 +32,6 @@ Do not implement anything from later phases.
 
 Play it yourself after every phase before starting the next, ideally with someone else on the couch.
 
-## Deliberately out of scope until the core loop works
+## Deliberately out of scope for now
 
-Dash, throwing, the review station, more levels, sound, art, menus beyond the join lobby, saving progress, online play.
+Online play, until the local game has enough content to be worth playing online (phase 11).
