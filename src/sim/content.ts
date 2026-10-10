@@ -168,6 +168,19 @@ export const SETTINGS_TITLE = 'Settings';
 export const CREDITS_TITLE = 'Credits';
 export const LEVEL_SELECT_TITLE = 'Pick a level';
 
+/** On a level's card: its chapter and place in it, e.g. "Level 2-1". */
+export function levelLabel(chapter: number, level: number): string {
+  return `Level ${chapter}-${level}`;
+}
+
+/** On a locked chapter: how many stars it takes, and how many you have. */
+export function chapterGateHint(needed: number, have: number): string {
+  return `Needs ${needed} ★ in total (you have ${have})`;
+}
+
+/** Shown on the results when the round opened a new chapter. */
+export const CHAPTER_UNLOCKED_TEXT = 'Chapter unlocked!';
+
 /** On a locked level's card: what it takes to open it. */
 export function unlockHint(stars: number, previousLevel: string): string {
   return `Get ${stars} ★ on ${previousLevel}`;
@@ -182,7 +195,7 @@ export function bugTitle(title: string): string {
 export const MENU_HINT = 'Enter, E or gamepad A: choose · Esc or gamepad B: back';
 /** Under the level select. */
 export const LEVEL_SELECT_HINT =
-  'Left or right to pick · Enter, E or gamepad A: play · Esc or gamepad B: change players';
+  'Left/right: chapter · Up/down: level · Enter, E or gamepad A: play · Esc or gamepad B: change players';
 /** Under the lobby. */
 export const LOBBY_BACK_HINT = 'Esc or gamepad B: back to the title';
 /** In the round, bottom center for a moment: how to pause. */

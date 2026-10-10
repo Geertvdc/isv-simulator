@@ -11,7 +11,14 @@ import type { DevicePress } from '../input/controller';
 import { type Lobby, createLobby, updateLobby } from '../input/lobby';
 import { END_SCREEN_INPUT_DELAY_MS, SFX_VOLUME_MAX } from '../sim/balance';
 import type { LevelResult } from '../sim/orders';
-import { type SaveData, isUnlocked, recordResult } from './save';
+import {
+  type ChapterInfo,
+  type SaveData,
+  chapterIndexOf,
+  isChapterOpen,
+  isUnlocked,
+  recordResult,
+} from './save';
 
 export type Screen =
   'title' | 'lobby' | 'levelSelect' | 'playing' | 'paused' | 'results' | 'settings' | 'credits';
@@ -39,6 +46,8 @@ export interface Results {
   newBest: boolean;
   /** The level this round just unlocked, if any. */
   unlockedIndex: number | null;
+  /** The chapter this round just opened (its star gate was met), if any. */
+  unlockedChapter: number | null;
   /** Whether there is a next level and it is open. */
   canGoNext: boolean;
   /** When the round ended, in the caller's clock; presses wait a moment after. */
@@ -68,6 +77,8 @@ export interface FlowContext {
   save: SaveData;
   /** Every level's id, in order. */
   levelIds: readonly string[];
+  /** The chapters, in order; together they hold `levelIds` in the same order. */
+  chapters: readonly ChapterInfo[];
   /** `?unlockAll`: every level is open. */
   unlockAll: boolean;
   /** Current time in ms, any clock that only goes forward. */
@@ -227,7 +238,7 @@ function navigate(flow: Flow, press: DevicePress, ctx: FlowContext, update: Flow
   const { x, y } = press.nav;
   if (x === 0 && y === 0) return false;
   if (flow.screen === 'levelSelect') {
-    const index = clamp(flow.levelIndex + (x !== 0 ? x : y), 0, ctx.levelIds.length - 1);
+    const index = chapterCursor(ctx, flow.levelIndex, x, y);
     if (index === flow.levelIndex) return false;
     flow.levelIndex = index;
     return true;
@@ -254,6 +265,27 @@ function navigate(flow: Flow, press: DevicePress, ctx: FlowContext, update: Flow
     return true;
   }
   return false;
+}
+
+/**
+ * The level select cursor moved from level `index`: left/right to the same
+ * row of the chapter next door (or its last level when it's shorter),
+ * up/down within the chapter. Returns the new level index.
+ */
+export function chapterCursor(ctx: FlowContext, index: number, x: number, y: number): number {
+  const { chapters, levelIds } = ctx;
+  const id = levelIds[index];
+  const chapter = id === undefined ? -1 : chapterIndexOf(chapters, id);
+  const current = chapters[chapter];
+  if (!current) return clamp(index + (x !== 0 ? x : y), 0, levelIds.length - 1);
+  const row = current.levelIds.indexOf(id ?? '');
+  const target =
+    x !== 0 ? chapters[clamp(chapter + Math.sign(x), 0, chapters.length - 1)] : current;
+  if (!target) return index;
+  const nextRow = x !== 0 ? row : row + Math.sign(y);
+  const nextId = target.levelIds[clamp(nextRow, 0, target.levelIds.length - 1)];
+  const next = nextId === undefined ? -1 : levelIds.indexOf(nextId);
+  return next < 0 ? index : next;
 }
 
 function toggleShake(ctx: FlowContext, update: FlowUpdate): void {
@@ -300,7 +332,7 @@ function startLevel(flow: Flow, levelIndex: number, update: FlowUpdate): void {
 
 function confirm(flow: Flow, ctx: FlowContext, update: FlowUpdate): void {
   if (flow.screen === 'levelSelect') {
-    if (isUnlocked(ctx.save, ctx.levelIds, flow.levelIndex, ctx.unlockAll)) {
+    if (isUnlocked(ctx.save, ctx.levelIds, flow.levelIndex, ctx.unlockAll, ctx.chapters)) {
       startLevel(flow, flow.levelIndex, update);
     }
     return;
@@ -361,14 +393,23 @@ export function finishRound(flow: Flow, result: LevelResult, ctx: FlowContext): 
   const levelId = ctx.levelIds[flow.levelIndex];
   if (levelId === undefined || flow.screen !== 'playing') return { changed: false, effects: [] };
   const next = flow.levelIndex + 1;
-  const wasOpen = isUnlocked(ctx.save, ctx.levelIds, next, ctx.unlockAll);
+  const open = (): { level: boolean; chapters: boolean[] } => ({
+    level: isUnlocked(ctx.save, ctx.levelIds, next, ctx.unlockAll, ctx.chapters),
+    chapters: ctx.chapters.map((_, i) =>
+      isChapterOpen(ctx.save, ctx.levelIds, ctx.chapters, i, ctx.unlockAll),
+    ),
+  });
+  const before = open();
   const { newBest } = recordResult(ctx.save, levelId, result);
-  const isOpen = isUnlocked(ctx.save, ctx.levelIds, next, ctx.unlockAll);
+  const after = open();
+  const isOpen = after.level;
+  const chapter = after.chapters.findIndex((o, i) => o && !before.chapters[i]);
   flow.results = {
     score: result.score,
     stars: result.stars,
     newBest,
-    unlockedIndex: isOpen && !wasOpen ? next : null,
+    unlockedIndex: isOpen && !before.level ? next : null,
+    unlockedChapter: chapter >= 0 ? chapter : null,
     canGoNext: isOpen,
     endedAtMs: ctx.nowMs,
   };

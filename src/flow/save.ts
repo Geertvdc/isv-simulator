@@ -168,20 +168,51 @@ export function recordResult(save: SaveData, levelId: string, result: LevelResul
   return { newBest: !old || result.score > old.bestScore };
 }
 
+/** A chapter as the menus see it: its levels in order and the stars that open it. */
+export interface ChapterInfo {
+  levelIds: readonly string[];
+  /** Best stars over all levels needed to open it. */
+  starGate: number;
+}
+
+/** Whether chapter `index` is open: the total of best stars meets its gate. */
+export function isChapterOpen(
+  save: SaveData,
+  levelIds: readonly string[],
+  chapters: readonly ChapterInfo[],
+  index: number,
+  unlockAll = false,
+): boolean {
+  const chapter = chapters[index];
+  if (!chapter) return false;
+  return unlockAll || totalStars(save, levelIds) >= chapter.starGate;
+}
+
+/** The chapter holding `levelId`, or -1 when no chapter has it. */
+export function chapterIndexOf(chapters: readonly ChapterInfo[], levelId: string): number {
+  return chapters.findIndex((c) => c.levelIds.includes(levelId));
+}
+
 /**
  * Whether the level at `index` of `levelIds` may be played: the first always,
- * the others once the one before has `STARS_TO_UNLOCK` stars.
+ * the others once the one before has `STARS_TO_UNLOCK` stars and its
+ * chapter's star gate is met.
  */
 export function isUnlocked(
   save: SaveData,
   levelIds: readonly string[],
   index: number,
   unlockAll = false,
+  chapters: readonly ChapterInfo[] = [],
 ): boolean {
   if (index < 0 || index >= levelIds.length) return false;
   if (unlockAll || index === 0) return true;
   const previous = levelIds[index - 1];
-  return previous !== undefined && (save.levels[previous]?.bestStars ?? 0) >= STARS_TO_UNLOCK;
+  const id = levelIds[index];
+  if (previous === undefined || id === undefined) return false;
+  if ((save.levels[previous]?.bestStars ?? 0) < STARS_TO_UNLOCK) return false;
+  const chapter = chapterIndexOf(chapters, id);
+  return chapter < 0 || isChapterOpen(save, levelIds, chapters, chapter);
 }
 
 /** Best stars added up over the given levels. */

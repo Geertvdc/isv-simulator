@@ -5,7 +5,9 @@ import { type MenuItem, menuItems } from '../flow/flow';
 import type { Settings } from '../flow/save';
 import type { FlowView } from '../render/GameScene';
 import { SFX_VOLUME_MAX } from '../sim/balance';
+import { CHAPTERS } from '../sim/levels';
 import {
+  CHAPTER_UNLOCKED_TEXT,
   CREDITS_TITLE,
   GAME_TAGLINE,
   GAME_TITLE,
@@ -106,9 +108,10 @@ export function mountResults(root: HTMLElement): ScreenView {
   const score = el('div', 'results-score');
   const best = el('div', 'results-badge', NEW_BEST_TEXT);
   const unlocked = el('div', 'results-badge');
+  const chapter = el('div', 'results-badge');
   const menu = createMenu();
   const hint = el('div', 'screen-hint', MENU_HINT);
-  screen.append(title, stars, score, best, unlocked, menu.root, hint);
+  screen.append(title, stars, score, best, unlocked, chapter, menu.root, hint);
   return {
     render: (view) => {
       const results = view?.flow.results;
@@ -123,6 +126,10 @@ export function mountResults(root: HTMLElement): ScreenView {
         results.unlockedIndex === null ? undefined : view.levelIds[results.unlockedIndex];
       unlocked.hidden = unlockedId === undefined;
       unlocked.textContent = `${LEVEL_UNLOCKED_TEXT} ${LEVEL_NAMES[unlockedId ?? ''] ?? ''}`.trim();
+      const opened =
+        results.unlockedChapter === null ? undefined : CHAPTERS[results.unlockedChapter];
+      chapter.hidden = opened === undefined;
+      chapter.textContent = `${CHAPTER_UNLOCKED_TEXT} ${opened?.name ?? ''}`.trim();
       hint.style.visibility = view.resultsReady ? 'visible' : 'hidden';
       menu.render(menuLines(view), view.flow.menuIndex, view.resultsReady);
     },
