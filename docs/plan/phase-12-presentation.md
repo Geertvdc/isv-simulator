@@ -18,8 +18,8 @@
 ## Done when
 
 - [ ] Someone who has never played gets through the first level without being told what to do
-- [ ] Music and sound volumes work independently and are remembered
-- [ ] `npm run check` passes
+- [x] Music and sound volumes work independently and are remembered
+- [x] `npm run check` passes
 
 ## Implementation
 
