@@ -560,14 +560,14 @@ function confirm(flow: Flow, ctx: FlowContext, update: FlowUpdate): void {
 
 // ---------------------------------------------------------------- joining online
 
+const NOT_CODE_LETTERS = new RegExp(`[^${JOIN_CODE_ALPHABET}]`, 'g');
+
 /**
  * The join-code screen with a gamepad (keyboards type into the UI's text
  * box, see `editJoinCode`): up and down turn the letter under the cursor,
  * left and right move the cursor, confirm joins and back goes to the title.
  * While a join is out only back counts, and drops it.
  */
-const NOT_CODE_LETTERS = new RegExp(`[^${JOIN_CODE_ALPHABET}]`, 'g');
-
 function updateJoinCodeScreen(flow: Flow, presses: readonly DevicePress[]): FlowUpdate {
   const update: FlowUpdate = { changed: false, effects: [] };
   const entry = flow.joinCode;

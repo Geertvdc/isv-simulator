@@ -128,6 +128,7 @@ export function createRoomState(joinCode: string, seed: number): RoomState {
   const flow = createFlow();
   flow.screen = 'lobby';
   flow.awake = true;
+  flow.online = true;
   return {
     joinCode,
     members: [],
@@ -179,7 +180,15 @@ export function lobbyMessage(room: RoomState): Outgoing {
     isHost: m.sessionId === host,
     connected: true,
   }));
-  return { to: null, message: { type: 'lobby', joinCode: room.joinCode, members } };
+  return {
+    to: null,
+    message: {
+      type: 'lobby',
+      joinCode: room.joinCode,
+      members,
+      levels: structuredClone(room.save.levels),
+    },
+  };
 }
 
 function errorTo(to: string, code: ErrorCode, message: string): Outgoing {
@@ -265,17 +274,20 @@ function followHost(room: RoomState): void {
 /**
  * A member's profile came in from the store (after joining: loading takes a
  * moment). Merged into what they have, so rounds finished in the meantime
- * aren't lost. When it's the host's, the room's unlocks change with it.
+ * aren't lost. When it's the host's, the room's unlocks change with it and
+ * everyone gets them in a new `lobby` message.
  */
 export function setMemberProfile(
   room: RoomState,
   sessionId: string,
   levels: Readonly<Record<string, LevelRecord>>,
-): void {
+): Outgoing[] {
   const member = room.members.find((m) => m.sessionId === sessionId);
-  if (!member) return;
+  if (!member) return [];
   member.levels = mergeLevels(member.levels, levels);
-  if (member === hostOf(room)) followHost(room);
+  if (member !== hostOf(room)) return [];
+  followHost(room);
+  return [lobbyMessage(room)];
 }
 
 /**
@@ -386,32 +398,56 @@ function updateMember(room: RoomState, member: Member, hello: HelloMessage): Out
 }
 
 /**
- * Join presses from devices that would take a session past the couch
- * players it said it has are dropped, so the room never holds more
- * players than its members announced.
+ * The presses the room's flow gets this tick, and whether a member's couch
+ * player count grew.
+ *
+ * - In the lobby every member's devices count. A join press from a device
+ *   past the couch players its member announced makes room for one more
+ *   while the room has space, and is dropped when it's full, so the room
+ *   never holds more players than its members' counts add up to.
+ * - Everywhere else (level select, intro, pause, results, and pausing a
+ *   round) only the host's devices count.
  */
-function allowedPresses(room: RoomState, presses: readonly DevicePress[]): DevicePress[] {
-  if (room.flow.screen !== 'lobby') return [...presses];
+function allowedPresses(
+  room: RoomState,
+  presses: readonly DevicePress[],
+): { presses: DevicePress[]; grew: boolean } {
+  const host = hostOf(room);
+  if (room.flow.screen !== 'lobby') {
+    return {
+      presses: host ? presses.filter((p) => isFromSession(p.deviceId, host.sessionId)) : [],
+      grew: false,
+    };
+  }
   const bound = new Set(room.flow.lobby.players.map((p) => p.deviceId));
   const joining = new Map<string, number>();
-  return presses.filter((press) => {
+  let grew = false;
+  const allowed = presses.filter((press) => {
     if (!press.join || bound.has(press.deviceId)) return true;
     const member = room.members.find((m) => isFromSession(press.deviceId, m.sessionId));
     if (!member) return false;
     const count = (joining.get(member.sessionId) ?? playerIdsOf(room, member.sessionId).length) + 1;
-    if (count > member.localPlayers) return false;
+    if (count > member.localPlayers) {
+      if (playerCount(room) >= MAX_PLAYERS) return false;
+      member.localPlayers++;
+      grew = true;
+    }
     joining.set(member.sessionId, count);
     return true;
   });
+  return { presses: allowed, grew };
 }
 
 function flowContext(room: RoomState): FlowContext {
+  const host = hostOf(room)?.sessionId;
   return {
     save: room.save,
     levelIds: LEVEL_IDS,
     chapters: CHAPTER_INFO,
     unlockAll: false,
     nowMs: room.serverTick * TICK_MS,
+    // Online the host starts the game, whoever joined first.
+    canStart: (deviceId) => host !== undefined && isFromSession(deviceId, host),
   };
 }
 
@@ -450,15 +486,17 @@ function runEffects(room: RoomState, effects: readonly FlowEffect[]): Outgoing[]
 const resultOf = (game: GameState): LevelResult | null => game.result;
 
 /**
- * One server tick: the flow with the presses since the last tick, then one
+ * One server tick: the flow with the presses the room allows (see
+ * `allowedPresses`) since the last tick, then one
  * input per player and a sim tick while the round plays, then a snapshot
  * every `NET_SNAPSHOT_EVERY_TICKS`.
  */
 export function stepRoom(room: RoomState): Outgoing[] {
   const ctx = flowContext(room);
-  const presses = allowedPresses(room, room.presses);
+  const { presses, grew } = allowedPresses(room, room.presses);
   room.presses = [];
   const out = runEffects(room, updateFlow(room.flow, presses, ctx).effects);
+  if (grew) out.push(lobbyMessage(room));
 
   const game = room.game;
   if (game) {
@@ -470,6 +508,8 @@ export function stepRoom(room: RoomState): Outgoing[] {
       const result = resultOf(game);
       if (result && finishRound(room.flow, result, ctx).changed) {
         recordForMembers(room, game.levelId, result);
+        // The host's progress changed: the level select shows it.
+        out.push(lobbyMessage(room));
       }
     }
   }
