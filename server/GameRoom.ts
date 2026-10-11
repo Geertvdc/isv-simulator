@@ -3,12 +3,18 @@
  * callbacks into calls on the room's plain state and delivers the messages
  * those calls return. Messages go both ways as Colyseus messages whose type
  * is the protocol message's `type` and whose payload is the whole message.
+ *
+ * Profiles: each member's profile is loaded from the store after they join
+ * (the host's drives the room's unlocks), and every finished round is
+ * written to every member's profile. Store trouble is logged and never stops
+ * the room: the round just isn't saved online.
  */
 
 import { randomInt } from 'node:crypto';
 import { type Client, Room, ServerError } from 'colyseus';
 import { MAX_PLAYERS } from '../src/sim/level';
 import { releaseJoinCode, reserveJoinCode } from './joinCodes';
+import type { ProfileStore } from './profileStore';
 import {
   type Outgoing,
   type RoomState,
@@ -18,6 +24,8 @@ import {
   handleMessage,
   joinRoom,
   leaveRoom,
+  setMemberProfile,
+  takeProfileWrites,
 } from './roomLogic';
 
 /** The room type clients create and join: `client.create(GAME_ROOM, hello)`. */
@@ -33,6 +41,8 @@ export class GameRoom extends Room {
   // Every member brings at least one player.
   maxClients = MAX_PLAYERS;
   private core!: RoomState;
+  /** Set by `gameRoomWith`; without one the room plays without profiles. */
+  protected store: ProfileStore | null = null;
 
   onCreate(): void {
     const code = reserveJoinCode();
@@ -46,6 +56,7 @@ export class GameRoom extends Room {
     // accumulator rather than `setFixedTimestep`, so tests can drive it).
     this.setTimestep((deltaMs) => {
       this.deliver(advanceRoom(this.core, deltaMs));
+      this.writeProfiles();
     }, TICK_MS);
   }
 
@@ -53,6 +64,7 @@ export class GameRoom extends Room {
     const result = joinRoom(this.core, client.sessionId, options);
     if (!result.ok) throw new ServerError(JOIN_REFUSED, result.code);
     this.deliver(result.out);
+    this.loadProfile(client.sessionId);
   }
 
   onLeave(client: Client): void {
@@ -63,10 +75,43 @@ export class GameRoom extends Room {
     releaseJoinCode(this.core.joinCode);
   }
 
+  private loadProfile(sessionId: string): void {
+    const userId = this.core.members.find((m) => m.sessionId === sessionId)?.profileId;
+    if (!this.store || !userId) return;
+    this.store.get(userId).then(
+      (profile) => {
+        if (profile) setMemberProfile(this.core, sessionId, profile.levels);
+      },
+      (error: unknown) => {
+        console.error(`Could not load profile ${userId}:`, error);
+      },
+    );
+  }
+
+  private writeProfiles(): void {
+    const writes = takeProfileWrites(this.core);
+    if (!this.store) return;
+    const now = new Date().toISOString();
+    for (const w of writes) {
+      this.store
+        .recordResult(w.userId, w.levelId, w.result, now, w.displayName)
+        .catch((error: unknown) => {
+          console.error(`Could not record a round for ${w.userId}:`, error);
+        });
+    }
+  }
+
   private deliver(out: readonly Outgoing[]): void {
     for (const { to, message } of out) {
       if (to === null) this.broadcast(message.type, message);
       else this.clients.get(to)?.send(message.type, message);
     }
   }
+}
+
+/** The room class for a server whose rooms keep profiles in `store`. */
+export function gameRoomWith(store: ProfileStore): typeof GameRoom {
+  return class extends GameRoom {
+    protected override store = store;
+  };
 }

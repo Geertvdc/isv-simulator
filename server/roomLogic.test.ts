@@ -20,7 +20,9 @@ import {
   joinRoom,
   leaveRoom,
   playerIdsOf,
+  setMemberProfile,
   stepRoom,
+  takeProfileWrites,
 } from './roomLogic';
 
 function hello(localPlayers = 1, name = 'Ada'): HelloMessage {
@@ -359,5 +361,93 @@ describe('a round', () => {
     expect(room.flow.screen).toBe('levelSelect');
     expect(room.game).toBeNull();
     expect(room.buffers).toEqual([]);
+  });
+});
+
+describe('profiles', () => {
+  const HOST_ID = '3f2b8c1e-9d4a-4e6b-8a1c-2b3c4d5e6f70';
+  const GUEST_ID = 'a1b2c3d4-e5f6-4a7b-9c8d-0e1f2a3b4c5d';
+  const opened = { garage: { bestStars: 3, bestScore: 100, plays: 2 } };
+
+  function joinAs(room: RoomState, sessionId: string, userId: string): void {
+    const result = joinRoom(room, sessionId, { ...hello(1, sessionId), userId });
+    if (!result.ok) throw new Error(result.reason);
+  }
+
+  /** A room on the level select with the cursor on the second level. */
+  function onSecondLevel(room: RoomState): void {
+    menu(room, 'host', press('kb-left', { join: true }));
+    menu(room, 'host', press('kb-left', { interact: true }));
+    expect(room.flow.screen).toBe('levelSelect');
+    menu(room, 'host', press('kb-left', { nav: { x: 0, y: 1 } }));
+    expect(room.flow.levelIndex).toBe(1);
+  }
+
+  it("uses the host's profile for unlocks", () => {
+    const locked = createRoomState('ABCD', 1);
+    joinAs(locked, 'host', HOST_ID);
+    onSecondLevel(locked);
+    menu(locked, 'host', press('kb-left', { interact: true }));
+    expect(locked.flow.screen).toBe('levelSelect');
+
+    const room = createRoomState('ABCD', 1);
+    joinAs(room, 'host', HOST_ID);
+    setMemberProfile(room, 'host', opened);
+    expect(room.save.levels).toEqual(opened);
+    onSecondLevel(room);
+    const out = menu(room, 'host', press('kb-left', { interact: true }));
+    expect(room.flow.screen).toBe('intro');
+    expect(messages(out, 'roundStart')[0]?.levelId).toBe('open-plan');
+  });
+
+  it("ignores a guest's profile for unlocks, until the guest becomes host", () => {
+    const room = createRoomState('ABCD', 1);
+    joinAs(room, 'host', HOST_ID);
+    joinAs(room, 'guest', GUEST_ID);
+    setMemberProfile(room, 'guest', opened);
+    expect(room.save.levels).toEqual({});
+    leaveRoom(room, 'host');
+    expect(room.save.levels).toEqual(opened);
+  });
+
+  it('keeps rounds played before the profile came in', () => {
+    const room = createRoomState('ABCD', 1);
+    joinAs(room, 'host', HOST_ID);
+    const host = hostOf(room);
+    if (!host) throw new Error('no host');
+    host.levels = { garage: { bestStars: 1, bestScore: 500, plays: 1 } };
+    setMemberProfile(room, 'host', opened);
+    expect(room.save.levels).toEqual({ garage: { bestStars: 3, bestScore: 500, plays: 2 } });
+  });
+
+  it('records a finished round for every member, once per user', () => {
+    const room = createRoomState('ABCD', 1);
+    joinAs(room, 'host', HOST_ID);
+    joinAs(room, 'guest', GUEST_ID);
+    joinAs(room, 'twin', GUEST_ID);
+    join(room, 'anon');
+    menu(room, 'host', press('kb-left', { join: true }));
+    menu(room, 'host', press('kb-left', { interact: true }));
+    menu(room, 'host', press('kb-left', { interact: true }));
+    menu(room, 'host', press('kb-left', { interact: true }));
+    steps(room, Math.ceil(COUNTDOWN_MS / TICK_MS) + 2);
+    expect(room.flow.screen).toBe('playing');
+    expect(takeProfileWrites(room)).toEqual([]);
+
+    const game = room.game;
+    if (!game) throw new Error('no game');
+    steps(room, game.settings.durationTicks + 10);
+    const result = game.result;
+    if (!result) throw new Error('no result');
+    const writes = takeProfileWrites(room);
+    expect(writes).toEqual([
+      { userId: HOST_ID, displayName: 'host', levelId: 'garage', result },
+      { userId: GUEST_ID, displayName: 'guest', levelId: 'garage', result },
+    ]);
+    expect(takeProfileWrites(room)).toEqual([]);
+    for (const member of room.members) {
+      expect(member.levels.garage?.plays).toBe(1);
+    }
+    expect(room.save.levels.garage?.plays).toBe(1);
   });
 });
