@@ -17,6 +17,9 @@ import { type LevelMap, MAX_PLAYERS } from '../sim/level';
 import type { InputCommand, Vec } from '../sim/state';
 import type { Snapshot } from './snapshot';
 
+/** The Colyseus room type clients create and join: `client.create(GAME_ROOM, hello)`. */
+export const GAME_ROOM = 'game';
+
 /** Bumped on every incompatible change; the server refuses other versions. */
 export const PROTOCOL_VERSION = 2;
 
