@@ -9,10 +9,10 @@ Built without a review round (the product owner was away); decisions are in `rev
 - Predict **only movement** (position, velocity, facing, dash) of this machine's players, with the sim's own deterministic movement and collision code. Interactions (pick up, work, throw, ship), tickets, stations, orders, managers and other players stay server-authoritative and interpolated as in 13e.
 - Keep the inputs this machine sent, per tick. When a snapshot comes in: take the server's player at that snapshot's tick and replay the inputs the server hadn't applied yet (reconciliation).
 - Small corrections glide away over a few frames (a visual error offset that decays in render); big ones (past `NET_PREDICT_SNAP_DISTANCE`) snap.
-- Hard reconciles (no replay of stale inputs, or a snap instead of a glide) when the server did something prediction can't know: the round not running (countdown, pause, results), being shoved by a dashing player, bumped by a manager.
+- Hard reconciles when the server did something prediction can't know: the round not running (pause, results: no prediction, the server's position), being shoved by a dashing player or bumped by a manager (a snap instead of a glide). The countdown's end is known (the room's clock), so prediction stands still until that server tick and moves from it, like the server.
 - A carried ticket follows the predicted body (the ticket renderer already draws carried tickets at `renderPos` of the carrier).
 - `?predict=0` turns it off for comparison; on by default.
-- Not in scope: predicting interactions, other players or managers; predicting the start of a round before its first `playing` snapshot arrives; lag compensation on the server.
+- Not in scope: predicting interactions, drawing other players or managers from prediction; predicting a pause; lag compensation on the server.
 
 ## Design
 
@@ -33,27 +33,32 @@ The client stamps inputs with `T = floor(target)` where `target = estimate + rtt
 interface Prediction {
   enabled: boolean; // ?predict=0 → false
   level: LevelMap | null;
-  base: PredictionBase | null; // newest snapshot: tick, running, others' and managers' positions
-  inputs: InputCommand[]; // sent, not yet acknowledged, sorted by tick
-  lastAcked: Record<PlayerId, InputCommand>; // newest input below the base tick (what the server repeats)
+  baseTick: number | null; // the newest snapshot's server tick
+  runsFrom: number | null; // the server tick the sim runs from (countdown end), null: paused/ended
+  others: Player[]; // other players, simulated without input from the newest snapshot (obstacles only)
+  managers: { pos; facing }[]; // where the newest snapshot has them
+  inputs: InputCommand[]; // sent for the base tick or later, sorted by tick
+  lastAcked: Record<PlayerId, InputCommand | undefined>; // newest input below the base tick (what the server repeats)
   tick: number; // predicted state = after ticks < tick
   current: Player[];
   previous: Player[]; // this machine's players at tick and tick − 1
-  offsets: Record<PlayerId, Vec>; // visual error, decays
-  stats: { reconciles; corrections; snaps; hardResets; maxErrorTiles };
+  offsets: Record<PlayerId, Vec | undefined>; // visual error, decays
+  stats: { reconciles; corrections; snaps; maxErrorTiles; lastErrorTiles };
 }
 (createPrediction(enabled), resetPrediction(p, level));
 recordInputs(p, stamped); // what was actually sent
 advancePrediction(p, targetTick); // simulate up to floor(targetTick) + 1
-reconcile(p, serverTick, state, localIds, running); // on every kept snapshot
+reconcile(p, { serverTick, players, managers, events, runsFrom }, localIds); // every kept snapshot
 decayCorrections(p, dtMs);
+predictionAlpha(p, targetTick);
 predictedPlayer(p, id, alpha); // lerp(previous, current) + offset, or null
+countdownEndTick(countdownStartMs); // the round's first sim tick
 ```
 
-- **Replaying a tick:** each local player `movePlayer` with the input for that tick (the newest at or before it if none was sent, as the server repeats it, idle after `NET_INPUT_REPEAT_TICKS`); then `separatePlayers` with copies of the other players frozen at the newest snapshot (not dashing, reset every tick), then `pushOutOfManager` against the managers frozen at the newest snapshot.
-- **Others:** collide against their positions in the newest snapshot. A teammate standing at a station (the common case) is exactly where the server has them, so walking into them doesn't rubber-band. Someone walking is off by up to a round trip either way; the server corrects and the correction glides.
-- **Reconcile:** `running` (the snapshot's flow is `playing` and the state has no result) → base = the server's players at `S`; inputs below `S` dropped (the newest kept per player as `lastAcked`); replay `S .. tick − 1`; error = old predicted position − new; `offsets += error`, zeroed when its length is past `NET_PREDICT_SNAP_DISTANCE` or a shove/bump hit a local player in this snapshot's events. Not running → hard reset: predicted = server at `S`, inputs cleared, the jump still glides when small (pause after running ahead a few ticks).
-- **Limits:** a target more than `NET_PREDICT_MAX_TICKS` ahead of the base (a stalled tab, a clock resync) jumps the base forward instead of simulating seconds; a target behind the base holds the base.
+- **Replaying a tick:** each local player `movePlayer` with the input for that tick (the newest at or before it if none was sent, as the server repeats it, idle after `NET_INPUT_REPEAT_TICKS`); the other players `movePlayer` without input; then `separatePlayers` on everyone (sorted by id, like the server), then `pushOutOfManager` against the managers frozen at the newest snapshot. Ticks before `runsFrom` (the countdown) don't move anyone.
+- **Others:** simulated along from the newest snapshot without input (they slow down and stop, and get pushed), never drawn from the prediction. A teammate standing at a station (the common case) then moves exactly as on the server when you walk into them and push them, so it doesn't rubber-band. (The first version froze them at the snapshot; pushing a teammate then gave small backward wobbles in the browser check.) Someone walking is off by up to a round trip; the server corrects and the correction glides. Their dash is dropped in the copy: a shove by them is the server's call and snaps.
+- **Reconcile:** base = the server's players at `S`; inputs below `S` dropped (the newest kept per player as `lastAcked`); when the sim runs, replay `S .. tick − 1`; error = old predicted position − new; `offsets += error`, zeroed when its length is past `NET_PREDICT_SNAP_DISTANCE` or a shove/bump hit a local player in this snapshot's events. Not running (pause, results) → no replay: the server's players at `S`, the jump back glides when small (a pause after running ahead; the pause screen covers the map anyway).
+- **Limits:** at most `NET_PREDICT_MAX_TICKS` simulated in one go (a stalled tab, a clock resync); the rest is skipped. A target behind the prediction holds it (alpha 1).
 - **Smoothing:** `offset *= exp(−dt / NET_PREDICT_SMOOTH_MS)`, zeroed under 0.001 tiles.
 
 ### View (`src/render/roundView.ts`)
@@ -62,9 +67,9 @@ predictedPlayer(p, id, alpha); // lerp(previous, current) + offset, or null
 
 ### Scene (`GameScene`)
 
-- `prediction` kept with the round: reset on a new round, `reconcile` after every snapshot the round kept (also the one in a `roundStart`), with `localBindings` and `isRoundRunning(online.flow)`.
+- `prediction` kept with the round: reset on a new round, `reconcile` after every snapshot the round kept (also the one in a `roundStart`), with `localBindings` and `runsFrom` from the snapshot's flow (playing: now; countdown: `countdownEndTick`; else `null`).
 - `sendInputs` records what it sent; each frame `advancePrediction` to the target tick, `decayCorrections`, and `renderRound(predictedView(...))` when prediction is on and has a base.
-- `NetDebug` gains `predict` (on/off, local ids, stats) and an opt-in `trace` (the script sets `isvNet.trace = []`; each frame pushes time, render tick and drawn local positions).
+- `NetDebug` gains `predict` (on/off, local ids, stats), `server` (the newest snapshot's player positions) and an opt-in `trace` (the script sets `isvNet.trace = []`; each frame pushes time, render tick, input target tick and drawn positions).
 
 ### Options
 
@@ -75,6 +80,7 @@ predictedPlayer(p, id, alpha); // lerp(previous, current) + offset, or null
 - `src/sim/movement.ts`, `tick.ts`, `manager.ts` + `movement.test.ts`, `manager.test.ts`
 - `src/sim/balance.ts`: `NET_PREDICT_SNAP_DISTANCE`, `NET_PREDICT_SMOOTH_MS`, `NET_PREDICT_MAX_TICKS`
 - `src/net/clock.ts` (`inputTargetTickExact`) + test
+- `server/roomLogic.test.ts`: the round's first sim tick is `countdownEndTick`
 - `src/net/prediction.ts` + `prediction.test.ts`
 - `src/render/roundView.ts` + test, `src/render/GameScene.ts`, `src/main.ts`, `src/ui/netHud.ts`
 - `scripts/verifyPrediction.ts`, `package.json` (`verify:prediction`)
@@ -98,18 +104,19 @@ predictedPlayer(p, id, alpha); // lerp(previous, current) + offset, or null
   - reconciliation after a mismatch: a server that shoved the player gives the server's position plus the replayed inputs;
   - replay: inputs below the snapshot tick are dropped, the rest replayed, missing ticks repeat the last input, idle after `NET_INPUT_REPEAT_TICKS`;
   - small corrections become an offset that decays toward 0 and never overshoots; a correction past `NET_PREDICT_SNAP_DISTANCE` snaps (offset 0); a shove event on a local player snaps;
-  - not running (countdown, pause, results) resets to the server and drops the inputs;
+  - not running (pause, results) holds the server position and predicts nothing; through a countdown it stands still and moves from the end tick on, with no corrections;
+  - walking into a teammate standing still predicts exactly (they get pushed the same); a teammate walking across corrects a little, without snaps;
   - a target too far ahead jumps instead of simulating; disabled prediction gives nothing.
 - `predictedView`: local players from the prediction, others interpolated, state copy only swaps local players.
 
 ## Done when
 
-- [ ] Your own player moves within a frame or two of the key online, with and without lag (measured in a browser)
-- [ ] No visible correction jitter walking into walls, around corners and dashing, without lag and at `?lag=100&jitter=20` (drawn positions sampled every frame: no backward steps, no snaps)
-- [ ] Others and managers still glide (interpolated) and interactions stay server-side
-- [ ] A carried ticket follows the predicted body
-- [ ] Pause, countdown, shoves and manager bumps don't leave the local player drifting
-- [ ] `?predict=0` turns it off
-- [ ] `npm run verify:online` still passes
-- [ ] `npm run check`, `npm run build` and `npm run build:server` pass; the suite passes several runs in a row
+- [x] Your own player moves within a frame or two of the key online, with and without lag (measured in a browser)
+- [x] No visible correction jitter walking into walls, around corners and dashing, without lag and at `?lag=100&jitter=20` (drawn positions sampled every frame: no backward steps, no snaps)
+- [x] Others and managers still glide (interpolated) and interactions stay server-side
+- [x] A carried ticket follows the predicted body
+- [x] Pause, countdown, shoves and manager bumps don't leave the local player drifting
+- [x] `?predict=0` turns it off
+- [x] `npm run verify:online` still passes
+- [x] `npm run check`, `npm run build` and `npm run build:server` pass; the suite passes several runs in a row
 - [ ] CI is green
