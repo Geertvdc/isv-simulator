@@ -5,7 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:online": "concurrently -k -n client,server -c cyan,magenta \"vite\" \"npm:server\"",
+    "server": "vite-node --watch server/main.ts",
     "build": "tsc --noEmit && vite build",
+    "build:server": "vite build --config vite.server.config.ts",
+    "start:server": "node dist-server/main.js",
     "preview": "vite preview",
     "sim": "vite-node scripts/sim.ts",
     "screenshots": "vite-node scripts/screenshots.ts",
@@ -13,16 +17,19 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p server",
     "check": "npm run typecheck && npm run lint && npm run test",
     "format": "prettier --write ."
   },
   "dependencies": {
+    "colyseus": "^0.18.9",
     "phaser": "^4.2.1"
   },
   "devDependencies": {
+    "@colyseus/sdk": "^0.18.5",
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.20.5",
+    "concurrently": "^10.0.6",
     "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.13.0",

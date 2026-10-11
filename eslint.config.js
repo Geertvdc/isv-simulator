@@ -5,7 +5,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig(
-  { ignores: ['dist', 'node_modules', 'coverage', '.claude'] },
+  { ignores: ['dist', 'dist-server', 'node_modules', 'coverage', '.claude'] },
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,
   {
@@ -49,6 +49,21 @@ export default defineConfig(
         { name: 'window', message: 'src/sim, src/flow and src/net must not touch the DOM.' },
         { name: 'document', message: 'src/sim, src/flow and src/net must not touch the DOM.' },
         { name: 'performance', message: 'The sim advances only via tick().' },
+      ],
+    },
+  },
+  {
+    // The game server runs on Node, never in a browser, and never with Phaser.
+    files: ['server/**/*.ts', 'vite.server.config.ts'],
+    languageOptions: { globals: globals.node },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: ['phaser', 'phaser/*'], message: 'The server must not depend on Phaser.' },
+          ],
+        },
       ],
     },
   },

@@ -202,3 +202,7 @@ export const NET_MAX_PRESSES_PER_MESSAGE = 16;
 export const NET_MAX_NAME_LENGTH = 24;
 /** Longest user id or device id, in characters. */
 export const NET_MAX_ID_LENGTH = 64;
+/** Letters in a room's join code. */
+export const NET_JOIN_CODE_LENGTH = 4;
+/** Most ticks the server runs in one go after a stall; the rest of the backlog is dropped. */
+export const NET_SERVER_MAX_CATCHUP_TICKS = 10;
