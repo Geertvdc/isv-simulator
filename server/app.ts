@@ -18,6 +18,8 @@ import {
 } from 'colyseus';
 import { normalizeJoinCode } from '../src/net/joinCode';
 import { NET_SERVER_DEFAULT_PORT } from '../src/sim/balance';
+import type { LagSettings } from '../src/net/lag';
+import { TICKS_PER_SECOND } from '../src/sim/balance';
 import { GAME_ROOM, gameRoomWith } from './GameRoom';
 import { isLiveJoinCode } from './joinCodes';
 import { type ProfileStore, profileStoreFromEnv } from './profileStore';
@@ -52,6 +54,10 @@ export interface RunningServer {
 export interface GameServerOptions {
   /** Where profiles live; `PROFILE_STORE_PATH` (or `data/profiles.json`) by default. */
   store?: ProfileStore;
+  /** Every round lasts this long instead of its level's length (`ROUND_SECONDS`; dev and tests). */
+  roundSeconds?: number;
+  /** The dev lag simulator: delays every message in and out (`NET_LAG_MS`, `NET_JITTER_MS`). */
+  lag?: LagSettings | null;
 }
 
 /** Starts the game server on `port` (0 picks a free one). */
@@ -62,7 +68,17 @@ export async function startGameServer(
   const store = options.store ?? profileStoreFromEnv();
   const httpServer = createServer();
   const server = defineServer({
-    rooms: { [GAME_ROOM]: defineRoom(gameRoomWith(store)) },
+    rooms: {
+      [GAME_ROOM]: defineRoom(
+        gameRoomWith(store, {
+          roundTicks:
+            options.roundSeconds && options.roundSeconds > 0
+              ? Math.round(options.roundSeconds * TICKS_PER_SECOND)
+              : undefined,
+          lag: options.lag ?? null,
+        }),
+      ),
+    },
     routes: createRouter({ health, room, ...profileEndpoints(store) }),
     transport: new WebSocketTransport({ server: httpServer }),
     greet: false,

@@ -112,6 +112,14 @@ export interface RoomState {
   seed: number;
   /** Finished rounds for the profile store; `takeProfileWrites` hands them out. */
   profileWrites: ProfileWrite[];
+  /** Every round lasts this many ticks instead of its level's length (dev and tests); `null`: as the level says. */
+  roundTicks: number | null;
+}
+
+/** How a room plays, set when the server starts. */
+export interface RoomOptions {
+  /** Every round lasts this many ticks (`ROUND_SECONDS` on the server, for trying things out and tests). */
+  roundTicks?: number;
 }
 
 /** A message to one session, or to everyone in the room (`to: null`). */
@@ -124,7 +132,11 @@ export type JoinResult =
   { ok: true; out: Outgoing[] } | { ok: false; code: ErrorCode; reason: string };
 
 /** A fresh room, on its lobby screen: everyone joining goes straight there. */
-export function createRoomState(joinCode: string, seed: number): RoomState {
+export function createRoomState(
+  joinCode: string,
+  seed: number,
+  options: RoomOptions = {},
+): RoomState {
   const flow = createFlow();
   flow.screen = 'lobby';
   flow.awake = true;
@@ -142,6 +154,7 @@ export function createRoomState(joinCode: string, seed: number): RoomState {
     presses: [],
     seed,
     profileWrites: [],
+    roundTicks: options.roundTicks ?? null,
   };
 }
 
@@ -460,6 +473,7 @@ function runEffects(room: RoomState, effects: readonly FlowEffect[]): Outgoing[]
         const ids = room.flow.lobby.players.map((p) => p.playerId);
         if (!level || ids.length === 0) break;
         room.game = createGame(level, room.seed++, ids);
+        if (room.roundTicks !== null) room.game.settings.durationTicks = room.roundTicks;
         room.buffers = ids.map((id) => createInputBuffer(id));
         room.log = createSnapshotLog();
         out.push(...roundStartTo(room, null));

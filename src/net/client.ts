@@ -11,6 +11,7 @@ import { Client, type Room } from '@colyseus/sdk';
 import type { OnlineError } from '../flow/flow';
 import type { Identity } from '../flow/identity';
 import { onlineErrorFromCode } from '../flow/online';
+import { type LagLine, type LagSettings, createLagLine, deliveryTime } from './lag';
 import {
   type ClientMessage,
   GAME_ROOM,
@@ -84,10 +85,22 @@ export function toJoinError(error: unknown): JoinError {
   return new JoinError(onlineErrorFromCode(message), message);
 }
 
+export interface ConnectOptions {
+  /**
+   * Dev only (`?lag=&jitter=`): delays every message sent and received by
+   * this much, keeping their order. Joining itself isn't delayed.
+   */
+  lag?: LagSettings | null;
+}
+
 /** Creates a room on the server at `serverUrl` (http or ws) and joins it as its host. */
-export async function hostRoom(serverUrl: string, hello: HelloMessage): Promise<NetConnection> {
+export async function hostRoom(
+  serverUrl: string,
+  hello: HelloMessage,
+  options: ConnectOptions = {},
+): Promise<NetConnection> {
   try {
-    return wrap(await new Client(socketUrl(serverUrl)).create(GAME_ROOM, hello));
+    return wrap(await new Client(socketUrl(serverUrl)).create(GAME_ROOM, hello), options);
   } catch (error) {
     throw toJoinError(error);
   }
@@ -98,15 +111,32 @@ export async function joinRoomByCode(
   serverUrl: string,
   code: string,
   hello: HelloMessage,
+  options: ConnectOptions = {},
 ): Promise<NetConnection> {
   try {
-    return wrap(await new Client(socketUrl(serverUrl)).joinById(code, hello));
+    return wrap(await new Client(socketUrl(serverUrl)).joinById(code, hello), options);
   } catch (error) {
     throw toJoinError(error);
   }
 }
 
-function wrap(room: Room): NetConnection {
+/** Calls `fn` now, or after the simulated lag on `line`. */
+function later(line: LagLine | null, fn: () => void): void {
+  if (!line) {
+    fn();
+    return;
+  }
+  const now = performance.now();
+  setTimeout(fn, deliveryTime(line, now) - now);
+}
+
+function lagLine(options: ConnectOptions): LagLine | null {
+  return options.lag ? createLagLine(options.lag, Math.floor(Math.random() * 2 ** 31)) : null;
+}
+
+function wrap(room: Room, options: ConnectOptions): NetConnection {
+  const lagIn = lagLine(options);
+  const lagOut = lagLine(options);
   const messageListeners = new Set<(message: ServerMessage) => void>();
   const statusListeners = new Set<(status: ConnectionStatus, error: OnlineError | null) => void>();
   const early: ServerMessage[] = [];
@@ -114,8 +144,10 @@ function wrap(room: Room): NetConnection {
   let closed = false;
 
   room.onMessage('*', (_type: string | number, payload: ServerMessage) => {
-    if (messageListeners.size === 0) early.push(payload);
-    for (const listener of messageListeners) listener(payload);
+    later(lagIn, () => {
+      if (messageListeners.size === 0) early.push(payload);
+      for (const listener of messageListeners) listener(payload);
+    });
   });
   const status = (next: ConnectionStatus, error: OnlineError | null): void => {
     for (const listener of statusListeners) listener(next, error);
@@ -135,7 +167,9 @@ function wrap(room: Room): NetConnection {
     sessionId: room.sessionId,
     joinCode: room.roomId,
     send: (message) => {
-      room.send(message.type, message);
+      later(lagOut, () => {
+        if (!closed) room.send(message.type, message);
+      });
     },
     onMessage: (listener) => {
       messageListeners.add(listener);

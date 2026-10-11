@@ -425,6 +425,18 @@ describe('a round', () => {
     expect(room.flow.results?.score).toBe(game.result?.score);
   });
 
+  it('lasts as long as the room says, when it says so', () => {
+    const room = createRoomState('ABCD', 1, { roundTicks: 120 });
+    join(room, 'host');
+    menu(room, 'host', press('kb-left', { join: true }));
+    menu(room, 'host', press('kb-left', { interact: true }));
+    menu(room, 'host', press('kb-left', { interact: true }));
+    expect(room.game?.settings.durationTicks).toBe(120);
+    menu(room, 'host', press('kb-left', { interact: true }));
+    steps(room, Math.ceil(COUNTDOWN_MS / TICK_MS) + 121);
+    expect(room.flow.screen).toBe('results');
+  });
+
   it('drops the round when the players go back to the level select', () => {
     const room = playingRoom();
     menu(room, 'host', press('kb-left', { menu: true }));

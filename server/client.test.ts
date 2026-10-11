@@ -190,4 +190,21 @@ describe('network client', () => {
     // Leaving twice is harmless.
     await guest.leave();
   });
+
+  it('simulates lag both ways, keeping messages in order', async () => {
+    const host = await hostRoom(url, helloFor(ADA), { lag: { lagMs: 60, jitterMs: 20 } });
+    const a = listen(host);
+    await a.waitFor('welcome');
+    const sentAt: number[] = [];
+    for (let id = 0; id < 5; id++) {
+      sentAt.push(performance.now());
+      host.send({ type: 'ping', id, clientTimeMs: id });
+    }
+    const pong = await a.waitFor('pong', (m) => m.id === 4);
+    // 60 ms out and 60 ms back at least.
+    expect(performance.now() - (sentAt[4] ?? 0)).toBeGreaterThanOrEqual(115);
+    const ids = a.received.flatMap((m) => (m.type === 'pong' ? [m.id] : []));
+    expect(ids).toEqual([0, 1, 2, 3, 4]);
+    expect(pong.clientTimeMs).toBe(4);
+  });
 });
