@@ -94,4 +94,4 @@ Built without a review round (the product owner was away); decisions are in `rev
 - [x] Guest level-select hint, Esc confirm in the online lobby
 - [x] `npm run verify:online` runs the browser checks
 - [x] `npm run check`, `npm run build` and `npm run build:server` pass; the suite passes several runs in a row
-- [ ] CI is green
+- [x] CI is green
