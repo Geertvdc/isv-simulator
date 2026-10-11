@@ -6,7 +6,7 @@ Internal Zure game. An Overcooked-style couch co-op game about shipping software
 
 - TypeScript (strict), Vite, Phaser 4 (latest 4.x), Vitest, ESLint, Prettier
 - HUD and panels: plain DOM + CSS overlay on top of the canvas, no UI framework
-- No backend
+- Online multiplayer: Node server in `server/` (Colyseus, plain JSON messages), see `docs/plan/phase-13-online-multiplayer.md`. Local couch play needs no server.
 
 ## Architecture rules
 
@@ -31,8 +31,10 @@ src/
   flow/      screens (title, lobby, menus, results) and save data (pure TS, same rules as sim/)
   render/    Phaser scenes, projection math, sprite sync
   input/     keyboard and gamepads to per-tick input commands
+  net/       netcode shared by client and server: protocol, snapshots, clock, interpolation (pure TS, same rules as sim/, except client.ts)
   ui/        DOM HUD and panels
   main.ts
+server/      online multiplayer server (Node, Colyseus): rooms, sim loop, profile store
 maps/        level maps as ASCII text
 public/assets/
 docs/plan/   phase specs
