@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { NET_INPUT_LEAD_TICKS, TICKS_PER_SECOND } from '../sim/balance';
 import { Rng } from '../sim/rng';
-import { addPong, createClockSync, estimateServerTick, inputTargetTick, isSynced } from './clock';
+import {
+  addPong,
+  createClockSync,
+  estimateServerTick,
+  inputTargetTick,
+  inputTargetTickExact,
+  isSynced,
+} from './clock';
 
 const TICK_MS = 1000 / TICKS_PER_SECOND;
 
@@ -122,6 +129,17 @@ describe('clock sync', () => {
     expect(now).toBeCloseTo(597 + 0.5 + 50 / TICK_MS);
     expect(inputTargetTick(clock, 1000)).toBe(
       Math.floor(now + 50 / TICK_MS + NET_INPUT_LEAD_TICKS),
+    );
+  });
+
+  it('gives the target tick with its fraction for prediction', () => {
+    const clock = createClockSync();
+    expect(inputTargetTickExact(clock, 1000)).toBeNull();
+    addPong(clock, { clientTimeMs: 900, serverTick: 597 }, 1000);
+    const exact = inputTargetTickExact(clock, 1000) ?? NaN;
+    expect(Math.floor(exact)).toBe(inputTargetTick(clock, 1000));
+    expect(exact).toBeCloseTo(
+      (estimateServerTick(clock, 1000) ?? NaN) + 50 / TICK_MS + NET_INPUT_LEAD_TICKS,
     );
   });
 });
