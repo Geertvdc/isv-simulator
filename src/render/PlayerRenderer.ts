@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { PLAYER_RADIUS } from '../sim/balance';
 import { isDashing } from '../sim/movement';
 import type { PlayerId, Vec } from '../sim/state';
-import type { GameLoop } from './GameLoop';
+import type { RoundView } from './roundView';
 import { type PlayerShape, playerColor, playerShape, shapePoints } from './playerColors';
 import { TILE_SIZE, VIEW_PITCH, tileDepth, tileToScreen } from './projection';
 
@@ -27,17 +27,17 @@ export const PLAYER_DEPTH_OFFSET = 0.02;
 
 /**
  * Syncs one Graphics per player, keyed by player id. Positions come from the
- * game loop's interpolation so movement looks smooth at any frame rate.
+ * view (the game loop, or the online interpolation) so movement looks smooth at any frame rate.
  */
 export class PlayerRenderer {
   private readonly sprites = new Map<PlayerId, Phaser.GameObjects.Graphics>();
 
   constructor(private readonly scene: Phaser.Scene) {}
 
-  sync(loop: GameLoop): void {
+  sync(view: RoundView): void {
     const seen = new Set<PlayerId>();
-    for (const player of loop.state.players) {
-      const pos = loop.renderPos(player.id);
+    for (const player of view.state.players) {
+      const pos = view.renderPos(player.id);
       if (!pos) continue;
       seen.add(player.id);
       let g = this.sprites.get(player.id);

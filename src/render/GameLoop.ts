@@ -2,6 +2,7 @@ import { MAX_TICKS_PER_FRAME, TICKS_PER_SECOND } from '../sim/balance';
 import type { GameEvent } from '../sim/orders';
 import type { GameState, InputCommand, PlayerId, Vec } from '../sim/state';
 import { tick } from '../sim/tick';
+import type { RoundView } from './roundView';
 
 const TICK_MS = 1000 / TICKS_PER_SECOND;
 /** Absorbs float error so exactly N ticks of time always runs N ticks. */
@@ -13,7 +14,7 @@ const EPSILON = 1e-6;
  * instead of spiralling). Keeps the player positions from before the last
  * tick so rendering can interpolate between the last two ticks.
  */
-export class GameLoop {
+export class GameLoop implements RoundView {
   /** Real time not yet simulated, in ticks. */
   private accumulator = 0;
   private previous = new Map<PlayerId, Vec>();

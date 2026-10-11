@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { MANAGER_RADIUS } from '../sim/balance';
 import type { Vec } from '../sim/state';
-import type { GameLoop } from './GameLoop';
+import type { RoundView } from './roundView';
 import { PLAYER_DEPTH_OFFSET } from './PlayerRenderer';
 import { TILE_SIZE, VIEW_PITCH, tileDepth, tileToScreen } from './projection';
 
@@ -23,10 +23,10 @@ export class ManagerRenderer {
 
   constructor(private readonly scene: Phaser.Scene) {}
 
-  sync(loop: GameLoop, timeMs: number): void {
+  sync(view: RoundView, timeMs: number): void {
     const seen = new Set<number>();
-    for (const manager of loop.state.managers) {
-      const pos = loop.renderManagerPos(manager.id);
+    for (const manager of view.state.managers) {
+      const pos = view.renderManagerPos(manager.id);
       if (!pos) continue;
       seen.add(manager.id);
       let g = this.sprites.get(manager.id);

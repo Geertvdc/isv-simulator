@@ -3,7 +3,7 @@ import { MEETING_ROOM_TEXT } from '../sim/content';
 import type { LevelMap } from '../sim/level';
 import type { Invite } from '../sim/meetings';
 import type { GameState } from '../sim/state';
-import type { GameLoop } from './GameLoop';
+import type { RoundView } from './roundView';
 import { vectors } from './MapRenderer';
 import { BODY_HEIGHT, PLAYER_DEPTH_OFFSET } from './PlayerRenderer';
 import { playerColor } from './playerColors';
@@ -55,12 +55,12 @@ export class MeetingRenderer {
     }
   }
 
-  sync(loop: GameLoop, timeMs: number): void {
-    const { state } = loop;
+  sync(view: RoundView, timeMs: number): void {
+    const { state } = view;
     this.drawRug(state.invites.length > 0, timeMs);
     const seen = new Set<number>();
     for (const invite of state.invites) {
-      const pos = loop.renderPos(invite.playerId);
+      const pos = view.renderPos(invite.playerId);
       if (!pos) continue;
       seen.add(invite.id);
       let g = this.icons.get(invite.id);

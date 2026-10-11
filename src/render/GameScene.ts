@@ -73,6 +73,7 @@ import { MusicPlayer } from './MusicPlayer';
 import { musicCue } from './music';
 import { SoundPlayer } from './SoundPlayer';
 import { screenToTile, tileCorners, tileDepth } from './projection';
+import type { RoundView } from './roundView';
 import { TicketRenderer } from './TicketRenderer';
 
 export interface TileHover {
@@ -417,21 +418,35 @@ export class GameScene extends Phaser.Scene {
         }
       }
       // Paused or done: nothing new happened, so nothing to react to.
-      const events = running ? loop.events : [];
-      this.game.events.emit(GAME_FRAME_EVENT, { state: loop.state, events } satisfies GameFrame);
-      this.playerRenderer.sync(loop);
-      this.managerRenderer.sync(loop, time);
-      this.meetingRenderer.sync(loop, time);
-      this.ticketRenderer.sync(loop);
-      this.pipelineRenderer.sync(loop.state, time);
-      this.effects.play(loop.state, events);
-      this.sounds.play(loop.state, events, time);
-      for (const player of loop.state.players) this.updateTarget(loop, player.id);
-      const screen = this.flow.screen;
-      this.hintRenderer.sync(this.hints, screen === 'countdown' || screen === 'playing', time);
+      this.renderRound(loop, running ? loop.events : [], this.flow, time);
     }
     this.updateMusic(delta);
     this.updateHover();
+  }
+
+  /**
+   * Draws the round from `view` (the couch's `GameLoop`, or an online
+   * round's interpolated frame) with this frame's events: every renderer,
+   * the HUD, effects and sounds.
+   */
+  private renderRound(
+    view: RoundView,
+    events: readonly GameEvent[],
+    flow: Flow,
+    time: number,
+  ): void {
+    const { state } = view;
+    this.game.events.emit(GAME_FRAME_EVENT, { state, events: [...events] } satisfies GameFrame);
+    this.playerRenderer.sync(view);
+    this.managerRenderer.sync(view, time);
+    this.meetingRenderer.sync(view, time);
+    this.ticketRenderer.sync(view);
+    this.pipelineRenderer.sync(state, time);
+    this.effects.play(state, events);
+    this.sounds.play(state, events, time);
+    for (const player of state.players) this.updateTarget(view, player.id);
+    const screen = flow.screen;
+    this.hintRenderer.sync(this.hints, screen === 'countdown' || screen === 'playing', time);
   }
 
   /** This frame's presses for the menus: none while a dialog is open (back closes it). */
@@ -727,13 +742,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Outlines the counter or station a player faces, in their color; nothing for floor and walls. */
-  private updateTarget(loop: GameLoop, id: PlayerId): void {
+  private updateTarget(view: RoundView, id: PlayerId): void {
     let highlight = this.targets.get(id);
     if (!highlight) {
       highlight = { g: this.add.graphics().setVisible(false), tile: null };
       this.targets.set(id, highlight);
     }
-    const target = targetTile(loop.state, id);
+    const target = targetTile(view.state, id);
     const next = isWorkSurface(getTile(this.map, target.x, target.y)) ? target : null;
     const prev = highlight.tile;
     if (prev?.x === next?.x && prev?.y === next?.y) return;
