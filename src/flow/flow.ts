@@ -105,7 +105,13 @@ export type OnlineError =
   /** The server can't be reached. */
   | 'unreachable'
   /** The connection to the room was lost. */
-  | 'disconnected';
+  | 'disconnected'
+  /** The connection dropped and getting back into the room didn't work in time. */
+  | 'reconnectFailed'
+  /** The server is shutting down (a restart or a deploy). */
+  | 'serverShutdown'
+  /** The room closed after a long time without anyone playing. */
+  | 'roomClosed';
 
 /** The join-code screen: what is typed so far. */
 export interface JoinCodeEntry {
@@ -653,6 +659,12 @@ export function cancelJoinCode(flow: Flow): FlowUpdate {
 export function joinSucceeded(flow: Flow): void {
   if (flow.screen !== 'joinCode') return;
   flow.joinCode.busy = false;
+  goTo(flow, 'online');
+}
+
+/** Back into an online room at boot (a reloaded page rejoins its room): the online screens take over. */
+export function enterOnline(flow: Flow): void {
+  flow.awake = true;
   goTo(flow, 'online');
 }
 

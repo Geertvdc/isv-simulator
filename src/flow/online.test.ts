@@ -1,19 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import type { DevicePress } from '../input/controller';
 import { PROTOCOL_VERSION, type LobbyMember } from '../net/protocol';
+import { NET_LEAVE_CONFIRM_MS } from '../sim/balance';
 import { createFlow } from './flow';
 import {
   type OnlineState,
   applyServerMessage,
+  canJoinNextRound,
   createOnline,
+  createRejoin,
   hostIsChoosing,
   isOnlineHost,
+  isSpectating,
+  leaveArmed,
   localBindings,
   membersWithPlayers,
   onlineConnected,
   onlineErrorFromCode,
   onlineMenuPresses,
   onlineNowMs,
+  reconnectingMembers,
   setOnlineStatus,
 } from './online';
 
@@ -171,30 +177,119 @@ describe('online state', () => {
 });
 
 describe('online presses', () => {
-  it('sends lobby presses to the server, and leaves on back', () => {
+  it('sends lobby presses to the server; back asks first, a second back leaves', () => {
     const state = inRoom();
     const join = press({ join: true });
-    expect(onlineMenuPresses(state, [join])).toEqual({ send: [join], leave: false });
-    expect(onlineMenuPresses(state, [join, press({ menu: true })])).toEqual({
+    expect(onlineMenuPresses(state, [join], 0)).toEqual({
       send: [join],
-      leave: true,
+      leave: false,
+      changed: false,
     });
-    expect(onlineMenuPresses(state, [press({ dash: true })]).leave).toBe(true);
+    expect(onlineMenuPresses(state, [join, press({ menu: true })], 1000)).toEqual({
+      send: [join],
+      leave: false,
+      changed: true,
+    });
+    expect(leaveArmed(state, 1000)).toBe(true);
+    expect(onlineMenuPresses(state, [press({ dash: true })], 2000).leave).toBe(true);
+  });
+
+  it('forgets the first back after a moment', () => {
+    const state = inRoom();
+    onlineMenuPresses(state, [press({ menu: true })], 1000);
+    const later = 1000 + NET_LEAVE_CONFIRM_MS;
+    expect(onlineMenuPresses(state, [], later)).toEqual({ send: [], leave: false, changed: true });
+    expect(state.leaveArmedAtMs).toBeNull();
+    expect(onlineMenuPresses(state, [press({ menu: true })], later + 10).leave).toBe(false);
   });
 
   it('sends everything on other screens, back included (it means back there)', () => {
     const state = inRoom();
     if (state.flow) state.flow.screen = 'levelSelect';
     const back = press({ dash: true });
-    expect(onlineMenuPresses(state, [back])).toEqual({ send: [back], leave: false });
+    expect(onlineMenuPresses(state, [back], 0)).toEqual({
+      send: [back],
+      leave: false,
+      changed: false,
+    });
   });
 
   it('sends nothing until connected, or once closed; back leaves', () => {
     const state = createOnline('host');
-    expect(onlineMenuPresses(state, [press({ join: true })])).toEqual({ send: [], leave: false });
-    expect(onlineMenuPresses(state, [press({ menu: true })]).leave).toBe(true);
+    expect(onlineMenuPresses(state, [press({ join: true })], 0)).toMatchObject({
+      send: [],
+      leave: false,
+    });
+    expect(onlineMenuPresses(state, [press({ menu: true })], 0).leave).toBe(true);
+    const rejoining = createRejoin('join', 'ABCD');
+    expect(onlineMenuPresses(rejoining, [press({ menu: true })], 0).leave).toBe(true);
     const closed = inRoom();
     setOnlineStatus(closed, 'closed', 'disconnected');
-    expect(onlineMenuPresses(closed, [press({ dash: true })])).toEqual({ send: [], leave: true });
+    expect(onlineMenuPresses(closed, [press({ dash: true })], 0)).toMatchObject({
+      send: [],
+      leave: true,
+    });
+  });
+
+  it("neither sends nor leaves while reconnecting (Esc to pause mustn't walk out)", () => {
+    const state = inRoom();
+    if (state.flow) state.flow.screen = 'playing';
+    setOnlineStatus(state, 'reconnecting');
+    expect(onlineMenuPresses(state, [press({ menu: true })], 0)).toEqual({
+      send: [],
+      leave: false,
+      changed: false,
+    });
+  });
+});
+
+describe('resilience', () => {
+  it('starts a reloaded page rejoining its room', () => {
+    expect(createRejoin('host', 'WXYZ')).toMatchObject({
+      role: 'host',
+      status: 'rejoining',
+      joinCode: 'WXYZ',
+      flow: null,
+    });
+  });
+
+  it('lists the others whose connection dropped', () => {
+    const state = inRoom('host');
+    expect(reconnectingMembers(state)).toEqual([]);
+    applyServerMessage(state, {
+      type: 'lobby',
+      joinCode: 'ABCD',
+      members: [member('host', true), { ...member('guest'), connected: false }],
+      levels: {},
+    });
+    expect(reconnectingMembers(state).map((m) => m.sessionId)).toEqual(['guest']);
+  });
+
+  it('says why the room closed when the server told us', () => {
+    const state = inRoom();
+    applyServerMessage(state, { type: 'closing', reason: 'shutdown' });
+    setOnlineStatus(state, 'closed', 'disconnected');
+    expect(state.error).toBe('serverShutdown');
+    const idle = inRoom();
+    applyServerMessage(idle, { type: 'closing', reason: 'idle' });
+    setOnlineStatus(idle, 'closed', 'disconnected');
+    expect(idle.error).toBe('roomClosed');
+  });
+
+  it('knows when this browser only watches the round, and when it can join the next', () => {
+    const state = inRoom();
+    const flow = state.flow;
+    if (!flow) throw new Error('no flow');
+    flow.lobby.players = [{ playerId: 1, deviceId: 'host:kb-left' }];
+    flow.screen = 'playing';
+    expect(isSpectating(state)).toBe(true);
+    expect(canJoinNextRound(state)).toBe(false);
+    flow.screen = 'results';
+    expect(isSpectating(state)).toBe(false);
+    expect(canJoinNextRound(state)).toBe(true);
+    flow.lobby.players.push({ playerId: 2, deviceId: 'guest:pad-0' });
+    expect(canJoinNextRound(state)).toBe(false);
+    flow.screen = 'playing';
+    expect(isSpectating(state)).toBe(false);
   });
 });

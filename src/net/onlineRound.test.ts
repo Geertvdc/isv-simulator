@@ -5,6 +5,7 @@ import { createGame } from '../sim/state';
 import { addPong, createClockSync } from './clock';
 import { renderTickFor } from './interpolation';
 import {
+  continueOnlineRound,
   pushRoundSnapshot,
   roundRenderTick,
   sampleRound,
@@ -24,10 +25,10 @@ function snapshot(serverTick: number, events: GameEvent[] = [], x?: number): Sna
   return encodeSnapshot(state, serverTick, events);
 }
 
-function roundStart(serverTick = 10): RoundStartMessage {
+function roundStart(serverTick = 10, roundId = 1): RoundStartMessage {
   return {
     type: 'roundStart',
-    roundId: 1,
+    roundId,
     counted: true,
     levelId: game.levelId,
     level: game.level,
@@ -85,6 +86,29 @@ describe('online round', () => {
     const second = startOnlineRound(roundStart(500));
     expect(takeDueEvents(second, 1000)).toEqual([]);
     expect(second.buffer.entries.map((e) => e.serverTick)).toEqual([500]);
+  });
+
+  it('carries on with the same round after a reconnect, and starts over for a new one', () => {
+    const round = startOnlineRound(roundStart(10));
+    pushRoundSnapshot(round, snapshot(12, [dash(1)]));
+    const again = continueOnlineRound(round, { ...roundStart(90), counted: false });
+    expect(again).toBe(round);
+    expect(again.counted).toBe(false);
+    expect(round.buffer.entries.map((e) => e.serverTick)).toEqual([10, 12, 90]);
+    expect(takeDueEvents(round, 100)).toEqual([dash(1)]);
+    const next = continueOnlineRound(round, roundStart(200, 2));
+    expect(next).not.toBe(round);
+    expect(next.roundId).toBe(2);
+    expect(continueOnlineRound(null, roundStart(5, 3)).roundId).toBe(3);
+  });
+
+  it('knows whether it saw the round being played', () => {
+    const round = startOnlineRound(roundStart(10));
+    expect(round.sawPlaying).toBe(true);
+    const ended = structuredClone(game);
+    ended.result = { score: 10, stars: 1 };
+    const late = startOnlineRound({ ...roundStart(10), snapshot: encodeSnapshot(ended, 10, []) });
+    expect(late.sawPlaying).toBe(false);
   });
 
   it('draws half a round trip further back than the interpolation delay', () => {

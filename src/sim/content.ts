@@ -206,6 +206,9 @@ export const MENU_HINT = 'Enter, E or gamepad A: choose · Esc or gamepad B: bac
 /** Under the level select. */
 export const LEVEL_SELECT_HINT =
   'Left/right: chapter · Up/down: level · Enter, E or gamepad A: play · Esc or gamepad B: change players';
+/** Under the level select for an online guest: the host picks. */
+export const LEVEL_SELECT_GUEST_HINT =
+  'The host picks the level · Enter or gamepad A: join the next round if you have no player yet';
 /** Under the lobby. */
 export const LOBBY_BACK_HINT = 'Esc or gamepad B: back to the title';
 /** In the round, bottom center for a moment: how to pause. */
@@ -329,10 +332,21 @@ export const ONLINE_TEXT = {
   lagSimulated: 'simulated lag',
   status: {
     connecting: 'Connecting to the server…',
+    rejoining: 'Getting back into the room…',
     connected: 'Connected',
-    reconnecting: 'Connection lost, reconnecting…',
+    reconnecting: 'Reconnecting…',
     closed: 'Disconnected',
   },
+  /** Over the screen while this browser reconnects. */
+  reconnectingBanner: 'Connection lost. Reconnecting…',
+  /** On the bar and in the lobby for others whose connection dropped. */
+  memberReconnecting: 'reconnecting…',
+  /** On the bar for someone who joined while a round ran (or has no player). */
+  spectating: "Round in progress: you're watching, you'll join after it",
+  /** On the level select and results for someone without a player. */
+  joinNextRound: 'Press Enter or gamepad A to join the next round',
+  /** Under the online lobby after one Esc. */
+  leaveConfirmHint: 'Press Esc or gamepad B again to leave the room',
   /** What a guest sees on the screens only the host drives. */
   waiting: {
     levelSelect: 'Host is choosing a level',
@@ -347,5 +361,8 @@ export const ONLINE_TEXT = {
     protocolMismatch: 'That room runs another version of the game. Reload the page and try again.',
     unreachable: 'The server is not reachable. Is it running?',
     disconnected: 'The connection to the room was lost.',
+    reconnectFailed: "Couldn't get back into the room in time. It may have closed.",
+    serverShutdown: 'The server is restarting. Host a new room in a minute.',
+    roomClosed: 'The room closed after a long time without anyone playing.',
   },
 } as const;

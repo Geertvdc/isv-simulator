@@ -33,6 +33,12 @@ interface QueuedEvents {
 }
 
 export interface OnlineRound {
+  /** The room's id for this round: a `roundStart` with the same id is this round again (a reconnect). */
+  roundId: number;
+  /** It counts for this browser: it was in the room when the round started. */
+  counted: boolean;
+  /** A snapshot of it still playing came in (a page that comes back on the results never saw it). */
+  sawPlaying: boolean;
   levelId: string;
   level: LevelMap;
   buffer: SnapshotBuffer<GameState>;
@@ -48,11 +54,31 @@ function stateOf(snapshot: Snapshot, level: LevelMap): GameState {
 /** A round from its `roundStart`: the map, and the first snapshot (it has no events). */
 export function startOnlineRound(message: RoundStartMessage): OnlineRound {
   const round: OnlineRound = {
+    roundId: message.roundId,
+    counted: message.counted,
+    sawPlaying: false,
     levelId: message.levelId,
     level: message.level,
     buffer: createSnapshotBuffer(),
     pending: [],
   };
+  pushRoundSnapshot(round, message.snapshot);
+  return round;
+}
+
+/**
+ * A `roundStart` came while a round is on screen. The same round again (a
+ * reconnect: same id) carries on, with its buffer and events, and takes in
+ * the new snapshot; returns the round to show: `round`, or a new one.
+ */
+export function continueOnlineRound(
+  round: OnlineRound | null,
+  message: RoundStartMessage,
+): OnlineRound {
+  if (round?.roundId !== message.roundId || round.levelId !== message.levelId) {
+    return startOnlineRound(message);
+  }
+  round.counted = message.counted;
   pushRoundSnapshot(round, message.snapshot);
   return round;
 }
@@ -66,6 +92,7 @@ export function pushRoundSnapshot(round: OnlineRound, snapshot: Snapshot): boole
   if (!pushSnapshot(round.buffer, snapshot.serverTick, stateOf(snapshot, round.level))) {
     return false;
   }
+  if (!snapshot.state.result) round.sawPlaying = true;
   if (snapshot.events.length > 0) {
     round.pending.push({ serverTick: snapshot.serverTick, events: snapshot.events });
     // Never more than the buffer holds: if nobody plays them, old ones go.

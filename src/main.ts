@@ -3,6 +3,7 @@ import type { ProfileAction } from './flow/flow';
 import { loadIdentity, replaceUserId, setDisplayName, uuidFromBytes } from './flow/identity';
 import { loadSave, mergeLevels, type StorageLike, writeSave } from './flow/save';
 import { parseLag } from './net/lag';
+import { REJOIN_KEY } from './net/rejoin';
 import { createProfileApi, serverUrl, syncLevels } from './net/profileApi';
 import { SCREEN_FADE_MS } from './sim/balance';
 import { sceneById } from './sim/scenes';
@@ -20,6 +21,7 @@ import {
   PROFILE_ACTION_EVENT,
   TILE_HOVER_EVENT,
   TOGGLE_SOUND_EVENT,
+  type TicketStore,
 } from './render/GameScene';
 import { mountGameHud } from './ui/game';
 import { mountHud } from './ui/hud';
@@ -39,6 +41,26 @@ function getElement(id: string): HTMLElement {
   if (!el) throw new Error(`Missing #${id} in index.html`);
   return el;
 }
+
+/** This tab's rejoin ticket in `sessionStorage` (survives a reload, not a new tab); quiet where storage throws. */
+const tickets: TicketStore = {
+  load: () => {
+    try {
+      return window.sessionStorage.getItem(REJOIN_KEY);
+    } catch {
+      return null;
+    }
+  },
+  save: (text) => {
+    try {
+      if (text === null) window.sessionStorage.removeItem(REJOIN_KEY);
+      else window.sessionStorage.setItem(REJOIN_KEY, text);
+    } catch {
+      // No session storage: a reload just doesn't rejoin.
+    }
+  },
+  nowMs: () => Date.now(),
+};
 
 /** The browser's `localStorage`, or `null` where touching it throws. */
 function browserStorage(): StorageLike | null {
@@ -80,6 +102,7 @@ const scene = new GameScene({
         // Dev tools: `?lag=100&jitter=20` simulates a slow network; `?nethud` shows the ping corner.
         lag: parseLag(params.get('lag'), params.get('jitter')),
         netHud: import.meta.env.DEV || params.has('nethud'),
+        tickets,
       },
 });
 

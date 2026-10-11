@@ -5,12 +5,19 @@
  * type is the protocol message's `type` and whose payload is the whole
  * message, both ways), and reports the connection's status. Everything the
  * game does with those messages lives in pure code (`src/flow/online.ts`).
+ *
+ * Reconnecting: when the socket drops, the SDK reconnects on its own for as
+ * long as the server keeps the seat (`NET_RECONNECT_GRACE_MS`). A socket that
+ * goes quiet without closing (a laptop that slept, a wifi that hangs) is
+ * closed after `NET_SILENCE_TIMEOUT_MS`, which starts the same reconnect. A
+ * reloaded page gets back in with `rejoinRoom` and the stored token.
  */
 
 import { Client, type Room } from '@colyseus/sdk';
 import type { OnlineError } from '../flow/flow';
 import type { Identity } from '../flow/identity';
 import { onlineErrorFromCode } from '../flow/online';
+import { NET_RECONNECT_GRACE_MS, NET_SILENCE_TIMEOUT_MS } from '../sim/balance';
 import { type LagSettings, createLagRunner } from './lag';
 import {
   type ClientMessage,
@@ -22,6 +29,27 @@ import {
 
 /** Colyseus's code for "no room with this id". */
 const INVALID_ROOM_ID = 522;
+/** Colyseus close codes: the server shutting down, and "drop me, I'll reconnect". */
+const SERVER_SHUTDOWN = 4001;
+const MAY_TRY_RECONNECT = 4010;
+
+/** The SDK's reconnect backoff never waits longer than this between tries. */
+const RECONNECT_MAX_DELAY_MS = 2000;
+
+/**
+ * Reconnect tries that cover the grace period: the SDK waits 200, 400, 800,
+ * 1600 ms, then `RECONNECT_MAX_DELAY_MS` between tries; one more try after
+ * the grace ran out makes sure the end is seen.
+ */
+export function reconnectRetries(graceMs: number): number {
+  let waited = 0;
+  let tries = 0;
+  while (waited <= graceMs) {
+    tries++;
+    waited += Math.min(RECONNECT_MAX_DELAY_MS, Math.max(100, 2 ** tries * 100));
+  }
+  return tries;
+}
 
 export type ConnectionStatus = 'connected' | 'reconnecting' | 'closed';
 
@@ -54,6 +82,8 @@ export interface NetConnection {
   onStatus(listener: (status: ConnectionStatus, error: OnlineError | null) => void): () => void;
   /** Leaves the room; resolves once the server knows. Never rejects. */
   leave(): Promise<void>;
+  /** What gets this session back in after a reload (`<roomId>:<token>`; changes after each reconnect). */
+  reconnectionToken(): string;
 }
 
 /** The game server's address as a WebSocket URL: `http` → `ws`, `https` → `wss`. */
@@ -70,6 +100,25 @@ export function helloFor(identity: Identity, localPlayers = 1): HelloMessage {
     displayName: identity.displayName,
     localPlayers,
   };
+}
+
+/** Gets a reloaded page back into its room with the token it kept. */
+export async function rejoinRoom(
+  serverUrl: string,
+  token: string,
+  options: ConnectOptions = {},
+): Promise<NetConnection> {
+  try {
+    return wrap(await new Client(socketUrl(serverUrl)).reconnect(token), options);
+  } catch (error) {
+    const joinError = toJoinError(error);
+    // No server is "unreachable"; anything else means the seat is gone.
+    throw joinError.code === 'unreachable' && /expired|invalid|disposed/i.test(joinError.message)
+      ? new JoinError('reconnectFailed', joinError.message)
+      : joinError.code === 'wrongCode'
+        ? new JoinError('reconnectFailed', joinError.message)
+        : joinError;
+  }
 }
 
 /** A refused or failed join as a `JoinError`. */
@@ -140,25 +189,75 @@ function wrap(room: Room, options: ConnectOptions): NetConnection {
   const early: ServerMessage[] = [];
   let leaving = false;
   let closed = false;
+  let reconnecting = false;
+  /** Why the server said it closes the room, or another protocol after a reconnect. */
+  let closeReason: OnlineError | null = null;
+  let lastHeardMs = performance.now();
 
+  // Reconnect right away (the SDK waits 5 s after joining by default) and for
+  // the whole grace period; nothing is queued while away: old inputs and
+  // pings are worthless by the time we're back.
+  room.reconnection.minUptime = 0;
+  room.reconnection.maxDelay = RECONNECT_MAX_DELAY_MS;
+  room.reconnection.maxRetries = reconnectRetries(NET_RECONNECT_GRACE_MS);
+  room.reconnection.maxEnqueuedMessages = 0;
+
+  const status = (next: ConnectionStatus, error: OnlineError | null): void => {
+    for (const listener of statusListeners) listener(next, error);
+  };
   room.onMessage('*', (_type: string | number, payload: ServerMessage) => {
+    lastHeardMs = performance.now();
+    if (payload.type === 'closing') {
+      closeReason = payload.reason === 'shutdown' ? 'serverShutdown' : 'roomClosed';
+    }
+    if (payload.type === 'welcome' && payload.protocol !== PROTOCOL_VERSION) {
+      // Back in after a reconnect, but the server was updated meanwhile.
+      closeReason = 'protocolMismatch';
+      void room.leave(true).catch(() => undefined);
+      return;
+    }
     lagIn(() => {
       if (messageListeners.size === 0) early.push(payload);
       for (const listener of messageListeners) listener(payload);
     });
   });
-  const status = (next: ConnectionStatus, error: OnlineError | null): void => {
-    for (const listener of statusListeners) listener(next, error);
-  };
   room.onDrop(() => {
+    reconnecting = true;
     status('reconnecting', null);
   });
   room.onReconnect(() => {
-    status('connected', null);
+    reconnecting = false;
+    if (leaving) {
+      // Left while away, and a try that was already out got back in: leave now.
+      void room.leave(true).catch(() => undefined);
+      return;
+    }
+    lastHeardMs = performance.now();
+    // The SDK sets the new reconnection token right after this callback.
+    queueMicrotask(() => {
+      status('connected', null);
+    });
   });
-  room.onLeave(() => {
+  // A socket can go quiet without closing; then close it, so the SDK reconnects.
+  const watchdog = setInterval(
+    () => {
+      if (closed || reconnecting) return;
+      if (performance.now() - lastHeardMs < NET_SILENCE_TIMEOUT_MS) return;
+      room.connection.close(MAY_TRY_RECONNECT, 'silent');
+    },
+    Math.min(1000, NET_SILENCE_TIMEOUT_MS / 2),
+  );
+  room.onLeave((code: number) => {
     closed = true;
-    status('closed', leaving ? null : 'disconnected');
+    clearInterval(watchdog);
+    let error: OnlineError | null;
+    if (closeReason) error = closeReason;
+    else if (leaving) error = null;
+    else if (code === SERVER_SHUTDOWN) error = 'serverShutdown';
+    else if (reconnecting) error = 'reconnectFailed';
+    else error = 'disconnected';
+    reconnecting = false;
+    status('closed', error);
   });
 
   return {
@@ -166,7 +265,7 @@ function wrap(room: Room, options: ConnectOptions): NetConnection {
     joinCode: room.roomId,
     send: (message) => {
       lagOut(() => {
-        if (!closed) room.send(message.type, message);
+        if (!closed && !reconnecting) room.send(message.type, message);
       });
     },
     onMessage: (listener) => {
@@ -182,11 +281,19 @@ function wrap(room: Room, options: ConnectOptions): NetConnection {
       // The library's `leave` waits for a close that already happened.
       if (closed) return;
       leaving = true;
+      clearInterval(watchdog);
+      if (reconnecting) {
+        // Nothing to say goodbye on: stop trying, the server lets the seat go after the grace period.
+        room.reconnection.maxRetries = 0;
+        closed = true;
+        return;
+      }
       try {
         await room.leave(true);
       } catch {
         // Already gone: nothing to leave.
       }
     },
+    reconnectionToken: () => room.reconnectionToken,
   };
 }
