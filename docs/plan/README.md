@@ -17,7 +17,7 @@ The game started as a Theme Hospital-style management sim and pivoted to Overcoo
 | 10 Game flow and save data (done, in review) | Title screen, pause, results with next level, settings, unlocks, versioned local save |
 | 11 Campaign (done, in review)                | About 12 levels in chapters (Garage to Enterprise), one new mechanic per chapter      |
 | 12 Music and onboarding (done, in review)    | Music, level intro cards, first-level hints, countdown and transitions                |
-| 13 Online multiplayer (later)                | Authoritative server, play from different machines, only after phase 11               |
+| 13 Online multiplayer (in progress)          | Authoritative Colyseus server, lobbies with join codes, user ids, stacked 13a to 13f  |
 
 ## How to feed a phase to Claude Code
 
