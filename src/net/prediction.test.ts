@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  COUNTDOWN_STEP_MS,
+  COUNTDOWN_STEPS,
   NET_INPUT_REPEAT_TICKS,
   NET_PREDICT_MAX_TICKS,
   NET_PREDICT_SMOOTH_MS,
   NET_PREDICT_SNAP_DISTANCE,
+  TICKS_PER_SECOND,
 } from '../sim/balance';
 import { levelById } from '../sim/levels';
 import type { GameEvent } from '../sim/orders';
@@ -19,6 +22,7 @@ import { tick } from '../sim/tick';
 import { type InputBuffer, createInputBuffer, pushInput, takeInput } from './inputBuffer';
 import {
   type Prediction,
+  countdownEndTick,
   type PredictionSnapshot,
   advancePrediction,
   createPrediction,
@@ -64,14 +68,14 @@ function snapshotOf(
   state: GameState,
   serverTick: number,
   events: GameEvent[] = [],
-  running = true,
+  runsFrom: number | null = 0,
 ): PredictionSnapshot {
   return {
     serverTick,
     players: structuredClone(state.players),
     managers: structuredClone(state.managers),
     events,
-    running,
+    runsFrom,
   };
 }
 
@@ -105,7 +109,11 @@ interface RigOptions {
   /** Messes with the server's state before tick `t` runs. */
   meddle?: (state: GameState, t: number) => GameEvent[];
   running?: (t: number) => boolean;
+  /** What the snapshot at `t` says about when the sim runs (default: from 0 while running). */
+  runsFrom?: (t: number) => number | null;
   inputFor?: (id: PlayerId, t: number) => InputCommand | null;
+  /** Inputs of players on other machines, arriving on time. */
+  remoteInput?: (id: PlayerId, t: number) => InputCommand | null;
 }
 
 /**
@@ -119,6 +127,7 @@ function play(steps: number, opts: RigOptions = {}): Rig {
   const players = opts.players ?? [1];
   const local = opts.local ?? [1];
   const running = opts.running ?? (() => true);
+  const runsFrom = opts.runsFrom ?? ((t: number) => (running(t) ? 0 : null));
   const inputFor = opts.inputFor ?? command;
   const state = newGame(players);
   const p = createPrediction(true);
@@ -137,7 +146,7 @@ function play(steps: number, opts: RigOptions = {}): Rig {
   let pendingEvents: GameEvent[] = [];
 
   // The round starts with a snapshot at tick 0.
-  reconcile(p, snapshotOf(state, 0, [], running(0)), local);
+  reconcile(p, snapshotOf(state, 0, [], runsFrom(0)), local);
   rig.server.set(0, structuredClone(state.players));
 
   for (let k = 0; k < steps; k++) {
@@ -158,6 +167,11 @@ function play(steps: number, opts: RigOptions = {}): Rig {
       if (buffer) pushInput(buffer, m.input, k);
     }
     toServer.splice(0, toServer.length, ...toServer.filter((m) => m.at > k));
+    for (const id of players.filter((id) => !local.includes(id))) {
+      const input = opts.remoteInput?.(id, k);
+      const buffer = buffers.get(id);
+      if (input && buffer) pushInput(buffer, input, k);
+    }
     const inputs = players.map((id) => takeInput(buffers.get(id) as InputBuffer, k));
     const meddled = opts.meddle ? opts.meddle(state, k) : [];
     if (running(k)) {
@@ -168,7 +182,7 @@ function play(steps: number, opts: RigOptions = {}): Rig {
     if ((k + 1) % 3 === 0) {
       toClient.push({
         at: k + down,
-        snap: snapshotOf(state, k + 1, pendingEvents, running(k + 1)),
+        snap: snapshotOf(state, k + 1, pendingEvents, runsFrom(k + 1)),
       });
       pendingEvents = [];
     }
@@ -311,9 +325,9 @@ describe('reconciliation', () => {
     expect(rig.p.offsets).toEqual({});
   });
 
-  it('only corrects a little when walking into a teammate standing still', () => {
-    // Player 2 (another machine) stands at (6, 3), right in player 1's way.
-    const rig = play(60, {
+  it('predicts walking into (and pushing) a teammate standing still exactly', () => {
+    // Player 2 (another machine, no input) stands at (6, 3), right in player 1's way.
+    const rig = play(90, {
       up: 6,
       down: 6,
       ahead: 7,
@@ -325,23 +339,69 @@ describe('reconciliation', () => {
       },
       inputFor: (id, t) => ({ ...command(id, t), move: { x: 1, y: 0 }, dash: false }),
     });
-    // The server pushes both apart softly; prediction holds the teammate where
-    // the last snapshot had them, so it's off a little and gets corrected.
-    expect(rig.p.stats.maxErrorTiles).toBeLessThan(0.25);
+    // The server pushes both along; prediction does the same.
+    expect(localAt(rig.server.get(90), 2).pos.x).toBeGreaterThan(6.5);
+    // Only the first snapshots after the teleport above correct anything.
+    expect(rig.correctionsSeen.every((t) => t <= 15)).toBe(true);
     expect(rig.p.stats.snaps).toBe(0);
-    expect(localAt(rig.server.get(60), 2).pos.x).toBeGreaterThan(6);
+    for (let t = 30; t <= 90; t++) {
+      expect(movement(localAt(rig.predicted.get(t), 1))).toEqual(
+        movement(localAt(rig.server.get(t), 1)),
+      );
+    }
+  });
+
+  it('only corrects a little when a teammate walks across', () => {
+    // Player 2 (another machine) walks down across player 1's path.
+    const rig = play(90, {
+      up: 6,
+      down: 6,
+      ahead: 7,
+      players: [1, 2],
+      local: [1],
+      meddle: (s, t) => {
+        if (t === 0) localAt(s.players, 2).pos = { x: 6, y: 1.2 };
+        return [];
+      },
+      inputFor: (id, t) => ({ ...command(id, t), move: { x: 1, y: 0 }, dash: false }),
+      remoteInput: (id, t) => ({ ...command(id, t), move: { x: 0, y: 1 }, dash: false }),
+    });
+    // They did meet: player 2 was pushed off its straight line down.
+    const path = [...rig.server.values()].map((ps) => localAt(ps, 2).pos.x);
+    expect(Math.max(...path.map((x) => Math.abs(x - 6)))).toBeGreaterThan(0.05);
+    expect(rig.p.stats.corrections).toBeGreaterThan(0);
+    expect(rig.p.stats.snaps).toBe(0);
+    expect(rig.p.stats.maxErrorTiles).toBeLessThan(NET_PREDICT_SNAP_DISTANCE);
   });
 
   it('predicts nothing while the round is not running, and holds the server position', () => {
     // Paused from tick 60 on.
     const rig = play(100, { up: 4, down: 4, ahead: 5, running: (t) => t < 60 });
     const { p } = rig;
-    expect(p.running).toBe(false);
+    expect(p.runsFrom).toBeNull();
     const server = localAt(rig.server.get(100), 1);
     expect(movement(localAt(p.current, 1))).toEqual(movement(server));
     const tickBefore = p.tick;
     advancePrediction(p, 500);
     expect(p.tick).toBe(tickBefore);
+  });
+
+  it('stands still through the countdown and moves from its end on, like the server', () => {
+    // The sim starts at tick 30; every snapshot before says so.
+    const rig = play(80, {
+      up: 6,
+      down: 6,
+      ahead: 7,
+      running: (t) => t >= 30,
+      runsFrom: () => 30,
+    });
+    expect(rig.p.stats.corrections).toBe(0);
+    for (let t = 8; t <= 80; t++) {
+      expect(movement(localAt(rig.predicted.get(t), 1))).toEqual(
+        movement(localAt(rig.server.get(t), 1)),
+      );
+    }
+    expect(localAt(rig.server.get(30), 1).pos).toEqual(localAt(rig.server.get(0), 1).pos);
   });
 
   it('glides the step back when a pause comes in after running ahead', () => {
@@ -424,5 +484,17 @@ describe('drawing', () => {
     }
     decayCorrections(p, NET_PREDICT_SMOOTH_MS * 10);
     expect(p.offsets).toEqual({});
+  });
+});
+
+describe('countdownEndTick', () => {
+  it('is the first server tick whose flow update finds the countdown over', () => {
+    const total = COUNTDOWN_STEPS * COUNTDOWN_STEP_MS;
+    for (const startTick of [0, 1, 7, 599, 12_345]) {
+      const start = startTick * (1000 / TICKS_PER_SECOND);
+      const end = countdownEndTick(start);
+      expect(end * (1000 / TICKS_PER_SECOND) - start).toBeGreaterThanOrEqual(total);
+      expect((end - 1) * (1000 / TICKS_PER_SECOND) - start).toBeLessThan(total);
+    }
   });
 });

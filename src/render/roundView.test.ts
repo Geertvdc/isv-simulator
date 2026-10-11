@@ -55,7 +55,7 @@ describe('predictedView', () => {
     resetPrediction(prediction, start.level);
     reconcile(
       prediction,
-      { serverTick: 40, players: start.players, managers: [], events: [], running: true },
+      { serverTick: 40, players: start.players, managers: [], events: [], runsFrom: 0 },
       [2],
     );
     recordInputs(prediction, [

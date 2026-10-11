@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { COUNTDOWN_MS } from '../src/flow/flow';
 import type { DevicePress } from '../src/input/controller';
+import { countdownEndTick } from '../src/net/prediction';
 import {
   type HelloMessage,
   PROTOCOL_VERSION,
@@ -98,6 +99,27 @@ function playingRoom(): RoomState {
   expect(room.flow.screen).toBe('playing');
   return room;
 }
+
+describe('countdown end (client-side prediction relies on it)', () => {
+  it("the round's first sim tick is the server tick countdownEndTick says", () => {
+    const room = createRoomState('ABCD', 1);
+    join(room, 'host');
+    menu(room, 'host', press('kb-left', { join: true }));
+    menu(room, 'host', press('kb-left', { interact: true }));
+    menu(room, 'host', press('kb-left', { interact: true }));
+    menu(room, 'host', press('kb-left', { interact: true }));
+    expect(room.flow.screen).toBe('countdown');
+    const end = countdownEndTick(room.flow.countdownStartMs);
+    let firstSimTick: number | null = null;
+    for (let i = 0; i < 200 && firstSimTick === null; i++) {
+      const before = room.game?.tick ?? 0;
+      const serverTick = room.serverTick;
+      stepRoom(room);
+      if ((room.game?.tick ?? 0) > before) firstSimTick = serverTick;
+    }
+    expect(firstSimTick).toBe(end);
+  });
+});
 
 describe('joining', () => {
   it('welcomes the newcomer and tells everyone who is in', () => {

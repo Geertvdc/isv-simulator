@@ -66,6 +66,7 @@ import {
   type Prediction,
   type PredictionStats,
   advancePrediction,
+  countdownEndTick,
   createPrediction,
   decayCorrections,
   isPredicting,
@@ -289,6 +290,18 @@ export interface TraceFrame {
 
 /** The trace never grows past this many frames (a few minutes at 60 Hz). */
 const TRACE_MAX_FRAMES = 20_000;
+
+/**
+ * The server tick the round's sim runs from, for prediction: while playing,
+ * now; during the countdown, its end (on the room's clock); otherwise
+ * (pause, results, a round that ended) it doesn't run.
+ */
+function runsFrom(flow: Flow | null, serverTick: number, ended: boolean): number | null {
+  if (!flow || ended) return null;
+  if (isRoundRunning(flow)) return serverTick;
+  if (flow.screen === 'countdown') return countdownEndTick(flow.countdownStartMs);
+  return null;
+}
 
 /** Handed to the scene once, at boot. */
 export interface GameSceneOptions {
@@ -885,7 +898,7 @@ export class GameScene extends Phaser.Scene {
         players: state.players,
         managers: state.managers,
         events: snapshot.events,
-        running: flow !== null && isRoundRunning(flow) && state.result === null,
+        runsFrom: runsFrom(flow, snapshot.serverTick, state.result !== null),
       },
       localBindings(online).map((b) => b.playerId),
     );
