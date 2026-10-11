@@ -40,6 +40,7 @@ Phase 13 is split into sub-phases, each a stacked PR on top of the one before (1
 | 13d | `phase-13d-online-lobby` | Title: Host online / Join online, join-code entry, online lobby (remote + couch players), host starts                                 |
 | 13e | `phase-13e-online-play`  | Full online round: inputs up, snapshots down, interpolated render, events and sound, results to all profiles, lag simulator, ping HUD |
 | 13f | `phase-13f-resilience`   | Disconnect/reconnect, late join, host leaving, docs, playtest notes                                                                   |
+| 13g | `phase-13g-prediction`   | Client-side prediction and reconciliation of this machine's players' movement, `?predict=0`, `verify:prediction`                      |
 
 ## Assumptions (product owner away, see also `review-notes-13.md`)
 
