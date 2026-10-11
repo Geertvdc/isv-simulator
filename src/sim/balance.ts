@@ -210,3 +210,10 @@ export const NET_SERVER_DEFAULT_PORT = 2567;
 export const NET_PROFILE_TIMEOUT_MS = 4000;
 /** Most ticks the server runs in one go after a stall; the rest of the backlog is dropped. */
 export const NET_SERVER_MAX_CATCHUP_TICKS = 10;
+/** Clients ping the server this often to keep the clock synced. */
+export const NET_PING_INTERVAL_MS = 500;
+/** The first few pings go out faster, so the clock is synced before the round starts. */
+export const NET_PING_FAST_COUNT = 8;
+export const NET_PING_FAST_INTERVAL_MS = 100;
+/** The dev lag simulator (`?lag=`, `NET_LAG_MS`) never delays a message more than this. */
+export const MAX_SIMULATED_LAG_MS = 2000;

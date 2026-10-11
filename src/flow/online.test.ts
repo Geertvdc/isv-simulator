@@ -8,6 +8,7 @@ import {
   createOnline,
   hostIsChoosing,
   isOnlineHost,
+  localBindings,
   membersWithPlayers,
   onlineConnected,
   onlineErrorFromCode,
@@ -133,6 +134,20 @@ describe('online state', () => {
           { playerId: 3, deviceId: 'kb-right' },
         ],
       },
+    ]);
+  });
+
+  it("binds only this machine's players, with local device ids", () => {
+    const state = inRoom();
+    expect(localBindings(state)).toEqual([]);
+    state.flow?.lobby.players.push(
+      { playerId: 1, deviceId: 'host:kb-left' },
+      { playerId: 2, deviceId: 'guest:kb-left' },
+      { playerId: 3, deviceId: 'guest:pad-1' },
+    );
+    expect(localBindings(state)).toEqual([
+      { playerId: 2, deviceId: 'kb-left' },
+      { playerId: 3, deviceId: 'pad-1' },
     ]);
   });
 
