@@ -298,3 +298,52 @@ export const PROFILE_TEXT = {
   badId: 'That is not a user ID (it looks like 8-4-4-4-12 hex digits).',
   badName: 'A name needs 1 to 24 characters.',
 } as const;
+
+/** Hosting, joining and the online lobby. */
+export const ONLINE_TEXT = {
+  joinTitle: 'Join online',
+  joinPrompt: "Type the room's code",
+  joinCodeHint:
+    'Type the code · Enter: join · Esc: back · Gamepad: up/down letter, left/right move, A join, B back',
+  joining: 'Joining…',
+  lobbyTitle: 'Online lobby',
+  codeLabel: 'Room code',
+  copy: 'Copy',
+  copied: 'Copied!',
+  copyFailed: 'Copy failed: tell them the code',
+  leave: 'Leave room',
+  back: 'Back to the title',
+  host: 'Host',
+  you: '(you)',
+  noPlayers: 'No players joined yet',
+  joinPlayerHint: 'Press Enter or gamepad A to join',
+  hostStartHint: 'Host: press E, right Shift or gamepad A on a joined device to start',
+  hostJoinFirst: 'Host: join a player first, then start',
+  guestWaitHint: 'Waiting for the host to start',
+  leaveHint: 'Esc or gamepad B: leave the room',
+  closedHint: 'Esc or gamepad B: back to the title',
+  roomLabel: 'Room',
+  roundTitle: 'Round in progress',
+  roundBody: 'The round runs on the server. Playing it online arrives with the next update.',
+  status: {
+    connecting: 'Connecting to the server…',
+    connected: 'Connected',
+    reconnecting: 'Connection lost, reconnecting…',
+    closed: 'Disconnected',
+  },
+  /** What a guest sees on the screens only the host drives. */
+  waiting: {
+    levelSelect: 'Host is choosing a level',
+    intro: 'Host starts the round',
+    paused: 'Paused by the host',
+    results: 'Host is choosing what is next',
+  },
+  errors: {
+    badCode: 'A code is 4 letters, like ABCD.',
+    wrongCode: 'No room with that code. Check it with the host.',
+    roomFull: 'That room is full (4 players at most).',
+    protocolMismatch: 'That room runs another version of the game. Reload the page and try again.',
+    unreachable: 'The server is not reachable. Is it running?',
+    disconnected: 'The connection to the room was lost.',
+  },
+} as const;

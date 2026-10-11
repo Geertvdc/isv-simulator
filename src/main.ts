@@ -12,6 +12,9 @@ import {
   type FlowView,
   GAME_FRAME_EVENT,
   GameScene,
+  JOIN_CODE_EVENT,
+  type JoinCodeInput,
+  ONLINE_LEAVE_EVENT,
   PROFILE_ACTION_EVENT,
   TILE_HOVER_EVENT,
   TOGGLE_SOUND_EVENT,
@@ -20,7 +23,9 @@ import { mountGameHud } from './ui/game';
 import { mountHud } from './ui/hud';
 import { mountCountdown, mountIntro } from './ui/intro';
 import { mountLevelSelect } from './ui/levelSelect';
+import { mountJoinCode } from './ui/joinCode';
 import { mountLobby } from './ui/lobby';
+import { mountOnlineBar, mountOnlineLobby, mountOnlineRound } from './ui/onlineLobby';
 import { mountProfile } from './ui/profile';
 import { mountSoundToggle } from './ui/soundToggle';
 import { mountCredits, mountPause, mountResults, mountSettings, mountTitle } from './ui/screens';
@@ -48,12 +53,23 @@ if (sceneId !== null && !shownScene) console.warn(`No scene '${sceneId}'`);
 // A scene never touches the save.
 const storage = shownScene ? null : browserStorage();
 const save = loadSave(storage);
+
+// Online identity: a random id kept in localStorage, shown under Settings → Online profile.
+let identity = loadIdentity(storage, () =>
+  typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : uuidFromBytes(crypto.getRandomValues(new Uint8Array(16))),
+);
+const gameServerUrl = serverUrl(import.meta.env.VITE_SERVER_URL, window.location);
+const profileApi = createProfileApi(gameServerUrl, (url, init) => fetch(url, init));
 const scene = new GameScene({
   storage,
   save,
   // For testing: every level open, without touching the save.
   unlockAll: params.has('unlockAll'),
   scene: shownScene,
+  // A scene is a picture: it never goes online.
+  online: shownScene ? null : { serverUrl: gameServerUrl, identity: () => identity },
 });
 
 const game = new Phaser.Game({
@@ -88,20 +104,28 @@ const screens = {
   settings: mountSettings(ui),
   credits: mountCredits(ui),
 } as const;
+const joinInput = (input: JoinCodeInput): void => {
+  game.events.emit(JOIN_CODE_EVENT, input);
+};
+const joinCode = mountJoinCode(ui, {
+  onText: (text) => {
+    joinInput({ type: 'text', text });
+  },
+  onSubmit: () => {
+    joinInput({ type: 'submit' });
+  },
+  onCancel: () => {
+    joinInput({ type: 'cancel' });
+  },
+});
+const leaveOnline = { onLeave: () => game.events.emit(ONLINE_LEAVE_EVENT) };
+const onlineLobby = mountOnlineLobby(ui, leaveOnline);
+const onlineRound = mountOnlineRound(ui);
+const onlineBar = mountOnlineBar(ui, leaveOnline);
 const soundToggle = mountSoundToggle(ui, () => {
   game.events.emit(TOGGLE_SOUND_EVENT);
 });
 
-// Online identity: a random id kept in localStorage, shown under Settings → Online profile.
-let identity = loadIdentity(storage, () =>
-  typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID()
-    : uuidFromBytes(crypto.getRandomValues(new Uint8Array(16))),
-);
-const profileApi = createProfileApi(
-  serverUrl(import.meta.env.VITE_SERVER_URL, window.location),
-  (url, init) => fetch(url, init),
-);
 const profile = mountProfile(ui, {
   identity: () => identity,
   changeId: (text) => {
@@ -145,7 +169,12 @@ void syncProgress();
 game.events.on(FLOW_EVENT, (view: FlowView) => {
   soundToggle.render(view.save.settings);
   const screen = view.flow.screen;
-  lobby.render(screen === 'lobby' ? view.flow.lobby : null);
+  // Online, the room's lobby has its own screen.
+  lobby.render(screen === 'lobby' && !view.online ? view.flow.lobby : null);
+  onlineLobby.render(view);
+  onlineRound.render(view);
+  onlineBar.render(view);
+  joinCode.render(view);
   levelSelect.render(screen === 'levelSelect' ? view : null);
   intro.render(view);
   countdown.render(view);
