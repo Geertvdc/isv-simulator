@@ -71,7 +71,7 @@ describe('snapshot codec', () => {
 
   it('stays small with 4 players mid-round', () => {
     const bytes = JSON.stringify(encodeSnapshot(state, 0, state.events)).length;
-    // About 6 KB; 20 a second is ~120 KB/s per client before compression.
+    // About 3 KB; 20 a second is ~60 KB/s per client before compression.
     expect(bytes).toBeLessThan(16_000);
   });
 });
