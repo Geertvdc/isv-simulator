@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { ProfileAction } from './flow/flow';
 import { loadIdentity, replaceUserId, setDisplayName, uuidFromBytes } from './flow/identity';
 import { loadSave, mergeLevels, type StorageLike, writeSave } from './flow/save';
+import { parseLag } from './net/lag';
 import { createProfileApi, serverUrl, syncLevels } from './net/profileApi';
 import { SCREEN_FADE_MS } from './sim/balance';
 import { sceneById } from './sim/scenes';
@@ -12,6 +13,7 @@ import {
   type FlowView,
   GAME_FRAME_EVENT,
   GameScene,
+  NET_STATS_EVENT,
   JOIN_CODE_EVENT,
   type JoinCodeInput,
   ONLINE_LEAVE_EVENT,
@@ -25,7 +27,8 @@ import { mountCountdown, mountIntro } from './ui/intro';
 import { mountLevelSelect } from './ui/levelSelect';
 import { mountJoinCode } from './ui/joinCode';
 import { mountLobby } from './ui/lobby';
-import { mountOnlineBar, mountOnlineLobby, mountOnlineRound } from './ui/onlineLobby';
+import { mountNetHud } from './ui/netHud';
+import { mountOnlineBar, mountOnlineLobby } from './ui/onlineLobby';
 import { mountProfile } from './ui/profile';
 import { mountSoundToggle } from './ui/soundToggle';
 import { mountCredits, mountPause, mountResults, mountSettings, mountTitle } from './ui/screens';
@@ -69,7 +72,15 @@ const scene = new GameScene({
   unlockAll: params.has('unlockAll'),
   scene: shownScene,
   // A scene is a picture: it never goes online.
-  online: shownScene ? null : { serverUrl: gameServerUrl, identity: () => identity },
+  online: shownScene
+    ? null
+    : {
+        serverUrl: gameServerUrl,
+        identity: () => identity,
+        // Dev tools: `?lag=100&jitter=20` simulates a slow network; `?nethud` shows the ping corner.
+        lag: parseLag(params.get('lag'), params.get('jitter')),
+        netHud: import.meta.env.DEV || params.has('nethud'),
+      },
 });
 
 const game = new Phaser.Game({
@@ -120,8 +131,9 @@ const joinCode = mountJoinCode(ui, {
 });
 const leaveOnline = { onLeave: () => game.events.emit(ONLINE_LEAVE_EVENT) };
 const onlineLobby = mountOnlineLobby(ui, leaveOnline);
-const onlineRound = mountOnlineRound(ui);
 const onlineBar = mountOnlineBar(ui, leaveOnline);
+const netHud = mountNetHud(ui);
+game.events.on(NET_STATS_EVENT, netHud.render);
 const soundToggle = mountSoundToggle(ui, () => {
   game.events.emit(TOGGLE_SOUND_EVENT);
 });
@@ -172,7 +184,6 @@ game.events.on(FLOW_EVENT, (view: FlowView) => {
   // Online, the room's lobby has its own screen.
   lobby.render(screen === 'lobby' && !view.online ? view.flow.lobby : null);
   onlineLobby.render(view);
-  onlineRound.render(view);
   onlineBar.render(view);
   joinCode.render(view);
   levelSelect.render(screen === 'levelSelect' ? view : null);

@@ -323,8 +323,10 @@ export const ONLINE_TEXT = {
   leaveHint: 'Esc or gamepad B: leave the room',
   closedHint: 'Esc or gamepad B: back to the title',
   roomLabel: 'Room',
-  roundTitle: 'Round in progress',
-  roundBody: 'The round runs on the server. Playing it online arrives with the next update.',
+  /** The ping corner (dev, `N` toggles it). */
+  ping: 'Ping',
+  waitingForSnapshots: 'waiting for the server',
+  lagSimulated: 'simulated lag',
   status: {
     connecting: 'Connecting to the server…',
     connected: 'Connected',

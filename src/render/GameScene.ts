@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { buildInputCommands } from '../input/commands';
 import type { DevicePress } from '../input/controller';
-import { InputDevices } from '../input/devices';
+import { type InputFrame, InputDevices } from '../input/devices';
 import { claimOrphanedPlayer } from '../input/lobby';
 import {
   type Flow,
@@ -28,16 +28,40 @@ import {
   type OnlineState,
   applyServerMessage,
   createOnline,
+  localBindings,
   onlineConnected,
   onlineMenuPresses,
   onlineNowMs,
   setOnlineStatus,
 } from '../flow/online';
 import { type NetConnection, helloFor, hostRoom, joinRoomByCode, toJoinError } from '../net/client';
-import { type HintId, startHints, updateHints } from '../flow/hints';
-import { type ChapterInfo, type SaveData, type StorageLike, writeSave } from '../flow/save';
+import { type ClockSync, addPong, createClockSync, inputTargetTick } from '../net/clock';
+import { createInputStamper, resetInputStamper, stampInputs } from '../net/inputStamp';
+import type { InterpolationStatus } from '../net/interpolation';
+import type { LagSettings } from '../net/lag';
 import {
+  type OnlineRound,
+  pushRoundSnapshot,
+  roundRenderTick,
+  sampleRound,
+  startOnlineRound,
+  takeDueEvents,
+} from '../net/onlineRound';
+import type { ServerMessage } from '../net/protocol';
+import { type HintId, startHints, updateHints } from '../flow/hints';
+import {
+  type ChapterInfo,
+  type SaveData,
+  type StorageLike,
+  recordLevel,
+  writeSave,
+} from '../flow/save';
+import {
+  NET_MAX_INPUTS_PER_MESSAGE,
   NET_MAX_PRESSES_PER_MESSAGE,
+  NET_PING_FAST_COUNT,
+  NET_PING_FAST_INTERVAL_MS,
+  NET_PING_INTERVAL_MS,
   RESULTS_STAR_DELAY_MS,
   RESULTS_STAR_INTERVAL_MS,
   SCREEN_FADE_MS,
@@ -73,7 +97,7 @@ import { MusicPlayer } from './MusicPlayer';
 import { musicCue } from './music';
 import { SoundPlayer } from './SoundPlayer';
 import { screenToTile, tileCorners, tileDepth } from './projection';
-import type { RoundView } from './roundView';
+import { type RoundView, frameView } from './roundView';
 import { TicketRenderer } from './TicketRenderer';
 
 export interface TileHover {
@@ -154,6 +178,47 @@ export interface OnlineOptions {
   serverUrl: string;
   /** Who this browser is right now: sent in the hello. */
   identity: () => Identity;
+  /** Dev only (`?lag=&jitter=`): delays every message in and out. */
+  lag: LagSettings | null;
+  /** The ping corner shows from the start (`N` toggles it). */
+  netHud: boolean;
+}
+
+/** What the ping corner shows. */
+export interface NetStats {
+  /** Smoothed round trip, or `null` before the first pong. */
+  rttMs: number | null;
+  /** Where render time is against the snapshots; `null` outside a round. */
+  status: InterpolationStatus | null;
+  /** Simulated lag, if on. */
+  lag: LagSettings | null;
+}
+
+/**
+ * Emitted on `game.events` with `NetStats` a few times a second while online
+ * and the ping corner is on, and with `null` when it should hide.
+ */
+export const NET_STATS_EVENT = 'net-stats';
+
+/** How often the ping corner updates. */
+const NET_STATS_EVERY_MS = 250;
+
+/**
+ * Dev builds put this on `window.isvNet` while online, for checking
+ * smoothness from a script: what the last frame drew.
+ */
+export interface NetDebug {
+  renderTick: number | null;
+  status: InterpolationStatus | null;
+  rttMs: number | null;
+  /** Frames drawn in the round, and how many of them held a snapshot waiting for the next. */
+  frames: number;
+  waitingFrames: number;
+  /** Where each player was drawn, by id. */
+  players: Record<number, { x: number; y: number }>;
+  score: number | null;
+  ticksLeft: number | null;
+  screen: string | null;
 }
 
 /** Handed to the scene once, at boot. */
@@ -287,11 +352,35 @@ export class GameScene extends Phaser.Scene {
   private onlineAttempt = 0;
   /** A network callback changed what the screens show. */
   private onlineDirty = false;
+  /** The online round on screen (from `roundStart` on), kept across scene restarts. */
+  private onlineRound: OnlineRound | null = null;
+  /** An online round was dropped: the scene restarts for a clean map. */
+  private onlineRoundDropped = false;
+  /** The round whose results this browser already chimed and saved. */
+  private recordedRound: OnlineRound | null = null;
+  private clock: ClockSync = createClockSync();
+  private readonly stamper = createInputStamper();
+  private pingsSent = 0;
+  private lastPingMs = -Infinity;
+  private netHudOn = false;
+  private lastNetStatsMs = -Infinity;
+  private readonly netDebug: NetDebug = {
+    renderTick: null,
+    status: null,
+    rttMs: null,
+    frames: 0,
+    waitingFrames: 0,
+    players: {},
+    score: null,
+    ticksLeft: null,
+    screen: null,
+  };
 
   constructor(private readonly options: GameSceneOptions) {
     super('GameScene');
     const id = options.scene?.levelId;
     if (id) this.mapLevelIndex = Math.max(0, LEVEL_IDS.indexOf(id));
+    this.netHudOn = options.online?.netHud ?? false;
   }
 
   preload(): void {
@@ -364,6 +453,10 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard?.addKey(K.M).on('down', () => {
       this.toggleSound();
     });
+    this.input.keyboard?.addKey(K.N).on('down', () => {
+      this.netHudOn = !this.netHudOn;
+      this.lastNetStatsMs = -Infinity;
+    });
     for (const code of [K.BACKTICK, K.F3]) {
       this.input.keyboard?.addKey(code).on('down', () => {
         this.debugVisible = !this.debugVisible;
@@ -377,8 +470,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.devices) return;
     const frame = this.devices.poll();
     if (this.flow.screen === 'online') {
-      this.updateOnline(frame.presses, time);
-      this.updateMusic(delta);
+      this.updateOnline(frame, time, delta);
       this.updateHover();
       return;
     }
@@ -420,7 +512,7 @@ export class GameScene extends Phaser.Scene {
       // Paused or done: nothing new happened, so nothing to react to.
       this.renderRound(loop, running ? loop.events : [], this.flow, time);
     }
-    this.updateMusic(delta);
+    this.updateMusic(delta, this.flow, this.loop?.state ?? null);
     this.updateHover();
   }
 
@@ -456,11 +548,11 @@ export class GameScene extends Phaser.Scene {
     return [];
   }
 
-  private updateMusic(deltaMs: number): void {
+  /** The music for `flow` (this browser's, or the online room's) and the round on screen. */
+  private updateMusic(deltaMs: number, flow: Flow, state: GameState | null): void {
     if (!this.music) return;
-    const state = this.loop?.state;
-    const cue = musicCue(this.flow, {
-      chapterId: chapterIdOf(this.flow.levelIndex),
+    const cue = musicCue(flow, {
+      chapterId: chapterIdOf(flow.levelIndex),
       ticksLeft: state ? state.settings.durationTicks - state.tick : null,
     });
     this.music.update(cue, deltaMs);
@@ -526,14 +618,14 @@ export class GameScene extends Phaser.Scene {
    * A frame in an online room: this machine's presses go to the server (back
    * on the lobby leaves instead), and the screens follow the room.
    */
-  private updateOnline(presses: readonly DevicePress[], nowMs: number): void {
+  private updateOnline(frame: InputFrame, nowMs: number, deltaMs: number): void {
     const online = this.online;
     if (!online) {
       onlineEnded(this.flow);
       this.emitFlow(nowMs);
       return;
     }
-    const { send, leave } = onlineMenuPresses(online, this.menuPresses(presses));
+    const { send, leave } = onlineMenuPresses(online, this.menuPresses(frame.presses));
     if (leave) {
       this.leaveOnline();
       return;
@@ -541,10 +633,11 @@ export class GameScene extends Phaser.Scene {
     if (send.length > 0) {
       this.connection?.send({ type: 'menu', presses: send.slice(0, NET_MAX_PRESSES_PER_MESSAGE) });
     }
+    if (this.restartForOnlineRound()) return;
     const flow = online.flow;
-    const now = onlineNowMs(online);
-    const ready = flow ? resultsReady(flow, now) : false;
-    const countdown = flow ? countdownNumber(flow, now) : null;
+    const roomNow = onlineNowMs(online);
+    const ready = flow ? resultsReady(flow, roomNow) : false;
+    const countdown = flow ? countdownNumber(flow, roomNow) : null;
     if (
       this.takeOnlineDirty() ||
       ready !== this.shownResultsReady ||
@@ -552,6 +645,169 @@ export class GameScene extends Phaser.Scene {
     ) {
       this.emitFlow(nowMs);
     }
+
+    const now = performance.now();
+    this.ping(now);
+    const round = this.onlineRound;
+    let state: GameState | null = null;
+    if (round && flow) {
+      this.sendInputs(online, frame, now);
+      state = this.renderOnlineRound(round, flow, now, nowMs);
+      this.finishOnlineRound(round, flow);
+    }
+    this.updateMusic(deltaMs, flow ?? this.flow, state);
+    this.updateNetStats(now);
+  }
+
+  /**
+   * Restarts the scene when the online round needs another map (a round on
+   * another level started) or a clean one (the round was dropped). Returns
+   * whether it did.
+   */
+  private restartForOnlineRound(): boolean {
+    const round = this.onlineRound;
+    if (round) {
+      const index = LEVEL_IDS.indexOf(round.levelId);
+      if (index >= 0 && index !== this.mapLevelIndex) {
+        this.onlineRoundDropped = false;
+        this.scene.restart({ levelIndex: index } satisfies SceneData);
+        return true;
+      }
+    }
+    if (!this.onlineRoundDropped) return false;
+    this.onlineRoundDropped = false;
+    this.scene.restart({ levelIndex: this.mapLevelIndex } satisfies SceneData);
+    return true;
+  }
+
+  /** Pings the server now and then, so the clock stays synced. */
+  private ping(now: number): void {
+    const connection = this.connection;
+    if (!connection || this.online?.status !== 'connected') return;
+    const every =
+      this.pingsSent < NET_PING_FAST_COUNT ? NET_PING_FAST_INTERVAL_MS : NET_PING_INTERVAL_MS;
+    if (now - this.lastPingMs < every) return;
+    this.lastPingMs = now;
+    connection.send({ type: 'ping', id: this.pingsSent++, clientTimeMs: now });
+  }
+
+  /**
+   * This machine's players' inputs for the tick they'll land on, while the
+   * round takes them (and during the countdown, so the first tick has them).
+   */
+  private sendInputs(online: OnlineState, frame: InputFrame, now: number): void {
+    const screen = online.flow?.screen;
+    if (!this.connection || (screen !== 'playing' && screen !== 'countdown')) return;
+    const target = inputTargetTick(this.clock, now);
+    const bindings = localBindings(online);
+    if (target === null || bindings.length === 0) return;
+    const inputs = stampInputs(
+      this.stamper,
+      buildInputCommands(bindings, frame.readings, target),
+      target,
+    );
+    if (inputs.length === 0) return;
+    this.connection.send({ type: 'inputs', inputs: inputs.slice(0, NET_MAX_INPUTS_PER_MESSAGE) });
+  }
+
+  /** Draws the online round as it was a moment ago, with the events that happened by then. */
+  private renderOnlineRound(
+    round: OnlineRound,
+    flow: Flow,
+    now: number,
+    time: number,
+  ): GameState | null {
+    const renderTick = roundRenderTick(this.clock, now);
+    const frame = sampleRound(round, renderTick);
+    if (!frame) return null;
+    const events = takeDueEvents(round, renderTick);
+    this.renderRound(frameView(frame), events, flow, time);
+
+    const debug = this.netDebug;
+    debug.renderTick = renderTick;
+    debug.status = frame.status;
+    debug.rttMs = this.clock.rttMs;
+    debug.frames++;
+    if (frame.status === 'waiting') debug.waitingFrames++;
+    debug.players = frame.players;
+    debug.score = frame.state.score;
+    debug.ticksLeft = frame.state.settings.durationTicks - frame.state.tick;
+    debug.screen = flow.screen;
+    return frame.state;
+  }
+
+  /**
+   * The room's results came up: the star chimes, and the round in this
+   * browser's save too (the server writes the same into the profile). Once
+   * per round.
+   */
+  private finishOnlineRound(round: OnlineRound, flow: Flow): void {
+    const results = flow.results;
+    if (flow.screen !== 'results' || !results || this.recordedRound === round) return;
+    this.recordedRound = round;
+    this.countStars(results.stars);
+    if (!this.options.storage) return;
+    recordLevel(this.options.save.levels, round.levelId, {
+      score: results.score,
+      stars: results.stars,
+    });
+    writeSave(this.options.storage, this.options.save);
+  }
+
+  /** Tells the ping corner what to show, a few times a second. */
+  private updateNetStats(now: number): void {
+    if (now - this.lastNetStatsMs < NET_STATS_EVERY_MS) return;
+    this.lastNetStatsMs = now;
+    const stats: NetStats | null =
+      this.netHudOn && this.online
+        ? {
+            rttMs: this.clock.rttMs,
+            status: this.onlineRound ? this.netDebug.status : null,
+            lag: this.options.online?.lag ?? null,
+          }
+        : null;
+    this.game.events.emit(NET_STATS_EVENT, stats);
+    if (import.meta.env.DEV) {
+      (window as unknown as { isvNet?: NetDebug }).isvNet = this.netDebug;
+    }
+  }
+
+  /** A message from the room: the session state, the clock, and the round. */
+  private serverMessage(online: OnlineState, message: ServerMessage): void {
+    if (applyServerMessage(online, message)) this.onlineDirty = true;
+    switch (message.type) {
+      case 'pong':
+        addPong(this.clock, message, performance.now());
+        break;
+      case 'roundStart':
+        this.onlineRound = startOnlineRound(message);
+        // First-level hints are a couch thing: they'd point at one machine's players only.
+        this.hints = [];
+        this.netDebug.frames = 0;
+        this.netDebug.waitingFrames = 0;
+        resetInputStamper(this.stamper);
+        break;
+      case 'snapshot': {
+        const round = this.onlineRound;
+        if (!round) break;
+        if (!message.game) {
+          this.dropOnlineRound();
+        } else if (message.game.state.levelId === round.levelId) {
+          pushRoundSnapshot(round, message.game);
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  /** The online round is over (back to the level select, or the room is gone). */
+  private dropOnlineRound(): void {
+    if (!this.onlineRound) return;
+    this.onlineRound = null;
+    this.onlineRoundDropped = true;
+    this.netDebug.status = null;
   }
 
   /** Creates (host) or joins a room. The answer arrives later, in `connected` or as a failure. */
@@ -565,10 +821,11 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const hello = helloFor(options.identity());
+    const connect = { lag: options.lag };
     const pending =
       role === 'host'
-        ? hostRoom(options.serverUrl, hello)
-        : joinRoomByCode(options.serverUrl, code, hello);
+        ? hostRoom(options.serverUrl, hello, connect)
+        : joinRoomByCode(options.serverUrl, code, hello, connect);
     pending.then(
       (connection) => {
         if (attempt !== this.onlineAttempt) {
@@ -593,14 +850,21 @@ export class GameScene extends Phaser.Scene {
     const online = this.online ?? createOnline(role);
     this.online = online;
     this.connection = connection;
+    this.clock = createClockSync();
+    resetInputStamper(this.stamper);
+    this.pingsSent = 0;
+    this.lastPingMs = -Infinity;
     onlineConnected(online, connection.sessionId, connection.joinCode);
     if (role === 'join') joinSucceeded(this.flow);
     connection.onMessage((message) => {
-      if (applyServerMessage(online, message)) this.onlineDirty = true;
+      if (this.connection === connection) this.serverMessage(online, message);
     });
     connection.onStatus((status, error) => {
       setOnlineStatus(online, status, error);
-      if (status === 'closed' && this.connection === connection) this.connection = null;
+      if (status === 'closed' && this.connection === connection) {
+        this.connection = null;
+        this.dropOnlineRound();
+      }
       this.onlineDirty = true;
     });
     this.onlineDirty = true;
@@ -615,6 +879,14 @@ export class GameScene extends Phaser.Scene {
     this.online = null;
     if (this.flow.screen === 'online') {
       onlineEnded(this.flow, role === 'join' ? 'joinOnline' : 'hostOnline');
+    }
+    this.game.events.emit(NET_STATS_EVENT, null);
+    if (this.onlineRound) {
+      // A clean map behind the title: no players or tickets left from the round.
+      this.onlineRound = null;
+      this.onlineRoundDropped = false;
+      this.scene.restart({ levelIndex: this.mapLevelIndex } satisfies SceneData);
+      return;
     }
     this.emitFlow(this.time.now);
   }

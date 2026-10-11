@@ -7,8 +7,8 @@
  *   connecting and when the room closed, with the reason.
  * - the online bar on every other online screen: the room code, the
  *   connection, "Host is choosing a level" for guests on the host's screens,
- *   and Leave.
- * - a placeholder while a round runs (the online round arrives in 13e).
+ *   and Leave. During a round it moves to the bottom left, out of the
+ *   orders' way.
  */
 
 import { type OnlineState, hostIsChoosing, isOnlineHost, membersWithPlayers } from '../flow/online';
@@ -149,33 +149,18 @@ export function mountOnlineBar(root: HTMLElement, deps: OnlineDeps): ScreenView 
       const online = view?.online ?? null;
       bar.hidden = !online || showsLobby(online);
       // The screens under it move down to make room.
-      root.classList.toggle('with-online-bar', !bar.hidden);
+      const screen = online?.flow?.screen;
+      const inRound = screen === 'countdown' || screen === 'playing';
+      root.classList.toggle('with-online-bar', !bar.hidden && !inRound);
+      bar.classList.toggle('in-round', inRound);
       if (!online || bar.hidden) return;
       room.textContent = `${ONLINE_TEXT.roomLabel} ${online.joinCode ?? ''} · ${statusText(online)}`;
-      const screen = online.flow?.screen;
       const text =
         hostIsChoosing(online) && screen !== undefined && screen in ONLINE_TEXT.waiting
           ? ONLINE_TEXT.waiting[screen as keyof typeof ONLINE_TEXT.waiting]
           : '';
       waiting.textContent = text;
       waiting.hidden = text === '';
-    },
-  };
-}
-
-/** While the server plays a round: the online round itself is phase 13e. */
-export function mountOnlineRound(root: HTMLElement): ScreenView {
-  const screen = el('div', 'screen online-round');
-  screen.hidden = true;
-  screen.append(
-    el('h1', 'screen-title', ONLINE_TEXT.roundTitle),
-    el('div', 'online-round-body', ONLINE_TEXT.roundBody),
-  );
-  root.append(screen);
-  return {
-    render: (view) => {
-      const online = view?.online;
-      screen.hidden = !(online?.status === 'connected' && online.flow?.screen === 'playing');
     },
   };
 }
