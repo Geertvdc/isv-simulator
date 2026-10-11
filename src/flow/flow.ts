@@ -1,7 +1,7 @@
 /**
  * The screens around a round, as a plain-data state machine: title, lobby,
  * level select, the level intro card and countdown, the round itself,
- * pause, results, settings and credits.
+ * pause, results, settings (with the online profile) and credits.
  * `updateFlow` turns this frame's button presses into a new screen and a
  * list of effects for the scene to run (start a round, save, ...). Like the
  * sim it never touches Phaser or the DOM, and time only comes in as an
@@ -38,6 +38,8 @@ export type Screen =
   | 'paused'
   | 'results'
   | 'settings'
+  /** Under settings: this browser's user id and display name. */
+  | 'profile'
   | 'credits';
 
 /** One line in a vertical menu. */
@@ -55,7 +57,15 @@ export type MenuItem =
   | 'volume'
   | 'music'
   | 'shake'
+  | 'profile'
+  | ProfileAction
   | 'back';
+
+/**
+ * What the profile screen's lines do. The flow only asks for them (a
+ * `profileAction` effect): copying and typing happen in the browser's UI.
+ */
+export type ProfileAction = 'copyId' | 'changeName' | 'changeId';
 
 export interface Results {
   score: number;
@@ -115,7 +125,9 @@ export type FlowEffect =
   /** The save changed and should be written. */
   | { type: 'saveChanged' }
   /** The settings changed and should be applied. */
-  | { type: 'settingsChanged' };
+  | { type: 'settingsChanged' }
+  /** A line on the profile screen was picked. */
+  | { type: 'profileAction'; action: ProfileAction };
 
 export interface FlowUpdate {
   /** Whether anything on screen changed. */
@@ -146,7 +158,9 @@ export function menuItems(flow: Flow): MenuItem[] {
     case 'results':
       return flow.results?.canGoNext ? ['next', 'retry', 'levelSelect'] : ['retry', 'levelSelect'];
     case 'settings':
-      return ['volume', 'music', 'shake', 'back'];
+      return ['volume', 'music', 'shake', 'profile', 'back'];
+    case 'profile':
+      return ['copyId', 'changeName', 'changeId', 'back'];
     case 'credits':
       return ['back'];
     default:
@@ -352,6 +366,9 @@ function back(flow: Flow, update: FlowUpdate): void {
     case 'settings':
       closeSettings(flow);
       return;
+    case 'profile':
+      goTo(flow, 'settings', menuItems({ ...flow, screen: 'settings' }).indexOf('profile'));
+      return;
     case 'credits':
       quitToTitle(flow, 'credits');
       return;
@@ -437,6 +454,15 @@ function confirm(flow: Flow, ctx: FlowContext, update: FlowUpdate): void {
       return;
     case 'shake':
       toggleShake(ctx, update);
+      return;
+    case 'profile':
+      goTo(flow, 'profile');
+      return;
+    case 'copyId':
+    case 'changeName':
+    case 'changeId':
+      update.effects.push({ type: 'profileAction', action: item });
+      update.changed = true;
       return;
     case 'back':
       back(flow, update);

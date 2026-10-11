@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { buildInputCommands } from '../input/commands';
+import type { DevicePress } from '../input/controller';
 import { InputDevices } from '../input/devices';
 import { claimOrphanedPlayer } from '../input/lobby';
 import {
@@ -96,6 +97,18 @@ export const FLOW_EVENT = 'flow';
 
 /** Emitted on `game.events` by the speaker button: turns all sound off or back on. */
 export const TOGGLE_SOUND_EVENT = 'toggle-sound';
+
+/** Emitted on `game.events` with a `ProfileAction` when a profile screen line is picked. */
+export const PROFILE_ACTION_EVENT = 'profile-action';
+
+/**
+ * Emitted on `game.events` by the UI with `true` when a text dialog opens and
+ * `false` when it closes: menu presses wait meanwhile.
+ */
+export const DIALOG_EVENT = 'dialog';
+
+/** Emitted on `game.events` by the scene: a back button was pressed while a dialog is open. */
+export const DIALOG_CANCEL_EVENT = 'dialog-cancel';
 
 /** Handed to the scene once, at boot. */
 export interface GameSceneOptions {
@@ -215,6 +228,8 @@ export class GameScene extends Phaser.Scene {
   /** When the scene's map started fading in. */
   private sceneStartMs = 0;
   private readonly sceneHandle: SceneHandle = { done: false };
+  /** A text dialog is open in the UI: menu presses wait, back cancels it. */
+  private dialogOpen = false;
 
   constructor(private readonly options: GameSceneOptions) {
     super('GameScene');
@@ -255,6 +270,10 @@ export class GameScene extends Phaser.Scene {
     this.game.events.off(TOGGLE_SOUND_EVENT);
     this.game.events.on(TOGGLE_SOUND_EVENT, () => {
       this.toggleSound();
+    });
+    this.game.events.off(DIALOG_EVENT);
+    this.game.events.on(DIALOG_EVENT, (open: boolean) => {
+      this.dialogOpen = open;
     });
     this.playerRenderer = new PlayerRenderer(this);
     this.managerRenderer = new ManagerRenderer(this);
@@ -298,7 +317,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     const ctx = this.flowContext(time);
-    const update = updateFlow(this.flow, frame.presses, ctx);
+    const update = updateFlow(this.flow, this.menuPresses(frame.presses), ctx);
     if (this.runEffects(update.effects)) return;
     const ready = resultsReady(this.flow, time);
     const countdown = countdownNumber(this.flow, time);
@@ -337,6 +356,13 @@ export class GameScene extends Phaser.Scene {
     }
     this.updateMusic(delta);
     this.updateHover();
+  }
+
+  /** This frame's presses for the menus: none while a dialog is open (back closes it). */
+  private menuPresses(presses: readonly DevicePress[]): readonly DevicePress[] {
+    if (!this.dialogOpen) return presses;
+    if (presses.some((p) => p.dash || p.menu)) this.game.events.emit(DIALOG_CANCEL_EVENT);
+    return [];
   }
 
   private updateMusic(deltaMs: number): void {
@@ -419,6 +445,9 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'settingsChanged':
           this.applySettings();
+          break;
+        case 'profileAction':
+          this.game.events.emit(PROFILE_ACTION_EVENT, effect.action);
           break;
       }
     }

@@ -8,6 +8,7 @@ import {
   normalizeUserId,
   replaceUserId,
   setDisplayName,
+  uuidFromBytes,
 } from './identity';
 import type { StorageLike } from './save';
 
@@ -139,5 +140,15 @@ describe('setDisplayName', () => {
     expect(storage.data.get(DISPLAY_NAME_KEY)).toBe('Linus');
     expect(setDisplayName(storage, identity, ' ').ok).toBe(false);
     expect(storage.data.get(DISPLAY_NAME_KEY)).toBe('Linus');
+  });
+});
+
+describe('uuidFromBytes', () => {
+  it('makes a valid UUID v4 from any 16 bytes', () => {
+    for (const fill of [0, 0xff, 0x5a]) {
+      const id = uuidFromBytes(new Uint8Array(16).fill(fill));
+      expect(normalizeUserId(id)).toBe(id);
+    }
+    expect(() => uuidFromBytes(new Uint8Array(4))).toThrow();
   });
 });

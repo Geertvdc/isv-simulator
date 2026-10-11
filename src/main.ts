@@ -1,12 +1,18 @@
 import Phaser from 'phaser';
-import { loadSave, type StorageLike } from './flow/save';
+import type { ProfileAction } from './flow/flow';
+import { loadIdentity, replaceUserId, setDisplayName, uuidFromBytes } from './flow/identity';
+import { loadSave, mergeLevels, type StorageLike, writeSave } from './flow/save';
+import { createProfileApi, serverUrl, syncLevels } from './net/profileApi';
 import { SCREEN_FADE_MS } from './sim/balance';
 import { sceneById } from './sim/scenes';
 import {
+  DIALOG_CANCEL_EVENT,
+  DIALOG_EVENT,
   FLOW_EVENT,
   type FlowView,
   GAME_FRAME_EVENT,
   GameScene,
+  PROFILE_ACTION_EVENT,
   TILE_HOVER_EVENT,
   TOGGLE_SOUND_EVENT,
 } from './render/GameScene';
@@ -15,6 +21,7 @@ import { mountHud } from './ui/hud';
 import { mountCountdown, mountIntro } from './ui/intro';
 import { mountLevelSelect } from './ui/levelSelect';
 import { mountLobby } from './ui/lobby';
+import { mountProfile } from './ui/profile';
 import { mountSoundToggle } from './ui/soundToggle';
 import { mountCredits, mountPause, mountResults, mountSettings, mountTitle } from './ui/screens';
 import './style.css';
@@ -40,9 +47,10 @@ const shownScene = sceneId === null ? null : (sceneById(sceneId) ?? null);
 if (sceneId !== null && !shownScene) console.warn(`No scene '${sceneId}'`);
 // A scene never touches the save.
 const storage = shownScene ? null : browserStorage();
+const save = loadSave(storage);
 const scene = new GameScene({
   storage,
-  save: loadSave(storage),
+  save,
   // For testing: every level open, without touching the save.
   unlockAll: params.has('unlockAll'),
   scene: shownScene,
@@ -83,6 +91,57 @@ const screens = {
 const soundToggle = mountSoundToggle(ui, () => {
   game.events.emit(TOGGLE_SOUND_EVENT);
 });
+
+// Online identity: a random id kept in localStorage, shown under Settings → Online profile.
+let identity = loadIdentity(storage, () =>
+  typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : uuidFromBytes(crypto.getRandomValues(new Uint8Array(16))),
+);
+const profileApi = createProfileApi(
+  serverUrl(import.meta.env.VITE_SERVER_URL, window.location),
+  (url, init) => fetch(url, init),
+);
+const profile = mountProfile(ui, {
+  identity: () => identity,
+  changeId: (text) => {
+    const change = replaceUserId(storage, identity, text);
+    if (!change.ok) return change.reason;
+    identity = change.identity;
+    void syncProgress();
+    return null;
+  },
+  changeName: (text) => {
+    const change = setDisplayName(storage, identity, text);
+    if (!change.ok) return change.reason;
+    identity = change.identity;
+    void syncProgress();
+    return null;
+  },
+  onDialog: (open) => game.events.emit(DIALOG_EVENT, open),
+});
+game.events.on(PROFILE_ACTION_EVENT, (action: ProfileAction) => {
+  profile.act(action);
+});
+game.events.on(DIALOG_CANCEL_EVENT, profile.cancelDialog);
+
+/**
+ * Merges this browser's progress with the online profile, both ways. When the
+ * server can't be reached nothing changes and the game plays on offline.
+ */
+async function syncProgress(): Promise<void> {
+  // A scene (`?scene=`) never touches the save.
+  if (!storage) return;
+  profile.setServerStatus('syncing');
+  const levels = await syncLevels(profileApi, identity, save.levels);
+  profile.setServerStatus(levels ? 'online' : 'offline');
+  if (!levels) return;
+  // Merged again: a round may have finished while the request was out.
+  save.levels = mergeLevels(save.levels, levels);
+  writeSave(storage, save);
+}
+void syncProgress();
+
 game.events.on(FLOW_EVENT, (view: FlowView) => {
   soundToggle.render(view.save.settings);
   const screen = view.flow.screen;
@@ -93,4 +152,5 @@ game.events.on(FLOW_EVENT, (view: FlowView) => {
   for (const [name, mounted] of Object.entries(screens)) {
     mounted.render(name === screen ? view : null);
   }
+  profile.render(screen === 'profile' ? view : null);
 });

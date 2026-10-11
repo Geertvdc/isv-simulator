@@ -999,3 +999,134 @@ body {
 .sound-toggle.muted {
   opacity: 0.7;
 }
+
+/* Settings → Online profile: the id, the name, and a dialog to change them. */
+.profile-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem 1.5rem;
+  align-items: baseline;
+  max-width: calc(100% - 2rem);
+  padding: 1.25rem 1.75rem;
+  border: 2px solid var(--panel-border);
+  border-radius: 1rem;
+  background: var(--panel);
+}
+
+.profile-label {
+  font-size: 1.125rem;
+  color: var(--text-muted);
+}
+
+.profile-id {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 1.375rem;
+  color: var(--gold);
+  overflow-wrap: anywhere;
+  /* So it can be selected and copied by hand when the clipboard isn't allowed. */
+  user-select: all;
+  pointer-events: auto;
+}
+
+.profile-name {
+  font-size: 1.625rem;
+  font-weight: 700;
+}
+
+.profile-status {
+  min-height: 1.5rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.profile-about,
+.profile-server {
+  max-width: 40rem;
+  font-size: 1.125rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.profile-server[data-status='offline'] {
+  color: var(--text-faint);
+}
+
+.profile-dialog {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(10, 12, 18, 0.8);
+  pointer-events: auto;
+}
+
+.profile-dialog[hidden] {
+  display: none;
+}
+
+.profile-dialog-box {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: min(40rem, 100%);
+  padding: 1.75rem;
+  border: 3px solid var(--gold);
+  border-radius: 1rem;
+  background: var(--panel-raised);
+  box-sizing: border-box;
+}
+
+.profile-dialog-prompt {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.profile-input {
+  padding: 0.625rem 0.875rem;
+  border: 2px solid var(--panel-border);
+  border-radius: 0.5rem;
+  background: var(--menu-bg);
+  color: #fff;
+  font: inherit;
+  font-size: 1.5rem;
+}
+
+.profile-input-id {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 1.125rem;
+}
+
+.profile-input:focus {
+  outline: 2px solid var(--gold);
+}
+
+.profile-dialog-error {
+  min-height: 1.25rem;
+  font-size: 1.125rem;
+  color: var(--gold);
+}
+
+.profile-dialog-hint {
+  font-size: 1rem;
+  color: var(--text-muted);
+}
+
+.profile-dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.profile-button {
+  padding: 0.5rem 1.25rem;
+  border: 2px solid var(--panel-border);
+  border-radius: 0.5rem;
+  background: var(--panel);
+  color: #e6e6e6;
+  font: inherit;
+  font-size: 1.125rem;
+  cursor: pointer;
+}

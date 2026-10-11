@@ -409,6 +409,33 @@ describe('settings', () => {
     expect(isRoundRunning(flow)).toBe(false);
   });
 
+  it('opens the online profile and comes back to its line', () => {
+    const c = ctx();
+    const flow = fromPause(c);
+    pick(flow, 'profile', c);
+    expect(flow.screen).toBe('profile');
+    expect(menuItems(flow)).toEqual(['copyId', 'changeName', 'changeId', 'back']);
+    updateFlow(flow, back(), c);
+    expect(flow.screen).toBe('settings');
+    expect(menuItems(flow)[flow.menuIndex]).toBe('profile');
+    pick(flow, 'profile', c);
+    pick(flow, 'back', c);
+    expect(flow.screen).toBe('settings');
+    expect(flow.settingsFrom).toBe('paused');
+  });
+
+  it('asks the UI to copy the id, change the name or use another id', () => {
+    const c = ctx();
+    const flow = fromPause(c);
+    pick(flow, 'profile', c);
+    for (const action of ['copyId', 'changeName', 'changeId'] as const) {
+      flow.menuIndex = menuItems(flow).indexOf(action);
+      const update = updateFlow(flow, confirm(), c);
+      expect(update.effects).toEqual([{ type: 'profileAction', action }]);
+      expect(flow.screen).toBe('profile');
+    }
+  });
+
   it('only takes presses from players once opened from the pause menu', () => {
     const c = ctx();
     const flow = fromPause(c);
