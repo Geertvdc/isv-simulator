@@ -51,11 +51,11 @@ The `hello` is the join options: `client.create('game', hello)` or `client.joinB
 
 ## Done when
 
-- [ ] `npm run server` boots a Colyseus server on `PORT` (2567) with `GET /health`
-- [ ] Rooms get unique 4-letter join codes; joining by code (any case) works, wrong codes and full rooms are refused
-- [ ] The room runs flow and sim at 60 ticks per second, sends snapshots at 20 Hz, answers pings
-- [ ] Pure room logic and integration tests pass in `npm run check`, which also typechecks and lints `server/`
-- [ ] `npm run build` still builds only the client; `npm run build:server` bundles the server; `Dockerfile` and `server/README.md` exist
-- [ ] CI is green
+- [x] `npm run server` boots a Colyseus server on `PORT` (2567) with `GET /health`
+- [x] Rooms get unique 4-letter join codes; joining by code (any case) works, wrong codes and full rooms are refused
+- [x] The room runs flow and sim at 60 ticks per second, sends snapshots at 20 Hz, answers pings
+- [x] Pure room logic and integration tests pass in `npm run check`, which also typechecks and lints `server/`
+- [x] `npm run build` still builds only the client; `npm run build:server` bundles the server; `Dockerfile` and `server/README.md` exist
+- [x] CI is green
 
 Manual check: `npm run server`, then `curl localhost:2567/health`. There is nothing to see in the game yet: the browser doesn't connect until 13d/13e.
