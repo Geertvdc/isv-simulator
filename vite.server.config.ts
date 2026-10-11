@@ -6,6 +6,8 @@ import { defineConfig } from 'vite';
  * packages from node_modules (Colyseus) stay external. `npm run build:server`.
  */
 export default defineConfig({
+  // public/ holds the client's art and sound; the server needs none of it.
+  publicDir: false,
   build: {
     ssr: 'server/main.ts',
     outDir: 'dist-server',
