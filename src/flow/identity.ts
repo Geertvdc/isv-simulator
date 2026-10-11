@@ -35,6 +35,19 @@ export function normalizeDisplayName(text: string): string | null {
   return name.length > 0 && name.length <= NET_MAX_NAME_LENGTH ? name : null;
 }
 
+/**
+ * A UUID v4 from 16 random bytes, for browsers without `crypto.randomUUID`
+ * (it needs a secure context, so plain http on a LAN has only `getRandomValues`).
+ */
+export function uuidFromBytes(bytes: Uint8Array): string {
+  if (bytes.length < 16) throw new Error('a UUID needs 16 random bytes');
+  const b = Array.from(bytes.slice(0, 16));
+  b[6] = ((b[6] ?? 0) & 0x0f) | 0x40;
+  b[8] = ((b[8] ?? 0) & 0x3f) | 0x80;
+  const hex = b.map((x) => x.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 /** "Dev 1234", the digits taken from the id so the same id always gets the same name. */
 export function defaultDisplayName(userId: string): string {
   const hex = userId.replace(/[^0-9a-f]/gi, '').slice(0, 8);

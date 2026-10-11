@@ -164,6 +164,10 @@ export const MENU_LABELS = {
   volume: 'Sound volume',
   music: 'Music volume',
   shake: 'Screen shake',
+  profile: 'Online profile',
+  copyId: 'Copy ID',
+  changeName: 'Change name',
+  changeId: 'Use another ID',
   back: 'Back',
 } as const;
 
@@ -267,3 +271,26 @@ export const HINT_TEXTS = {
 
 /** A new player's display name is this plus four digits from their user id, e.g. "Dev 1234". */
 export const DEFAULT_DISPLAY_NAME_PREFIX = 'Dev';
+
+/** The online profile screen, under Settings. */
+export const PROFILE_TEXT = {
+  title: 'Online profile',
+  idLabel: 'Your ID',
+  nameLabel: 'Name',
+  about: 'Copy your ID to another browser (Use another ID) to take your progress along.',
+  copied: 'ID copied!',
+  copyFailed: "Couldn't copy: select the ID above and copy it by hand.",
+  idChanged: 'Now playing as this ID.',
+  nameChanged: 'Name changed.',
+  serverOnline: 'Progress synced with the server.',
+  serverOffline: 'Server not reachable: progress stays on this device for now.',
+  serverSyncing: 'Syncing with the server…',
+  nameDialog: 'Your name, as others see it online',
+  idDialog: 'Paste the ID from your other browser',
+  idConfirm:
+    "Switch to this ID? This browser's progress is added to it; the old ID is forgotten here unless you copied it.",
+  dialogHint: 'Enter: OK · Esc: cancel',
+  confirmHint: 'Enter: switch · Esc: cancel',
+  ok: 'OK',
+  cancel: 'Cancel',
+} as const;
