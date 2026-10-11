@@ -14,25 +14,33 @@
  *   (the base) and replays the inputs stamped `S` and later (reconciliation).
  * - Ticks without a sent input repeat the newest earlier one, as the server
  *   does, and stand still after `NET_INPUT_REPEAT_TICKS`.
- * - Other players and managers are obstacles where the newest snapshot has
- *   them. Someone standing at a station is exactly there; someone walking
- *   is off and the server's correction glides it away.
+ * - Other players are simulated along without input from where the newest
+ *   snapshot has them (they slow down and stop, and get pushed like on the
+ *   server), but never drawn from here: the screen shows them interpolated.
+ *   A teammate standing still is then exactly what the server has; someone
+ *   walking is off and the server's correction glides it away. Managers are
+ *   obstacles where the newest snapshot has them.
  * - A correction (the predicted position moved by a reconcile) becomes a
  *   visual offset that decays over `NET_PREDICT_SMOOTH_MS`; past
  *   `NET_PREDICT_SNAP_DISTANCE`, or when the snapshot says a local player
  *   was shoved or bumped, it snaps.
- * - While the round isn't running (countdown, pause, results) nothing is
- *   predicted: the local players are where the newest snapshot has them.
+ * - While the round isn't running (pause, results) nothing is predicted:
+ *   the local players are where the newest snapshot has them. During the
+ *   countdown the server tick the round starts on is known, so prediction
+ *   stands still until then and moves from that tick on, like the server.
  *
  * Only movement is predicted. Tickets, stations, throws and everything else
  * stay the server's, drawn interpolated.
  */
 
 import {
+  COUNTDOWN_STEP_MS,
+  COUNTDOWN_STEPS,
   NET_INPUT_REPEAT_TICKS,
   NET_PREDICT_MAX_TICKS,
   NET_PREDICT_SMOOTH_MS,
   NET_PREDICT_SNAP_DISTANCE,
+  TICKS_PER_SECOND,
 } from '../sim/balance';
 import type { LevelMap } from '../sim/level';
 import { pushOutOfManager } from '../sim/manager';
@@ -40,6 +48,9 @@ import { movePlayer } from '../sim/movement';
 import type { GameEvent } from '../sim/orders';
 import { separatePlayers } from '../sim/push';
 import type { InputCommand, Player, PlayerId, Vec } from '../sim/state';
+
+const TICK_MS = 1000 / TICKS_PER_SECOND;
+const COUNTDOWN_MS = COUNTDOWN_STEPS * COUNTDOWN_STEP_MS;
 
 /** A correction smaller than this (tiles) is rounding, not a correction. */
 const CORRECTION_EPSILON = 1e-6;
@@ -69,8 +80,12 @@ export interface PredictionSnapshot {
   players: readonly Player[];
   managers: readonly Obstacle[];
   events: readonly GameEvent[];
-  /** The round is playing (not the countdown, a pause or the results). */
-  running: boolean;
+  /**
+   * The server tick the sim runs from: at or before `serverTick` while the
+   * round plays, the countdown's end during the countdown, `null` while it
+   * doesn't run (a pause, the results).
+   */
+  runsFrom: number | null;
 }
 
 export interface Prediction {
@@ -79,8 +94,12 @@ export interface Prediction {
   level: LevelMap | null;
   /** The newest snapshot's server tick; `null` until the first one of the round. */
   baseTick: number | null;
-  running: boolean;
-  /** The other players and the managers where the newest snapshot has them. */
+  /** The server tick the sim runs from; `null`: it doesn't (pause, results). */
+  runsFrom: number | null;
+  /**
+   * The other players at `tick`, simulated without input from the newest
+   * snapshot (only as obstacles), and the managers where it has them.
+   */
   others: Player[];
   managers: Obstacle[];
   /** Inputs sent for the base tick or later, sorted by tick. */
@@ -106,7 +125,7 @@ export function createPrediction(enabled: boolean): Prediction {
     enabled,
     level: null,
     baseTick: null,
-    running: false,
+    runsFrom: null,
     others: [],
     managers: [],
     inputs: [],
@@ -178,10 +197,9 @@ function step(p: Prediction, t: number): void {
     const input = inputFor(p, player.id, t);
     movePlayer(level, player, input?.move, input?.dash);
   }
-  // Others are frozen where the server last had them, and never dash: a
-  // shove is the server's call (it arrives as a correction that snaps).
-  const others = p.others.map((o) => ({ ...clonePlayer(o), dashTicks: 0 }));
-  const everyone = [...p.current, ...others].sort((a, b) => a.id - b.id);
+  // Their inputs are on other machines: they let go.
+  for (const other of p.others) movePlayer(level, other);
+  const everyone = [...p.current, ...p.others].sort((a, b) => a.id - b.id);
   separatePlayers(level, everyone);
   for (const player of p.current) {
     for (const manager of p.managers) pushOutOfManager(level, player, manager);
@@ -193,7 +211,8 @@ function simulate(p: Prediction, until: number): void {
   const from = Math.max(p.tick, until - NET_PREDICT_MAX_TICKS);
   for (let t = from; t < until; t++) {
     p.previous = p.current.map(clonePlayer);
-    step(p, t);
+    // Before the countdown ends the server's sim doesn't run: nobody moves.
+    if (p.runsFrom !== null && t >= p.runsFrom) step(p, t);
   }
   p.tick = Math.max(p.tick, until);
 }
@@ -204,7 +223,7 @@ function simulate(p: Prediction, until: number): void {
  * that tick ran. Never goes back.
  */
 export function advancePrediction(p: Prediction, targetTick: number): void {
-  if (!p.enabled || p.baseTick === null || !p.running) return;
+  if (!p.enabled || p.baseTick === null || p.runsFrom === null) return;
   const until = Math.floor(targetTick) + 1;
   if (until > p.tick) simulate(p, until);
 }
@@ -238,8 +257,12 @@ export function reconcile(
 
   p.stats.reconciles++;
   p.baseTick = snap.serverTick;
-  p.running = snap.running;
-  p.others = snap.players.filter((pl) => !local.has(pl.id)).map(clonePlayer);
+  p.runsFrom = snap.runsFrom;
+  // Others never dash here: a shove by them is the server's call (it
+  // arrives as a correction that snaps).
+  p.others = snap.players
+    .filter((pl) => !local.has(pl.id))
+    .map((pl) => ({ ...clonePlayer(pl), dashTicks: 0 }));
   p.managers = snap.managers.map((m) => ({ pos: { ...m.pos }, facing: { ...m.facing } }));
   const acked = p.inputs.filter((i) => i.tick < snap.serverTick);
   for (const input of acked) p.lastAcked[input.playerId] = input;
@@ -248,7 +271,7 @@ export function reconcile(
   p.current = snap.players.filter((pl) => local.has(pl.id)).map(clonePlayer);
   p.previous = p.current.map(clonePlayer);
   p.tick = snap.serverTick;
-  if (snap.running && hadBase && reached > snap.serverTick) simulate(p, reached);
+  if (snap.runsFrom !== null && hadBase && reached > snap.serverTick) simulate(p, reached);
 
   const wasKnocked = knocked(snap.events, local);
   const offsets: Record<PlayerId, Vec | undefined> = {};
@@ -310,4 +333,15 @@ export function predictedPlayer(p: Prediction, id: PlayerId, alpha: number): Pla
       y: was.pos.y + (now.pos.y - was.pos.y) * alpha + offset.y,
     },
   };
+}
+
+/**
+ * The server tick a countdown that started at `countdownStartMs` (the room's
+ * clock: server tick times the tick length) ends on: the first tick whose
+ * flow update finds it over, which is also the round's first sim tick.
+ */
+export function countdownEndTick(countdownStartMs: number): number {
+  let t = Math.max(0, Math.floor((countdownStartMs + COUNTDOWN_MS) / TICK_MS) - 1);
+  while (t * TICK_MS - countdownStartMs < COUNTDOWN_MS) t++;
+  return t;
 }

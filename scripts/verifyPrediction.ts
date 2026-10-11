@@ -578,6 +578,55 @@ async function main(): Promise<void> {
     carried ? undefined : where,
   );
 
+  // Walking into a teammate standing still (on another machine).
+  if (carried) await holdKeys(host, ['KeyE'], 80); // put it down (or throw it): hands free
+  const mate = await serverPos(host, 2);
+  if (mate) {
+    await walkTo(host, 1, mate.x - 1.6, mate.y);
+    await sleep(800);
+    const before = await predictStats(host);
+    await startRecording(host);
+    await holdKeys(host, ['KeyD'], 1200);
+    await sleep(500);
+    const { trace, keys } = await stopRecording(host);
+    const after = await predictStats(host);
+    const j = jitter(trace, keys, 1);
+    const pushed = await serverPos(host, 2);
+    const corrections = (after?.corrections ?? 0) - (before?.corrections ?? 0);
+    check(
+      'walking into a teammate: no backward steps or snaps',
+      j.backward === 0 && j.snaps === 0,
+      `${j.backward} backward (worst ${j.worstBackward.toFixed(3)}), ${j.snaps} snaps, ${corrections} corrections (max error so far ${after?.maxErrorTiles.toFixed(3) ?? '?'}), teammate pushed ${pushed ? (pushed.x - mate.x).toFixed(2) : '?'} tiles`,
+    );
+  }
+
+  // The countdown of a restarted round: nothing moves before it, then the player answers at once.
+  await host.key('Escape');
+  await host.waitFor(`window.isvNet?.screen === 'paused'`, 'the pause');
+  await host.key('ArrowDown');
+  await host.key('Enter'); // Restart
+  await host.waitFor(`window.isvNet?.screen === 'countdown'`, 'the countdown', 10_000);
+  await sleep(300);
+  await startRecording(host);
+  const spawn = await localPos(host, 1);
+  await host.down('KeyD');
+  await host.waitFor(`window.isvNet?.screen === 'playing'`, 'the restarted round', 10_000);
+  const playingAt = await host.eval<number>(`performance.now()`);
+  await sleep(700);
+  await host.up('KeyD');
+  await sleep(500);
+  const restart = await stopRecording(host);
+  const moved = restart.trace.find((f) => {
+    const p = f.players[1];
+    return spawn && p && Math.hypot(p.x - spawn.x, p.y - spawn.y) > 0.01;
+  });
+  const j = jitter(restart.trace, restart.keys, 1);
+  check(
+    'the countdown: standing still until the round plays, then no jitter',
+    !!moved && moved.t > playingAt - 600 && j.backward === 0 && j.snaps === 0,
+    `first moved ${moved ? (moved.t - playingAt).toFixed(0) : '?'} ms after this page saw "playing", ${j.backward} backward, ${j.snaps} snaps`,
+  );
+
   writeFileSync(join(OUT, 'results.json'), JSON.stringify(rows, null, 2));
 }
 
