@@ -219,6 +219,12 @@ export interface NetDebug {
   score: number | null;
   ticksLeft: number | null;
   screen: string | null;
+  /** The state drawn (not a copy: read it, don't change it). */
+  state: GameState | null;
+  /** Snapshot events played this round, by type. */
+  eventsPlayed: Record<string, number>;
+  /** The music track playing. */
+  music: string | null;
 }
 
 /** Handed to the scene once, at boot. */
@@ -374,6 +380,9 @@ export class GameScene extends Phaser.Scene {
     score: null,
     ticksLeft: null,
     screen: null,
+    state: null,
+    eventsPlayed: {},
+    music: null,
   };
 
   constructor(private readonly options: GameSceneOptions) {
@@ -555,6 +564,7 @@ export class GameScene extends Phaser.Scene {
       chapterId: chapterIdOf(flow.levelIndex),
       ticksLeft: state ? state.settings.durationTicks - state.tick : null,
     });
+    this.netDebug.music = cue.track;
     this.music.update(cue, deltaMs);
   }
 
@@ -733,6 +743,8 @@ export class GameScene extends Phaser.Scene {
     debug.score = frame.state.score;
     debug.ticksLeft = frame.state.settings.durationTicks - frame.state.tick;
     debug.screen = flow.screen;
+    debug.state = frame.state;
+    for (const e of events) debug.eventsPlayed[e.type] = (debug.eventsPlayed[e.type] ?? 0) + 1;
     return frame.state;
   }
 
@@ -744,6 +756,11 @@ export class GameScene extends Phaser.Scene {
   private finishOnlineRound(round: OnlineRound, flow: Flow): void {
     const results = flow.results;
     if (flow.screen !== 'results' || !results || this.recordedRound === round) return;
+    // Right after the host picks Retry or Next, the new round's `roundStart`
+    // is here before the snapshot that leaves the results: only a round that
+    // ended counts.
+    const newest = round.buffer.entries[round.buffer.entries.length - 1];
+    if (!newest?.state.result) return;
     this.recordedRound = round;
     this.countStars(results.stars);
     if (!this.options.storage) return;
@@ -785,6 +802,7 @@ export class GameScene extends Phaser.Scene {
         this.hints = [];
         this.netDebug.frames = 0;
         this.netDebug.waitingFrames = 0;
+        this.netDebug.eventsPlayed = {};
         resetInputStamper(this.stamper);
         break;
       case 'snapshot': {
