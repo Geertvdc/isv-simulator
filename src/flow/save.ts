@@ -52,7 +52,12 @@ export interface SaveData {
 }
 
 export function defaultSettings(): Settings {
-  return { sfxVolume: DEFAULT_SFX_VOLUME, musicVolume: DEFAULT_MUSIC_VOLUME, screenShake: true, muted: false };
+  return {
+    sfxVolume: DEFAULT_SFX_VOLUME,
+    musicVolume: DEFAULT_MUSIC_VOLUME,
+    screenShake: true,
+    muted: false,
+  };
 }
 
 export function createSave(): SaveData {
@@ -80,6 +85,44 @@ function parseLevel(raw: unknown): LevelRecord | null {
   return { bestStars, bestScore: bestScore ?? 0, plays: plays ?? 1 };
 }
 
+/** Levels by id, from any parsed JSON: broken records are left out. Also read by the server. */
+export function parseLevels(raw: unknown): Record<string, LevelRecord> {
+  const levels: Record<string, LevelRecord> = {};
+  if (!isObject(raw)) return levels;
+  for (const [id, level] of Object.entries(raw)) {
+    // A key that would set the object's prototype instead of a level.
+    if (id === '__proto__') continue;
+    const parsed = parseLevel(level);
+    if (parsed) levels[id] = parsed;
+  }
+  return levels;
+}
+
+/**
+ * Two sets of progress as one, e.g. this browser's save and the online
+ * profile: per level the best stars and best score win and plays is the
+ * larger count (the same rounds are often in both, so adding would count
+ * them twice). Neither argument changes.
+ */
+export function mergeLevels(
+  a: Readonly<Record<string, LevelRecord>>,
+  b: Readonly<Record<string, LevelRecord>>,
+): Record<string, LevelRecord> {
+  const merged: Record<string, LevelRecord> = {};
+  for (const [id, record] of Object.entries(a)) merged[id] = { ...record };
+  for (const [id, record] of Object.entries(b)) {
+    const old = merged[id];
+    merged[id] = old
+      ? {
+          bestStars: Math.max(old.bestStars, record.bestStars),
+          bestScore: Math.max(old.bestScore, record.bestScore),
+          plays: Math.max(old.plays, record.plays),
+        }
+      : { ...record };
+  }
+  return merged;
+}
+
 /**
  * Any parsed JSON to a save, field by field: what's broken or missing falls
  * back to its default. A save from a newer version is read as far as we
@@ -90,12 +133,7 @@ export function parseSave(raw: unknown): SaveData {
   if (!isObject(raw)) return save;
   const version = wholeNumber(raw.version, 1, Infinity);
   if (version !== null) save.version = version;
-  if (isObject(raw.levels)) {
-    for (const [id, level] of Object.entries(raw.levels)) {
-      const parsed = parseLevel(level);
-      if (parsed) save.levels[id] = parsed;
-    }
-  }
+  save.levels = parseLevels(raw.levels);
   if (isObject(raw.settings)) {
     const volume = wholeNumber(raw.settings.sfxVolume, 0, SFX_VOLUME_MAX);
     if (volume !== null) save.settings.sfxVolume = volume;
@@ -178,9 +216,18 @@ export interface RecordOutcome {
 
 /** Adds a finished round to the save. A worse round never lowers a best. */
 export function recordResult(save: SaveData, levelId: string, result: LevelResult): RecordOutcome {
-  const old = save.levels[levelId];
+  return recordLevel(save.levels, levelId, result);
+}
+
+/** Adds a finished round to a set of level records (a save's or a profile's). */
+export function recordLevel(
+  levels: Record<string, LevelRecord>,
+  levelId: string,
+  result: LevelResult,
+): RecordOutcome {
+  const old = levels[levelId];
   const stars = Math.min(MAX_STARS, Math.max(0, result.stars));
-  save.levels[levelId] = {
+  levels[levelId] = {
     bestStars: Math.max(old?.bestStars ?? 0, stars),
     bestScore: old ? Math.max(old.bestScore, result.score) : result.score,
     plays: (old?.plays ?? 0) + 1,

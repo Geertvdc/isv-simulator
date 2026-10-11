@@ -14,6 +14,9 @@ import {
   isChapterOpen,
   isUnlocked,
   loadSave,
+  mergeLevels,
+  parseLevels,
+  recordLevel,
   parseSave,
   recordResult,
   totalStars,
@@ -280,5 +283,41 @@ describe('chapter gates', () => {
     save.levels.a1 = record(3);
     expect(isChapterOpen(save, IDS, CHAPTERS, 1)).toBe(true);
     expect(isUnlocked(save, IDS, 2, false, CHAPTERS)).toBe(false);
+  });
+});
+
+describe('parseLevels, mergeLevels and recordLevel', () => {
+  it('parses levels and leaves out broken ones', () => {
+    const raw = JSON.parse(
+      '{"a":{"bestStars":2,"bestScore":50,"plays":3},"b":"nope","__proto__":{"bestStars":1}}',
+    ) as unknown;
+    expect(parseLevels(raw)).toEqual({ a: { bestStars: 2, bestScore: 50, plays: 3 } });
+    expect(Object.getPrototypeOf(parseLevels(raw))).toBe(Object.prototype);
+    expect(parseLevels(null)).toEqual({});
+  });
+
+  it('merges: best stars and score win, plays is the larger count', () => {
+    const a = {
+      x: { bestStars: 3, bestScore: 10, plays: 2 },
+      y: { bestStars: 1, bestScore: 5, plays: 1 },
+    };
+    const b = {
+      x: { bestStars: 1, bestScore: 40, plays: 5 },
+      z: { bestStars: 2, bestScore: 7, plays: 1 },
+    };
+    expect(mergeLevels(a, b)).toEqual({
+      x: { bestStars: 3, bestScore: 40, plays: 5 },
+      y: { bestStars: 1, bestScore: 5, plays: 1 },
+      z: { bestStars: 2, bestScore: 7, plays: 1 },
+    });
+    expect(a.x).toEqual({ bestStars: 3, bestScore: 10, plays: 2 });
+    expect(mergeLevels(b, a)).toEqual(mergeLevels(a, b));
+  });
+
+  it('records a round in a set of levels', () => {
+    const levels = {};
+    expect(recordLevel(levels, 'x', { score: 30, stars: 2 })).toEqual({ newBest: true });
+    expect(recordLevel(levels, 'x', { score: 10, stars: 3 })).toEqual({ newBest: false });
+    expect(levels).toEqual({ x: { bestStars: 3, bestScore: 30, plays: 2 } });
   });
 });

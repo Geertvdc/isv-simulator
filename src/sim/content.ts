@@ -264,3 +264,6 @@ export const HINT_TEXTS = {
   keyboard: 'Hold work here to code',
   ship: 'Ship it here!',
 } as const;
+
+/** A new player's display name is this plus four digits from their user id, e.g. "Dev 1234". */
+export const DEFAULT_DISPLAY_NAME_PREFIX = 'Dev';
