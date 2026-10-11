@@ -1141,3 +1141,230 @@ body {
   font-size: 1.125rem;
   cursor: pointer;
 }
+
+/* Join online: four letter boxes with a text box laid over them for typing. */
+.join-code-prompt {
+  font-size: 1.375rem;
+  color: var(--text-muted);
+}
+
+.join-code-boxes {
+  position: relative;
+  display: flex;
+  gap: 0.75rem;
+  pointer-events: auto;
+}
+
+.join-code-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.5rem;
+  height: 5.5rem;
+  border: 3px solid var(--panel-border);
+  border-radius: 0.75rem;
+  background: var(--panel);
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 3rem;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.join-code-box.cursor {
+  border-color: var(--gold);
+  background: var(--panel-raised);
+}
+
+/* Invisible, over the boxes: it takes the typing (and pastes) and the clicks. */
+.join-code-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  border: 0;
+  font-size: 1rem;
+  cursor: text;
+}
+
+.join-code-status {
+  min-height: 1.5em;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.join-code-status.error {
+  color: #ff8a80;
+}
+
+/* The online lobby: the code, the members and their couch players. */
+.online-lobby {
+  gap: 1.25rem;
+}
+
+.online-code-card {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0.75rem 1.5rem;
+  border: 2px solid var(--panel-border);
+  border-radius: 1rem;
+  background: var(--panel);
+  pointer-events: auto;
+}
+
+.online-code-card[hidden] {
+  display: none;
+}
+
+.online-code {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 4rem;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  color: var(--gold);
+  user-select: all;
+}
+
+.online-copied {
+  min-width: 6rem;
+  font-size: 1rem;
+  color: var(--text-muted);
+}
+
+.online-status {
+  font-size: 1.125rem;
+  color: var(--text-muted);
+}
+
+.online-status[data-status='connected'] {
+  color: #7bd88f;
+}
+
+.online-status[data-status='closed'] {
+  font-weight: 700;
+  color: #ff8a80;
+}
+
+.online-members {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  width: min(44rem, calc(100% - 2rem));
+}
+
+.online-member {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--panel-border);
+  border-radius: 0.75rem;
+  background: var(--panel);
+}
+
+.online-member.you {
+  border-color: var(--text-faint);
+}
+
+.online-member-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 12rem;
+  font-size: 1.375rem;
+  font-weight: 700;
+}
+
+.online-you {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.online-host {
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.375rem;
+  background: var(--gold);
+  color: #1a1d24;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.online-players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.online-player {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  border: 2px solid var(--player-color);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--player-color) 22%, var(--panel));
+}
+
+.online-player-name {
+  font-weight: 700;
+  color: var(--player-color);
+}
+
+.online-player-device {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.online-no-players {
+  color: var(--text-faint);
+}
+
+.online-leave,
+.online-bar-leave {
+  pointer-events: auto;
+}
+
+/* On top of the online screens other than the lobby: the room, and who is choosing. */
+.online-bar {
+  position: absolute;
+  top: 0.75rem;
+  left: 50%;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.375rem 0.5rem 0.375rem 1rem;
+  border: 2px solid var(--panel-border);
+  border-radius: 0.75rem;
+  background: var(--panel);
+  transform: translateX(-50%);
+  font-size: 1.125rem;
+  white-space: nowrap;
+}
+
+.online-bar[hidden],
+.online-bar-waiting[hidden] {
+  display: none;
+}
+
+.online-bar-room {
+  color: var(--text-muted);
+}
+
+.online-bar-waiting {
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.online-round-body {
+  max-width: 36rem;
+  font-size: 1.25rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.with-online-bar > .screen {
+  padding-top: 4.5rem;
+}

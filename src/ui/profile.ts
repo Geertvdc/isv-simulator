@@ -44,7 +44,7 @@ const STATUS_TEXT: Record<ServerStatus, string> = {
 };
 
 /** Copies with the clipboard API, or the old way where that isn't allowed (plain http on a LAN). */
-async function copyText(text: string, selectable: HTMLElement): Promise<boolean> {
+export async function copyText(text: string, selectable: HTMLElement): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
     return true;

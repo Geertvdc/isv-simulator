@@ -7,16 +7,37 @@ import {
   type Flow,
   type FlowContext,
   type FlowEffect,
+  type FlowUpdate,
+  type OnlineError,
+  cancelJoinCode,
   countdownNumber,
   createFlow,
+  editJoinCode,
   finishRound,
   isRoundRunning,
+  joinFailed,
+  joinSucceeded,
+  onlineEnded,
   resultsReady,
+  submitJoinCode,
   updateFlow,
 } from '../flow/flow';
+import type { Identity } from '../flow/identity';
+import {
+  type OnlineRole,
+  type OnlineState,
+  applyServerMessage,
+  createOnline,
+  onlineConnected,
+  onlineMenuPresses,
+  onlineNowMs,
+  setOnlineStatus,
+} from '../flow/online';
+import { type NetConnection, helloFor, hostRoom, joinRoomByCode, toJoinError } from '../net/client';
 import { type HintId, startHints, updateHints } from '../flow/hints';
 import { type ChapterInfo, type SaveData, type StorageLike, writeSave } from '../flow/save';
 import {
+  NET_MAX_PRESSES_PER_MESSAGE,
   RESULTS_STAR_DELAY_MS,
   RESULTS_STAR_INTERVAL_MS,
   SCREEN_FADE_MS,
@@ -90,6 +111,12 @@ export interface FlowView {
   resultsReady: boolean;
   /** During the countdown: the number showing (3, 2, 1). */
   countdown: number | null;
+  /**
+   * In an online room: the session. `flow` is then the room's flow from the
+   * server (or this browser's own `online` screen while connecting) and
+   * `save.levels` the room's unlocks.
+   */
+  online: OnlineState | null;
 }
 
 /** Emitted on `game.events` with a `FlowView` whenever the screens change. */
@@ -110,6 +137,24 @@ export const DIALOG_EVENT = 'dialog';
 /** Emitted on `game.events` by the scene: a back button was pressed while a dialog is open. */
 export const DIALOG_CANCEL_EVENT = 'dialog-cancel';
 
+/** What the join-code screen's text box did. */
+export type JoinCodeInput =
+  { type: 'text'; text: string } | { type: 'submit' } | { type: 'cancel' };
+
+/** Emitted on `game.events` by the UI with a `JoinCodeInput`. */
+export const JOIN_CODE_EVENT = 'join-code';
+
+/** Emitted on `game.events` by the UI: the Leave button of an online room was clicked. */
+export const ONLINE_LEAVE_EVENT = 'online-leave';
+
+/** How the scene reaches the game server; `null` where online play is off (`?scene=`). */
+export interface OnlineOptions {
+  /** The server's http(s) address (`serverUrl` in `profileApi.ts`). */
+  serverUrl: string;
+  /** Who this browser is right now: sent in the hello. */
+  identity: () => Identity;
+}
+
 /** Handed to the scene once, at boot. */
 export interface GameSceneOptions {
   storage: StorageLike | null;
@@ -118,6 +163,7 @@ export interface GameSceneOptions {
   unlockAll: boolean;
   /** `?scene=<id>`: shows that scene (see `src/sim/scenes.ts`) instead of the menus. */
   scene: Scene | null;
+  online: OnlineOptions | null;
 }
 
 /**
@@ -230,6 +276,16 @@ export class GameScene extends Phaser.Scene {
   private readonly sceneHandle: SceneHandle = { done: false };
   /** A text dialog is open in the UI: menu presses wait, back cancels it. */
   private dialogOpen = false;
+  /**
+   * The online room this browser is in (or connecting to), shown while the
+   * local flow is on its `online` screen. Kept across scene restarts.
+   */
+  private online: OnlineState | null = null;
+  private connection: NetConnection | null = null;
+  /** Bumped whenever a join is dropped, so a late answer to it is left at once. */
+  private onlineAttempt = 0;
+  /** A network callback changed what the screens show. */
+  private onlineDirty = false;
 
   constructor(private readonly options: GameSceneOptions) {
     super('GameScene');
@@ -275,6 +331,14 @@ export class GameScene extends Phaser.Scene {
     this.game.events.on(DIALOG_EVENT, (open: boolean) => {
       this.dialogOpen = open;
     });
+    this.game.events.off(JOIN_CODE_EVENT);
+    this.game.events.on(JOIN_CODE_EVENT, (input: JoinCodeInput) => {
+      this.joinCodeInput(input);
+    });
+    this.game.events.off(ONLINE_LEAVE_EVENT);
+    this.game.events.on(ONLINE_LEAVE_EVENT, () => {
+      this.leaveOnline();
+    });
     this.playerRenderer = new PlayerRenderer(this);
     this.managerRenderer = new ManagerRenderer(this);
     this.meetingRenderer = new MeetingRenderer(this, this.map);
@@ -311,6 +375,12 @@ export class GameScene extends Phaser.Scene {
   update(time: number, delta: number): void {
     if (!this.devices) return;
     const frame = this.devices.poll();
+    if (this.flow.screen === 'online') {
+      this.updateOnline(frame.presses, time);
+      this.updateMusic(delta);
+      this.updateHover();
+      return;
+    }
     const { players } = this.flow.lobby;
     if (this.flow.lobby.started) {
       claimOrphanedPlayer(players, frame.presses, new Set(frame.readings.keys()));
@@ -321,7 +391,13 @@ export class GameScene extends Phaser.Scene {
     if (this.runEffects(update.effects)) return;
     const ready = resultsReady(this.flow, time);
     const countdown = countdownNumber(this.flow, time);
-    if (update.changed || ready !== this.shownResultsReady || countdown !== this.shownCountdown) {
+    const dirty = this.takeOnlineDirty();
+    if (
+      update.changed ||
+      dirty ||
+      ready !== this.shownResultsReady ||
+      countdown !== this.shownCountdown
+    ) {
       this.emitFlow(time);
     }
 
@@ -405,17 +481,142 @@ export class GameScene extends Phaser.Scene {
   }
 
   private emitFlow(nowMs: number): void {
-    this.shownResultsReady = resultsReady(this.flow, nowMs);
-    this.shownCountdown = countdownNumber(this.flow, nowMs);
+    // Online, the screens show the room: its flow, its clock and its unlocks.
+    const online = this.flow.screen === 'online' ? this.online : null;
+    const flow = online?.flow ?? this.flow;
+    const now = online ? onlineNowMs(online) : nowMs;
+    this.shownResultsReady = resultsReady(flow, now);
+    this.shownCountdown = countdownNumber(flow, now);
     this.game.events.emit(FLOW_EVENT, {
-      flow: this.flow,
-      save: this.options.save,
+      flow,
+      save: online ? { ...this.options.save, levels: online.levels } : this.options.save,
       levelIds: LEVEL_IDS,
       chapters: CHAPTER_INFO,
-      unlockAll: this.options.unlockAll,
+      unlockAll: online ? false : this.options.unlockAll,
       resultsReady: this.shownResultsReady,
       countdown: this.shownCountdown,
+      online,
     } satisfies FlowView);
+  }
+
+  private takeOnlineDirty(): boolean {
+    const dirty = this.onlineDirty;
+    this.onlineDirty = false;
+    return dirty;
+  }
+
+  // ------------------------------------------------------------ online
+
+  /**
+   * A frame in an online room: this machine's presses go to the server (back
+   * on the lobby leaves instead), and the screens follow the room.
+   */
+  private updateOnline(presses: readonly DevicePress[], nowMs: number): void {
+    const online = this.online;
+    if (!online) {
+      onlineEnded(this.flow);
+      this.emitFlow(nowMs);
+      return;
+    }
+    const { send, leave } = onlineMenuPresses(online, this.menuPresses(presses));
+    if (leave) {
+      this.leaveOnline();
+      return;
+    }
+    if (send.length > 0) {
+      this.connection?.send({ type: 'menu', presses: send.slice(0, NET_MAX_PRESSES_PER_MESSAGE) });
+    }
+    const flow = online.flow;
+    const now = onlineNowMs(online);
+    const ready = flow ? resultsReady(flow, now) : false;
+    const countdown = flow ? countdownNumber(flow, now) : null;
+    if (
+      this.takeOnlineDirty() ||
+      ready !== this.shownResultsReady ||
+      countdown !== this.shownCountdown
+    ) {
+      this.emitFlow(nowMs);
+    }
+  }
+
+  /** Creates (host) or joins a room. The answer arrives later, in `connected` or as a failure. */
+  private startOnline(role: OnlineRole, code = ''): void {
+    const options = this.options.online;
+    const attempt = ++this.onlineAttempt;
+    this.online = role === 'host' ? createOnline('host') : null;
+    this.onlineDirty = true;
+    if (!options) {
+      this.onlineFailed(role, 'unreachable');
+      return;
+    }
+    const hello = helloFor(options.identity());
+    const pending =
+      role === 'host'
+        ? hostRoom(options.serverUrl, hello)
+        : joinRoomByCode(options.serverUrl, code, hello);
+    pending.then(
+      (connection) => {
+        if (attempt !== this.onlineAttempt) {
+          void connection.leave();
+          return;
+        }
+        this.connected(role, connection);
+      },
+      (error: unknown) => {
+        if (attempt === this.onlineAttempt) this.onlineFailed(role, toJoinError(error).code);
+      },
+    );
+  }
+
+  private onlineFailed(role: OnlineRole, error: OnlineError): void {
+    if (role === 'join') joinFailed(this.flow, error);
+    else if (this.online) setOnlineStatus(this.online, 'closed', error);
+    this.onlineDirty = true;
+  }
+
+  private connected(role: OnlineRole, connection: NetConnection): void {
+    const online = this.online ?? createOnline(role);
+    this.online = online;
+    this.connection = connection;
+    onlineConnected(online, connection.sessionId, connection.joinCode);
+    if (role === 'join') joinSucceeded(this.flow);
+    connection.onMessage((message) => {
+      if (applyServerMessage(online, message)) this.onlineDirty = true;
+    });
+    connection.onStatus((status, error) => {
+      setOnlineStatus(online, status, error);
+      if (status === 'closed' && this.connection === connection) this.connection = null;
+      this.onlineDirty = true;
+    });
+    this.onlineDirty = true;
+  }
+
+  /** Leaves the room (or drops the join that is out) and goes back to the title. */
+  private leaveOnline(): void {
+    this.onlineAttempt++;
+    const role = this.online?.role;
+    void this.connection?.leave();
+    this.connection = null;
+    this.online = null;
+    if (this.flow.screen === 'online') {
+      onlineEnded(this.flow, role === 'join' ? 'joinOnline' : 'hostOnline');
+    }
+    this.emitFlow(this.time.now);
+  }
+
+  /** The join-code text box: typing, Enter and Esc. */
+  private joinCodeInput(input: JoinCodeInput): void {
+    let update: FlowUpdate;
+    if (input.type === 'text') {
+      update = { changed: editJoinCode(this.flow, input.text), effects: [] };
+    } else if (input.type === 'submit') {
+      update = submitJoinCode(this.flow);
+    } else {
+      update = cancelJoinCode(this.flow);
+    }
+    this.runEffects(update.effects);
+    // Always redrawn: the text box must show the code as the flow kept it.
+    this.emitFlow(this.time.now);
   }
 
   /** Runs what the flow asked for. Returns whether the scene is restarting. */
@@ -448,6 +649,15 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'profileAction':
           this.game.events.emit(PROFILE_ACTION_EVENT, effect.action);
+          break;
+        case 'hostOnline':
+          this.startOnline('host');
+          break;
+        case 'joinOnline':
+          this.startOnline('join', effect.code);
+          break;
+        case 'cancelJoin':
+          this.onlineAttempt++;
           break;
       }
     }
