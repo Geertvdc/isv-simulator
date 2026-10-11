@@ -17,12 +17,13 @@ import {
   defineServer,
 } from 'colyseus';
 import { normalizeJoinCode } from '../src/net/joinCode';
+import { NET_SERVER_DEFAULT_PORT } from '../src/sim/balance';
 import { GAME_ROOM, gameRoomWith } from './GameRoom';
 import { isLiveJoinCode } from './joinCodes';
 import { type ProfileStore, profileStoreFromEnv } from './profileStore';
 import { profileEndpoints } from './profileRoutes';
 
-export const DEFAULT_PORT = 2567;
+export const DEFAULT_PORT = NET_SERVER_DEFAULT_PORT;
 
 const health = createEndpoint('/health', { method: 'GET' }, () =>
   Promise.resolve(new Response('ok', { status: 200 })),
