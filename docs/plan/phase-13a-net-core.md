@@ -16,10 +16,10 @@ Built without a review round (the product owner was away); decisions are in `rev
   - Client → server (`ClientMessage`): `hello` (protocol version, `userId`, `displayName`, `localPlayers`), `inputs` (a batch of `InputCommand`s, one per local player per tick, stamped with the server tick they're meant for), `ping` (`id`, `clientTimeMs`), `menu` (this frame's `DevicePress`es with client-local device ids; the server prefixes them with `<sessionId>:`).
   - Server → client (`ServerMessage`): `welcome` (session id, join code, server tick, tick rate, snapshot rate), `lobby` (join code, host, members without their user ids), `roundStart` (level id, the static `LevelMap`, the first snapshot), `snapshot` (server tick, the flow, the game snapshot or `null` outside rounds), `pong` (echoes `id` and `clientTimeMs`, adds `serverTick`), `error` (code + text).
   - `parseClientMessage(raw: unknown): ParseResult<ClientMessage>` checks everything on untrusted input: shape, types, finite numbers, integer ticks, string lengths, id format, batch sizes, and clamps `move` to length 1. `decodeClientMessage(text)` does `JSON.parse` safely first.
-- `src/net/snapshot.ts`: `encodeSnapshot(state, serverTick, events)` returns a deep copy of the `GameState` without `level`, plus the events since the last snapshot and the server tick. `decodeSnapshot(snapshot, level)` puts the map back. `SnapshotEvents` helpers collect events tick by tick on the server. `isSnapshotTick(serverTick)`.
-- `src/net/inputBuffer.ts`: one buffer per player on the server. `pushInput(buffer, input, nextTick)` classifies (`queued`, `late`, `duplicate`, `stale`, `tooLate`, `tooEarly`, `wrongPlayer`); `takeInput(buffer, tick)` gives the input for the tick about to run.
-- `src/net/clock.ts`: `createClockSync()`, `addPong(clock, pong, nowMs)`, `estimateServerTick(clock, nowMs)`, `inputTargetTick(clock, nowMs)`, `rttMs(clock)`.
-- `src/net/interpolation.ts`: `createSnapshotBuffer()`, `pushSnapshot(buffer, serverTick, state)`, `renderTickFor(estimatedServerTick)`, `sampleAt(buffer, renderTick)` returning the base state, lerped player and manager positions and a status (`interpolating`, `waiting` when render time is past the newest snapshot, `behind` when it's before the oldest).
+- `src/net/snapshot.ts`: `encodeSnapshot(state, serverTick, events)` returns a deep copy of the `GameState` without `level`, plus the events since the last snapshot and the server tick. `decodeSnapshot(snapshot, level)` puts the map back. `createSnapshotLog()`, `recordTick(log, state)` and `takeSnapshot(log, state, serverTick)` collect the events tick by tick on the server and cut a snapshot. `isSnapshotTick(serverTick)`.
+- `src/net/inputBuffer.ts`: one buffer per player on the server. `pushInput(buffer, input, nextTick)` classifies (`queued`, `late`, `duplicate`, `stale`, `tooLate`, `tooEarly`, `wrongPlayer`); `takeInput(buffer, tick)` gives the input for the tick about to run. `isAccepted(outcome)`.
+- `src/net/clock.ts`: `createClockSync()`, `addPong(clock, { clientTimeMs, serverTick }, nowMs)`, `isSynced(clock)`, `estimateServerTick(clock, nowMs)`, `inputTargetTick(clock, nowMs)`; the smoothed round trip is `clock.rttMs`.
+- `src/net/interpolation.ts`: `createSnapshotBuffer<S>()`, `pushSnapshot(buffer, serverTick, state)` (generic over any state with `levelId`, `tick`, `players` and `managers`, so it takes a decoded `GameState`), `renderTickFor(estimatedServerTick)`, `sampleAt(buffer, renderTick)` returning the base state, lerped player and manager positions and a status (`interpolating`, `waiting` when render time is past the newest snapshot, `behind` when it's before the oldest).
 - Tests next to each: `protocol.test.ts`, `snapshot.test.ts`, `inputBuffer.test.ts`, `clock.test.ts`, `interpolation.test.ts`, and `determinism.test.ts`.
 
 ## Steps (one commit each)
@@ -44,9 +44,9 @@ Built without a review round (the product owner was away); decisions are in `rev
 
 ## Done when
 
-- [ ] `src/net/` has protocol, snapshot, inputBuffer, clock and interpolation, each with tests
-- [ ] Determinism test passes
-- [ ] `src/net/` is pure (ESLint rule) and every `NET_*` number is in `balance.ts`
-- [ ] `npm run check` and `npm run build` pass
+- [x] `src/net/` has protocol, snapshot, inputBuffer, clock and interpolation, each with tests
+- [x] Determinism test passes
+- [x] `src/net/` is pure (ESLint rule) and every `NET_*` number is in `balance.ts`
+- [x] `npm run check` and `npm run build` pass
 
 There's nothing to check by hand in this sub-phase: nothing uses `src/net/` yet. The game plays exactly as before.
