@@ -32,14 +32,14 @@ Phase 13 is split into sub-phases, each a stacked PR on top of the one before (1
 
 ## Sub-phases (stacked PRs)
 
-| #   | Branch                   | Result                                                                                                       |
-| --- | ------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| 13a | `phase-13a-net-core`     | `src/net/` pure netcode: protocol, snapshot codec, input buffer, clock sync, interpolation. Determinism test |
-| 13b | `phase-13b-server`       | `server/`: Colyseus server, room with join code, fixed-tick sim loop, `npm run server`, Dockerfile, tests    |
-| 13c | `phase-13c-identity`     | User id in localStorage, copy/paste id UI, server `ProfileStore` + HTTP API, save merge                      |
-| 13d | `phase-13d-online-lobby` | Title: Host online / Join online, join-code entry, online lobby (remote + couch players), host starts        |
-| 13e | `phase-13e-online-play`  | Full online round: inputs up, snapshots down, interpolated render, events and sound, results to all profiles |
-| 13f | `phase-13f-resilience`   | Disconnect/reconnect, late join, host leaving, lag simulator, ping HUD, docs, playtest notes                 |
+| #   | Branch                   | Result                                                                                                                                |
+| --- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| 13a | `phase-13a-net-core`     | `src/net/` pure netcode: protocol, snapshot codec, input buffer, clock sync, interpolation. Determinism test                          |
+| 13b | `phase-13b-server`       | `server/`: Colyseus server, room with join code, fixed-tick sim loop, `npm run server`, Dockerfile, tests                             |
+| 13c | `phase-13c-identity`     | User id in localStorage, copy/paste id UI, server `ProfileStore` + HTTP API, save merge                                               |
+| 13d | `phase-13d-online-lobby` | Title: Host online / Join online, join-code entry, online lobby (remote + couch players), host starts                                 |
+| 13e | `phase-13e-online-play`  | Full online round: inputs up, snapshots down, interpolated render, events and sound, results to all profiles, lag simulator, ping HUD |
+| 13f | `phase-13f-resilience`   | Disconnect/reconnect, late join, host leaving, docs, playtest notes                                                                   |
 
 ## Assumptions (product owner away, see also `review-notes-13.md`)
 
