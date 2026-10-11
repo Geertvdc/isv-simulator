@@ -11,7 +11,7 @@ import {
   type TicketKind,
   queuedTickets,
 } from '../sim/tickets';
-import type { GameLoop } from './GameLoop';
+import type { RoundView } from './roundView';
 import { type MapRenderer, tileColor } from './MapRenderer';
 import { BODY_HEIGHT, PLAYER_DEPTH_OFFSET } from './PlayerRenderer';
 import { tileDepth, tileToScreen } from './projection';
@@ -83,11 +83,11 @@ export class TicketRenderer {
     private readonly mapRenderer: MapRenderer,
   ) {}
 
-  sync(loop: GameLoop): void {
-    const { state } = loop;
+  sync(view: RoundView): void {
+    const { state } = view;
     const seen = new Set<number>();
     for (const ticket of state.tickets) {
-      const placed = this.place(loop, ticket);
+      const placed = this.place(view, ticket);
       if (!placed) continue;
       seen.add(ticket.id);
       let sprite = this.sprites.get(ticket.id);
@@ -183,17 +183,17 @@ export class TicketRenderer {
 
   /** Screen point of the card's bottom center, its depth, and whether it shows. */
   private place(
-    loop: GameLoop,
+    view: RoundView,
     ticket: Ticket,
   ): { x: number; y: number; depth: number; visible: boolean } | null {
     const loc = ticket.location;
     if (loc.kind === 'queue') {
-      const anchor = this.queueAnchor(loop.state, loc.queue);
+      const anchor = this.queueAnchor(view.state, loc.queue);
       if (!anchor) return null;
-      const index = queuedTickets(loop.state, loc.queue).indexOf(ticket);
+      const index = queuedTickets(view.state, loc.queue).indexOf(ticket);
       // The oldest ticket, the one you'd grab next, sits on top.
       const fromTop = Math.min(index, QUEUE_STACK_MAX);
-      const level = Math.min(queuedTickets(loop.state, loc.queue).length, QUEUE_STACK_MAX) - 1;
+      const level = Math.min(queuedTickets(view.state, loc.queue).length, QUEUE_STACK_MAX) - 1;
       const height = Math.max(0, level - fromTop);
       return {
         x: anchor.x,
@@ -202,7 +202,7 @@ export class TicketRenderer {
         visible: index < QUEUE_STACK_MAX,
       };
     }
-    if (loc.kind === 'tile' && getTile(loop.state.level, loc.x, loc.y) === 'floor') {
+    if (loc.kind === 'tile' && getTile(view.state.level, loc.x, loc.y) === 'floor') {
       const s = tileToScreen(loc.x, loc.y);
       return {
         x: s.x,
@@ -232,7 +232,7 @@ export class TicketRenderer {
         visible: true,
       };
     }
-    const pos = loop.renderPos(loc.playerId);
+    const pos = view.renderPos(loc.playerId);
     if (!pos) return null;
     const s = tileToScreen(pos.x, pos.y);
     return {
