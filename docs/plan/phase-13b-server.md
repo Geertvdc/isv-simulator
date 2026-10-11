@@ -32,7 +32,7 @@ The `hello` is the join options: `client.create('game', hello)` or `client.joinB
 - `server/app.ts`: `createGameServer()` (room `game`, routes `GET /health` and `GET /rooms/:code`), `startGameServer(port)` returning the port and a `close()`; used by `main.ts` and the tests.
 - `server/main.ts`: entry; `PORT` env var, default 2567.
 - `server/tsconfig.json`, `vite.server.config.ts` (bundles the server to `dist-server/` for production, so the `?raw` maps are inlined), `Dockerfile` (multi-stage, `node:22-slim`), `.dockerignore`, `server/README.md`.
-- Scripts: `npm run server` (vite-node, watch), `npm run dev:online` (vite + server via `concurrently`), `npm run build:server`, `npm run start:server` (the built bundle). `npm run typecheck` also checks `server/`, ESLint lints it with Node globals, Vitest runs `server/**/*.test.ts`.
+- Scripts: `npm run server` (vite-node under `node --watch`, which restarts the whole process so the port is freed), `npm run dev:online` (vite + server via `concurrently`), `npm run build:server`, `npm run start:server` (the built bundle). `npm run typecheck` also checks `server/`, ESLint lints it with Node globals, Vitest runs `server/**/*.test.ts`.
 
 ## Steps (one commit each)
 
