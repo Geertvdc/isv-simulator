@@ -99,6 +99,6 @@ Built without a review round (the product owner was away); decisions are in `rev
 - [x] Starting a level shows the server's intro and countdown on every machine
 - [x] Verified in a real browser with two tabs (host and guest both in the lobby)
 - [x] `npm run check`, `npm run build` and `npm run build:server` pass
-- [ ] CI is green
+- [x] CI is green
 
 Manual check: `npm run dev:online`, open two browser windows. In one: Host online, note the code. In the other: Join online, type the code, Enter. Both lobbies list both names, the host has the badge. Press Enter in each window to join a player, then E in the host's: the host gets the level select, the guest sees "Host is choosing a level". Pick Garage: both show the intro card, then the countdown.
