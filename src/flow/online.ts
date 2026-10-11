@@ -185,6 +185,14 @@ export function membersWithPlayers(state: OnlineState): OnlineMemberView[] {
   });
 }
 
+/**
+ * The players bound to this browser's devices, with the local device ids:
+ * whose inputs this machine sends during a round. Empty for a spectator.
+ */
+export function localBindings(state: OnlineState): OnlinePlayer[] {
+  return membersWithPlayers(state).find((m) => m.isYou)?.players ?? [];
+}
+
 function isBack(press: DevicePress): boolean {
   return press.dash || press.menu;
 }
