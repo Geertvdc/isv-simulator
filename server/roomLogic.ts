@@ -17,7 +17,15 @@ import {
   isRoundRunning,
   updateFlow,
 } from '../src/flow/flow';
-import { type ChapterInfo, type SaveData, createSave } from '../src/flow/save';
+import { normalizeUserId } from '../src/flow/identity';
+import {
+  type ChapterInfo,
+  type LevelRecord,
+  type SaveData,
+  createSave,
+  mergeLevels,
+  recordLevel,
+} from '../src/flow/save';
 import type { DevicePress } from '../src/input/controller';
 import { type InputBuffer, createInputBuffer, pushInput, takeInput } from '../src/net/inputBuffer';
 import {
@@ -64,6 +72,18 @@ export interface Member {
   displayName: string;
   /** Couch players on this machine, as `hello` said. */
   localPlayers: number;
+  /** The user id as a profile id (a UUID v4 in lower case), or `null`: then no profile. */
+  profileId: string | null;
+  /** Progress from the member's profile plus rounds played in this room. */
+  levels: Record<string, LevelRecord>;
+}
+
+/** A finished round to add to a profile in the store. */
+export interface ProfileWrite {
+  userId: string;
+  displayName: string;
+  levelId: string;
+  result: LevelResult;
 }
 
 export interface RoomState {
@@ -76,7 +96,10 @@ export interface RoomState {
   accumulator: number;
   /** The room's screens, run for everyone. */
   flow: Flow;
-  /** The flow's save context. A fresh one per room until profiles (13c). */
+  /**
+   * The flow's save context. Its levels are the host's (`Member.levels`),
+   * so unlocks follow the host; settings are the defaults and unused.
+   */
   save: SaveData;
   /** The round, from its level's intro card to its results; `null` in menus. */
   game: GameState | null;
@@ -87,6 +110,8 @@ export interface RoomState {
   presses: DevicePress[];
   /** The next round's seed. */
   seed: number;
+  /** Finished rounds for the profile store; `takeProfileWrites` hands them out. */
+  profileWrites: ProfileWrite[];
 }
 
 /** A message to one session, or to everyone in the room (`to: null`). */
@@ -115,6 +140,7 @@ export function createRoomState(joinCode: string, seed: number): RoomState {
     log: createSnapshotLog(),
     presses: [],
     seed,
+    profileWrites: [],
   };
 }
 
@@ -198,6 +224,7 @@ export function joinRoom(room: RoomState, sessionId: string, options: unknown): 
     return { ok: false, code: 'roomFull', reason: `at most ${MAX_PLAYERS} players per room` };
   }
   room.members.push(memberFrom(sessionId, hello));
+  followHost(room);
   return {
     ok: true,
     out: [
@@ -225,7 +252,54 @@ function memberFrom(sessionId: string, hello: HelloMessage): Member {
     userId: hello.userId,
     displayName: hello.displayName,
     localPlayers: hello.localPlayers,
+    profileId: normalizeUserId(hello.userId),
+    levels: {},
   };
+}
+
+/** The room's unlocks follow the host: the save's levels become a copy of theirs. */
+function followHost(room: RoomState): void {
+  room.save.levels = structuredClone(hostOf(room)?.levels ?? {});
+}
+
+/**
+ * A member's profile came in from the store (after joining: loading takes a
+ * moment). Merged into what they have, so rounds finished in the meantime
+ * aren't lost. When it's the host's, the room's unlocks change with it.
+ */
+export function setMemberProfile(
+  room: RoomState,
+  sessionId: string,
+  levels: Readonly<Record<string, LevelRecord>>,
+): void {
+  const member = room.members.find((m) => m.sessionId === sessionId);
+  if (!member) return;
+  member.levels = mergeLevels(member.levels, levels);
+  if (member === hostOf(room)) followHost(room);
+}
+
+/**
+ * A round ended: it counts for everyone in the room, not only the host.
+ * Recorded in every member's levels, and queued once per profile for the store.
+ */
+function recordForMembers(room: RoomState, levelId: string, result: LevelResult): void {
+  const queued = new Set<string>();
+  for (const member of room.members) {
+    recordLevel(member.levels, levelId, result);
+    if (!member.profileId || queued.has(member.profileId)) continue;
+    queued.add(member.profileId);
+    room.profileWrites.push({
+      userId: member.profileId,
+      displayName: member.displayName,
+      levelId,
+      result: { score: result.score, stars: result.stars },
+    });
+  }
+}
+
+/** The finished rounds to write to the profile store since the last call. */
+export function takeProfileWrites(room: RoomState): ProfileWrite[] {
+  return room.profileWrites.splice(0);
 }
 
 /**
@@ -237,6 +311,7 @@ export function leaveRoom(room: RoomState, sessionId: string): Outgoing[] {
   const before = room.members.length;
   room.members = room.members.filter((m) => m.sessionId !== sessionId);
   if (room.members.length === before) return [];
+  followHost(room);
   room.presses = room.presses.filter((p) => !isFromSession(p.deviceId, sessionId));
   const lobby = room.flow.lobby;
   if (!lobby.started) {
@@ -359,8 +434,9 @@ function runEffects(room: RoomState, effects: readonly FlowEffect[]): Outgoing[]
         room.buffers = [];
         room.log = createSnapshotLog();
         break;
-      // Rounds run on server ticks, so pause needs no catching up. Saves and
-      // settings are per player and come with profiles (13c).
+      // Rounds run on server ticks, so pause needs no catching up. Results
+      // go to the profiles (`recordForMembers`); settings and the profile
+      // screen belong to each player's own browser.
       case 'resumeRound':
       case 'saveChanged':
       case 'settingsChanged':
@@ -392,7 +468,9 @@ export function stepRoom(room: RoomState): Outgoing[] {
       tick(game, inputs);
       recordTick(room.log, game);
       const result = resultOf(game);
-      if (result) finishRound(room.flow, result, ctx);
+      if (result && finishRound(room.flow, result, ctx).changed) {
+        recordForMembers(room, game.levelId, result);
+      }
     }
   }
 

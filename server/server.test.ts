@@ -15,13 +15,16 @@ import {
 } from '../src/net/protocol';
 import { type RunningServer, startGameServer } from './app';
 import { GAME_ROOM } from './GameRoom';
+import { MemoryProfileStore } from './profileStore';
 
 let server: RunningServer;
+let store: MemoryProfileStore;
 let baseUrl: string;
 const open: Room[] = [];
 
 beforeAll(async () => {
-  server = await startGameServer(0);
+  store = new MemoryProfileStore();
+  server = await startGameServer(0, { store });
   baseUrl = `http://localhost:${server.port}`;
 });
 
@@ -246,5 +249,84 @@ describe('game server', () => {
     await expect
       .poll(async () => (await fetch(`${baseUrl}/rooms/${joinCode}`)).status, { timeout: 3000 })
       .toBe(404);
+  });
+});
+
+describe('profiles over HTTP', () => {
+  const ID = '0b6d3c7a-1f2e-4d5c-9b8a-7f6e5d4c3b2a';
+  const json = (body: unknown): RequestInit => ({
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', origin: 'http://localhost:5173' },
+    body: JSON.stringify(body),
+  });
+
+  it('has no profile for a new user, and refuses bad ids', async () => {
+    expect((await fetch(`${baseUrl}/profiles/${ID}`)).status).toBe(404);
+    expect((await fetch(`${baseUrl}/profiles/not-a-uuid`)).status).toBe(400);
+    expect((await fetch(`${baseUrl}/profiles/not-a-uuid`, json({}))).status).toBe(400);
+  });
+
+  it('creates and merges a profile with PUT', async () => {
+    const id = ID.replace('0b6d', '1b6d');
+    const first = await fetch(
+      `${baseUrl}/profiles/${id.toUpperCase()}`,
+      json({ displayName: 'Ada', levels: { garage: { bestStars: 2, bestScore: 50, plays: 3 } } }),
+    );
+    expect(first.status).toBe(200);
+    expect(first.headers.get('access-control-allow-origin')).toBe('http://localhost:5173');
+    const merged = await fetch(
+      `${baseUrl}/profiles/${id}`,
+      json({ levels: { garage: { bestStars: 3, bestScore: 10, plays: 1 } } }),
+    );
+    expect(await merged.json()).toMatchObject({
+      userId: id,
+      displayName: 'Ada',
+      levels: { garage: { bestStars: 3, bestScore: 50, plays: 3 } },
+    });
+    const got = await fetch(`${baseUrl}/profiles/${id}`);
+    expect(((await got.json()) as { displayName: string }).displayName).toBe('Ada');
+  });
+
+  it('refuses bad bodies', async () => {
+    for (const body of [
+      [],
+      'text',
+      { displayName: '' },
+      { levels: [] },
+      { levels: { 'Bad Id!': {} } },
+    ]) {
+      expect((await fetch(`${baseUrl}/profiles/${ID}`, json(body))).status).toBe(400);
+    }
+  });
+
+  it('answers the CORS preflight for the Vite dev server', async () => {
+    const res = await fetch(`${baseUrl}/profiles/${ID}`, {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'http://localhost:5173',
+        'access-control-request-method': 'PUT',
+        'access-control-request-headers': 'content-type',
+      },
+    });
+    expect(res.status).toBeLessThan(300);
+    expect(res.headers.get('access-control-allow-origin')).toBe('http://localhost:5173');
+    expect(res.headers.get('access-control-allow-methods')).toContain('PUT');
+  });
+
+  it("loads the host's profile into the room", async () => {
+    const id = ID.replace('0b6d', '2b6d');
+    await store.merge(id, { levels: { garage: { bestStars: 3, bestScore: 1, plays: 1 } } }, 'now');
+    const a = wrap(await new Client(baseUrl).create(GAME_ROOM, { ...hello('Ada'), userId: id }));
+    await a.waitFor('welcome');
+    // Join, start, then move to the second level and pick it: only open with the profile.
+    a.send({ type: 'menu', presses: [press({ join: true })] });
+    await a.waitFor('snapshot', (m) => m.flow.lobby.players.length === 1);
+    a.send({ type: 'menu', presses: [press({ interact: true })] });
+    await a.waitFor('snapshot', (m) => m.flow.screen === 'levelSelect');
+    a.send({ type: 'menu', presses: [press({ nav: { x: 0, y: 1 } })] });
+    await a.waitFor('snapshot', (m) => m.flow.levelIndex === 1);
+    a.send({ type: 'menu', presses: [press({ interact: true })] });
+    const start = await a.waitFor('roundStart');
+    expect(start.levelId).toBe('open-plan');
   });
 });
