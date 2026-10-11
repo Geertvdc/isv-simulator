@@ -1,0 +1,16 @@
+node_modules
+dist
+dist-server
+coverage
+.git
+.github
+.claude
+.agents
+.vscode
+.idea
+docs
+sfx-candidates
+music-candidates
+*.log
+.env
+.env.*
