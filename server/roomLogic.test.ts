@@ -227,19 +227,94 @@ describe('messages', () => {
     expect(playerIdsOf(room, 'b')).toEqual([2]);
   });
 
-  it("can't bind more devices than the couch players a member announced", () => {
+  it('makes room for more couch players as they join, while the room has space', () => {
     const room = createRoomState('ABCD', 1);
     join(room, 'a', 1);
-    menu(
+    join(room, 'b', 1);
+    const out = menu(
       room,
       'a',
       press('kb-left', { join: true }),
       press('pad-0', { join: true }),
       press('pad-1', { join: true }),
     );
-    expect(playerIdsOf(room, 'a')).toEqual([1]);
+    expect(playerIdsOf(room, 'a')).toEqual([1, 2, 3]);
+    expect(room.members.map((m) => m.localPlayers)).toEqual([3, 1]);
+    expect(
+      messages(out, 'lobby')
+        .at(-1)
+        ?.members.map((m) => m.localPlayers),
+    ).toEqual([3, 1]);
+    // b's seat is kept for b: a can't take it.
     menu(room, 'a', press('pad-2', { join: true }));
-    expect(playerIdsOf(room, 'a')).toEqual([1]);
+    expect(playerIdsOf(room, 'a')).toEqual([1, 2, 3]);
+    menu(room, 'b', press('pad-0', { join: true }));
+    expect(playerIdsOf(room, 'b')).toEqual([4]);
+    expect(room.members.reduce((n, m) => n + m.localPlayers, 0)).toBe(MAX_PLAYERS);
+  });
+});
+
+describe('who drives the menus', () => {
+  /** Host and guest joined with a keyboard each; the guest joined first, so is player 1. */
+  function lobbyRoom(): RoomState {
+    const room = createRoomState('ABCD', 1);
+    join(room, 'host');
+    join(room, 'guest');
+    menu(room, 'guest', press('kb-left', { join: true }));
+    menu(room, 'host', press('kb-left', { join: true }));
+    expect(playerIdsOf(room, 'guest')).toEqual([1]);
+    return room;
+  }
+
+  it('lets only the host start, even when a guest is player 1', () => {
+    const room = lobbyRoom();
+    menu(room, 'guest', press('kb-left', { interact: true }));
+    menu(room, 'guest', press('kb-left', { join: true }));
+    expect(room.flow.screen).toBe('lobby');
+    menu(room, 'host', press('kb-left', { interact: true }));
+    expect(room.flow.screen).toBe('levelSelect');
+  });
+
+  it('ignores back in the lobby: nobody sends the room to a title screen', () => {
+    const room = lobbyRoom();
+    menu(room, 'host', press('kb-left', { menu: true }), press('kb-right', { dash: true }));
+    expect(room.flow.screen).toBe('lobby');
+    expect(room.flow.lobby.players).toHaveLength(2);
+  });
+
+  it('lets only the host pick a level, pause and choose on the results', () => {
+    const room = lobbyRoom();
+    menu(room, 'host', press('kb-left', { interact: true }));
+    menu(room, 'guest', press('kb-left', { nav: { x: 0, y: 1 } }));
+    menu(room, 'guest', press('kb-left', { interact: true }));
+    expect(room.flow).toMatchObject({ screen: 'levelSelect', levelIndex: 0 });
+    menu(room, 'host', press('kb-left', { interact: true }));
+    expect(room.flow.screen).toBe('intro');
+    menu(room, 'guest', press('kb-left', { interact: true }));
+    expect(room.flow.screen).toBe('intro');
+    menu(room, 'host', press('kb-left', { interact: true }));
+    steps(room, Math.ceil(COUNTDOWN_MS / TICK_MS) + 1);
+    expect(room.flow.screen).toBe('playing');
+    menu(room, 'guest', press('kb-left', { menu: true }));
+    expect(room.flow.screen).toBe('playing');
+    menu(room, 'host', press('kb-left', { menu: true }));
+    expect(room.flow.screen).toBe('paused');
+    // Paused for everyone: the round stands still.
+    const tick = room.game?.tick;
+    steps(room, 10);
+    expect(room.game?.tick).toBe(tick);
+    menu(room, 'guest', press('kb-left', { interact: true }));
+    expect(room.flow.screen).toBe('paused');
+    menu(room, 'host', press('kb-left', { dash: true }));
+    expect(room.flow.screen).toBe('playing');
+  });
+
+  it('hands the menus to the next host when the host leaves', () => {
+    const room = lobbyRoom();
+    menu(room, 'host', press('kb-left', { interact: true }));
+    leaveRoom(room, 'host');
+    menu(room, 'guest', press('kb-left', { interact: true }));
+    expect(room.flow.screen).toBe('intro');
   });
 });
 
@@ -353,8 +428,7 @@ describe('a round', () => {
   it('drops the round when the players go back to the level select', () => {
     const room = playingRoom();
     menu(room, 'host', press('kb-left', { menu: true }));
-    // Paused menu: resume, restart, settings, level select.
-    menu(room, 'host', press('kb-left', { nav: { x: 0, y: 1 } }));
+    // Paused menu online: resume, restart, level select.
     menu(room, 'host', press('kb-left', { nav: { x: 0, y: 1 } }));
     menu(room, 'host', press('kb-left', { nav: { x: 0, y: 1 } }));
     menu(room, 'host', press('kb-left', { interact: true }));
@@ -449,5 +523,28 @@ describe('profiles', () => {
       expect(member.levels.garage?.plays).toBe(1);
     }
     expect(room.save.levels.garage?.plays).toBe(1);
+  });
+
+  it("sends the room's unlocks in the lobby message, again when the host's profile comes in", () => {
+    const room = createRoomState('ABCD', 1);
+    const result = joinRoom(room, 'host', { ...hello(1, 'host'), userId: HOST_ID });
+    if (!result.ok) throw new Error(result.reason);
+    expect(messages(result.out, 'lobby')[0]?.levels).toEqual({});
+    joinAs(room, 'guest', GUEST_ID);
+    expect(setMemberProfile(room, 'guest', opened)).toEqual([]);
+    const out = setMemberProfile(room, 'host', opened);
+    expect(messages(out, 'lobby')[0]?.levels).toEqual(opened);
+    // A copy: later changes to the room don't change a message already out.
+    expect(messages(out, 'lobby')[0]?.levels).not.toBe(room.save.levels);
+  });
+
+  it('sends the new unlocks after a round', () => {
+    const room = playingRoom();
+    const game = room.game;
+    if (!game) throw new Error('no game');
+    const out = steps(room, game.settings.durationTicks + 10);
+    expect(room.flow.screen).toBe('results');
+    const levels = messages(out, 'lobby').at(-1)?.levels;
+    expect(levels?.garage?.plays).toBe(1);
   });
 });

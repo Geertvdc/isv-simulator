@@ -80,7 +80,7 @@ export class GameRoom extends Room {
     if (!this.store || !userId) return;
     this.store.get(userId).then(
       (profile) => {
-        if (profile) setMemberProfile(this.core, sessionId, profile.levels);
+        if (profile) this.deliver(setMemberProfile(this.core, sessionId, profile.levels));
       },
       (error: unknown) => {
         console.error(`Could not load profile ${userId}:`, error);

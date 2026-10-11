@@ -5,6 +5,7 @@
  */
 
 import type { Flow } from '../flow/flow';
+import type { LevelRecord } from '../flow/save';
 import type { DevicePress } from '../input/controller';
 import {
   NET_MAX_ID_LENGTH,
@@ -17,7 +18,7 @@ import type { InputCommand, Vec } from '../sim/state';
 import type { Snapshot } from './snapshot';
 
 /** Bumped on every incompatible change; the server refuses other versions. */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 // ---------------------------------------------------------------- client → server
 
@@ -88,6 +89,11 @@ export interface LobbyMessage {
   joinCode: string;
   /** In join order. */
   members: LobbyMember[];
+  /**
+   * The room's progress: the host's levels, which decide what is open in
+   * the level select. Sent again whenever it changes.
+   */
+  levels: Record<string, LevelRecord>;
 }
 
 /** A round begins: the static map, sent once, and the first snapshot. */
