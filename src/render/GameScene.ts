@@ -44,9 +44,15 @@ import {
   rejoinRoom,
   toJoinError,
 } from '../net/client';
-import { type ClockSync, addPong, createClockSync, inputTargetTick } from '../net/clock';
+import {
+  type ClockSync,
+  addPong,
+  createClockSync,
+  inputTargetTick,
+  inputTargetTickExact,
+} from '../net/clock';
 import { createInputStamper, resetInputStamper, stampInputs } from '../net/inputStamp';
-import type { InterpolationStatus } from '../net/interpolation';
+import type { InterpolatedFrame, InterpolationStatus } from '../net/interpolation';
 import type { LagSettings } from '../net/lag';
 import {
   type OnlineRound,
@@ -56,8 +62,21 @@ import {
   sampleRound,
   takeDueEvents,
 } from '../net/onlineRound';
+import {
+  type Prediction,
+  type PredictionStats,
+  advancePrediction,
+  createPrediction,
+  decayCorrections,
+  isPredicting,
+  predictionAlpha,
+  recordInputs,
+  reconcile,
+  resetPrediction,
+} from '../net/prediction';
 import { encodeTicket, parseTicket } from '../net/rejoin';
 import type { ServerMessage } from '../net/protocol';
+import type { Snapshot } from '../net/snapshot';
 import { type HintId, startHints, updateHints } from '../flow/hints';
 import {
   type ChapterInfo,
@@ -107,7 +126,7 @@ import { MusicPlayer } from './MusicPlayer';
 import { musicCue } from './music';
 import { SoundPlayer } from './SoundPlayer';
 import { screenToTile, tileCorners, tileDepth } from './projection';
-import { type RoundView, frameView } from './roundView';
+import { type RoundView, frameView, predictedView } from './roundView';
 import { TicketRenderer } from './TicketRenderer';
 
 export interface TileHover {
@@ -192,6 +211,8 @@ export interface OnlineOptions {
   lag: LagSettings | null;
   /** The ping corner shows from the start (`N` toggles it). */
   netHud: boolean;
+  /** Predict this machine's players' movement (`?predict=0` turns it off, for comparison). */
+  predict: boolean;
   /** Where this tab keeps its rejoin ticket (`sessionStorage`), so a reload gets back into the room. */
   tickets: TicketStore | null;
 }
@@ -212,6 +233,8 @@ export interface NetStats {
   status: InterpolationStatus | null;
   /** Simulated lag, if on. */
   lag: LagSettings | null;
+  /** Whether this machine's players are predicted. */
+  predict: boolean;
 }
 
 /**
@@ -245,7 +268,25 @@ export interface NetDebug {
   eventsPlayed: Record<string, number>;
   /** The music track playing. */
   music: string | null;
+  /** Prediction of this machine's players: on or off, who, how it's going. */
+  predict: { on: boolean; local: number[]; stats: PredictionStats | null };
+  /**
+   * Set it to `[]` from a script to record every drawn frame (time, render
+   * tick, input target tick, drawn positions); `null` records nothing.
+   */
+  trace: TraceFrame[] | null;
 }
+
+/** One drawn frame of an online round, for `NetDebug.trace`. */
+export interface TraceFrame {
+  t: number;
+  renderTick: number | null;
+  targetTick: number | null;
+  players: Record<number, { x: number; y: number }>;
+}
+
+/** The trace never grows past this many frames (a few minutes at 60 Hz). */
+const TRACE_MAX_FRAMES = 20_000;
 
 /** Handed to the scene once, at boot. */
 export interface GameSceneOptions {
@@ -405,13 +446,19 @@ export class GameScene extends Phaser.Scene {
     state: null,
     eventsPlayed: {},
     music: null,
+    predict: { on: false, local: [], stats: null },
+    trace: null,
   };
+  /** Prediction of this machine's players' movement in the online round. */
+  private readonly prediction: Prediction;
+  private lastPredictMs: number | null = null;
 
   constructor(private readonly options: GameSceneOptions) {
     super('GameScene');
     const id = options.scene?.levelId;
     if (id) this.mapLevelIndex = Math.max(0, LEVEL_IDS.indexOf(id));
     this.netHudOn = options.online?.netHud ?? false;
+    this.prediction = createPrediction(options.online?.predict ?? true);
   }
 
   preload(): void {
@@ -749,7 +796,9 @@ export class GameScene extends Phaser.Scene {
       target,
     );
     if (inputs.length === 0) return;
-    this.connection.send({ type: 'inputs', inputs: inputs.slice(0, NET_MAX_INPUTS_PER_MESSAGE) });
+    const sent = inputs.slice(0, NET_MAX_INPUTS_PER_MESSAGE);
+    recordInputs(this.prediction, sent);
+    this.connection.send({ type: 'inputs', inputs: sent });
   }
 
   /** Draws the online round as it was a moment ago, with the events that happened by then. */
@@ -763,7 +812,8 @@ export class GameScene extends Phaser.Scene {
     const frame = sampleRound(round, renderTick);
     if (!frame) return null;
     const events = takeDueEvents(round, renderTick);
-    this.renderRound(frameView(frame), events, flow, time);
+    const view = this.predictedFrame(frame, now);
+    this.renderRound(view, events, flow, time);
 
     const debug = this.netDebug;
     debug.renderTick = renderTick;
@@ -771,13 +821,66 @@ export class GameScene extends Phaser.Scene {
     debug.rttMs = this.clock.rttMs;
     debug.frames++;
     if (frame.status === 'waiting') debug.waitingFrames++;
-    debug.players = frame.players;
+    debug.players = {};
+    for (const player of view.state.players) {
+      const pos = view.renderPos(player.id);
+      if (pos) debug.players[player.id] = { x: pos.x, y: pos.y };
+    }
+    debug.predict = {
+      on: this.prediction.enabled,
+      local: this.prediction.current.map((p) => p.id),
+      stats: { ...this.prediction.stats },
+    };
+    if (debug.trace) {
+      if (debug.trace.length >= TRACE_MAX_FRAMES) debug.trace.shift();
+      debug.trace.push({
+        t: now,
+        renderTick,
+        targetTick: inputTargetTickExact(this.clock, now),
+        players: debug.players,
+      });
+    }
     debug.score = frame.state.score;
     debug.ticksLeft = frame.state.settings.durationTicks - frame.state.tick;
     debug.screen = flow.screen;
-    debug.state = frame.state;
+    debug.state = view.state;
     for (const e of events) debug.eventsPlayed[e.type] = (debug.eventsPlayed[e.type] ?? 0) + 1;
     return frame.state;
+  }
+
+  /**
+   * The round's frame with this machine's players where prediction has them:
+   * runs the prediction up to this frame's input tick and lets corrections
+   * glide. Without prediction (off, or nothing to predict), the frame as is.
+   */
+  private predictedFrame(frame: InterpolatedFrame<GameState>, now: number): RoundView {
+    const prediction = this.prediction;
+    const target = inputTargetTickExact(this.clock, now);
+    if (target !== null) advancePrediction(prediction, target);
+    decayCorrections(prediction, this.lastPredictMs === null ? 0 : now - this.lastPredictMs);
+    this.lastPredictMs = now;
+    if (!isPredicting(prediction)) return frameView(frame);
+    const alpha = target === null ? 1 : predictionAlpha(prediction, target);
+    return predictedView(frame, prediction, alpha);
+  }
+
+  /**
+   * Prediction takes in a snapshot the round kept: where the server had this
+   * machine's players, and whether the round was playing then.
+   */
+  private reconcilePrediction(online: OnlineState, snapshot: Snapshot, flow: Flow | null): void {
+    const { state } = snapshot;
+    reconcile(
+      this.prediction,
+      {
+        serverTick: snapshot.serverTick,
+        players: state.players,
+        managers: state.managers,
+        events: snapshot.events,
+        running: flow !== null && isRoundRunning(flow) && state.result === null,
+      },
+      localBindings(online).map((b) => b.playerId),
+    );
   }
 
   /**
@@ -817,6 +920,7 @@ export class GameScene extends Phaser.Scene {
             rttMs: this.clock.rttMs,
             status: this.onlineRound ? this.netDebug.status : null,
             lag: this.options.online?.lag ?? null,
+            predict: this.prediction.enabled,
           }
         : null;
     this.game.events.emit(NET_STATS_EVENT, stats);
@@ -836,7 +940,12 @@ export class GameScene extends Phaser.Scene {
         const before = this.onlineRound;
         // The same round again after a reconnect carries on; a new one starts clean.
         this.onlineRound = continueOnlineRound(before, message);
-        if (this.onlineRound === before) break;
+        if (this.onlineRound === before) {
+          this.reconcilePrediction(online, message.snapshot, online.flow);
+          break;
+        }
+        resetPrediction(this.prediction, message.level);
+        this.reconcilePrediction(online, message.snapshot, online.flow);
         // First-level hints are a couch thing: they'd point at one machine's players only.
         this.hints = [];
         this.netDebug.frames = 0;
@@ -850,8 +959,11 @@ export class GameScene extends Phaser.Scene {
         if (!round) break;
         if (!message.game) {
           this.dropOnlineRound();
-        } else if (message.game.state.levelId === round.levelId) {
-          pushRoundSnapshot(round, message.game);
+        } else if (
+          message.game.state.levelId === round.levelId &&
+          pushRoundSnapshot(round, message.game)
+        ) {
+          this.reconcilePrediction(online, message.game, message.flow);
         }
         break;
       }
@@ -865,6 +977,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.onlineRound) return;
     this.onlineRound = null;
     this.onlineRoundDropped = true;
+    resetPrediction(this.prediction, null);
     this.netDebug.status = null;
   }
 

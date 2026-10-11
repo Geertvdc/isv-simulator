@@ -17,6 +17,7 @@ export function netStatsText(stats: NetStats): string {
     `${ONLINE_TEXT.ping} ${stats.rttMs === null ? '…' : `${Math.round(stats.rttMs)} ms`}`,
   ];
   if (stats.status === 'waiting') parts.push(ONLINE_TEXT.waitingForSnapshots);
+  if (!stats.predict) parts.push(ONLINE_TEXT.noPrediction);
   if (stats.lag) {
     parts.push(`${ONLINE_TEXT.lagSimulated} ${stats.lag.lagMs}±${stats.lag.jitterMs} ms`);
   }
