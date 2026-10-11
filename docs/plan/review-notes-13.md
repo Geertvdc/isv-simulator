@@ -292,4 +292,4 @@ PR: `phase-13g-prediction` → `phase-13f-resilience`. Your own developer is pre
 
   About 20–30 ms is one to two frames: the key is seen on the next frame and drawn on it. (13e quoted ~90 ms and ~340 ms without prediction measured another way; this script measures from the keydown event, so the numbers are a bit higher.) Standing still afterwards the drawn player is exactly where the server has it (0.0000 tiles) in every setting. Also checked: the guest sees the host's walk interpolated without jitter; a pause pressed while walking with lag stops the player where the server stopped it (it glides back at most ~0.2 tiles a frame, under the pause screen) and it stays there; a ticket picked up from the inbox is drawn on the predicted body while walking with lag (screenshot); walking into the guest and pushing them: 0 backward steps, 0 snaps, 0 corrections; a restarted round's countdown: standing still, then moving with no backward steps or snaps.
 
-- `npm run verify:online` still passes (12/12).
+- `npm run verify:online` still passes (12/12). CI is green.
