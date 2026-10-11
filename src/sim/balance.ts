@@ -170,3 +170,35 @@ export const RESULTS_STAR_INTERVAL_MS = 400;
 export const SCREEN_FADE_MS = 250;
 /** Most stars a round can give. */
 export const MAX_STARS = 3;
+
+/** Online play (`src/net/`). */
+/** The server sends a snapshot every this many ticks: 20 per second. */
+export const NET_SNAPSHOT_EVERY_TICKS = 3;
+/** Clients render this far behind the newest snapshot, so there's always a pair to lerp between. */
+export const NET_INTERP_DELAY_MS = 100;
+/** Snapshots a client keeps for interpolation: over a second's worth. */
+export const NET_SNAPSHOT_BUFFER_SIZE = 32;
+/** An entity that moved further than this many tiles between two snapshots jumps instead of gliding. */
+export const NET_INTERP_SNAP_DISTANCE = 3;
+/** An input arriving after its tick ran is applied at the next tick, unless it is more than this many ticks late. */
+export const NET_MAX_INPUT_LATE_TICKS = 6;
+/** Inputs stamped further ahead of the server than this are dropped (a broken or lying client clock). */
+export const NET_MAX_INPUT_AHEAD_TICKS = 30;
+/** A player whose inputs stop keeps doing what they last did for this many ticks, then stands still. */
+export const NET_INPUT_REPEAT_TICKS = 15;
+/** Clients stamp inputs this many ticks later than they expect them to arrive, as a safety margin. */
+export const NET_INPUT_LEAD_TICKS = 1;
+/** Ping samples the clock sync keeps; it trusts the half with the lowest round trip. */
+export const NET_CLOCK_SAMPLES = 9;
+/** Weight of each new round trip in the smoothed round trip time (like TCP's 1/8). */
+export const NET_CLOCK_RTT_SMOOTHING = 0.125;
+/** A ping that disagrees with the estimate by more than this many ticks restarts the clock sync. */
+export const NET_CLOCK_RESYNC_TICKS = 30;
+/** Most input commands in one message: 4 local players times 16 frames. */
+export const NET_MAX_INPUTS_PER_MESSAGE = 64;
+/** Most button presses in one menu message. */
+export const NET_MAX_PRESSES_PER_MESSAGE = 16;
+/** Longest display name, in characters. */
+export const NET_MAX_NAME_LENGTH = 24;
+/** Longest user id or device id, in characters. */
+export const NET_MAX_ID_LENGTH = 64;
