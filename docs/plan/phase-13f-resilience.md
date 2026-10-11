@@ -84,14 +84,14 @@ Built without a review round (the product owner was away); decisions are in `rev
 
 ## Done when
 
-- [ ] A dropped socket (offline for a few seconds) comes back into the same round with its player, checked in a browser
-- [ ] A page reload mid-round comes back into the same round with its player, checked in a browser
-- [ ] Others see "<name> reconnecting…" while someone is away; after the grace period the member is removed
-- [ ] The host leaving mid-round makes the guest host, who can pause, finish and pick the next level (browser)
-- [ ] Someone joining mid-round spectates and plays the next round (browser)
-- [ ] Rounds are recorded for members who left mid-round; late joiners aren't
-- [ ] Floods are dropped, idle rooms close, a server shutdown tells the clients
-- [ ] Guest level-select hint, Esc confirm in the online lobby
-- [ ] `npm run verify:online` runs the browser checks
-- [ ] `npm run check`, `npm run build` and `npm run build:server` pass; the suite passes several runs in a row
+- [x] A dropped socket (offline for a few seconds) comes back into the same round with its player, checked in a browser
+- [x] A page reload mid-round comes back into the same round with its player, checked in a browser
+- [x] Others see "<name> reconnecting…" while someone is away; after the grace period the member is removed
+- [x] The host leaving mid-round makes the guest host, who can pause, finish and pick the next level (browser)
+- [x] Someone joining mid-round spectates and plays the next round (browser)
+- [x] Rounds are recorded for members who left mid-round; late joiners aren't
+- [x] Floods are dropped, idle rooms close, a server shutdown tells the clients
+- [x] Guest level-select hint, Esc confirm in the online lobby
+- [x] `npm run verify:online` runs the browser checks
+- [x] `npm run check`, `npm run build` and `npm run build:server` pass; the suite passes several runs in a row
 - [ ] CI is green

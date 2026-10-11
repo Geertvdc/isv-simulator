@@ -30,7 +30,9 @@ curl localhost:2567/health
 - `profileStore.ts`: `ProfileStore` with `JsonFileProfileStore` (one JSON file, read on first use, rewritten through a temp file and a rename after every change, one change at a time; a corrupt file is moved to `<path>.corrupt-<time>` and the store starts empty) and `MemoryProfileStore` for tests.
 - `profileRoutes.ts`: `GET`/`PUT /profiles/:userId`.
 - `app.ts`: `startGameServer(port, { store, roundSeconds, lag })`, with the HTTP routes. `main.ts` is the entry point (reads the env vars above).
-- `roomLogic.test.ts`, `server.test.ts` (a real server on a free port with `@colyseus/sdk` clients), `client.test.ts` (the browser's wrapper against a real server), `round.test.ts` (two browsers' network code play a whole short round, from the lobby to the profiles).
+- `roomLogic.test.ts`, `server.test.ts` (a real server on a free port with `@colyseus/sdk` clients), `client.test.ts` (the browser's wrapper against a real server), `round.test.ts` (two browsers' network code play a whole short round, from the lobby to the profiles), `resilience.test.ts` (clients behind a small TCP proxy whose sockets get cut: reconnecting within and after the grace period, a reloaded page rejoining with its token, the host moving while away, floods, room cleanup, shutdown).
+
+`npm run verify:online` (`scripts/verifyOnline.ts`, not in CI) starts its own server and Vite and drives three headless Chromes through a session with a network drop, a page reload, a late joiner and the host leaving; see the top of the file.
 
 ## Talking to it
 
@@ -52,7 +54,7 @@ const room = await client.create('game', hello); // host a room
 // or join one: await client.joinById(normalizeJoinCode(typed), hello)
 
 room.onMessage('*', (_type, message: ServerMessage) => {
-  /* welcome, lobby, roundStart, snapshot, pong, error */
+  /* welcome, lobby, roundStart, snapshot, pong, error, closing */
 });
 room.send('ping', { type: 'ping', id: 1, clientTimeMs: performance.now() });
 ```
@@ -64,7 +66,17 @@ room.send('ping', { type: 'ping', id: 1, clientTimeMs: performance.now() });
 - During a round each client sends one `inputs` message per frame with an `InputCommand` per local player, stamped with the server tick it should land on (`inputTargetTick` from the clock sync, see `src/net/inputStamp.ts`; at most one per tick), and pings every half second (faster at first) to keep that clock synced. It draws the round from the snapshots `NET_INTERP_DELAY_MS` plus half a round trip behind the server (`src/net/onlineRound.ts`), and plays each snapshot's events once, when the picture reaches them.
 - `inputs` are stamped with the server tick they're meant for (`inputTargetTick` in `src/net/clock.ts`) and only count for players bound to the sender's devices.
 - `hello` again in the room changes the display name and couch player count.
-- The first member is the host; when the host leaves, the earliest joined member left takes over. The room closes when the last member leaves.
+- The host is the earliest joined member whose connection is up: when the host's connection drops, the next one drives the menus until they're back; when the host leaves, the earliest joined member left takes over. A host whose machine has no joined player still drives every screen after the lobby (their presses count as player 1's device for the menus).
+- On the level select and the results, a member without any player (they joined while a round ran, or only watched) joins one with a join press, so they play the next round. More couch players join through Change players (the lobby).
+- A member who leaves for good loses their players right away outside a round; during a round their character stands still until the round ends and is dropped when the next one starts. A room with no players left goes back to the lobby.
+
+### Connections and reconnecting
+
+- A socket that drops without a goodbye (`onDrop`) keeps its member, players and couch devices for `NET_RECONNECT_GRACE_MS` (20 s). Everyone gets a `lobby` with that member's `connected: false`; their players stand still (no inputs). The SDK reconnects on its own (the browser wrapper tunes it to retry for the whole grace period and closes a socket that has been silent for `NET_SILENCE_TIMEOUT_MS`, 4 s, to start that). A reloaded page comes back with `client.reconnect(token)`: the browser keeps the room's `reconnectionToken` in `sessionStorage` (`src/net/rejoin.ts`). Back in, the session id is the same; the member gets `welcome` (with the protocol version, which the client checks again: a page running another version leaves), `lobby` and the loaded round's `roundStart` with the same `roundId`.
+- After the grace period, or on a goodbye, the member is gone (`onLeave`).
+- A round counts for everyone who was in the room when it started (`roundStart.counted`), also those who left during it; not for someone who joined while it ran.
+- Each member has a message budget (`NET_MAX_MESSAGES_PER_SECOND`, 120 a second with bursts of `NET_MESSAGE_BURST`, 60); messages past it are dropped. Colyseus disconnects a client at 5 times that.
+- A room where nobody pressed or moved anything for `NET_ROOM_IDLE_MS` (30 min) sends `closing { reason: 'idle' }` and closes. On `SIGTERM`/`SIGINT` every room sends `closing { reason: 'shutdown' }` and closes with code 4001, without waiting for anyone's grace period. A room with nobody connected closes when the last grace period runs out.
 
 HTTP: `GET /health` → `ok`. `GET /rooms/:code` → `{ joinCode }` for an open room (any case, spaces and dashes allowed), 404 otherwise.
 
@@ -81,7 +93,7 @@ curl -X PUT -H 'content-type: application/json' \
 
 `PUT` merges: per level the best stars and best score win and `plays` is the larger count; `displayName` replaces the name when given. The game does this at start-up with its local save and keeps the merged levels.
 
-In a room, each member's profile is loaded when they join (hello's `userId`). The host's levels are the room's unlocks (a new host's when the host leaves). When a round ends, it is recorded in the profile of every member in the room, once per user id. Members whose `userId` isn't a UUID v4 play without a profile.
+In a room, each member's profile is loaded when they join (hello's `userId`). The host's levels are the room's unlocks (a new host's when the host leaves). When a round ends, it is recorded in the profile of every member who was in the room when it started, once per user id. Members whose `userId` isn't a UUID v4 play without a profile.
 
 ## Deploy
 
@@ -93,10 +105,10 @@ docker run --rm -p 2567:2567 isv-simulator-server
 The `Dockerfile` bundles `server/` with Vite (`npm run build:server`, which inlines the level maps) into `dist-server/main.js` and runs that with Node 22 and the production dependencies. It runs anywhere that runs a container and allows WebSockets: Azure Container Apps, Fly.io, Render, a VM. Things to know:
 
 - **Profiles on disk.** Mount a volume for the profile file, e.g. `-v isv-profiles:/app/server/data` (or set `PROFILE_STORE_PATH` to a path on one); without it, profiles go with the container.
-- **One instance.** Rooms live in the process's memory and the join codes are unique per process. Don't scale out (no Redis presence or driver is set up); restarting drops the rooms.
+- **One instance.** Rooms live in the process's memory and the join codes are unique per process. Don't scale out (no Redis presence or driver is set up); restarting drops the rooms (players are told "The server is restarting").
 - **WebSockets and sticky sessions.** The platform's ingress must allow WebSocket upgrades. With one instance, no sticky sessions are needed.
 - **TLS.** Let the platform terminate HTTPS; browsers on an `https://` page need `wss://`. The client finds the server through `VITE_SERVER_URL` (13d/13e).
 - **Health check:** `GET /health`. The platform sets `PORT`; the image defaults to 2567.
-- **No auth, no rate limiting** beyond validating every message. Fine for an internal game; don't expose it widely.
+- **No auth.** Every message is validated and each client has a message budget, but anyone who knows a code can join. Fine for an internal game; don't expose it widely.
 
 `npm run build` still builds only the browser game.
