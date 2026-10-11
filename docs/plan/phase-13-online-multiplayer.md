@@ -68,5 +68,5 @@ Phase 13 is split into sub-phases, each a stacked PR on top of the one before (1
 - [ ] Movement looks smooth at 100 ms latency
 - [ ] Lobby: host gets a code, others join with it, couch players on either machine can join too
 - [ ] A user id can be copied to another browser and brings its progress along
-- [ ] Disconnect and reconnect within the grace period puts the player back in the round
+- [x] Disconnect and reconnect within the grace period puts the player back in the round
 - [ ] `npm run check` passes (including `server/`)

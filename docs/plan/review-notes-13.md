@@ -2,6 +2,18 @@
 
 Decisions made without you, open questions and issues found while the sub-phases were built by agents. Review these with the PRs.
 
+## How to playtest online
+
+The whole online stack (13a net core, 13b server, 13c profiles, 13d lobby, 13e online play, 13f resilience; 13g, client-side prediction for your own player, comes after) is played from the last branch of the stack.
+
+1. **Start it.** `npm install`, then `npm run dev:online`: Vite on 5173 and the game server on 2567 (`curl localhost:2567/health` says `ok`). Add `ROUND_SECONDS=30` in front to make every online round 30 s.
+2. **Two (or more) players on one machine:** open the game in two windows, one of them private (each browser profile has its own user id). On other machines on the LAN: open `http://<your-ip>:5173`; the game finds the server on the same host, port 2567 (or set `VITE_SERVER_URL` when the server is elsewhere).
+3. **Play.** Title → Host online: a room code shows. Others: Join online, type the code, Enter. Everyone presses Enter (or gamepad A) to join a player, more couch players on any machine too (4 per room). The host presses E to pick a level and plays; Esc on the host pauses everyone. Results go to every player's profile (Settings → Online profile shows the id; `curl localhost:2567/profiles/<id>`).
+4. **Break it on purpose** (13f): turn a machine's wifi off for a few seconds mid-round (it shows "Reconnecting…", the others "<name> reconnecting…", it comes back into the round); reload a page mid-round (straight back in); join from a third window mid-round (it watches, then joins on the results with Enter); have the host click Leave room mid-round (the next player drives pause and the results); stop the server (everyone is told). Offline longer than 20 s: removed, with a message.
+5. **Slow network:** `?lag=100&jitter=20` on the game's URL (or `NET_LAG_MS=50 NET_JITTER_MS=20` on the server). `N` shows the ping corner.
+6. **Automated check:** `npm run verify:online` runs most of step 4 with three headless Chromes against its own server and Vite (about two and a half minutes, needs Chrome; set `CHROME` if it isn't in the usual place). `npm run check` covers the rest, including real-server tests.
+7. **Deploy notes** are in `server/README.md` (one container, a volume for profiles, WebSockets through the ingress).
+
 ## How to review this stack
 
 Stacked PRs, each on top of the one before: 13a → `main`, 13b → 13a, 13c → 13b, 13d → 13c, 13e → 13d, 13f → 13e. Merge in order, rebase-merge only. To play the whole thing, check out the last branch (`phase-13f-resilience`).
@@ -198,3 +210,47 @@ PR: `phase-13e-online-play` → `phase-13d-online-lobby`. A whole online round: 
 - In the browser: two headless Chromes (separate profiles, so two user ids) driven over the DevTools protocol against `vite` and the server (`ROUND_SECONDS=25`). Host online, join with the code, both join a player, the host picks Garage. Checked from page JS and screenshots: both screens show both players walking, the host's player picks up a ticket and the guest sees it carried, the HUD clock, score and orders match, Esc on the host pauses both (the guest's clock stops), both get the results with stars, the host's Next level loads Open Plan's map on both, both local saves and both server profiles got the round once, the snapshot events played are the same on both machines (e.g. `orderCreated: 3, pickedUp: 1, levelEnded: 1`), the music is the chapter track while playing and the menu track on the results. Leave room mid-round on the guest goes back to the title while the host plays on. On The Reorg (host with every level open) the manager, a meeting invite (icon and HUD card) and review stations show on both.
 - Smoothness: sampled the drawn positions every animation frame while both players walked. Without lag, with `?lag=100&jitter=20` (round trip ~220 ms), `?lag=100&jitter=80` (~295 ms), server `NET_LAG_MS=50 NET_JITTER_MS=20` (~125 ms) and both together (~250 ms): never a frame waiting for a snapshot, never a step backwards, never a still frame mid-walk, the drawn position moves exactly 5 tiles/s of render time (0.0833 tiles per render tick, every frame), and render time advances 1.00 ticks per frame (sd ~0.05, that's the frame timing). No rubber-banding. Own key to own player moving on screen: ~90 ms without lag, ~340 ms at 100 ms each way.
 - Local couch play checked in the browser too (Play, two keyboard players, Garage with its hints, pause): as before, no ping corner or room bar.
+
+## 13f resilience
+
+PR: `phase-13f-resilience` → `phase-13e-online-play`. Reconnecting, rejoining after a reload, host migration on every screen, late joins, rounds counted for leavers, server hygiene, a few small open items, and `npm run verify:online`. Plan and file list in `phase-13f-resilience.md`; how it behaves on the wire in `server/README.md`.
+
+### Decisions
+
+- **Grace period 20 s** (`NET_RECONNECT_GRACE_MS`), Colyseus `allowReconnection` in `onDrop`. While away the member stays in the room with their players (who stand still: no inputs) and their couch devices; `LobbyMember.connected` is now real. The SDK's own reconnection is tuned in `src/net/client.ts`: no 5 s minimum uptime, retries spread over the whole grace period (`reconnectRetries`), and nothing queued while away (stale inputs and pings are worthless).
+- **Silent sockets:** the client closes a socket it heard nothing on for `NET_SILENCE_TIMEOUT_MS` (4 s; snapshots come 20 times a second, even in menus), which starts a reconnect. Covers a laptop waking up or a wifi that hangs instead of dropping. The SDK also closes on the browser's `offline` event.
+- **Reload:** `sessionStorage` (`isv-simulator.rejoin`) keeps `{ joinCode, token, role, savedAtMs }`, saved after joining and after every reconnect (the token changes), dated again on `pagehide`; a ticket older than the grace period isn't tried. On boot the page goes straight to "Getting back into the room…" and `client.reconnect(token)`. Per tab, on purpose: a new tab is a new player. A failed rejoin shows "Couldn't get back into the room in time" with Back to the title.
+- **"Return to the title with a clear message"** is the online lobby panel in its closed state (the reason in red, Back to the title, Esc), as 13d already did for a lost connection, rather than an automatic jump to the title, which would hide the reason.
+- **While reconnecting** the screen it was on stays, with a big "Connection lost. Reconnecting…" banner; presses are not sent and Esc doesn't leave (Esc is pause; walking out of the room during a wifi blip would be cruel). The Leave room button still works.
+- **Host:** the earliest joined member whose connection is up (`hostOf`). So the host badge (and the room's unlocks, which follow the host) move to the next member while the host is away and come back with them. Simple, and no screen is ever undriveable for 20 s.
+- **A host without a player** (13d note) drives every screen after the lobby: the room passes their presses on as player 1's device, since the flow only takes joined devices after the lobby. In the lobby they still join a player to start (the hint says so). No auto-binding.
+- **Leaving for good:** outside a round the leaver's players go at once and the rest are renumbered (also on the level select and results now, not only the lobby). Mid-round their character stands still until the round ends; it's dropped when the round stops or the next one starts. A room without any players left after that goes back to the lobby. Nobody takes over a departed character (deferred).
+- **Late join:** someone joining mid-round watches (they already got the round in 13e; now the bar says "Round in progress: you're watching, you'll join after it"). On the level select and the results, a member without any player joins one with a join press (Enter / gamepad A), which does nothing else that frame; so they play the next round whatever the host picks (Retry, Next or another level). Members with players add more couch players only through Change players, so the host's Enter on the results can't accidentally add their second keyboard scheme.
+- **Rounds count for who was there at the start** (`room.participants`), leavers included, late joiners not. `roundStart` now says so (`counted`), with a `roundId` (so a reconnect carries on with the same round on screen instead of restarting it). The browser records a round locally only when it was counted and it saw the round being played: a page that comes back on the results doesn't chime or count it again (the profile has it).
+- **Message budget:** a token bucket per member, 120 messages a second with bursts of 60, refilled per server tick; past it messages are dropped silently (counted on the member). Colyseus disconnects a client at 600 a second. A normal client sends at most ~75 a second (one `inputs` per tick, pings, menu presses).
+- **Idle rooms** close after 30 min without a press or a move (pings and standing still don't count) with `closing { reason: 'idle' }`. Empty rooms already close when the last member leaves; a room where everyone dropped closes when the last grace period ends.
+- **Shutdown:** `onBeforeShutdown` sends `closing { reason: 'shutdown' }` and closes with code 4001 at once (pending reconnects are dropped, so a restart doesn't wait 20 s). The browser says "The server is restarting. Host a new room in a minute."
+- **Protocol version 3** (`roundId`, `counted`, `closing`). Checked again on reconnect: the server's `welcome` after a reconnect carries the version and a client that doesn't match leaves with "another version".
+- **Esc in the online lobby asks first:** the first back press turns the hint into "Press Esc or gamepad B again to leave the room" for 3 s (`NET_LEAVE_CONFIRM_MS`); the Leave room button leaves at once.
+- **Guest level-select hint:** "The host picks the level · Enter or gamepad A: join the next round if you have no player yet".
+- **`npm run verify:online`** (`scripts/verifyOnline.ts`, with a small DevTools client in `scripts/cdp.ts`) is the browser check, not in CI. `screenshots.ts` keeps its own copy of the DevTools client for now.
+
+### Deferred
+
+- Guests pausing (still host only); the "Esc or Start: pause" hint still shows for guests and spectators.
+- Taking over a departed player's character mid-round.
+- A server-side protocol check on reconnect (the SDK's reconnect sends no options; the client checks the `welcome` instead).
+- Moving `screenshots.ts` onto `scripts/cdp.ts`.
+- Showing the reason on the title itself instead of the closed lobby panel.
+
+### What to check
+
+- See "How to playtest online" at the top: step 4 is this phase.
+
+### How it was verified
+
+- `npm run check` (746 tests; the whole suite 6 times in a row, the server tests 3 times in parallel, no failures), `npm run build`, `npm run build:server`.
+- `server/roomLogic.test.ts` (resilience block, 17 tests): drop keeps players and moves the menus, rejoin sends welcome/lobby/same round, a spectator host drives level select, intro, pause and results, leaving mid-round keeps the character until the next round, renumbering, back to the lobby without players, late joins on results and level select only, participants recorded after leaving, the budget, idle close.
+- `server/resilience.test.ts`: real server, `@colyseus/sdk` clients behind TCP proxies whose sockets are destroyed: reconnect within the grace period (same session, the others see `connected: false` then `true`, same `roundId`, still bound), removal after the grace period (and the token stops working), a fresh client rejoining with the token (the reload path), the host moving while away and back, a 300-message flood dropped without a kick, the room closing after its last member's grace, shutdown sending `closing` and code 4001 within a second despite a pending 60 s grace.
+- In the browser, `npm run verify:online` (12/12 on two runs; 11/11 on the run before the last step was added): three headless Chromes against the dev build. Checked: Esc once in the lobby only asks; the guest's level-select hint; both walk in a round; the guest offline for 5 s (DevTools network emulation) shows the banner, the host shows "Grace reconnecting…", the guest comes back into the same round and walks; the guest reloads mid-round and is back in the round walking; a third browser joins mid-round and watches; the host clicks Leave room mid-round, the guest pauses (the watcher sees "Paused by the host") and resumes, the round ends, the late joiner joins on the results, the guest starts the next round and the late joiner walks in it; the late joiner offline past 20 s gets "Couldn't get back into the room in time" and Esc to the title, and the room lets them go; the host's server profile has the round they left. Screenshots looked right (banner, bar, closed panel).
+- By hand: a server stopped with `SIGTERM` while a browser was in a room: "The server is restarting. Host a new room in a minute." Local couch play (two keyboard players, a round, pause): unchanged, no room bar or ping corner.

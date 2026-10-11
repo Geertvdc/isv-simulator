@@ -70,11 +70,20 @@ Online play needs the game server (`npm run dev:online` runs it with the game). 
 
 ![Join online with a wrong code](images/screens/join-code.webp)
 
-The online lobby shows the code (with Copy), everyone in the room, the host's badge and each machine's couch players in their colors and hats. Couch players on every machine join with Enter or gamepad A, as on the couch (4 players per room in total). The host starts with their pick-up button and picks the level; everyone else sees "Host is choosing a level". Online, only the host's devices drive the level select, the intro card, pause (which pauses the whole room) and the results. Settings and the online profile aren't reachable from an online room. Esc, gamepad B or Leave room leaves.
+The online lobby shows the code (with Copy), everyone in the room, the host's badge and each machine's couch players in their colors and hats. Couch players on every machine join with Enter or gamepad A, as on the couch (4 players per room in total). The host starts with their pick-up button and picks the level; everyone else sees "Host is choosing a level" (and the level select's hint says the host picks). Online, only the host's devices drive the level select, the intro card, pause (which pauses the whole room) and the results. Settings and the online profile aren't reachable from an online room. Leave room leaves; so does Esc or gamepad B twice.
 
 ![Online lobby with two machines](images/screens/online-lobby.webp)
 
 The round itself plays like on the couch: every machine draws the whole office, with everyone's players, the same orders, score and clock. The server runs the round; each machine sends its own players' buttons and draws what the server sends about a tenth of a second behind it, so movement glides smoothly even on a slow connection (your own player answers your keys a little later than on the couch). During a round a small room bar sits over the score with Leave room. When the round ends everyone gets the results, and the round counts for every player's progress, online and in their own browser. The first-level hints only show on the couch.
+
+Things go wrong on real networks, and the room copes:
+
+- **Dropped connection** (wifi blip, laptop lid): your screen shows "Connection lost. Reconnecting…" and the game keeps trying for 20 seconds; the others see "<name> reconnecting…" and your players stand still meanwhile. Back in, you're in the same round with the same players. If it doesn't work in time you get a message and Back to the title.
+- **Reloading the page** in a room takes you straight back in (same tab, within 20 seconds).
+- **The host leaves or drops:** the next person who joined takes over the menus (level select, pause, results), even without a player of their own.
+- **Joining while a round runs:** you watch it ("you're watching, you'll join after it"), then press Enter or gamepad A on the results or the level select to play the next round.
+- Leaving mid-round still counts the round for you; the round counts for everyone who was there when it started.
+- Esc in the online lobby asks first: press it again to leave. If the server restarts, everyone is told.
 
 For trying it out: `ROUND_SECONDS=30 npm run dev:online` makes every online round 30 seconds; `?lag=100&jitter=20` on the game's URL pretends the network is slow (100 ms each way plus up to 20 ms); the ping corner (bottom right, on in dev builds or with `?nethud`) shows the round trip, and `N` turns it on and off.
 
