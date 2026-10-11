@@ -7,7 +7,7 @@
  */
 
 import { NET_MAX_NAME_LENGTH } from '../sim/balance';
-import { DEFAULT_DISPLAY_NAME_PREFIX } from '../sim/content';
+import { DEFAULT_DISPLAY_NAME_PREFIX, PROFILE_TEXT } from '../sim/content';
 import type { StorageLike } from './save';
 
 export const USER_ID_KEY = 'isv-simulator.userId';
@@ -123,7 +123,7 @@ export function setDisplayName(
 ): IdentityChange {
   const displayName = normalizeDisplayName(text);
   if (!displayName) {
-    return { ok: false, reason: `A name needs 1 to ${NET_MAX_NAME_LENGTH} characters.` };
+    return { ok: false, reason: PROFILE_TEXT.badName };
   }
   write(storage, DISPLAY_NAME_KEY, displayName);
   return { ok: true, identity: { ...identity, displayName } };

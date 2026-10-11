@@ -1001,6 +1001,16 @@ body {
 }
 
 /* Settings → Online profile: the id, the name, and a dialog to change them. */
+.profile-screen {
+  gap: 1.25rem;
+}
+
+.profile-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
 .profile-card {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -1034,8 +1044,9 @@ body {
 }
 
 .profile-status {
+  grid-column: 1 / -1;
   min-height: 1.5rem;
-  font-size: 1.25rem;
+  font-size: 1.125rem;
   font-weight: 700;
   color: var(--gold);
 }

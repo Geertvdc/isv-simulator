@@ -48,11 +48,15 @@ The title waits for any button. After that it shows the main menu.
 | ------------------------------------------ | --------------------------------------------- |
 | ![Title screen](images/screens/title.webp) | ![Title menu](images/screens/title-menu.webp) |
 
-Settings has sound volume, music volume and screen shake. Credits lists the asset packs.
+Settings has sound volume, music volume, screen shake and the online profile. Credits lists the asset packs.
 
 |                                           |                                         |
 | ----------------------------------------- | --------------------------------------- |
 | ![Settings](images/screens/settings.webp) | ![Credits](images/screens/credits.webp) |
+
+Settings → Online profile shows this browser's user ID and display name. Copy ID puts the ID on the clipboard; Use another ID takes an ID pasted from another browser (and asks again before switching), so your progress comes along. When the game server is running, progress is synced with your online profile at start-up; without it everything stays on this device. Typing a name or an ID needs a keyboard.
+
+![Online profile](images/screens/profile.webp)
 
 ### Lobby
 

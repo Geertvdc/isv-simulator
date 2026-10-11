@@ -10,7 +10,7 @@
  */
 
 import { type MenuItem, type ProfileAction, menuItems } from '../flow/flow';
-import type { Identity } from '../flow/identity';
+import { type Identity, normalizeUserId } from '../flow/identity';
 import type { FlowView } from '../render/GameScene';
 import { MENU_HINT, MENU_LABELS, PROFILE_TEXT } from '../sim/content';
 import { el } from './dom';
@@ -88,15 +88,16 @@ export function mountProfile(root: HTMLElement, deps: ProfileDeps): ProfileScree
     nameValue,
   );
   const status = el('div', 'profile-status');
+  card.append(status);
   const server = el('div', 'profile-server');
   const menu = createMenu();
+  const notes = el('div', 'profile-notes');
+  notes.append(el('div', 'profile-about', PROFILE_TEXT.about), server);
   screen.append(
     el('h1', 'screen-title', PROFILE_TEXT.title),
     card,
-    status,
     menu.root,
-    el('div', 'profile-about', PROFILE_TEXT.about),
-    server,
+    notes,
     el('div', 'screen-hint', MENU_HINT),
   );
 
@@ -174,6 +175,10 @@ export function mountProfile(root: HTMLElement, deps: ProfileDeps): ProfileScree
     } else if (editing === 'changeId') {
       if (pendingId === null) {
         // First Enter: check it, then ask to confirm.
+        if (!normalizeUserId(input.value)) {
+          error.textContent = PROFILE_TEXT.badId;
+          return;
+        }
         pendingId = input.value;
         input.readOnly = true;
         error.textContent = PROFILE_TEXT.idConfirm;
