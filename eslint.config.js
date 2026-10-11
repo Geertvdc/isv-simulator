@@ -23,7 +23,9 @@ export default defineConfig(
   { files: ['**/*.js'], extends: [tseslint.configs.disableTypeChecked] },
   {
     // AGENTS.md rules 1 and 2: the sim (and the screen flow) is pure, deterministic TypeScript.
-    files: ['src/sim/**/*.ts', 'src/flow/**/*.ts'],
+    // src/net is pure too, except the thin network client (13e).
+    files: ['src/sim/**/*.ts', 'src/flow/**/*.ts', 'src/net/**/*.ts'],
+    ignores: ['src/net/client.ts'],
     languageOptions: { globals: {} },
     rules: {
       'no-restricted-imports': [
@@ -32,7 +34,7 @@ export default defineConfig(
           patterns: [
             {
               group: ['phaser', 'phaser/*'],
-              message: 'src/sim and src/flow must not depend on Phaser.',
+              message: 'src/sim, src/flow and src/net must not depend on Phaser.',
             },
           ],
         },
@@ -44,8 +46,8 @@ export default defineConfig(
       ],
       'no-restricted-globals': [
         'error',
-        { name: 'window', message: 'src/sim and src/flow must not touch the DOM.' },
-        { name: 'document', message: 'src/sim and src/flow must not touch the DOM.' },
+        { name: 'window', message: 'src/sim, src/flow and src/net must not touch the DOM.' },
+        { name: 'document', message: 'src/sim, src/flow and src/net must not touch the DOM.' },
         { name: 'performance', message: 'The sim advances only via tick().' },
       ],
     },
