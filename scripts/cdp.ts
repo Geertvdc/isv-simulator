@@ -66,10 +66,23 @@ export class Page {
     };
   }
 
-  send(method: string, params: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
+  /**
+   * Sends a DevTools command. Rejects after `timeoutMs`: a command sent while
+   * the page reloads can go unanswered, which would otherwise hang the run.
+   */
+  send(
+    method: string,
+    params: Record<string, unknown> = {},
+    timeoutMs = 15_000,
+  ): Promise<Record<string, unknown>> {
     const id = ++this.nextId;
     return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`${this.name}: ${method} got no answer in ${timeoutMs} ms`));
+      }, timeoutMs);
       this.pending.set(id, (m) => {
+        clearTimeout(timer);
         if (m.error) reject(new Error(`${method}: ${m.error.message}`));
         else resolve(m.result ?? {});
       });
@@ -79,11 +92,15 @@ export class Page {
 
   /** Evaluates `expression` in the page and returns its value. */
   async eval<T>(expression: string): Promise<T> {
-    const r = await this.send('Runtime.evaluate', {
-      expression,
-      returnByValue: true,
-      awaitPromise: true,
-    });
+    const r = await this.send(
+      'Runtime.evaluate',
+      {
+        expression,
+        returnByValue: true,
+        awaitPromise: true,
+      },
+      5_000,
+    );
     const details = r.exceptionDetails as { exception?: { description?: string } } | undefined;
     if (details) throw new Error(details.exception?.description ?? `Failed: ${expression}`);
     return (r.result as { value: T }).value;
