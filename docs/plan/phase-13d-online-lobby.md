@@ -29,6 +29,7 @@ Built without a review round (the product owner was away); decisions are in `rev
 ### Online session state (`src/flow/online.ts`, pure)
 
 `OnlineState = { role, status, error, sessionId, joinCode, members, levels, flow, serverTick }` and:
+
 - `createOnline(role)`, `onlineConnected(state, sessionId, joinCode)`, `applyServerMessage(state, message)` (welcome, lobby, snapshot, roundStart, error), `onlineStatus(state, status, error?)`.
 - `isOnlineHost`, `hostIsChoosing(state)` (a host-only screen and this machine isn't the host), `membersWithPlayers(state)` (each member with its couch players, local device ids), `onlineMenuPresses(state, presses)` → `{ send, leave }`: back on the lobby (or while connecting, or after the connection failed) leaves; everything else goes to the server.
 - `onlineErrorFromCode(code)` maps protocol `ErrorCode`s to the screen's friendly errors.
