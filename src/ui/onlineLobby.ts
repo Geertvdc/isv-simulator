@@ -7,11 +7,21 @@
  *   connecting and when the room closed, with the reason.
  * - the online bar on every other online screen: the room code, the
  *   connection, "Host is choosing a level" for guests on the host's screens,
- *   and Leave. During a round it moves to the bottom left, out of the
- *   orders' way.
+ *   who is reconnecting, "you're watching" for someone without a player in
+ *   the round, and Leave. During a round it moves to the bottom left, out of
+ *   the orders' way.
+ * - a banner over everything while this browser reconnects.
  */
 
-import { type OnlineState, hostIsChoosing, isOnlineHost, membersWithPlayers } from '../flow/online';
+import {
+  type OnlineState,
+  canJoinNextRound,
+  hostIsChoosing,
+  isOnlineHost,
+  isSpectating,
+  membersWithPlayers,
+  reconnectingMembers,
+} from '../flow/online';
 import { playerCssColor } from '../render/playerColors';
 import { ONLINE_TEXT } from '../sim/content';
 import { el } from './dom';
@@ -39,9 +49,21 @@ function statusText(online: OnlineState): string {
   return ONLINE_TEXT.status[online.status];
 }
 
-/** Whether the lobby panel is the screen to show (rather than the server's other screens). */
+/**
+ * Whether the lobby panel is the screen to show (rather than the server's
+ * other screens). While reconnecting, the screen it was on stays (with the
+ * banner on top).
+ */
 function showsLobby(online: OnlineState): boolean {
-  return online.status !== 'connected' || online.flow === null || online.flow.screen === 'lobby';
+  const up = online.status === 'connected' || online.status === 'reconnecting';
+  return !up || online.flow === null || online.flow.screen === 'lobby';
+}
+
+/** "Grace reconnecting…", for everyone else whose connection dropped. */
+function awayText(online: OnlineState): string {
+  return reconnectingMembers(online)
+    .map((m) => `${m.displayName} ${ONLINE_TEXT.memberReconnecting}`)
+    .join(' · ');
 }
 
 /** What to press now, under the members. */
@@ -101,7 +123,12 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineDeps): ScreenVie
       status.dataset.status = online.status;
       hint.textContent = online.status === 'connected' && online.flow ? lobbyHint(online) : '';
       leave.textContent = closed ? ONLINE_TEXT.back : ONLINE_TEXT.leave;
-      keys.textContent = closed ? ONLINE_TEXT.closedHint : ONLINE_TEXT.leaveHint;
+      keys.textContent = closed
+        ? ONLINE_TEXT.closedHint
+        : online.leaveArmedAtMs !== null
+          ? ONLINE_TEXT.leaveConfirmHint
+          : ONLINE_TEXT.leaveHint;
+      keys.classList.toggle('armed', !closed && online.leaveArmedAtMs !== null);
 
       const list = membersWithPlayers(online);
       const key = JSON.stringify(list);
@@ -111,9 +138,13 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineDeps): ScreenVie
         ...list.map(({ member, isYou, players }) => {
           const row = el('div', 'online-member');
           row.classList.toggle('you', isYou);
+          row.classList.toggle('away', !member.connected);
           const name = el('div', 'online-member-name', member.displayName);
           if (isYou) name.append(el('span', 'online-you', ` ${ONLINE_TEXT.you}`));
           if (member.isHost) name.append(el('span', 'online-host', ONLINE_TEXT.host));
+          if (!member.connected) {
+            name.append(el('span', 'online-away', ONLINE_TEXT.memberReconnecting));
+          }
           const chips = el('div', 'online-players');
           if (players.length === 0)
             chips.append(el('div', 'online-no-players', ONLINE_TEXT.noPlayers));
@@ -141,13 +172,17 @@ export function mountOnlineBar(root: HTMLElement, deps: OnlineDeps): ScreenView 
   bar.hidden = true;
   const room = el('span', 'online-bar-room');
   const waiting = el('span', 'online-bar-waiting');
+  const away = el('span', 'online-bar-away');
   const leave = button('online-bar-leave', ONLINE_TEXT.leave, deps.onLeave);
-  bar.append(room, waiting, leave);
-  root.append(bar);
+  bar.append(room, waiting, away, leave);
+  const banner = el('div', 'online-banner', ONLINE_TEXT.reconnectingBanner);
+  banner.hidden = true;
+  root.append(bar, banner);
   return {
     render: (view) => {
       const online = view?.online ?? null;
       bar.hidden = !online || showsLobby(online);
+      banner.hidden = bar.hidden || online?.status !== 'reconnecting';
       // The screens under it move down to make room.
       const screen = online?.flow?.screen;
       const inRound = screen === 'countdown' || screen === 'playing';
@@ -155,12 +190,16 @@ export function mountOnlineBar(root: HTMLElement, deps: OnlineDeps): ScreenView 
       bar.classList.toggle('in-round', inRound);
       if (!online || bar.hidden) return;
       room.textContent = `${ONLINE_TEXT.roomLabel} ${online.joinCode ?? ''} · ${statusText(online)}`;
-      const text =
-        hostIsChoosing(online) && screen !== undefined && screen in ONLINE_TEXT.waiting
+      const text = isSpectating(online)
+        ? ONLINE_TEXT.spectating
+        : hostIsChoosing(online) && screen !== undefined && screen in ONLINE_TEXT.waiting
           ? ONLINE_TEXT.waiting[screen as keyof typeof ONLINE_TEXT.waiting]
           : '';
-      waiting.textContent = text;
-      waiting.hidden = text === '';
+      const join = canJoinNextRound(online) ? ONLINE_TEXT.joinNextRound : '';
+      waiting.textContent = [text, join].filter((t) => t !== '').join(' · ');
+      waiting.hidden = waiting.textContent === '';
+      away.textContent = awayText(online);
+      away.hidden = away.textContent === '';
     },
   };
 }

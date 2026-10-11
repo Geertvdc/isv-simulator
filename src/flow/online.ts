@@ -10,7 +10,7 @@
 
 import type { DevicePress } from '../input/controller';
 import type { LobbyMember, ServerMessage } from '../net/protocol';
-import { TICKS_PER_SECOND } from '../sim/balance';
+import { NET_LEAVE_CONFIRM_MS, TICKS_PER_SECOND } from '../sim/balance';
 import type { PlayerId } from '../sim/state';
 import type { Flow, OnlineError, Screen } from './flow';
 import type { LevelRecord } from './save';
@@ -21,6 +21,8 @@ export type OnlineRole = 'host' | 'join';
 export type OnlineStatus =
   /** Creating or joining the room. */
   | 'connecting'
+  /** A reloaded page getting back into its room with the stored ticket. */
+  | 'rejoining'
   | 'connected'
   /** The connection dropped; the network library is trying to get it back. */
   | 'reconnecting'
@@ -45,6 +47,10 @@ export interface OnlineState {
   serverTick: number;
   /** The level of the round loaded on the server, if any. */
   levelId: string | null;
+  /** When back was pressed once in the lobby (a second press soon after leaves); `null`: not armed. */
+  leaveArmedAtMs: number | null;
+  /** Why the server said it is closing the room, if it did. */
+  closing: 'idle' | 'shutdown' | null;
 }
 
 export function createOnline(role: OnlineRole): OnlineState {
@@ -59,7 +65,14 @@ export function createOnline(role: OnlineRole): OnlineState {
     flow: null,
     serverTick: 0,
     levelId: null,
+    leaveArmedAtMs: null,
+    closing: null,
   };
+}
+
+/** A reloaded page on its way back into room `joinCode`. */
+export function createRejoin(role: OnlineRole, joinCode: string): OnlineState {
+  return { ...createOnline(role), status: 'rejoining', joinCode };
 }
 
 /** The room was created or joined. */
@@ -77,7 +90,14 @@ export function setOnlineStatus(
   error: OnlineError | null = null,
 ): void {
   state.status = status;
-  if (status === 'closed') state.error = error;
+  if (status === 'closed') state.error = closeError(state, error);
+}
+
+/** Why the room closed, as the player should read it: the server's own reason first. */
+function closeError(state: OnlineState, error: OnlineError | null): OnlineError | null {
+  if (state.closing === 'shutdown') return 'serverShutdown';
+  if (state.closing === 'idle') return 'roomClosed';
+  return error;
 }
 
 /**
@@ -125,9 +145,11 @@ export function applyServerMessage(state: OnlineState, message: ServerMessage): 
       state.levelId = message.levelId;
       state.serverTick = Math.max(state.serverTick, message.snapshot.serverTick);
       return true;
+    case 'closing':
+      state.closing = message.reason;
+      return true;
     case 'pong':
     case 'error':
-    case 'closing':
       return false;
   }
 }
@@ -143,6 +165,39 @@ export function onlineHost(state: OnlineState): LobbyMember | undefined {
 
 export function isOnlineHost(state: OnlineState): boolean {
   return state.sessionId !== null && onlineHost(state)?.sessionId === state.sessionId;
+}
+
+/** Others in the room whose connection dropped (the room waits for them), in join order. */
+export function reconnectingMembers(state: OnlineState): LobbyMember[] {
+  return state.members.filter((m) => !m.connected && m.sessionId !== state.sessionId);
+}
+
+const ROUND_SCREENS: readonly Screen[] = ['intro', 'countdown', 'playing', 'paused'];
+
+/** A round is on and none of its players are on this machine: this browser watches. */
+export function isSpectating(state: OnlineState): boolean {
+  const screen = state.flow?.screen;
+  return (
+    state.status === 'connected' &&
+    screen !== undefined &&
+    ROUND_SCREENS.includes(screen) &&
+    localBindings(state).length === 0
+  );
+}
+
+/** Between rounds with no player of our own: a join press gets one for the next round. */
+export function canJoinNextRound(state: OnlineState): boolean {
+  const screen = state.flow?.screen;
+  return (
+    state.status === 'connected' &&
+    (screen === 'levelSelect' || screen === 'results') &&
+    localBindings(state).length === 0
+  );
+}
+
+/** Whether a second back in the online lobby leaves now (the first one was a moment ago). */
+export function leaveArmed(state: OnlineState, nowMs: number): boolean {
+  return state.leaveArmedAtMs !== null && nowMs - state.leaveArmedAtMs < NET_LEAVE_CONFIRM_MS;
 }
 
 /** Screens only the host's devices drive online (the server ignores everyone else's presses). */
@@ -200,20 +255,38 @@ function isBack(press: DevicePress): boolean {
 
 /**
  * What this frame's presses mean online: `send` goes to the server as a
- * `menu` message, `leave` leaves the room. Back on the room's lobby leaves
- * (as it goes back to the title on the couch); so does back while
- * connecting, reconnecting or after the room closed. Everything else is the
- * server's to judge, so it all goes there.
+ * `menu` message, `leave` leaves the room, `changed` says the screen should
+ * redraw (the lobby's leave hint).
+ *
+ * - Back on the room's lobby asks first: the first back arms it ("press Esc
+ *   again"), a second within `NET_LEAVE_CONFIRM_MS` leaves.
+ * - While reconnecting nothing is sent and nothing leaves (Esc to pause in a
+ *   wifi blip must not walk out of the room); the Leave button still works.
+ * - While connecting, rejoining or after the room closed, back leaves.
+ * - Everything else is the server's to judge, so it all goes there.
  */
 export function onlineMenuPresses(
   state: OnlineState,
   presses: readonly DevicePress[],
-): { send: DevicePress[]; leave: boolean } {
+  nowMs: number,
+): { send: DevicePress[]; leave: boolean; changed: boolean } {
+  const back = presses.some(isBack);
+  if (state.status === 'reconnecting') return { send: [], leave: false, changed: false };
   if (state.status !== 'connected' || state.flow === null) {
-    return { send: [], leave: presses.some(isBack) };
+    return { send: [], leave: back, changed: false };
   }
   if (state.flow.screen === 'lobby') {
-    return { send: presses.filter((p) => !isBack(p)), leave: presses.some(isBack) };
+    const send = presses.filter((p) => !isBack(p));
+    let changed = false;
+    if (state.leaveArmedAtMs !== null && !leaveArmed(state, nowMs)) {
+      state.leaveArmedAtMs = null;
+      changed = true;
+    }
+    if (!back) return { send, leave: false, changed };
+    if (leaveArmed(state, nowMs)) return { send, leave: true, changed };
+    state.leaveArmedAtMs = nowMs;
+    return { send, leave: false, changed: true };
   }
-  return { send: [...presses], leave: false };
+  if (state.leaveArmedAtMs !== null) state.leaveArmedAtMs = null;
+  return { send: [...presses], leave: false, changed: false };
 }

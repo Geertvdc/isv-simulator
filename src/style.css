@@ -1374,6 +1374,49 @@ body {
   opacity: 0.9;
 }
 
+/* Someone whose connection dropped: the room waits for them. */
+.online-member.away {
+  opacity: 0.6;
+}
+
+.online-away,
+.online-bar-away {
+  font-weight: 700;
+  color: #ffb74d;
+}
+
+.online-away {
+  font-size: 0.875rem;
+}
+
+.online-bar-away[hidden],
+.online-banner[hidden] {
+  display: none;
+}
+
+/* The second Esc in the online lobby leaves: say so loudly. */
+.screen-hint.armed {
+  font-weight: 700;
+  color: #ffb74d;
+}
+
+/* This browser lost its connection: over the screen it was on until it's back. */
+.online-banner {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  z-index: 6;
+  padding: 1rem 2rem;
+  border: 2px solid #ffb74d;
+  border-radius: 1rem;
+  background: var(--panel);
+  transform: translate(-50%, -50%);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #ffb74d;
+  pointer-events: none;
+}
+
 /* The ping corner (dev, `N`): over the clock. */
 .net-hud {
   position: absolute;

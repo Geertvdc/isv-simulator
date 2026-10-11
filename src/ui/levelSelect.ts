@@ -1,9 +1,11 @@
+import { isOnlineHost } from '../flow/online';
 import { isChapterOpen, isUnlocked, totalStars } from '../flow/save';
 import type { FlowView } from '../render/GameScene';
 import { MAX_STARS, STARS_TO_UNLOCK } from '../sim/balance';
 import {
   CHAPTER_BLURBS,
   LEVEL_BLURBS,
+  LEVEL_SELECT_GUEST_HINT,
   LEVEL_SELECT_HINT,
   LEVEL_SELECT_TITLE,
   chapterGateHint,
@@ -68,12 +70,8 @@ export function mountLevelSelect(root: HTMLElement): LevelSelectView {
     columns.append(column);
     chapterViews.push({ column, gate });
   });
-  panel.append(
-    el('h1', 'screen-title', LEVEL_SELECT_TITLE),
-    total,
-    columns,
-    el('div', 'screen-hint', LEVEL_SELECT_HINT),
-  );
+  const hint = el('div', 'screen-hint', LEVEL_SELECT_HINT);
+  panel.append(el('h1', 'screen-title', LEVEL_SELECT_TITLE), total, columns, hint);
   root.append(panel);
 
   return {
@@ -81,6 +79,9 @@ export function mountLevelSelect(root: HTMLElement): LevelSelectView {
       panel.hidden = view === null;
       if (!view) return;
       const { flow, save, levelIds, chapters, unlockAll } = view;
+      // Online only the host picks; a guest's Enter joins the next round (if they have no player).
+      hint.textContent =
+        view.online && !isOnlineHost(view.online) ? LEVEL_SELECT_GUEST_HINT : LEVEL_SELECT_HINT;
       const stars = totalStars(save, levelIds);
       total.textContent = `${stars} / ${levelIds.length * MAX_STARS} ★`;
       const selected = entries.find((e) => e.index === flow.levelIndex)?.chapter;

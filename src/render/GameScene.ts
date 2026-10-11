@@ -13,6 +13,7 @@ import {
   countdownNumber,
   createFlow,
   editJoinCode,
+  enterOnline,
   finishRound,
   isRoundRunning,
   joinFailed,
@@ -28,25 +29,34 @@ import {
   type OnlineState,
   applyServerMessage,
   createOnline,
+  createRejoin,
   localBindings,
   onlineConnected,
   onlineMenuPresses,
   onlineNowMs,
   setOnlineStatus,
 } from '../flow/online';
-import { type NetConnection, helloFor, hostRoom, joinRoomByCode, toJoinError } from '../net/client';
+import {
+  type NetConnection,
+  helloFor,
+  hostRoom,
+  joinRoomByCode,
+  rejoinRoom,
+  toJoinError,
+} from '../net/client';
 import { type ClockSync, addPong, createClockSync, inputTargetTick } from '../net/clock';
 import { createInputStamper, resetInputStamper, stampInputs } from '../net/inputStamp';
 import type { InterpolationStatus } from '../net/interpolation';
 import type { LagSettings } from '../net/lag';
 import {
   type OnlineRound,
+  continueOnlineRound,
   pushRoundSnapshot,
   roundRenderTick,
   sampleRound,
-  startOnlineRound,
   takeDueEvents,
 } from '../net/onlineRound';
+import { encodeTicket, parseTicket } from '../net/rejoin';
 import type { ServerMessage } from '../net/protocol';
 import { type HintId, startHints, updateHints } from '../flow/hints';
 import {
@@ -182,6 +192,16 @@ export interface OnlineOptions {
   lag: LagSettings | null;
   /** The ping corner shows from the start (`N` toggles it). */
   netHud: boolean;
+  /** Where this tab keeps its rejoin ticket (`sessionStorage`), so a reload gets back into the room. */
+  tickets: TicketStore | null;
+}
+
+/** Keeps one text (the rejoin ticket) for this browser tab, with the wall clock to date it. */
+export interface TicketStore {
+  load(): string | null;
+  /** `null` forgets it. */
+  save(text: string | null): void;
+  nowMs(): number;
 }
 
 /** What the ping corner shows. */
@@ -364,6 +384,8 @@ export class GameScene extends Phaser.Scene {
   private onlineRoundDropped = false;
   /** The round whose results this browser already chimed and saved. */
   private recordedRound: OnlineRound | null = null;
+  /** The boot-time checks (a rejoin ticket, the page-hide hook) ran; not again on scene restarts. */
+  private booted = false;
   private clock: ClockSync = createClockSync();
   private readonly stamper = createInputStamper();
   private pingsSent = 0;
@@ -452,6 +474,10 @@ export class GameScene extends Phaser.Scene {
 
     this.loop = null;
     this.hints = [];
+    if (!this.booted) {
+      this.booted = true;
+      this.boot();
+    }
     if (this.options.scene) this.startScene(this.options.scene);
     else if (data.startRound) this.startRound();
     else this.game.events.emit(GAME_FRAME_EVENT, null);
@@ -635,11 +661,16 @@ export class GameScene extends Phaser.Scene {
       this.emitFlow(nowMs);
       return;
     }
-    const { send, leave } = onlineMenuPresses(online, this.menuPresses(frame.presses));
+    const { send, leave, changed } = onlineMenuPresses(
+      online,
+      this.menuPresses(frame.presses),
+      nowMs,
+    );
     if (leave) {
       this.leaveOnline();
       return;
     }
+    if (changed) this.onlineDirty = true;
     if (send.length > 0) {
       this.connection?.send({ type: 'menu', presses: send.slice(0, NET_MAX_PRESSES_PER_MESSAGE) });
     }
@@ -707,7 +738,8 @@ export class GameScene extends Phaser.Scene {
    */
   private sendInputs(online: OnlineState, frame: InputFrame, now: number): void {
     const screen = online.flow?.screen;
-    if (!this.connection || (screen !== 'playing' && screen !== 'countdown')) return;
+    if (!this.connection || online.status !== 'connected') return;
+    if (screen !== 'playing' && screen !== 'countdown') return;
     const target = inputTargetTick(this.clock, now);
     const bindings = localBindings(online);
     if (target === null || bindings.length === 0) return;
@@ -762,8 +794,12 @@ export class GameScene extends Phaser.Scene {
     const newest = round.buffer.entries[round.buffer.entries.length - 1];
     if (!newest?.state.result) return;
     this.recordedRound = round;
+    // A page that came back (reload) on the results didn't see the round end:
+    // no chimes, and the server's profile has it already.
+    if (!round.sawPlaying) return;
     this.countStars(results.stars);
-    if (!this.options.storage) return;
+    // Someone who joined while it ran only watched: not their round.
+    if (!this.options.storage || !round.counted) return;
     recordLevel(this.options.save.levels, round.levelId, {
       score: results.score,
       stars: results.stars,
@@ -796,8 +832,11 @@ export class GameScene extends Phaser.Scene {
       case 'pong':
         addPong(this.clock, message, performance.now());
         break;
-      case 'roundStart':
-        this.onlineRound = startOnlineRound(message);
+      case 'roundStart': {
+        const before = this.onlineRound;
+        // The same round again after a reconnect carries on; a new one starts clean.
+        this.onlineRound = continueOnlineRound(before, message);
+        if (this.onlineRound === before) break;
         // First-level hints are a couch thing: they'd point at one machine's players only.
         this.hints = [];
         this.netDebug.frames = 0;
@@ -805,6 +844,7 @@ export class GameScene extends Phaser.Scene {
         this.netDebug.eventsPlayed = {};
         resetInputStamper(this.stamper);
         break;
+      }
       case 'snapshot': {
         const round = this.onlineRound;
         if (!round) break;
@@ -858,6 +898,73 @@ export class GameScene extends Phaser.Scene {
     );
   }
 
+  /**
+   * Once per page: a tab that was in a room before a reload goes straight
+   * back in, and the ticket gets a fresh date when the page goes away (the
+   * server's grace period starts then).
+   */
+  private boot(): void {
+    const tickets = this.options.online?.tickets;
+    if (!tickets || this.options.scene) return;
+    window.addEventListener('pagehide', () => {
+      this.saveTicket();
+    });
+    const ticket = parseTicket(tickets.load(), tickets.nowMs());
+    if (!ticket) {
+      tickets.save(null);
+      return;
+    }
+    enterOnline(this.flow);
+    this.startRejoin(ticket.role, ticket.joinCode, ticket.token);
+  }
+
+  /** Back into the room this tab was in (a reload), with the token it kept. */
+  private startRejoin(role: OnlineRole, joinCode: string, token: string): void {
+    const options = this.options.online;
+    if (!options) return;
+    const attempt = ++this.onlineAttempt;
+    this.online = createRejoin(role, joinCode);
+    this.onlineDirty = true;
+    rejoinRoom(options.serverUrl, token, { lag: options.lag }).then(
+      (connection) => {
+        if (attempt !== this.onlineAttempt) {
+          void connection.leave();
+          return;
+        }
+        this.connected(role, connection);
+      },
+      (error: unknown) => {
+        if (attempt !== this.onlineAttempt || !this.online) return;
+        const code = toJoinError(error).code;
+        setOnlineStatus(this.online, 'closed', code === 'unreachable' ? code : 'reconnectFailed');
+        this.saveTicket();
+        this.onlineDirty = true;
+      },
+    );
+  }
+
+  /** Keeps this tab's way back into the room (or forgets it once out of the room). */
+  private saveTicket(): void {
+    const tickets = this.options.online?.tickets;
+    if (!tickets) return;
+    const online = this.online;
+    const connection = this.connection;
+    // Still on the way back in: the ticket stays for another reload.
+    if (online?.status === 'rejoining') return;
+    if (!online || !connection || online.status === 'closed') {
+      tickets.save(null);
+      return;
+    }
+    tickets.save(
+      encodeTicket({
+        joinCode: connection.joinCode,
+        token: connection.reconnectionToken(),
+        role: online.role,
+        savedAtMs: tickets.nowMs(),
+      }),
+    );
+  }
+
   private onlineFailed(role: OnlineRole, error: OnlineError): void {
     if (role === 'join') joinFailed(this.flow, error);
     else if (this.online) setOnlineStatus(this.online, 'closed', error);
@@ -878,13 +985,21 @@ export class GameScene extends Phaser.Scene {
       if (this.connection === connection) this.serverMessage(online, message);
     });
     connection.onStatus((status, error) => {
+      if (this.connection !== connection) return;
       setOnlineStatus(online, status, error);
-      if (status === 'closed' && this.connection === connection) {
+      if (status === 'connected') {
+        // Back after a drop: a new token for a reload, and inputs start over.
+        resetInputStamper(this.stamper);
+        this.saveTicket();
+      }
+      if (status === 'closed') {
         this.connection = null;
+        this.saveTicket();
         this.dropOnlineRound();
       }
       this.onlineDirty = true;
     });
+    this.saveTicket();
     this.onlineDirty = true;
   }
 
@@ -895,6 +1010,7 @@ export class GameScene extends Phaser.Scene {
     void this.connection?.leave();
     this.connection = null;
     this.online = null;
+    this.saveTicket();
     if (this.flow.screen === 'online') {
       onlineEnded(this.flow, role === 'join' ? 'joinOnline' : 'hostOnline');
     }
