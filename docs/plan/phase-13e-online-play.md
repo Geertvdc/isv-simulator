@@ -111,6 +111,6 @@ frameView(frame: InterpolatedFrame<GameState>): RoundView
 - [x] Local couch play behaves exactly as before
 - [x] Verified in a real browser with two contexts (host and guest), with and without lag
 - [x] `npm run check`, `npm run build` and `npm run build:server` pass
-- [ ] CI is green
+- [x] CI is green
 
 Manual check: `ROUND_SECONDS=30 npm run dev:online`, two browser windows (one private). Host online, join with the code, Enter in both, E in the host's, pick Garage. Both players walk on both screens; pick up a ticket in one window and watch it move in the other; the clock and score match. Esc in the host's pauses both. At the end both show the results with stars; the host picks Retry, both play again. Then the same with `?lag=100&jitter=20` on both URLs: movement should glide, no snapping back.
