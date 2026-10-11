@@ -102,6 +102,8 @@ const scene = new GameScene({
         // Dev tools: `?lag=100&jitter=20` simulates a slow network; `?nethud` shows the ping corner.
         lag: parseLag(params.get('lag'), params.get('jitter')),
         netHud: import.meta.env.DEV || params.has('nethud'),
+        // `?predict=0`: no client-side prediction of your own player, to compare.
+        predict: params.get('predict') !== '0',
         tickets,
       },
 });

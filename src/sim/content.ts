@@ -330,6 +330,7 @@ export const ONLINE_TEXT = {
   ping: 'Ping',
   waitingForSnapshots: 'waiting for the server',
   lagSimulated: 'simulated lag',
+  noPrediction: 'no prediction',
   status: {
     connecting: 'Connecting to the server…',
     rejoining: 'Getting back into the room…',
