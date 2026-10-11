@@ -11,7 +11,7 @@ import { Client, type Room } from '@colyseus/sdk';
 import type { OnlineError } from '../flow/flow';
 import type { Identity } from '../flow/identity';
 import { onlineErrorFromCode } from '../flow/online';
-import { type LagLine, type LagSettings, createLagLine, deliveryTime } from './lag';
+import { type LagSettings, createLagRunner } from './lag';
 import {
   type ClientMessage,
   GAME_ROOM,
@@ -120,23 +120,21 @@ export async function joinRoomByCode(
   }
 }
 
-/** Calls `fn` now, or after the simulated lag on `line`. */
-function later(line: LagLine | null, fn: () => void): void {
-  if (!line) {
-    fn();
-    return;
-  }
-  const now = performance.now();
-  setTimeout(fn, deliveryTime(line, now) - now);
-}
-
-function lagLine(options: ConnectOptions): LagLine | null {
-  return options.lag ? createLagLine(options.lag, Math.floor(Math.random() * 2 ** 31)) : null;
+/** Runs functions right away, or after the simulated lag (in order) when there is one. */
+function lagRunner(options: ConnectOptions): (fn: () => void) => void {
+  if (!options.lag)
+    return (fn) => {
+      fn();
+    };
+  return createLagRunner(options.lag, Math.floor(Math.random() * 2 ** 31), {
+    now: () => performance.now(),
+    setTimer: (fn, ms) => setTimeout(fn, ms),
+  });
 }
 
 function wrap(room: Room, options: ConnectOptions): NetConnection {
-  const lagIn = lagLine(options);
-  const lagOut = lagLine(options);
+  const lagIn = lagRunner(options);
+  const lagOut = lagRunner(options);
   const messageListeners = new Set<(message: ServerMessage) => void>();
   const statusListeners = new Set<(status: ConnectionStatus, error: OnlineError | null) => void>();
   const early: ServerMessage[] = [];
@@ -144,7 +142,7 @@ function wrap(room: Room, options: ConnectOptions): NetConnection {
   let closed = false;
 
   room.onMessage('*', (_type: string | number, payload: ServerMessage) => {
-    later(lagIn, () => {
+    lagIn(() => {
       if (messageListeners.size === 0) early.push(payload);
       for (const listener of messageListeners) listener(payload);
     });
@@ -167,7 +165,7 @@ function wrap(room: Room, options: ConnectOptions): NetConnection {
     sessionId: room.sessionId,
     joinCode: room.roomId,
     send: (message) => {
-      later(lagOut, () => {
+      lagOut(() => {
         if (!closed) room.send(message.type, message);
       });
     },
