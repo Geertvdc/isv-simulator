@@ -1,7 +1,9 @@
 /**
  * The screens around a round, as a plain-data state machine: title, lobby,
  * level select, the level intro card and countdown, the round itself,
- * pause, results, settings (with the online profile) and credits.
+ * pause, results, settings (with the online profile), credits, and the way
+ * into an online room (typing a join code). The server runs the same flow
+ * for a room (`flow.online`), with a few online rules.
  * `updateFlow` turns this frame's button presses into a new screen and a
  * list of effects for the scene to run (start a round, save, ...). Like the
  * sim it never touches Phaser or the DOM, and time only comes in as an
@@ -9,11 +11,14 @@
  */
 
 import type { DevicePress } from '../input/controller';
+import type { DeviceId } from '../input/controller';
 import { type Lobby, createLobby, updateLobby } from '../input/lobby';
+import { JOIN_CODE_ALPHABET, normalizeJoinCode } from '../net/joinCode';
 import {
   COUNTDOWN_STEPS,
   COUNTDOWN_STEP_MS,
   END_SCREEN_INPUT_DELAY_MS,
+  NET_JOIN_CODE_LENGTH,
   SFX_VOLUME_MAX,
 } from '../sim/balance';
 import type { LevelResult } from '../sim/orders';
@@ -40,11 +45,17 @@ export type Screen =
   | 'settings'
   /** Under settings: this browser's user id and display name. */
   | 'profile'
-  | 'credits';
+  | 'credits'
+  /** Typing a join code to join an online room. */
+  | 'joinCode'
+  /** In an online room: the screens come from the server, this flow waits. */
+  | 'online';
 
 /** One line in a vertical menu. */
 export type MenuItem =
   | 'play'
+  | 'hostOnline'
+  | 'joinOnline'
   | 'settings'
   | 'credits'
   | 'resume'
@@ -82,6 +93,40 @@ export interface Results {
   endedAtMs: number;
 }
 
+/** Why joining or staying in an online room didn't work, for the screens to explain. */
+export type OnlineError =
+  /** The typed code can't be a code (not 4 letters from the code alphabet). */
+  | 'badCode'
+  /** No room with that code. */
+  | 'wrongCode'
+  | 'roomFull'
+  /** The server runs another version of the game. */
+  | 'protocolMismatch'
+  /** The server can't be reached. */
+  | 'unreachable'
+  /** The connection to the room was lost. */
+  | 'disconnected';
+
+/** The join-code screen: what is typed so far. */
+export interface JoinCodeEntry {
+  /** Upper case, code letters only, at most `NET_JOIN_CODE_LENGTH`. */
+  text: string;
+  /** For the gamepad letter wheel: the letter it changes. */
+  cursor: number;
+  error: OnlineError | null;
+  /** A join is out: waiting for the server. */
+  busy: boolean;
+}
+
+/** The title menu, in order. */
+export const TITLE_ITEMS: readonly MenuItem[] = [
+  'play',
+  'hostOnline',
+  'joinOnline',
+  'settings',
+  'credits',
+];
+
 /** Screens that can open the settings, and get them back after. */
 export type SettingsFrom = 'title' | 'paused';
 
@@ -100,6 +145,14 @@ export interface Flow {
   results: Results | null;
   /** When the countdown started, in the caller's clock. */
   countdownStartMs: number;
+  /** The join-code screen's entry. */
+  joinCode: JoinCodeEntry;
+  /**
+   * The flow of an online room, run on the server: back in the lobby does
+   * nothing (leaving is up to each browser), and the pause menu has no
+   * settings or quit.
+   */
+  online: boolean;
 }
 
 export interface FlowContext {
@@ -113,6 +166,8 @@ export interface FlowContext {
   unlockAll: boolean;
   /** Current time in ms, any clock that only goes forward. */
   nowMs: number;
+  /** Who may start the game from the lobby; player 1 when left out. */
+  canStart?: (deviceId: DeviceId) => boolean;
 }
 
 export type FlowEffect =
@@ -127,7 +182,13 @@ export type FlowEffect =
   /** The settings changed and should be applied. */
   | { type: 'settingsChanged' }
   /** A line on the profile screen was picked. */
-  | { type: 'profileAction'; action: ProfileAction };
+  | { type: 'profileAction'; action: ProfileAction }
+  /** Create an online room and go in. */
+  | { type: 'hostOnline' }
+  /** Join the online room with this code (already normalized). */
+  | { type: 'joinOnline'; code: string }
+  /** Drop the join that is out: the player backed out. */
+  | { type: 'cancelJoin' };
 
 export interface FlowUpdate {
   /** Whether anything on screen changed. */
@@ -145,16 +206,24 @@ export function createFlow(): Flow {
     settingsFrom: 'title',
     results: null,
     countdownStartMs: 0,
+    joinCode: emptyJoinCode(),
+    online: false,
   };
+}
+
+function emptyJoinCode(): JoinCodeEntry {
+  return { text: '', cursor: 0, error: null, busy: false };
 }
 
 /** The lines of the current screen's menu; empty for screens without one. */
 export function menuItems(flow: Flow): MenuItem[] {
   switch (flow.screen) {
     case 'title':
-      return flow.awake ? ['play', 'settings', 'credits'] : [];
+      return flow.awake ? [...TITLE_ITEMS] : [];
     case 'paused':
-      return ['resume', 'restart', 'settings', 'levelSelect', 'changePlayers', 'quit'];
+      return flow.online
+        ? ['resume', 'restart', 'levelSelect', 'changePlayers']
+        : ['resume', 'restart', 'settings', 'levelSelect', 'changePlayers', 'quit'];
     case 'results':
       return flow.results?.canGoNext ? ['next', 'retry', 'levelSelect'] : ['retry', 'levelSelect'];
     case 'settings':
@@ -214,7 +283,7 @@ function goTo(flow: Flow, screen: Screen, menuIndex = 0): void {
 /** Back on the title with nobody joined. */
 function quitToTitle(flow: Flow, item: MenuItem = 'play'): void {
   flow.lobby = createLobby();
-  goTo(flow, 'title', ['play', 'settings', 'credits'].indexOf(item));
+  goTo(flow, 'title', TITLE_ITEMS.indexOf(item));
 }
 
 /** To the lobby, keeping everyone who joined, so players can join or leave. */
@@ -235,7 +304,10 @@ export function updateFlow(
   ctx: FlowContext,
 ): FlowUpdate {
   const update: FlowUpdate = { changed: false, effects: [] };
-  if (flow.screen === 'lobby') return updateLobbyScreen(flow, presses);
+  if (flow.screen === 'lobby') return updateLobbyScreen(flow, presses, ctx);
+  if (flow.screen === 'joinCode') return updateJoinCodeScreen(flow, presses);
+  // Online, the server's flow drives the screens; this one waits for the room to end.
+  if (flow.screen === 'online') return update;
   // Nobody can do anything during the countdown, not even pause: it only waits.
   if (flow.screen === 'countdown') {
     if (ctx.nowMs - flow.countdownStartMs < COUNTDOWN_MS) return update;
@@ -272,14 +344,18 @@ export function updateFlow(
   return update;
 }
 
-function updateLobbyScreen(flow: Flow, presses: readonly DevicePress[]): FlowUpdate {
+function updateLobbyScreen(
+  flow: Flow,
+  presses: readonly DevicePress[],
+  ctx: FlowContext,
+): FlowUpdate {
   const joined = new Set(flow.lobby.players.map((p) => p.deviceId));
   const backPress = presses.find((p) => isBack(p) && (joined.size === 0 || joined.has(p.deviceId)));
-  if (backPress) {
+  if (backPress && !flow.online) {
     quitToTitle(flow);
     return { changed: true, effects: [] };
   }
-  const changed = updateLobby(flow.lobby, presses);
+  const changed = updateLobby(flow.lobby, presses, ctx.canStart);
   if (flow.lobby.started) goTo(flow, 'levelSelect');
   return { changed, effects: [] };
 }
@@ -422,6 +498,14 @@ function confirm(flow: Flow, ctx: FlowContext, update: FlowUpdate): void {
       flow.lobby = createLobby();
       goTo(flow, 'lobby');
       return;
+    case 'hostOnline':
+      goTo(flow, 'online');
+      update.effects.push({ type: 'hostOnline' });
+      return;
+    case 'joinOnline':
+      flow.joinCode = emptyJoinCode();
+      goTo(flow, 'joinCode');
+      return;
     case 'settings':
       flow.settingsFrom = flow.screen === 'paused' ? 'paused' : 'title';
       goTo(flow, 'settings');
@@ -472,6 +556,117 @@ function confirm(flow: Flow, ctx: FlowContext, update: FlowUpdate): void {
     case undefined:
       return;
   }
+}
+
+// ---------------------------------------------------------------- joining online
+
+/**
+ * The join-code screen with a gamepad (keyboards type into the UI's text
+ * box, see `editJoinCode`): up and down turn the letter under the cursor,
+ * left and right move the cursor, confirm joins and back goes to the title.
+ * While a join is out only back counts, and drops it.
+ */
+const NOT_CODE_LETTERS = new RegExp(`[^${JOIN_CODE_ALPHABET}]`, 'g');
+
+function updateJoinCodeScreen(flow: Flow, presses: readonly DevicePress[]): FlowUpdate {
+  const update: FlowUpdate = { changed: false, effects: [] };
+  const entry = flow.joinCode;
+  if (presses.some(isBack)) {
+    if (entry.busy) update.effects.push({ type: 'cancelJoin' });
+    quitToTitle(flow, 'joinOnline');
+    update.changed = true;
+    return update;
+  }
+  if (entry.busy) return update;
+  for (const { nav } of presses) {
+    if (nav.y !== 0) turnLetter(entry, nav.y);
+    else if (nav.x !== 0) {
+      entry.cursor = clamp(
+        entry.cursor + nav.x,
+        0,
+        Math.min(entry.text.length, NET_JOIN_CODE_LENGTH - 1),
+      );
+    } else continue;
+    entry.error = null;
+    update.changed = true;
+  }
+  if (presses.some(isConfirm)) {
+    const submitted = submitJoinCode(flow);
+    update.effects.push(...submitted.effects);
+    update.changed = true;
+  }
+  return update;
+}
+
+/** The gamepad wheel: the letter under the cursor one step on (down) or back (up). */
+function turnLetter(entry: JoinCodeEntry, step: number): void {
+  const n = JOIN_CODE_ALPHABET.length;
+  const at = entry.cursor;
+  const current = entry.text[at];
+  const index = current === undefined ? (step > 0 ? -1 : 0) : JOIN_CODE_ALPHABET.indexOf(current);
+  const letter = JOIN_CODE_ALPHABET[(((index + step) % n) + n) % n] ?? 'A';
+  entry.text = (entry.text.slice(0, at) + letter + entry.text.slice(at + 1)).slice(
+    0,
+    NET_JOIN_CODE_LENGTH,
+  );
+}
+
+/**
+ * Typed into the join-code box (any case, pasted with spaces or dashes):
+ * kept as code letters only, upper case, at most a code long. The cursor
+ * follows the end. Returns whether anything changed.
+ */
+export function editJoinCode(flow: Flow, typed: string): boolean {
+  const entry = flow.joinCode;
+  if (flow.screen !== 'joinCode' || entry.busy) return false;
+  const text = typed.toUpperCase().replace(NOT_CODE_LETTERS, '').slice(0, NET_JOIN_CODE_LENGTH);
+  if (text === entry.text) return false;
+  entry.text = text;
+  entry.cursor = Math.min(text.length, NET_JOIN_CODE_LENGTH - 1);
+  entry.error = null;
+  return true;
+}
+
+/** Joins with the typed code, or says it can't be one. */
+export function submitJoinCode(flow: Flow): FlowUpdate {
+  const entry = flow.joinCode;
+  if (flow.screen !== 'joinCode' || entry.busy) return { changed: false, effects: [] };
+  const code = normalizeJoinCode(entry.text);
+  if (!code) {
+    entry.error = 'badCode';
+    return { changed: true, effects: [] };
+  }
+  entry.error = null;
+  entry.busy = true;
+  return { changed: true, effects: [{ type: 'joinOnline', code }] };
+}
+
+/** The join-code screen's text box was closed with Esc: back to the title. */
+export function cancelJoinCode(flow: Flow): FlowUpdate {
+  if (flow.screen !== 'joinCode') return { changed: false, effects: [] };
+  const effects: FlowEffect[] = flow.joinCode.busy ? [{ type: 'cancelJoin' }] : [];
+  quitToTitle(flow, 'joinOnline');
+  return { changed: true, effects };
+}
+
+/** The join worked: the online screens take over. */
+export function joinSucceeded(flow: Flow): void {
+  if (flow.screen !== 'joinCode') return;
+  flow.joinCode.busy = false;
+  goTo(flow, 'online');
+}
+
+/** The join was refused or the server is away: say why, and let them try again. */
+export function joinFailed(flow: Flow, error: OnlineError): void {
+  if (flow.screen !== 'joinCode') return;
+  flow.joinCode.busy = false;
+  flow.joinCode.error = error;
+}
+
+/** The online room is over (left, or the connection is gone): back on the title. */
+export function onlineEnded(flow: Flow, item: MenuItem = 'hostOnline'): void {
+  flow.awake = true;
+  quitToTitle(flow, item);
 }
 
 /**

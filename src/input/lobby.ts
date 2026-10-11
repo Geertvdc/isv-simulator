@@ -25,16 +25,20 @@ function isBound(players: readonly PlayerBinding[], deviceId: DeviceId): boolean
 /**
  * Applies this frame's button presses. A join press joins the first free
  * device in its join group (so Enter joins the left keyboard scheme, then the
- * right one). Player 1 starts the game with their interact button, or with
- * their join button once nothing in its group is left to join. Returns
- * whether the lobby changed.
+ * right one). A joined device that `canStart` (player 1's by default; online,
+ * the host's) starts the game with its interact button, or with its join
+ * button once nothing in its group is left to join. Returns whether the
+ * lobby changed.
  */
-export function updateLobby(lobby: Lobby, presses: readonly DevicePress[]): boolean {
+export function updateLobby(
+  lobby: Lobby,
+  presses: readonly DevicePress[],
+  canStart: (deviceId: DeviceId) => boolean = (id) => id === lobby.players[0]?.deviceId,
+): boolean {
   if (lobby.started) return false;
-  const first = lobby.players[0];
-  // Decided before anyone joins, so the press that joins player 1 doesn't also start.
-  let start =
-    first !== undefined && presses.some((p) => p.interact && p.deviceId === first.deviceId);
+  const starter = (id: DeviceId): boolean => isBound(lobby.players, id) && canStart(id);
+  // Decided before anyone joins, so the press that joins a player doesn't also start.
+  let start = presses.some((p) => p.interact && starter(p.deviceId));
   let changed = false;
 
   const groups = new Map<string, DevicePress[]>();
@@ -50,7 +54,7 @@ export function updateLobby(lobby: Lobby, presses: readonly DevicePress[]): bool
       if (lobby.players.length >= MAX_PLAYERS) continue;
       lobby.players.push({ playerId: lobby.players.length + 1, deviceId: free.deviceId });
       changed = true;
-    } else if (first && group.some((p) => p.deviceId === first.deviceId)) {
+    } else if (group.some((p) => starter(p.deviceId))) {
       start = true;
     }
   }

@@ -6,7 +6,13 @@ import {
   type FlowContext,
   type MenuItem,
   COUNTDOWN_MS,
+  cancelJoinCode,
   chapterCursor,
+  editJoinCode,
+  joinFailed,
+  joinSucceeded,
+  onlineEnded,
+  submitJoinCode,
   countdownNumber,
   createFlow,
   finishRound,
@@ -100,7 +106,7 @@ describe('title', () => {
     expect(updateFlow(flow, [], ctx()).changed).toBe(false);
     expect(updateFlow(flow, confirm('pad-3'), ctx()).changed).toBe(true);
     expect(flow).toMatchObject({ screen: 'title', awake: true, menuIndex: 0 });
-    expect(menuItems(flow)).toEqual(['play', 'settings', 'credits']);
+    expect(menuItems(flow)).toEqual(['play', 'hostOnline', 'joinOnline', 'settings', 'credits']);
   });
 
   it('moves the cursor up and down, stopping at the ends', () => {
@@ -108,8 +114,8 @@ describe('title', () => {
     updateFlow(flow, confirm(), ctx());
     updateFlow(flow, [press('kb-right', { nav: { x: 0, y: -1 } })], ctx());
     expect(flow.menuIndex).toBe(0);
-    for (let i = 0; i < 5; i++) updateFlow(flow, down('pad-2'), ctx());
-    expect(flow.menuIndex).toBe(2);
+    for (let i = 0; i < 7; i++) updateFlow(flow, down('pad-2'), ctx());
+    expect(flow.menuIndex).toBe(4);
   });
 
   it('goes to an empty lobby, the settings and the credits', () => {
@@ -119,11 +125,11 @@ describe('title', () => {
     pick(flow, 'credits', c);
     expect(flow.screen).toBe('credits');
     updateFlow(flow, back(), c);
-    expect(flow).toMatchObject({ screen: 'title', menuIndex: 2 });
+    expect(flow).toMatchObject({ screen: 'title', menuIndex: 4 });
     pick(flow, 'settings', c);
     expect(flow).toMatchObject({ screen: 'settings', settingsFrom: 'title' });
     pick(flow, 'back', c);
-    expect(flow).toMatchObject({ screen: 'title', menuIndex: 1 });
+    expect(flow).toMatchObject({ screen: 'title', menuIndex: 3 });
     pick(flow, 'play', c);
     expect(flow.screen).toBe('lobby');
     expect(flow.lobby).toEqual({ players: [], started: false });
@@ -582,5 +588,155 @@ describe('results', () => {
     const flow = atLevelSelect();
     expect(finishRound(flow, { score: 1, stars: 1 }, ctx()).changed).toBe(false);
     expect(flow.screen).toBe('levelSelect');
+  });
+});
+
+describe('online: hosting and joining', () => {
+  function title(c = ctx()): Flow {
+    const flow = createFlow();
+    updateFlow(flow, confirm(), c);
+    return flow;
+  }
+
+  function joinScreen(c = ctx()): Flow {
+    const flow = title(c);
+    pick(flow, 'joinOnline', c);
+    expect(flow.screen).toBe('joinCode');
+    return flow;
+  }
+
+  it('Host online hands the screens to the online session', () => {
+    const c = ctx();
+    const flow = title(c);
+    expect(pick(flow, 'hostOnline', c).effects).toEqual([{ type: 'hostOnline' }]);
+    expect(flow.screen).toBe('online');
+    // The local flow waits: presses do nothing until the session ends.
+    expect(updateFlow(flow, [...confirm(), ...back(), ...menu()], c)).toEqual({
+      changed: false,
+      effects: [],
+    });
+    onlineEnded(flow);
+    expect(flow).toMatchObject({ screen: 'title', awake: true });
+    expect(menuItems(flow)[flow.menuIndex]).toBe('hostOnline');
+  });
+
+  it('takes typed codes in any case, keeping code letters only', () => {
+    const flow = joinScreen();
+    expect(editJoinCode(flow, 'ab')).toBe(true);
+    expect(flow.joinCode).toMatchObject({ text: 'AB', cursor: 2, error: null });
+    // I and O aren't code letters; spaces, dashes and digits go too; at most 4.
+    editJoinCode(flow, ' x-io1yzwv ');
+    expect(flow.joinCode).toMatchObject({ text: 'XYZW', cursor: 3 });
+    expect(editJoinCode(flow, 'xyzw')).toBe(false);
+  });
+
+  it('says a short code is not a code, and joins with a whole one', () => {
+    const flow = joinScreen();
+    editJoinCode(flow, 'abc');
+    expect(submitJoinCode(flow).effects).toEqual([]);
+    expect(flow.joinCode.error).toBe('badCode');
+    editJoinCode(flow, 'abcd');
+    expect(flow.joinCode.error).toBe(null);
+    expect(submitJoinCode(flow).effects).toEqual([{ type: 'joinOnline', code: 'ABCD' }]);
+    expect(flow.joinCode.busy).toBe(true);
+    // While the join is out, typing and joining again do nothing.
+    expect(editJoinCode(flow, 'zz')).toBe(false);
+    expect(submitJoinCode(flow).effects).toEqual([]);
+  });
+
+  it('shows why a join failed and lets them try again', () => {
+    const flow = joinScreen();
+    editJoinCode(flow, 'abcd');
+    submitJoinCode(flow);
+    joinFailed(flow, 'wrongCode');
+    expect(flow.joinCode).toMatchObject({ busy: false, error: 'wrongCode', text: 'ABCD' });
+    expect(submitJoinCode(flow).effects).toEqual([{ type: 'joinOnline', code: 'ABCD' }]);
+    joinSucceeded(flow);
+    expect(flow.screen).toBe('online');
+    onlineEnded(flow, 'joinOnline');
+    expect(menuItems(flow)[flow.menuIndex]).toBe('joinOnline');
+  });
+
+  it('turns letters with a gamepad: up and down change, left and right move', () => {
+    const c = ctx();
+    const flow = joinScreen(c);
+    updateFlow(flow, down(), c);
+    expect(flow.joinCode.text).toBe('A');
+    updateFlow(flow, down(), c);
+    expect(flow.joinCode.text).toBe('B');
+    updateFlow(flow, [press('pad-0', { nav: { x: 0, y: -1 } })], c);
+    updateFlow(flow, [press('pad-0', { nav: { x: 0, y: -1 } })], c);
+    // Wraps around the alphabet.
+    expect(flow.joinCode.text).toBe('Z');
+    // The cursor can't skip past the end of what's there.
+    updateFlow(flow, right(), c);
+    updateFlow(flow, right(), c);
+    expect(flow.joinCode.cursor).toBe(1);
+    for (let i = 0; i < 3; i++) {
+      updateFlow(flow, down(), c);
+      updateFlow(flow, right(), c);
+    }
+    expect(flow.joinCode).toMatchObject({ text: 'ZAAA', cursor: 3 });
+    updateFlow(flow, left(), c);
+    updateFlow(flow, down(), c);
+    expect(flow.joinCode.text).toBe('ZABA');
+    expect(updateFlow(flow, confirm(), c).effects).toEqual([{ type: 'joinOnline', code: 'ZABA' }]);
+  });
+
+  it('goes back to the title, dropping a join that is out', () => {
+    const c = ctx();
+    const flow = joinScreen(c);
+    expect(updateFlow(flow, back(), c).effects).toEqual([]);
+    expect(flow.screen).toBe('title');
+    expect(menuItems(flow)[flow.menuIndex]).toBe('joinOnline');
+    pick(flow, 'joinOnline', c);
+    editJoinCode(flow, 'abcd');
+    submitJoinCode(flow);
+    expect(updateFlow(flow, menu(), c).effects).toEqual([{ type: 'cancelJoin' }]);
+    pick(flow, 'joinOnline', c);
+    // A fresh screen every time.
+    expect(flow.joinCode).toEqual({ text: '', cursor: 0, error: null, busy: false });
+    editJoinCode(flow, 'abcd');
+    submitJoinCode(flow);
+    expect(cancelJoinCode(flow).effects).toEqual([{ type: 'cancelJoin' }]);
+    expect(flow.screen).toBe('title');
+  });
+});
+
+describe("a room's flow (online)", () => {
+  function roomLobby(): Flow {
+    const flow = createFlow();
+    flow.online = true;
+    flow.awake = true;
+    flow.screen = 'lobby';
+    return flow;
+  }
+
+  it('ignores back in the lobby: leaving is up to each browser', () => {
+    const c = ctx();
+    const flow = roomLobby();
+    updateFlow(flow, confirm('a:pad-0'), c);
+    updateFlow(flow, [...back('a:pad-0'), ...menu('b:pad-0')], c);
+    expect(flow.screen).toBe('lobby');
+    expect(flow.lobby.players).toHaveLength(1);
+  });
+
+  it('lets only the devices canStart allows start the game', () => {
+    const host = (id: string): boolean => id.startsWith('host:');
+    const c = ctx({ canStart: host });
+    const flow = roomLobby();
+    updateFlow(flow, confirm('guest:pad-0'), c);
+    updateFlow(flow, confirm('host:pad-0'), c);
+    // The guest is player 1 but not the host.
+    updateFlow(flow, confirm('guest:pad-0'), c);
+    expect(flow.screen).toBe('lobby');
+    updateFlow(flow, confirm('host:pad-0'), c);
+    expect(flow.screen).toBe('levelSelect');
+  });
+
+  it('has no settings or quit in the pause menu', () => {
+    const flow = roomLobby();
+    flow.screen = 'paused';
+    expect(menuItems(flow)).toEqual(['resume', 'restart', 'levelSelect', 'changePlayers']);
   });
 });

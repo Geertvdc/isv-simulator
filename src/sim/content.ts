@@ -152,6 +152,8 @@ export const PRESS_ANY_BUTTON_TEXT = 'Press any button';
 /** Menu lines, by the flow's menu item. */
 export const MENU_LABELS = {
   play: 'Play',
+  hostOnline: 'Host online',
+  joinOnline: 'Join online',
   settings: 'Settings',
   credits: 'Credits',
   resume: 'Resume',
