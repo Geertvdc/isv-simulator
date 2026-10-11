@@ -154,22 +154,38 @@ function walk(state: GameState, manager: Manager): void {
  */
 function pushPlayers(state: GameState, manager: Manager): void {
   for (const player of state.players) {
-    const depth = overlap(player, manager.pos);
-    if (depth <= 0) continue;
-    const n = awayFrom(player, manager.pos, manager.facing);
-    player.pos.x += n.x * depth;
-    player.pos.y += n.y * depth;
-    resolveCollisions(state.level, player.pos);
-    if (isDashing(player)) {
-      player.dashTicks = 0;
-      player.vel = { x: 0, y: 0 };
-    }
+    const n = pushOutOfManager(state.level, player, manager);
+    if (!n) continue;
     if (manager.walking && state.tick >= manager.nextBumpTick) {
       player.vel = { x: n.x * MANAGER_SHOVE_SPEED, y: n.y * MANAGER_SHOVE_SPEED };
       manager.nextBumpTick = state.tick + MANAGER_BUMP_COOLDOWN_TICKS;
       state.events.push({ type: 'managerBumped', managerId: manager.id, target: player.id });
     }
   }
+}
+
+/**
+ * Pushes `player` out of a manager standing at `manager.pos` (and back out of
+ * walls); a dash into a manager stops dead. Mutates the player. Returns the
+ * direction it was pushed, or `null` when they didn't touch. Client-side
+ * prediction uses it too, against the managers where the server last had them.
+ */
+export function pushOutOfManager(
+  map: LevelMap,
+  player: Player,
+  manager: { pos: Vec; facing: Vec },
+): Vec | null {
+  const depth = overlap(player, manager.pos);
+  if (depth <= 0) return null;
+  const n = awayFrom(player, manager.pos, manager.facing);
+  player.pos.x += n.x * depth;
+  player.pos.y += n.y * depth;
+  resolveCollisions(map, player.pos);
+  if (isDashing(player)) {
+    player.dashTicks = 0;
+    player.vel = { x: 0, y: 0 };
+  }
+  return n;
 }
 
 /** Per tick, after players moved: every manager waits, picks a spot or walks, then pushes players. */

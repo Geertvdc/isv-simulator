@@ -11,7 +11,14 @@ import {
   TICKS_PER_SECOND,
 } from './balance';
 import { type LevelMap, parseLevelMap } from './level';
-import { clampMove, isDashing, maxPenetration, startDash, stepPlayer } from './movement';
+import {
+  clampMove,
+  isDashing,
+  maxPenetration,
+  movePlayer,
+  startDash,
+  stepPlayer,
+} from './movement';
 import * as rng from './rng';
 import { type Player, type Vec, newPlayer } from './state';
 
@@ -216,5 +223,29 @@ describe('dash', () => {
     startDash(p, { x: 1, y: 0 });
     run(OPEN, p, { x: 1, y: 0 }, DASH_TICKS);
     expect(maxPenetration(OPEN, p.pos)).toBeLessThan(1e-6);
+  });
+});
+
+describe('movePlayer', () => {
+  it('dashes only on the press, then steps like stepPlayer', () => {
+    const a = player(5, 5);
+    const b = player(5, 5);
+    expect(movePlayer(OPEN, a, { x: 1, y: 0 }, true)).toBe(true);
+    startDash(b, { x: 1, y: 0 });
+    stepPlayer(OPEN, b, { x: 1, y: 0 });
+    expect(a).toEqual({ ...b, dashHeld: true });
+    // Held: no new dash, even once the cooldown is over.
+    for (let i = 0; i < DASH_COOLDOWN_TICKS + 1; i++) {
+      expect(movePlayer(OPEN, a, { x: 1, y: 0 }, true)).toBe(false);
+    }
+    expect(movePlayer(OPEN, a, { x: 1, y: 0 }, false)).toBe(false);
+    expect(movePlayer(OPEN, a, { x: 1, y: 0 }, true)).toBe(true);
+  });
+
+  it('stands still without input', () => {
+    const p = player(5, 5);
+    movePlayer(OPEN, p);
+    expect(p.pos).toEqual({ x: 5, y: 5 });
+    expect(p.dashHeld).toBe(false);
   });
 });

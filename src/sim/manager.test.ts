@@ -11,7 +11,7 @@ import {
 } from './balance';
 import { getTile, parseLevelMap } from './level';
 import { levelWithMap } from './levels';
-import { type Manager, createManagers, managerTiles } from './manager';
+import { type Manager, createManagers, managerTiles, pushOutOfManager } from './manager';
 import { type GameState, createGame, getPlayer } from './state';
 import { cmd, idle } from './testing';
 import { tick } from './tick';
@@ -175,5 +175,38 @@ describe('players and the manager', () => {
     const state = game();
     idle(state, 10 * TICKS_PER_SECOND);
     expect(JSON.parse(JSON.stringify(state))).toEqual(state);
+  });
+});
+
+describe('pushOutOfManager', () => {
+  it('pushes a player out of a manager and stops their dash', () => {
+    const state = game();
+    const p = getPlayer(state, 1);
+    if (!p) throw new Error('no player');
+    p.pos = { x: 4, y: 3 };
+    const m = { pos: { x: 3.7, y: 3 }, facing: { x: 1, y: 0 } };
+    p.dashTicks = 3;
+    p.vel = { x: 14, y: 0 };
+    const n = pushOutOfManager(state.level, p, m);
+    expect(n?.x).toBeCloseTo(1);
+    expect(Math.hypot(p.pos.x - m.pos.x, p.pos.y - m.pos.y)).toBeCloseTo(
+      PLAYER_RADIUS + MANAGER_RADIUS,
+    );
+    expect(p.dashTicks).toBe(0);
+    expect(p.vel).toEqual({ x: 0, y: 0 });
+  });
+
+  it('leaves a player alone who does not touch the manager', () => {
+    const state = game();
+    const p = getPlayer(state, 1);
+    if (!p) throw new Error('no player');
+    const before = structuredClone(p);
+    expect(
+      pushOutOfManager(state.level, p, {
+        pos: { x: p.pos.x + 3, y: p.pos.y },
+        facing: { x: 1, y: 0 },
+      }),
+    ).toBeNull();
+    expect(p).toEqual(before);
   });
 });
