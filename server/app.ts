@@ -1,0 +1,63 @@
+/**
+ * The game server: Colyseus with the `game` room, plus two HTTP routes.
+ *
+ * - `GET /health`: `ok`, for load balancers and container checks.
+ * - `GET /rooms/:code`: whether a room with this join code is open, any case
+ *   (`{ joinCode }` with the code as the server knows it, or 404).
+ */
+
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import {
+  WebSocketTransport,
+  createEndpoint,
+  createRouter,
+  defineRoom,
+  defineServer,
+} from 'colyseus';
+import { normalizeJoinCode } from '../src/net/joinCode';
+import { GAME_ROOM, GameRoom } from './GameRoom';
+import { isLiveJoinCode } from './joinCodes';
+
+export const DEFAULT_PORT = 2567;
+
+const health = createEndpoint('/health', { method: 'GET' }, () =>
+  Promise.resolve(new Response('ok', { status: 200 })),
+);
+
+const room = createEndpoint('/rooms/:code', { method: 'GET' }, (ctx) => {
+  let typed: string;
+  try {
+    typed = decodeURIComponent(ctx.params.code);
+  } catch {
+    typed = '';
+  }
+  const code = normalizeJoinCode(typed);
+  if (!code || !isLiveJoinCode(code)) {
+    return Promise.resolve(Response.json({ error: 'no such room' }, { status: 404 }));
+  }
+  return Promise.resolve(Response.json({ joinCode: code }));
+});
+
+export interface RunningServer {
+  /** The port it listens on (useful when started on port 0). */
+  port: number;
+  close(): Promise<void>;
+}
+
+/** Starts the game server on `port` (0 picks a free one). */
+export async function startGameServer(port: number): Promise<RunningServer> {
+  const httpServer = createServer();
+  const server = defineServer({
+    rooms: { [GAME_ROOM]: defineRoom(GameRoom) },
+    routes: createRouter({ health, room }),
+    transport: new WebSocketTransport({ server: httpServer }),
+    greet: false,
+    gracefullyShutdown: false,
+  });
+  await server.listen(port);
+  return {
+    port: (httpServer.address() as AddressInfo).port,
+    close: () => server.gracefullyShutdown(false),
+  };
+}
