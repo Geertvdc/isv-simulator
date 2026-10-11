@@ -13,6 +13,7 @@
     "preview": "vite preview",
     "sim": "vite-node scripts/sim.ts",
     "screenshots": "vite-node scripts/screenshots.ts",
+    "verify:online": "vite-node scripts/verifyOnline.ts",
     "sfx": "vite-node scripts/sfx.ts",
     "test": "vitest run",
     "test:watch": "vitest",

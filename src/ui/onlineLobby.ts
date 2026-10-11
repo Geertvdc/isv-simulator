@@ -190,11 +190,12 @@ export function mountOnlineBar(root: HTMLElement, deps: OnlineDeps): ScreenView 
       bar.classList.toggle('in-round', inRound);
       if (!online || bar.hidden) return;
       room.textContent = `${ONLINE_TEXT.roomLabel} ${online.joinCode ?? ''} · ${statusText(online)}`;
-      const text = isSpectating(online)
-        ? ONLINE_TEXT.spectating
-        : hostIsChoosing(online) && screen !== undefined && screen in ONLINE_TEXT.waiting
+      const text =
+        hostIsChoosing(online) && screen !== undefined && screen in ONLINE_TEXT.waiting
           ? ONLINE_TEXT.waiting[screen as keyof typeof ONLINE_TEXT.waiting]
-          : '';
+          : isSpectating(online)
+            ? ONLINE_TEXT.spectating
+            : '';
       const join = canJoinNextRound(online) ? ONLINE_TEXT.joinNextRound : '';
       waiting.textContent = [text, join].filter((t) => t !== '').join(' · ');
       waiting.hidden = waiting.textContent === '';
