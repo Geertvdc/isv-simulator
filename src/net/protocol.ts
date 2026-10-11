@@ -21,7 +21,7 @@ import type { Snapshot } from './snapshot';
 export const GAME_ROOM = 'game';
 
 /** Bumped on every incompatible change; the server refuses other versions. */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 // ---------------------------------------------------------------- client → server
 
@@ -84,6 +84,7 @@ export interface LobbyMember {
   displayName: string;
   localPlayers: number;
   isHost: boolean;
+  /** `false` while their connection is down and the room waits for them to reconnect. */
   connected: boolean;
 }
 
@@ -102,6 +103,14 @@ export interface LobbyMessage {
 /** A round begins: the static map, sent once, and the first snapshot. */
 export interface RoundStartMessage {
   type: 'roundStart';
+  /** Counts up per room: a reconnect gets the same round again with the same id. */
+  roundId: number;
+  /**
+   * Whether this member counts in the round: they were in the room when it
+   * started, so it goes into their profile. `false` for someone who joined
+   * while it ran (they watch it).
+   */
+  counted: boolean;
   levelId: string;
   level: LevelMap;
   snapshot: Snapshot;
@@ -124,6 +133,12 @@ export interface PongMessage {
   serverTick: number;
 }
 
+/** The server is about to close the room: nobody did anything for a long time, or it is shutting down. */
+export interface ClosingMessage {
+  type: 'closing';
+  reason: 'idle' | 'shutdown';
+}
+
 export type ErrorCode =
   'badMessage' | 'protocolMismatch' | 'wrongCode' | 'roomFull' | 'roundRunning' | 'notHost';
 
@@ -134,7 +149,13 @@ export interface ErrorMessage {
 }
 
 export type ServerMessage =
-  WelcomeMessage | LobbyMessage | RoundStartMessage | SnapshotMessage | PongMessage | ErrorMessage;
+  | WelcomeMessage
+  | LobbyMessage
+  | RoundStartMessage
+  | SnapshotMessage
+  | PongMessage
+  | ErrorMessage
+  | ClosingMessage;
 
 // ---------------------------------------------------------------- validation
 

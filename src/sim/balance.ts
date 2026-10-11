@@ -217,3 +217,17 @@ export const NET_PING_FAST_COUNT = 8;
 export const NET_PING_FAST_INTERVAL_MS = 100;
 /** The dev lag simulator (`?lag=`, `NET_LAG_MS`) never delays a message more than this. */
 export const MAX_SIMULATED_LAG_MS = 2000;
+/** A member whose connection dropped keeps their place (and players) this long, to reconnect. */
+export const NET_RECONNECT_GRACE_MS = 20_000;
+/** A client that hears nothing from the server for this long closes the socket and reconnects. */
+export const NET_SILENCE_TIMEOUT_MS = 4000;
+/** Messages a client may send per second on average; more are dropped. */
+export const NET_MAX_MESSAGES_PER_SECOND = 120;
+/** ...with bursts of up to this many at once. */
+export const NET_MESSAGE_BURST = 60;
+/** Clients far past the budget (this many times it) are disconnected by Colyseus. */
+export const NET_FLOOD_KICK_FACTOR = 5;
+/** A room where nobody pressed or moved anything for this long closes. */
+export const NET_ROOM_IDLE_MS = 30 * 60 * 1000;
+/** In the online lobby, a second Esc within this long leaves the room. */
+export const NET_LEAVE_CONFIRM_MS = 3000;

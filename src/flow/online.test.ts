@@ -94,6 +94,8 @@ describe('online state', () => {
     const state = inRoom();
     applyServerMessage(state, {
       type: 'roundStart',
+      roundId: 1,
+      counted: true,
       levelId: 'garage',
       level: { width: 1, height: 1, tiles: [], spawns: [] } as never,
       snapshot: { serverTick: 90, state: {} as never, events: [] },
