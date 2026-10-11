@@ -259,6 +259,8 @@ export interface NetDebug {
   waitingFrames: number;
   /** Where each player was drawn, by id. */
   players: Record<number, { x: number; y: number }>;
+  /** Where the newest snapshot has each player (the server's word), by id. */
+  server: Record<number, { x: number; y: number }>;
   score: number | null;
   ticksLeft: number | null;
   screen: string | null;
@@ -440,6 +442,7 @@ export class GameScene extends Phaser.Scene {
     frames: 0,
     waitingFrames: 0,
     players: {},
+    server: {},
     score: null,
     ticksLeft: null,
     screen: null,
@@ -825,6 +828,11 @@ export class GameScene extends Phaser.Scene {
     for (const player of view.state.players) {
       const pos = view.renderPos(player.id);
       if (pos) debug.players[player.id] = { x: pos.x, y: pos.y };
+    }
+    const newest = round.buffer.entries[round.buffer.entries.length - 1];
+    debug.server = {};
+    for (const player of newest?.state.players ?? []) {
+      debug.server[player.id] = { x: player.pos.x, y: player.pos.y };
     }
     debug.predict = {
       on: this.prediction.enabled,
