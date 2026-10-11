@@ -117,3 +117,44 @@ PR: `phase-13c-identity` → `phase-13b-server`. A user id and display name per 
 - Play a level, reload (sync), `curl` again: the level is in the profile. Open another browser (or a private window), Settings → Online profile → Use another ID, paste, Enter, Enter: the level select there opens the same levels.
 - Stop the server and reload: the game plays as before; the profile screen says the server isn't reachable.
 - Corrupt `data/profiles.json` by hand and restart the server: it starts empty and keeps `profiles.json.corrupt-<time>` next to it.
+
+## 13d online lobby
+
+PR: `phase-13d-online-lobby` → `phase-13c-identity`. Title gets Host online and Join online, a join-code screen, the online lobby, and the online level select, intro and countdown drawn from the server's messages. The round itself still only runs on the server: clients show a "Round in progress" placeholder until 13e. Plan and file list in `phase-13d-online-lobby.md`.
+
+### Decisions
+
+- **Two flows, one on each side.** The browser's own flow gets two screens: `joinCode` (typing a code) and `online` (it hands the screens to the room and waits). While online, the scene shows the room's flow from the server's snapshots, with the room's unlocks as `save.levels` and the room's clock (`serverTick`) for the countdown and results delay. The session state lives in `src/flow/online.ts` (pure: status, members, levels, the room's flow, the server tick) and the scene keeps it with the `NetConnection` (`GameScene.online`, `GameScene.connection`). `FlowView.online` tells the UI it is in a room.
+- **The flow stays pure.** Host online and Join online emit `hostOnline` / `joinOnline { code }` / `cancelJoin` effects; the scene runs them with `src/net/client.ts` and reports back with `joinSucceeded`, `joinFailed(error)` and `onlineEnded` (pure functions in `flow.ts`).
+- **Menu authority (decided: host only).** In the lobby every machine's devices join their own couch players. Only the host's joined devices start the game (`FlowContext.canStart`, also on the couch, where it defaults to player 1 as before), so the host starts even when a guest's device joined first and is player 1. On every other screen (level select, intro card, pause, results, and pausing a round) the server only takes the host's presses. Pause is room-wide (the room has one flow). Guests see a bar on top: "Host is choosing a level", "Host starts the round", "Paused by the host", "Host is choosing what is next".
+- **Leaving is local.** Back in the room's lobby never reaches the server (a room's flow ignores it anyway, `flow.online`), it leaves the room, like back leaves the couch lobby for the title. Leave room buttons are on the lobby and on the online bar (so a guest can leave mid-round or from the level select). The online pause menu has no Settings and no Quit to title (`resume`, `restart`, `levelSelect`, `changePlayers`). The settings and the online profile can't be reached while online (only the speaker button and M mute work); they are this browser's own business anyway.
+- **Couch players per machine grow as they join.** The client says `localPlayers: 1` in its hello (it can't know how many will join). In the lobby, a join press from one more device on that machine raises the member's `localPlayers` while the room has space, and is dropped when 4 players are in. A member's first seat stays reserved, so the room never has more players than its members' counts add up to.
+- **Unlocks in the `lobby` message** (`levels`: the host's progress, a copy). Sent on join, leave, hello, when the host's profile arrives (`setMemberProfile` now returns the message) and after each finished round. `PROTOCOL_VERSION` is now 2 (a field was added to a server message).
+- **Snapshots still carry the whole `Flow`.** In menus it's a few hundred bytes at 20 Hz, so slimming it wasn't worth a second message type. The client only redraws when the flow actually changed (compared as JSON).
+- **Typing a code**: four letter boxes with an invisible text box over them. Its keydowns stop there, so typing W, E or Q doesn't move or pick anything; Enter joins, Esc goes back; pasting `ab-cd` works. Letters outside the code alphabet (I, O, digits) are dropped as they're typed. After a refused code the text is selected, so typing replaces it. A gamepad turns letters with up/down, moves with left/right, joins with A, backs out with B.
+- **Friendly errors**: `badCode` (not 4 code letters, checked before connecting), `wrongCode` (Colyseus's 522 "invalid room id"), `roomFull`, `protocolMismatch` (our refusal codes), `unreachable` (anything else, e.g. no server), `disconnected` (the connection closed while in the room). Texts in `ONLINE_TEXT` in `content.ts`.
+- **The client wrapper** keeps messages that arrive before anyone listens and hands them to the first listener, so nothing between the join and the scene subscribing is lost. Status comes from the SDK's `onDrop` (reconnecting), `onReconnect` and `onLeave`. The SDK's own automatic reconnection is left on as it is; 13f decides what reconnecting means for the room.
+- **`@colyseus/sdk` moved to `dependencies`** (the browser bundle uses it). `GAME_ROOM` moved to `src/net/protocol.ts`, the server re-exports it.
+- **Screenshots**: `screens/join-code` and `screens/online-lobby` (the second member joins from the script itself with the client wrapper; needs `npm run dev:online`, `--server=` if it's elsewhere). The title shots follow the longer menu.
+
+### Assumptions
+
+- The server is at `VITE_SERVER_URL` or the page's host on port 2567, as for the profile API (13c).
+- A guest who never joined a device in the lobby is a spectator: their screens follow the room, but nothing of theirs is bound.
+
+### Open questions
+
+- **A new host without joined devices can't drive the menus.** When the host leaves after the lobby, the next member becomes host; if that member never joined a player, nobody can pick a level (after the lobby only joined devices count). 13f (host leaving) should send the room back to the lobby or let the new host's devices in.
+- Should guests be allowed to pause (and then only the host resumes)? Today only the host can, so a guest whose doorbell rings has to shout.
+- Should Esc in the online lobby ask before leaving? It leaves at once, like it goes back to the title on the couch.
+- The guest's level select hint still says "Enter: play"; the bar says the host chooses. A per-role hint would be nicer.
+- The map behind the online menus stays the one the browser had loaded (the first level); 13e loads the round's map on `roundStart`.
+
+### What to check
+
+- `npm run dev:online`, open two browser windows (a private one for the second, so it has its own user id). In the first: Host online, a code shows with you as host. In the second: Join online, type the code, Enter. Both lobbies list both names, the host with the badge.
+- Press Enter in each window: each machine gets its player (colors and hats in join order); Enter again in one adds its second keyboard player. Press E in the guest's window: nothing. Press E in the host's: the host gets the level select, the guest sees it too with "Host is choosing a level" on top.
+- Host picks Garage: both show the intro card, then the countdown, then "Round in progress". Esc in the host's window pauses for both; the guest's Esc does nothing during the round.
+- Leave room in the guest's window: back on the title, and the host's lobby/bar shows one member less.
+- Join online with ZZZZ: "No room with that code". Stop the server: Host online says the server is not reachable, Esc goes back.
+- Local couch play: Play, Enter, Enter, E: exactly as before.

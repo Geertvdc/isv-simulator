@@ -39,6 +39,8 @@ Built without a review round (the product owner was away); decisions are in `rev
 - `socketUrl(httpUrl)`: `http` → `ws`, `https` → `wss`.
 - `hostRoom(url, hello)` / `joinRoomByCode(url, code, hello)` → `Promise<NetConnection>`; reject with `JoinError { code: 'wrongCode' | 'roomFull' | 'protocolMismatch' | 'unreachable' }`.
 - `NetConnection`: `sessionId`, `joinCode`, `send(message)`, `onMessage(cb)` (messages that came before anyone listened are kept and replayed), `onStatus(cb)` (`connected`, `reconnecting`, `closed`), `leave()`.
+- `toJoinError(error)`: Colyseus's "invalid room id" (522) → `wrongCode`; our refusal codes come through; anything else → `unreachable`.
+- `GAME_ROOM` moved to `src/net/protocol.ts` (the server re-exports it).
 - `helloFor(identity, localPlayers)` builds the hello with `identity.userId` and `displayName`.
 
 ### Server (`server/roomLogic.ts`)
@@ -55,7 +57,7 @@ Built without a review round (the product owner was away); decisions are in `rev
 - `FlowView.online: OnlineState | null`, `FlowView.isHost`.
 - `src/ui/joinCode.ts`: the code entry (4 boxes, a text input that keeps keys from the game, the error line).
 - `src/ui/onlineLobby.ts`: code (big) + Copy, members with name, host badge, "you", each member's players with color and hat, the status line, the start hint, Leave. Also the "Round in progress" placeholder.
-- `src/ui/levelSelect.ts`: "Host is choosing a level" for guests. Pause and results show the same note.
+- The online bar (in `src/ui/onlineLobby.ts`) sits on top of every online screen but the lobby: the room code, the connection, "Host is choosing a level" (or "Paused by the host", ...) for guests on the host's screens, and Leave. The level select, intro, countdown, pause and results screens themselves are the local ones, drawn from the room's flow.
 - `main.ts`: hands the scene `serverUrl` and the identity; routes `FLOW_EVENT` to the online screens.
 - Texts in `src/sim/content.ts` (`ONLINE_TEXT`, menu labels).
 
@@ -65,7 +67,7 @@ Built without a review round (the product owner was away); decisions are in `rev
 - `src/input/lobby.ts`, `lobby.test.ts` (`canStart`)
 - `src/net/protocol.ts` (`levels`, version 2), `src/net/client.ts`, `server/client.test.ts` (real server)
 - `server/roomLogic.ts`, `roomLogic.test.ts`, `server/GameRoom.ts`, `server/server.test.ts`
-- `src/render/GameScene.ts`, `src/main.ts`, `src/ui/joinCode.ts`, `src/ui/onlineLobby.ts`, `src/ui/levelSelect.ts`, `src/ui/screens.ts`, `src/ui/profile.ts` (`copyText` exported), `src/style.css`, `src/sim/content.ts`
+- `src/render/GameScene.ts`, `src/main.ts`, `src/ui/joinCode.ts`, `src/ui/onlineLobby.ts`, `src/ui/profile.ts` (`copyText` exported), `src/style.css`, `src/sim/content.ts`
 - `scripts/screenshots.ts` (title shots follow the new menu, `screens/join-code`, `screens/online-lobby`), `docs/game/README.md`
 - `package.json`: `@colyseus/sdk` to `dependencies`
 
@@ -89,14 +91,14 @@ Built without a review round (the product owner was away); decisions are in `rev
 
 ## Done when
 
-- [ ] Title has Host online and Join online; Play still starts local couch play exactly as before
-- [ ] Join online takes a 4-letter code (keyboard or gamepad) and shows friendly errors for no such room, room full, protocol mismatch and server unreachable
-- [ ] The online lobby shows the code (with Copy), members with names, a host badge, each member's couch players with colors and hats, and the connection status; Leave works
-- [ ] Couch players on each machine join with their own devices; the host starts and picks a level, guests see "Host is choosing a level"
-- [ ] Level select online shows the host's stars and locks
-- [ ] Starting a level shows the server's intro and countdown on every machine
-- [ ] Verified in a real browser with two tabs (host and guest both in the lobby)
-- [ ] `npm run check`, `npm run build` and `npm run build:server` pass
+- [x] Title has Host online and Join online; Play still starts local couch play exactly as before
+- [x] Join online takes a 4-letter code (keyboard or gamepad) and shows friendly errors for no such room, room full, protocol mismatch and server unreachable
+- [x] The online lobby shows the code (with Copy), members with names, a host badge, each member's couch players with colors and hats, and the connection status; Leave works
+- [x] Couch players on each machine join with their own devices; the host starts and picks a level, guests see "Host is choosing a level"
+- [x] Level select online shows the host's stars and locks
+- [x] Starting a level shows the server's intro and countdown on every machine
+- [x] Verified in a real browser with two tabs (host and guest both in the lobby)
+- [x] `npm run check`, `npm run build` and `npm run build:server` pass
 - [ ] CI is green
 
 Manual check: `npm run dev:online`, open two browser windows. In one: Host online, note the code. In the other: Join online, type the code, Enter. Both lobbies list both names, the host has the badge. Press Enter in each window to join a player, then E in the host's: the host gets the level select, the guest sees "Host is choosing a level". Pick Garage: both show the intro card, then the countdown.
