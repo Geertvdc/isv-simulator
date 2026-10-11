@@ -158,3 +158,43 @@ PR: `phase-13d-online-lobby` → `phase-13c-identity`. Title gets Host online an
 - Leave room in the guest's window: back on the title, and the host's lobby/bar shows one member less.
 - Join online with ZZZZ: "No room with that code". Stop the server: Host online says the server is not reachable, Esc goes back.
 - Local couch play: Play, Enter, Enter, E: exactly as before.
+
+## 13e online play
+
+PR: `phase-13e-online-play` → `phase-13d-online-lobby`. A whole online round: inputs up, snapshots down, the round drawn through the couch renderers 100 ms (plus half a round trip) behind the server, events and sounds once each, results for everyone, plus a lag simulator and a ping corner (both were listed under 13f; they were needed to check this phase). Plan and file list in `phase-13e-online-play.md`.
+
+### Decisions
+
+- **One set of renderers.** They read a `RoundView` (`src/render/roundView.ts`: a state plus `renderPos`/`renderManagerPos`). The couch `GameLoop` already was one; online, `frameView` turns the interpolated frame into one. `GameScene.renderRound(view, events, flow, time)` drives every renderer, the HUD frame, effects and sounds for both. Local play goes through the same call as before.
+- **Render time = estimated server tick − half the round trip − `NET_INTERP_DELAY_MS`** (`roundRenderTick` in `src/net/onlineRound.ts`). 13a's `renderTickFor(estimate)` subtracts only the delay; a snapshot only gets here half a round trip after the server took it, so at 100 ms each way render time would sit right on the newest snapshot and stutter. With the half round trip, a 100 ms + 80 ms jitter link never ran out of snapshots in the browser checks.
+- **Events play when render time reaches the snapshot that brought them** (not on arrival), so a sound or shake matches the picture. Each snapshot's events are queued once (duplicates and out-of-order snapshots add nothing) and taken once. Before the clock is synced everything plays at once.
+- **Inputs:** each frame one `InputCommand` per local player (`localBindings`: the players bound to this machine's devices, from the room's lobby), screen-relative to world as on the couch, stamped with `inputTargetTick`. At most one send per target tick (`src/net/inputStamp.ts`); a tap on a frame that sent nothing is OR-ed into the next send so it isn't lost; a clock resync starts the stamper over. Inputs go out during the countdown too, so the first tick has them.
+- **Pings** every `NET_PING_INTERVAL_MS` (500 ms), the first `NET_PING_FAST_COUNT` (8) every 100 ms, from the moment the room is joined, so the clock is synced long before the round.
+- **Round start and end:** `roundStart` makes a new `OnlineRound`; a round on another level restarts the scene on that map (the map behind the online menus now follows the room). A snapshot with `game: null` (back to the level select) or the connection closing drops the round and restarts the scene for a clean map; so does leaving mid-round.
+- **Results:** the star chimes and a `recordLevel` in this browser's save, once per round, only for a round whose state has a result (right after the host picks Retry/Next, the new `roundStart` arrives while the last snapshot still shows the results: without that check the browser counted the round twice; found in the browser check). The local record is the same one the server writes into the profile, so the next profile sync (max of both) agrees.
+- **First-level hints are skipped online**: they point at one machine's players and save `tutorialDone`.
+- **Music** follows the room's flow and the online round's clock (hurry at the end), like on the couch.
+- **Lag simulator** (`src/net/lag.ts`): `?lag=<ms>&jitter=<ms>` on the page delays every message the browser sends and receives by `lag` plus up to `jitter`, so `lag=100` adds about 200 ms to the round trip. The server does the same with `NET_LAG_MS`/`NET_JITTER_MS`. Order is kept: one queue and one timer per direction (a timer per message let two messages a fraction of a millisecond apart swap, which a test caught). Capped at 2 s. Seeded RNG, so the pure part is tested.
+- **`ROUND_SECONDS`** on the server makes every round that long, for trying the results; `RoomOptions.roundTicks` in the room logic, used by the round test.
+- **Ping corner** (`src/ui/netHud.ts`): bottom right over the clock, "Ping 42 ms", "waiting for the server" when render time ran past the newest snapshot, and the simulated lag. On in dev builds and with `?nethud`, `N` toggles it.
+- **The online bar steps aside during a round**: small, over the score, bottom left (on top it covered the orders). The "Round in progress" placeholder is gone.
+- **Dev debug handle**: dev builds set `window.isvNet` (render tick, interpolation status, frames that waited, drawn positions, the drawn state, events played by type, the music track). The browser checks below read it.
+
+### Assumptions
+
+- Smooth enough without client-side prediction: at 100 ms each way your own player answers keys about 340 ms after the press (couch: under 100 ms). Everyone else glides smoothly. Prediction for the local players is the upgrade if playtests find it sluggish.
+- Spectators (a member with no joined player) send no inputs and just watch.
+
+### Open questions
+
+- Is the extra input delay online acceptable, or should 13f (or later) predict the local players' own movement?
+- Should the host's guests also get the first-level hints online?
+- The ping corner shows in dev by default; in production only with `?nethud`. Should it always be available with `N`? (It is: `N` works in production too, it just starts hidden.)
+
+### How it was verified
+
+- `npm run check` (711 tests, the full suite run 10 times in a row without a failure after the lag queue fix), `npm run build`, `npm run build:server`.
+- `server/round.test.ts`: two `src/net/client.ts` connections with real clock sync and input stamping play a 3 s Garage round on a real server: both join a player, the host starts, both walk; both get snapshots with both players moved, identical snapshots for the same server tick, the same results, and both profiles in the store have the round.
+- In the browser: two headless Chromes (separate profiles, so two user ids) driven over the DevTools protocol against `vite` and the server (`ROUND_SECONDS=25`). Host online, join with the code, both join a player, the host picks Garage. Checked from page JS and screenshots: both screens show both players walking, the host's player picks up a ticket and the guest sees it carried, the HUD clock, score and orders match, Esc on the host pauses both (the guest's clock stops), both get the results with stars, the host's Next level loads Open Plan's map on both, both local saves and both server profiles got the round once, the snapshot events played are the same on both machines (e.g. `orderCreated: 3, pickedUp: 1, levelEnded: 1`), the music is the chapter track while playing and the menu track on the results. Leave room mid-round on the guest goes back to the title while the host plays on. On The Reorg (host with every level open) the manager, a meeting invite (icon and HUD card) and review stations show on both.
+- Smoothness: sampled the drawn positions every animation frame while both players walked. Without lag, with `?lag=100&jitter=20` (round trip ~220 ms), `?lag=100&jitter=80` (~295 ms), server `NET_LAG_MS=50 NET_JITTER_MS=20` (~125 ms) and both together (~250 ms): never a frame waiting for a snapshot, never a step backwards, never a still frame mid-walk, the drawn position moves exactly 5 tiles/s of render time (0.0833 tiles per render tick, every frame), and render time advances 1.00 ticks per frame (sd ~0.05, that's the frame timing). No rubber-banding. Own key to own player moving on screen: ~90 ms without lag, ~340 ms at 100 ms each way.
+- Local couch play checked in the browser too (Play, two keyboard players, Garage with its hints, pause): as before, no ping corner or room bar.

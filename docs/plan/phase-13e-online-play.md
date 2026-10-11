@@ -34,6 +34,7 @@ frameView(frame: InterpolatedFrame<GameState>): RoundView
 
 - `OnlineRound = { levelId, level, buffer: SnapshotBuffer<GameState>, events: { serverTick, events }[], lastPlayedTick }`.
 - `startOnlineRound(message: RoundStartMessage)`, `pushRoundSnapshot(round, snapshot)` (decodes with the round's map, shared rather than copied per snapshot; queues its events once, only when the buffer took it).
+- `roundRenderTick(clock, nowMs)`: the estimated server tick minus half the round trip minus `NET_INTERP_DELAY_MS`. (13a's `renderTickFor(estimate)` alone puts render time right at the newest snapshot once the one-way trip reaches the delay, so at 100 ms each way every frame would wait.)
 - `sampleRound(round, renderTick)` → the interpolated frame (or `null`).
 - `takeDueEvents(round, renderTick)`: the events of every queued snapshot at or before `renderTick`, oldest first, each only once.
 
@@ -48,7 +49,8 @@ frameView(frame: InterpolatedFrame<GameState>): RoundView
 ### Lag simulator (`src/net/lag.ts`, pure)
 
 - `parseLag(params)` → `{ lagMs, jitterMs } | null` from `?lag=&jitter=` (or env values on the server).
-- `createLagLine(lag, seed)`, `delayFor(line, nowMs)` → the time a message sent now is delivered: `now + lag + jitter * random` with the seeded RNG, never before the previous message (WebSockets keep order).
+- `createLagLine(lag, seed)`, `deliveryTime(line, nowMs)` → the time a message sent now is delivered: `now + lag + jitter * random` with the seeded RNG, never before the previous message (WebSockets keep order).
+- `createLagRunner(lag, seed, { now, setTimer })`: runs handed-over functions after the lag, in order, with one timer for the oldest (a timer per message let two messages a fraction of a millisecond apart swap: found by a flaky test).
 - `src/net/client.ts` delays `send` and incoming messages with it when given a lag; `GameRoom` does the same for its messages when the env vars are set.
 
 ### Server
@@ -65,7 +67,8 @@ frameView(frame: InterpolatedFrame<GameState>): RoundView
 
 ### UI
 
-- `src/ui/netHud.ts`: `ping 42 ms` plus the interpolation status, bottom left. `NET_HUD_EVENT` from the scene with `{ rttMs, status } | null`.
+- `src/ui/netHud.ts`: `Ping 42 ms`, "waiting for the server" when render time ran past the newest snapshot, and the simulated lag; over the clock, bottom right. `NET_STATS_EVENT` from the scene with `NetStats | null`.
+- Dev builds set `window.isvNet` (`NetDebug`: render tick, interpolation status, frames and waiting frames, drawn player positions, the drawn state, events played by type, the music track) for checking an online round from a script.
 
 ## Files
 
@@ -98,16 +101,16 @@ frameView(frame: InterpolatedFrame<GameState>): RoundView
 
 ## Done when
 
-- [ ] Both machines show both players moving, the same orders, score and timer, during a whole online round
-- [ ] Tickets, pipelines, managers, invites, effects, sounds and music work online
-- [ ] Countdown, room-wide pause, results with stars, Next/Retry/Level select (host) work online
-- [ ] The round is recorded in every member's profile and in each browser's save
-- [ ] A round on another level loads that level's map on every machine
-- [ ] Movement looks smooth with `?lag=100&jitter=20` (checked in a browser)
-- [ ] Ping HUD shows while online; `N` toggles it
-- [ ] Local couch play behaves exactly as before
-- [ ] Verified in a real browser with two contexts (host and guest), with and without lag
-- [ ] `npm run check`, `npm run build` and `npm run build:server` pass
+- [x] Both machines show both players moving, the same orders, score and timer, during a whole online round
+- [x] Tickets, pipelines, managers, invites, effects, sounds and music work online
+- [x] Countdown, room-wide pause, results with stars, Next/Retry/Level select (host) work online
+- [x] The round is recorded in every member's profile and in each browser's save
+- [x] A round on another level loads that level's map on every machine
+- [x] Movement looks smooth with `?lag=100&jitter=20` (checked in a browser)
+- [x] Ping HUD shows while online; `N` toggles it
+- [x] Local couch play behaves exactly as before
+- [x] Verified in a real browser with two contexts (host and guest), with and without lag
+- [x] `npm run check`, `npm run build` and `npm run build:server` pass
 - [ ] CI is green
 
 Manual check: `ROUND_SECONDS=30 npm run dev:online`, two browser windows (one private). Host online, join with the code, Enter in both, E in the host's, pick Garage. Both players walk on both screens; pick up a ticket in one window and watch it move in the other; the clock and score match. Esc in the host's pauses both. At the end both show the results with stars; the host picks Retry, both play again. Then the same with `?lag=100&jitter=20` on both URLs: movement should glide, no snapping back.
