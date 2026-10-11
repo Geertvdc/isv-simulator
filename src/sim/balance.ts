@@ -204,5 +204,9 @@ export const NET_MAX_NAME_LENGTH = 24;
 export const NET_MAX_ID_LENGTH = 64;
 /** Letters in a room's join code. */
 export const NET_JOIN_CODE_LENGTH = 4;
+/** The game server's port when `VITE_SERVER_URL` doesn't say otherwise (and the server's default `PORT`). */
+export const NET_SERVER_DEFAULT_PORT = 2567;
+/** How long a profile request may take before the game gives up and plays on offline. */
+export const NET_PROFILE_TIMEOUT_MS = 4000;
 /** Most ticks the server runs in one go after a stall; the rest of the backlog is dropped. */
 export const NET_SERVER_MAX_CATCHUP_TICKS = 10;
