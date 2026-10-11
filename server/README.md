@@ -16,6 +16,9 @@ curl localhost:2567/health
 | -------------------- | ------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PORT`               | `2567`                                                        | Port for HTTP and WebSockets                                 |
 | `PROFILE_STORE_PATH` | `data/profiles.json` (repo root, outside the watched folders) | The online profiles (gitignored; created on the first write) |
+| `ROUND_SECONDS`      | (the level's length)                                          | Dev: every round lasts this long, to reach the results fast  |
+| `NET_LAG_MS`         | `0`                                                           | Dev: delays every message in and out by this much            |
+| `NET_JITTER_MS`      | `0`                                                           | Dev: plus up to this much at random (order is kept)          |
 
 `npm run dev:online` leaves `PORT` alone: Vite reads it too, so setting it there would put both on one port.
 
@@ -26,8 +29,8 @@ curl localhost:2567/health
 - `joinCodes.ts`: codes of the rooms alive in this process, so they stay unique.
 - `profileStore.ts`: `ProfileStore` with `JsonFileProfileStore` (one JSON file, read on first use, rewritten through a temp file and a rename after every change, one change at a time; a corrupt file is moved to `<path>.corrupt-<time>` and the store starts empty) and `MemoryProfileStore` for tests.
 - `profileRoutes.ts`: `GET`/`PUT /profiles/:userId`.
-- `app.ts`: `startGameServer(port, { store })`, with the HTTP routes. `main.ts` is the entry point.
-- `roomLogic.test.ts`, `server.test.ts` (a real server on a free port with `@colyseus/sdk` clients).
+- `app.ts`: `startGameServer(port, { store, roundSeconds, lag })`, with the HTTP routes. `main.ts` is the entry point (reads the env vars above).
+- `roomLogic.test.ts`, `server.test.ts` (a real server on a free port with `@colyseus/sdk` clients), `client.test.ts` (the browser's wrapper against a real server), `round.test.ts` (two browsers' network code play a whole short round, from the lobby to the profiles).
 
 ## Talking to it
 
@@ -57,7 +60,8 @@ room.send('ping', { type: 'ping', id: 1, clientTimeMs: performance.now() });
 - The `hello` goes in as the join options. A refused join rejects with the `ErrorCode` as its message: `badMessage`, `protocolMismatch` or `roomFull` (a room holds `MAX_PLAYERS` players, counting every member's `localPlayers`). A wrong code rejects too (the room doesn't exist).
 - After joining: `welcome` to the newcomer, `lobby` to everyone (members, plus `levels`: the room's unlocks, i.e. the host's progress; again whenever someone joins, leaves or changes, the host's profile arrives or a round ends), `roundStart` when a round is loaded (also to someone joining mid-round), `snapshot` every 3 ticks (the flow, plus the round or `null`).
 - `menu` presses carry local device ids (`kb-left`, `pad-0`); the server makes them `<sessionId>:<deviceId>`. In the lobby a member's `localPlayers` grows by one when another of its devices joins, while the room has space (4 players in total); back presses are ignored there (leaving is the client's business). Only the host's joined devices start the game. On every other screen (level select, intro, pause, results, and pausing a round) only the host's devices count.
-- The browser's side is `src/net/client.ts` (`hostRoom`, `joinRoomByCode`, `helloFor`), a thin wrapper around `@colyseus/sdk` that maps refused joins to `wrongCode`, `roomFull`, `protocolMismatch` or `unreachable`.
+- The browser's side is `src/net/client.ts` (`hostRoom`, `joinRoomByCode`, `helloFor`), a thin wrapper around `@colyseus/sdk` that maps refused joins to `wrongCode`, `roomFull`, `protocolMismatch` or `unreachable`, and can simulate lag (`{ lag: { lagMs, jitterMs } }`, the page's `?lag=&jitter=`).
+- During a round each client sends one `inputs` message per frame with an `InputCommand` per local player, stamped with the server tick it should land on (`inputTargetTick` from the clock sync, see `src/net/inputStamp.ts`; at most one per tick), and pings every half second (faster at first) to keep that clock synced. It draws the round from the snapshots `NET_INTERP_DELAY_MS` plus half a round trip behind the server (`src/net/onlineRound.ts`), and plays each snapshot's events once, when the picture reaches them.
 - `inputs` are stamped with the server tick they're meant for (`inputTargetTick` in `src/net/clock.ts`) and only count for players bound to the sender's devices.
 - `hello` again in the room changes the display name and couch player count.
 - The first member is the host; when the host leaves, the earliest joined member left takes over. The room closes when the last member leaves.
