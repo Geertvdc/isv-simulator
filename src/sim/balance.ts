@@ -188,8 +188,8 @@ export const NET_MAX_INPUT_AHEAD_TICKS = 30;
 export const NET_INPUT_REPEAT_TICKS = 15;
 /** Clients stamp inputs this many ticks later than they expect them to arrive, as a safety margin. */
 export const NET_INPUT_LEAD_TICKS = 1;
-/** Ping samples the clock sync keeps; it trusts the half with the lowest round trip. */
-export const NET_CLOCK_SAMPLES = 9;
+/** Ping samples the clock sync keeps; it trusts the half with the shortest round trips. */
+export const NET_CLOCK_SAMPLES = 16;
 /** Weight of each new round trip in the smoothed round trip time (like TCP's 1/8). */
 export const NET_CLOCK_RTT_SMOOTHING = 0.125;
 /** A ping that disagrees with the estimate by more than this many ticks restarts the clock sync. */
