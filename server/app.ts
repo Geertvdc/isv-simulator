@@ -58,6 +58,8 @@ export interface GameServerOptions {
   roundSeconds?: number;
   /** The dev lag simulator: delays every message in and out (`NET_LAG_MS`, `NET_JITTER_MS`). */
   lag?: LagSettings | null;
+  /** How long a dropped member may take to reconnect (`NET_RECONNECT_GRACE_MS` by default; tests use less). */
+  reconnectGraceMs?: number;
 }
 
 /** Starts the game server on `port` (0 picks a free one). */
@@ -76,6 +78,7 @@ export async function startGameServer(
               ? Math.round(options.roundSeconds * TICKS_PER_SECOND)
               : undefined,
           lag: options.lag ?? null,
+          reconnectGraceMs: options.reconnectGraceMs,
         }),
       ),
     },

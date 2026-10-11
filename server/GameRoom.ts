@@ -8,11 +8,21 @@
  * (the host's drives the room's unlocks), and every finished round is
  * written to every member's profile. Store trouble is logged and never stops
  * the room: the round just isn't saved online.
+ *
+ * Connections: a member whose socket drops (`onDrop`) keeps their place for
+ * the reconnect grace period (`allowReconnection`); the SDK reconnects on its
+ * own, a reloaded page with the stored token (`onReconnect`). After the grace
+ * period, or when they leave on purpose, `onLeave` removes them.
  */
 
 import { randomInt } from 'node:crypto';
 import { type Client, Room, ServerError } from 'colyseus';
 import { type LagSettings, createLagRunner } from '../src/net/lag';
+import {
+  NET_FLOOD_KICK_FACTOR,
+  NET_MAX_MESSAGES_PER_SECOND,
+  NET_RECONNECT_GRACE_MS,
+} from '../src/sim/balance';
 import { MAX_PLAYERS } from '../src/sim/level';
 import { releaseJoinCode, reserveJoinCode } from './joinCodes';
 import type { ProfileStore } from './profileStore';
@@ -23,9 +33,11 @@ import {
   TICK_MS,
   advanceRoom,
   createRoomState,
+  dropMember,
   handleMessage,
   joinRoom,
   leaveRoom,
+  rejoinMember,
   setMemberProfile,
   takeProfileWrites,
 } from './roomLogic';
@@ -38,15 +50,23 @@ export { GAME_ROOM } from '../src/net/protocol';
  */
 export const JOIN_REFUSED = 4400;
 
+/** Colyseus close codes: a goodbye (the client doesn't try to reconnect), and the server going away. */
+const CONSENTED = 4000;
+const SERVER_SHUTDOWN = 4001;
+
 /** How the server's rooms play: `RoomOptions` plus the dev lag simulator. */
 export interface GameRoomSettings extends RoomOptions {
   /** Delays every message in and out (`NET_LAG_MS`, `NET_JITTER_MS`); dev only. */
   lag?: LagSettings | null;
+  /** How long a dropped member may take to reconnect; `NET_RECONNECT_GRACE_MS` by default (tests use less). */
+  reconnectGraceMs?: number;
 }
 
 export class GameRoom extends Room {
   // Every member brings at least one player.
   maxClients = MAX_PLAYERS;
+  // `roomLogic` drops messages past the budget; a client this far past it is broken or hostile.
+  maxMessagesPerSecond = NET_MAX_MESSAGES_PER_SECOND * NET_FLOOD_KICK_FACTOR;
   private core!: RoomState;
   /** Set by `gameRoomWith`; without one the room plays without profiles. */
   protected store: ProfileStore | null = null;
@@ -82,8 +102,10 @@ export class GameRoom extends Room {
     // last call; `advanceRoom` turns that into whole ticks (our own tested
     // accumulator rather than `setFixedTimestep`, so tests can drive it).
     this.setTimestep((deltaMs) => {
+      if (this.closing) return;
       this.deliver(advanceRoom(this.core, deltaMs));
       this.writeProfiles();
+      if (this.core.closing) this.close();
     }, TICK_MS);
   }
 
@@ -94,12 +116,43 @@ export class GameRoom extends Room {
     this.loadProfile(client.sessionId);
   }
 
+  /** The socket dropped without a goodbye: keep their place while they reconnect. */
+  onDrop(client: Client): void {
+    this.deliver(dropMember(this.core, client.sessionId));
+    const grace = this.settings.reconnectGraceMs ?? NET_RECONNECT_GRACE_MS;
+    // A rejected reconnection (the grace ran out, or the room closes) ends in `onLeave`.
+    this.allowReconnection(client, grace / 1000).catch(() => undefined);
+  }
+
+  onReconnect(client: Client): void {
+    this.deliver(rejoinMember(this.core, client.sessionId));
+  }
+
+  /** Gone for good: left on purpose, or didn't come back in time. */
   onLeave(client: Client): void {
     this.deliver(leaveRoom(this.core, client.sessionId));
   }
 
+  /**
+   * The server is shutting down: everyone hears why, nobody waits for a
+   * reconnect that can't happen, then the room closes.
+   */
+  onBeforeShutdown(): void {
+    this.sendNow([{ to: null, message: { type: 'closing', reason: 'shutdown' } }]);
+    this.close(SERVER_SHUTDOWN);
+  }
+
   onDispose(): void {
     releaseJoinCode(this.core.joinCode);
+  }
+
+  private closing = false;
+
+  /** Closes the room: pending reconnections are dropped, everyone is disconnected. */
+  private close(code = CONSENTED): void {
+    if (this.closing) return;
+    this.closing = true;
+    this.disconnect(code).catch(() => undefined);
   }
 
   private loadProfile(sessionId: string): void {
@@ -130,13 +183,16 @@ export class GameRoom extends Room {
 
   private deliver(out: readonly Outgoing[]): void {
     if (out.length === 0) return;
-    const send = (): void => {
-      for (const { to, message } of out) {
-        if (to === null) this.broadcast(message.type, message);
-        else this.clients.get(to)?.send(message.type, message);
-      }
-    };
-    this.lagOut(send);
+    this.lagOut(() => {
+      this.sendNow(out);
+    });
+  }
+
+  private sendNow(out: readonly Outgoing[]): void {
+    for (const { to, message } of out) {
+      if (to === null) this.broadcast(message.type, message);
+      else this.clients.get(to)?.send(message.type, message);
+    }
   }
 }
 

@@ -27,6 +27,7 @@ import {
   recordLevel,
 } from '../src/flow/save';
 import type { DevicePress } from '../src/input/controller';
+import { createLobby } from '../src/input/lobby';
 import { type InputBuffer, createInputBuffer, pushInput, takeInput } from '../src/net/inputBuffer';
 import {
   type ErrorCode,
@@ -44,6 +45,9 @@ import {
   takeSnapshot,
 } from '../src/net/snapshot';
 import {
+  NET_MAX_MESSAGES_PER_SECOND,
+  NET_MESSAGE_BURST,
+  NET_ROOM_IDLE_MS,
   NET_SERVER_MAX_CATCHUP_TICKS,
   NET_SNAPSHOT_EVERY_TICKS,
   TICKS_PER_SECOND,
@@ -51,7 +55,7 @@ import {
 import { MAX_PLAYERS } from '../src/sim/level';
 import type { LevelResult } from '../src/sim/orders';
 import { CHAPTERS, LEVELS } from '../src/sim/levels';
-import { type GameState, type PlayerId, createGame } from '../src/sim/state';
+import { type GameState, type InputCommand, type PlayerId, createGame } from '../src/sim/state';
 import { tick } from '../src/sim/tick';
 
 export const TICK_MS = 1000 / TICKS_PER_SECOND;
@@ -76,6 +80,19 @@ export interface Member {
   profileId: string | null;
   /** Progress from the member's profile plus rounds played in this room. */
   levels: Record<string, LevelRecord>;
+  /** `false` while their connection is down and the room waits for them to come back. */
+  connected: boolean;
+  /** Messages they may still send right now (a token bucket, refilled every tick). */
+  budget: number;
+  /** Messages dropped for going over the budget. */
+  dropped: number;
+}
+
+/** Someone in the room when a round started: the round counts for them. */
+export interface Participant {
+  sessionId: string;
+  profileId: string | null;
+  displayName: string;
 }
 
 /** A finished round to add to a profile in the store. */
@@ -114,6 +131,14 @@ export interface RoomState {
   profileWrites: ProfileWrite[];
   /** Every round lasts this many ticks instead of its level's length (dev and tests); `null`: as the level says. */
   roundTicks: number | null;
+  /** The loaded round's id, counting up per room (0 before the first). */
+  roundId: number;
+  /** Who was in the room when the loaded round started: it counts for them. */
+  participants: Participant[];
+  /** The last server tick someone pressed or moved anything. */
+  lastActivityTick: number;
+  /** Set when the room should close (nobody did anything for too long); `GameRoom` closes it. */
+  closing: 'idle' | null;
 }
 
 /** How a room plays, set when the server starts. */
@@ -155,11 +180,20 @@ export function createRoomState(
     seed,
     profileWrites: [],
     roundTicks: options.roundTicks ?? null,
+    roundId: 0,
+    participants: [],
+    lastActivityTick: 0,
+    closing: null,
   };
 }
 
+/**
+ * The host: the earliest joined member whose connection is up, so someone
+ * can always drive the menus while the host reconnects; the earliest joined
+ * member when nobody is connected.
+ */
 export function hostOf(room: RoomState): Member | undefined {
-  return room.members[0];
+  return room.members.find((m) => m.connected) ?? room.members[0];
 }
 
 /** Device ids from a session are `<sessionId>:<deviceId>`; clients can't send a colon. */
@@ -191,7 +225,7 @@ export function lobbyMessage(room: RoomState): Outgoing {
     displayName: m.displayName,
     localPlayers: m.localPlayers,
     isHost: m.sessionId === host,
-    connected: true,
+    connected: m.connected,
   }));
   return {
     to: null,
@@ -208,17 +242,41 @@ function errorTo(to: string, code: ErrorCode, message: string): Outgoing {
   return { to, message: { type: 'error', code, message } };
 }
 
+/** The loaded round's `roundStart`, for everyone (`to: null`, all counted) or one session. */
 function roundStartTo(room: RoomState, to: string | null): Outgoing[] {
   const game = room.game;
   if (!game) return [];
   // Not `takeSnapshot`: that would steal the events meant for the next snapshot.
   const snapshot = takeSnapshot({ events: [] }, game, room.serverTick);
+  const counted = to === null || room.participants.some((p) => p.sessionId === to);
   return [
     {
       to,
-      message: { type: 'roundStart', levelId: game.levelId, level: game.level, snapshot },
+      message: {
+        type: 'roundStart',
+        roundId: room.roundId,
+        counted,
+        levelId: game.levelId,
+        level: game.level,
+        snapshot,
+      },
     },
   ];
+}
+
+function welcomeTo(room: RoomState, sessionId: string): Outgoing {
+  return {
+    to: sessionId,
+    message: {
+      type: 'welcome',
+      protocol: PROTOCOL_VERSION,
+      sessionId,
+      joinCode: room.joinCode,
+      serverTick: room.serverTick,
+      ticksPerSecond: TICKS_PER_SECOND,
+      snapshotEveryTicks: NET_SNAPSHOT_EVERY_TICKS,
+    },
+  };
 }
 
 /**
@@ -249,22 +307,7 @@ export function joinRoom(room: RoomState, sessionId: string, options: unknown): 
   followHost(room);
   return {
     ok: true,
-    out: [
-      {
-        to: sessionId,
-        message: {
-          type: 'welcome',
-          protocol: PROTOCOL_VERSION,
-          sessionId,
-          joinCode: room.joinCode,
-          serverTick: room.serverTick,
-          ticksPerSecond: TICKS_PER_SECOND,
-          snapshotEveryTicks: NET_SNAPSHOT_EVERY_TICKS,
-        },
-      },
-      lobbyMessage(room),
-      ...roundStartTo(room, sessionId),
-    ],
+    out: [welcomeTo(room, sessionId), lobbyMessage(room), ...roundStartTo(room, sessionId)],
   };
 }
 
@@ -276,6 +319,9 @@ function memberFrom(sessionId: string, hello: HelloMessage): Member {
     localPlayers: hello.localPlayers,
     profileId: normalizeUserId(hello.userId),
     levels: {},
+    connected: true,
+    budget: NET_MESSAGE_BURST,
+    dropped: 0,
   };
 }
 
@@ -304,18 +350,22 @@ export function setMemberProfile(
 }
 
 /**
- * A round ended: it counts for everyone in the room, not only the host.
- * Recorded in every member's levels, and queued once per profile for the store.
+ * A round ended: it counts for everyone who was in the room when it started
+ * (not only the host, and also those who left since; not those who joined
+ * while it ran). Recorded in the levels of those still here, and queued once
+ * per profile for the store.
  */
 function recordForMembers(room: RoomState, levelId: string, result: LevelResult): void {
   const queued = new Set<string>();
-  for (const member of room.members) {
-    recordLevel(member.levels, levelId, result);
-    if (!member.profileId || queued.has(member.profileId)) continue;
-    queued.add(member.profileId);
+  for (const participant of room.participants) {
+    const member = room.members.find((m) => m.sessionId === participant.sessionId);
+    if (member) recordLevel(member.levels, levelId, result);
+    const profileId = participant.profileId;
+    if (!profileId || queued.has(profileId)) continue;
+    queued.add(profileId);
     room.profileWrites.push({
-      userId: member.profileId,
-      displayName: member.displayName,
+      userId: profileId,
+      displayName: member?.displayName ?? participant.displayName,
       levelId,
       result: { score: result.score, stars: result.stars },
     });
@@ -328,9 +378,11 @@ export function takeProfileWrites(room: RoomState): ProfileWrite[] {
 }
 
 /**
- * Someone left. The host moves to the earliest joined member left. In the
- * lobby their players are dropped and the others renumbered in join order;
- * in a round their players stay and stand still (13f decides more).
+ * Someone left for good (on purpose, or their reconnect grace ran out). The
+ * host moves to the earliest joined member left. Outside a round their
+ * players are dropped and the others renumbered in join order; during a
+ * round their players stay and stand still until it ends (`pruneDeparted`
+ * runs when the round stops or the next one starts).
  */
 export function leaveRoom(room: RoomState, sessionId: string): Outgoing[] {
   const before = room.members.length;
@@ -338,19 +390,70 @@ export function leaveRoom(room: RoomState, sessionId: string): Outgoing[] {
   if (room.members.length === before) return [];
   followHost(room);
   room.presses = room.presses.filter((p) => !isFromSession(p.deviceId, sessionId));
-  const lobby = room.flow.lobby;
-  if (!lobby.started) {
-    lobby.players = lobby.players
-      .filter((p) => !isFromSession(p.deviceId, sessionId))
-      .map((p, i) => ({ ...p, playerId: i + 1 }));
-  }
+  if (!room.game) pruneDeparted(room);
   return room.members.length > 0 ? [lobbyMessage(room)] : [];
+}
+
+/**
+ * Drops the players of devices whose member left, renumbering the others in
+ * join order (player ids must be 1..n for the spawns). A room left without
+ * players after the lobby goes back to the lobby, so someone joins again.
+ */
+function pruneDeparted(room: RoomState): void {
+  const lobby = room.flow.lobby;
+  const kept = lobby.players.filter((p) =>
+    room.members.some((m) => isFromSession(p.deviceId, m.sessionId)),
+  );
+  if (kept.length !== lobby.players.length) {
+    lobby.players = kept.map((p, i) => ({ ...p, playerId: i + 1 }));
+  }
+  if (lobby.started && lobby.players.length === 0 && !room.game) {
+    room.flow.lobby = createLobby();
+    room.flow.screen = 'lobby';
+    room.flow.menuIndex = 0;
+    room.flow.results = null;
+  }
+}
+
+/**
+ * A member's connection dropped: they stay in the room (with their players,
+ * who stand still) while it waits for them to reconnect. Menu authority
+ * moves to the next connected member meanwhile (`hostOf`).
+ */
+export function dropMember(room: RoomState, sessionId: string): Outgoing[] {
+  const member = room.members.find((m) => m.sessionId === sessionId);
+  if (!member?.connected) return [];
+  member.connected = false;
+  room.presses = room.presses.filter((p) => !isFromSession(p.deviceId, sessionId));
+  followHost(room);
+  return [lobbyMessage(room)];
+}
+
+/**
+ * A dropped member reconnected (the same session): they get the welcome
+ * (with the protocol, which the client checks again), the room and the
+ * loaded round (same round id) again, as they may have missed changes;
+ * everyone gets the new `lobby`.
+ */
+export function rejoinMember(room: RoomState, sessionId: string): Outgoing[] {
+  const member = room.members.find((m) => m.sessionId === sessionId);
+  if (!member) return [];
+  member.connected = true;
+  member.budget = NET_MESSAGE_BURST;
+  followHost(room);
+  return [welcomeTo(room, sessionId), lobbyMessage(room), ...roundStartTo(room, sessionId)];
 }
 
 /** A message from a member: checked first, refused with an `error` when it doesn't parse. */
 export function handleMessage(room: RoomState, sessionId: string, raw: unknown): Outgoing[] {
   const member = room.members.find((m) => m.sessionId === sessionId);
   if (!member) return [];
+  // A flood is dropped before anything else looks at it.
+  if (member.budget < 1) {
+    member.dropped++;
+    return [];
+  }
+  member.budget--;
   const parsed = parseClientMessage(raw);
   if (!parsed.ok) return [errorTo(sessionId, 'badMessage', parsed.reason)];
   const message = parsed.value;
@@ -371,12 +474,14 @@ export function handleMessage(room: RoomState, sessionId: string, raw: unknown):
       const owned = new Set(playerIdsOf(room, sessionId));
       for (const input of message.inputs) {
         if (!owned.has(input.playerId)) continue;
+        if (isActive(input)) room.lastActivityTick = room.serverTick;
         const buffer = room.buffers.find((b) => b.playerId === input.playerId);
         if (buffer) pushInput(buffer, input, room.serverTick);
       }
       return [];
     }
     case 'menu':
+      if (message.presses.length > 0) room.lastActivityTick = room.serverTick;
       for (const press of message.presses) {
         room.presses.push({
           ...press,
@@ -410,45 +515,103 @@ function updateMember(room: RoomState, member: Member, hello: HelloMessage): Out
   return [lobbyMessage(room)];
 }
 
+/** An input that does something (a standing, idle player's inputs don't keep a room open). */
+function isActive(input: InputCommand): boolean {
+  return input.move.x !== 0 || input.move.y !== 0 || input.interact || input.work || input.dash;
+}
+
 /**
- * The presses the room's flow gets this tick, and whether a member's couch
- * player count grew.
+ * The presses the room's flow gets this tick, and whether the players or a
+ * member's couch player count changed.
  *
  * - In the lobby every member's devices count. A join press from a device
  *   past the couch players its member announced makes room for one more
  *   while the room has space, and is dropped when it's full, so the room
  *   never holds more players than its members' counts add up to.
+ * - On the level select and the results, a member without any player (they
+ *   joined while a round ran, or only watched) joins one with a join press,
+ *   so they play the next round whatever the host picks. That press does
+ *   nothing else. More couch players join through Change players.
  * - Everywhere else (level select, intro, pause, results, and pausing a
- *   round) only the host's devices count.
+ *   round) only the host's devices count. After the lobby the flow only
+ *   takes devices with a player, so a host without one (say, a spectator
+ *   who became host when the host left) has their presses passed on as
+ *   player 1's device: someone can always drive the menus.
  */
 function allowedPresses(
   room: RoomState,
   presses: readonly DevicePress[],
-): { presses: DevicePress[]; grew: boolean } {
-  const host = hostOf(room);
-  if (room.flow.screen !== 'lobby') {
-    return {
-      presses: host ? presses.filter((p) => isFromSession(p.deviceId, host.sessionId)) : [],
-      grew: false,
-    };
+): { presses: DevicePress[]; changed: boolean } {
+  const screen = room.flow.screen;
+  if (screen === 'lobby') return lobbyPresses(room, presses);
+  let changed = false;
+  let rest = presses;
+  if (screen === 'levelSelect' || screen === 'results') {
+    const joined = joinBetweenRounds(room, presses);
+    if (joined.size > 0) {
+      changed = true;
+      rest = presses.filter((p) => !joined.has(p.deviceId.slice(0, p.deviceId.indexOf(':'))));
+    }
   }
+  const host = hostOf(room);
+  if (!host) return { presses: [], changed };
+  const bound = new Set(room.flow.lobby.players.map((p) => p.deviceId));
+  const stand = room.flow.lobby.players[0]?.deviceId;
+  const own = rest
+    .filter((p) => isFromSession(p.deviceId, host.sessionId))
+    .flatMap((p) => {
+      if (bound.has(p.deviceId)) return [p];
+      return stand === undefined ? [] : [{ ...p, deviceId: stand }];
+    });
+  return { presses: own, changed };
+}
+
+/** The lobby's presses: everyone's, with join presses checked against the room's size. */
+function lobbyPresses(
+  room: RoomState,
+  presses: readonly DevicePress[],
+): { presses: DevicePress[]; changed: boolean } {
   const bound = new Set(room.flow.lobby.players.map((p) => p.deviceId));
   const joining = new Map<string, number>();
-  let grew = false;
+  const groups = new Set<string>();
+  let changed = false;
   const allowed = presses.filter((press) => {
     if (!press.join || bound.has(press.deviceId)) return true;
+    // The lobby joins one device per join group per tick (Enter presses both keyboard schemes).
+    const group = `${press.deviceId.slice(0, press.deviceId.indexOf(':'))}/${press.joinGroup}`;
+    if (groups.has(group)) return true;
     const member = room.members.find((m) => isFromSession(press.deviceId, m.sessionId));
     if (!member) return false;
     const count = (joining.get(member.sessionId) ?? playerIdsOf(room, member.sessionId).length) + 1;
     if (count > member.localPlayers) {
       if (playerCount(room) >= MAX_PLAYERS) return false;
       member.localPlayers++;
-      grew = true;
+      changed = true;
     }
     joining.set(member.sessionId, count);
+    groups.add(group);
     return true;
   });
-  return { presses: allowed, grew };
+  return { presses: allowed, changed };
+}
+
+/**
+ * Join presses on the level select and results from members without a
+ * player: each such member gets one (while the room has space). Returns the
+ * sessions that joined; their presses this tick are used up.
+ */
+function joinBetweenRounds(room: RoomState, presses: readonly DevicePress[]): Set<string> {
+  const lobby = room.flow.lobby;
+  const joined = new Set<string>();
+  for (const press of presses) {
+    if (!press.join || lobby.players.length >= MAX_PLAYERS) continue;
+    const member = room.members.find((m) => isFromSession(press.deviceId, m.sessionId));
+    if (!member || joined.has(member.sessionId)) continue;
+    if (playerIdsOf(room, member.sessionId).length > 0) continue;
+    lobby.players.push({ playerId: lobby.players.length + 1, deviceId: press.deviceId });
+    joined.add(member.sessionId);
+  }
+  return joined;
 }
 
 function flowContext(room: RoomState): FlowContext {
@@ -469,20 +632,30 @@ function runEffects(room: RoomState, effects: readonly FlowEffect[]): Outgoing[]
   for (const effect of effects) {
     switch (effect.type) {
       case 'startLevel': {
+        // The round before (if any) is over: those who left during it go now.
+        room.game = null;
+        pruneDeparted(room);
         const level = LEVELS[effect.levelIndex];
         const ids = room.flow.lobby.players.map((p) => p.playerId);
-        if (!level || ids.length === 0) break;
+        if (!level || ids.length === 0) {
+          stopRound(room);
+          break;
+        }
         room.game = createGame(level, room.seed++, ids);
         if (room.roundTicks !== null) room.game.settings.durationTicks = room.roundTicks;
         room.buffers = ids.map((id) => createInputBuffer(id));
         room.log = createSnapshotLog();
+        room.roundId++;
+        room.participants = room.members.map((m) => ({
+          sessionId: m.sessionId,
+          profileId: m.profileId,
+          displayName: m.displayName,
+        }));
         out.push(...roundStartTo(room, null));
         break;
       }
       case 'stopRound':
-        room.game = null;
-        room.buffers = [];
-        room.log = createSnapshotLog();
+        stopRound(room);
         break;
       // Rounds run on server ticks, so pause needs no catching up. Results
       // go to the profiles (`recordForMembers`); settings and the profile
@@ -496,6 +669,15 @@ function runEffects(room: RoomState, effects: readonly FlowEffect[]): Outgoing[]
   return out;
 }
 
+/** The round is dropped; those who left during it lose their players now. */
+function stopRound(room: RoomState): void {
+  room.game = null;
+  room.buffers = [];
+  room.log = createSnapshotLog();
+  room.participants = [];
+  pruneDeparted(room);
+}
+
 /** A function, so TypeScript doesn't assume `tick` left `result` alone. */
 const resultOf = (game: GameState): LevelResult | null => game.result;
 
@@ -506,11 +688,15 @@ const resultOf = (game: GameState): LevelResult | null => game.result;
  * every `NET_SNAPSHOT_EVERY_TICKS`.
  */
 export function stepRoom(room: RoomState): Outgoing[] {
+  const refill = NET_MAX_MESSAGES_PER_SECOND / TICKS_PER_SECOND;
+  for (const member of room.members) {
+    member.budget = Math.min(NET_MESSAGE_BURST, member.budget + refill);
+  }
   const ctx = flowContext(room);
-  const { presses, grew } = allowedPresses(room, room.presses);
+  const { presses, changed } = allowedPresses(room, room.presses);
   room.presses = [];
   const out = runEffects(room, updateFlow(room.flow, presses, ctx).effects);
-  if (grew) out.push(lobbyMessage(room));
+  if (changed) out.push(lobbyMessage(room));
 
   const game = room.game;
   if (game) {
@@ -529,6 +715,13 @@ export function stepRoom(room: RoomState): Outgoing[] {
   }
 
   room.serverTick++;
+  if (
+    room.closing === null &&
+    (room.serverTick - room.lastActivityTick) * TICK_MS >= NET_ROOM_IDLE_MS
+  ) {
+    room.closing = 'idle';
+    out.push({ to: null, message: { type: 'closing', reason: 'idle' } });
+  }
   if (isSnapshotTick(room.serverTick)) {
     out.push({
       to: null,

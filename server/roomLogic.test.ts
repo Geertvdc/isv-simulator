@@ -7,7 +7,14 @@ import {
   type ServerMessage,
   type SnapshotMessage,
 } from '../src/net/protocol';
-import { NET_SERVER_MAX_CATCHUP_TICKS, NET_SNAPSHOT_EVERY_TICKS } from '../src/sim/balance';
+import {
+  NET_MAX_MESSAGES_PER_SECOND,
+  NET_MESSAGE_BURST,
+  NET_ROOM_IDLE_MS,
+  NET_SERVER_MAX_CATCHUP_TICKS,
+  NET_SNAPSHOT_EVERY_TICKS,
+  TICKS_PER_SECOND,
+} from '../src/sim/balance';
 import { MAX_PLAYERS } from '../src/sim/level';
 import {
   type Outgoing,
@@ -15,11 +22,13 @@ import {
   TICK_MS,
   advanceRoom,
   createRoomState,
+  dropMember,
   handleMessage,
   hostOf,
   joinRoom,
   leaveRoom,
   playerIdsOf,
+  rejoinMember,
   setMemberProfile,
   stepRoom,
   takeProfileWrites,
@@ -558,5 +567,322 @@ describe('profiles', () => {
     expect(room.flow.screen).toBe('results');
     const levels = messages(out, 'lobby').at(-1)?.levels;
     expect(levels?.garage?.plays).toBe(1);
+  });
+});
+
+describe('resilience', () => {
+  const ADA = '3f2b8c1e-9d4a-4e6b-8a1c-2b3c4d5e6f70';
+  const GRACE = 'a1b2c3d4-e5f6-4a7b-9c8d-0e1f2a3b4c5d';
+  const LATE = 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e';
+
+  function joinAs(room: RoomState, sessionId: string, userId?: string): void {
+    const result = joinRoom(room, sessionId, {
+      ...hello(1, sessionId),
+      userId: userId ?? sessionId,
+    });
+    if (!result.ok) throw new Error(result.reason);
+  }
+
+  /** Host and guest each with a keyboard player (host is player 1), on the level select. */
+  function twoPlayers(): RoomState {
+    const room = createRoomState('ABCD', 1);
+    joinAs(room, 'host', ADA);
+    joinAs(room, 'guest', GRACE);
+    menu(room, 'host', press('kb-left', { join: true }));
+    menu(room, 'guest', press('kb-left', { join: true }));
+    menu(room, 'host', press('kb-left', { interact: true }));
+    expect(room.flow.screen).toBe('levelSelect');
+    return room;
+  }
+
+  /** From the level select into a running round of the first level, driven by `by`. */
+  function play(room: RoomState, by = 'host', device = 'kb-left'): void {
+    menu(room, by, press(device, { interact: true }));
+    expect(room.flow.screen).toBe('intro');
+    menu(room, by, press(device, { interact: true }));
+    steps(room, Math.ceil(COUNTDOWN_MS / TICK_MS) + 1);
+    expect(room.flow.screen).toBe('playing');
+  }
+
+  function finish(room: RoomState): void {
+    const game = room.game;
+    if (!game) throw new Error('no round');
+    steps(room, game.settings.durationTicks - game.tick + 5);
+    expect(room.flow.screen).toBe('results');
+    // The results take presses after a moment.
+    steps(room, TICKS_PER_SECOND * 3);
+  }
+
+  function walk(room: RoomState, sessionId: string, playerId: number): void {
+    handleMessage(room, sessionId, {
+      type: 'inputs',
+      inputs: [
+        {
+          playerId,
+          tick: room.serverTick,
+          move: { x: 1, y: 0 },
+          interact: false,
+          work: false,
+          dash: false,
+        },
+      ],
+    });
+  }
+
+  describe('dropping and reconnecting', () => {
+    it('keeps a dropped member and their players, marked as not connected', () => {
+      const room = twoPlayers();
+      play(room);
+      const out = dropMember(room, 'guest');
+      expect(room.members.map((m) => m.sessionId)).toEqual(['host', 'guest']);
+      expect(playerIdsOf(room, 'guest')).toEqual([2]);
+      const lobby = messages(out, 'lobby')[0];
+      expect(lobby?.members.map((m) => [m.displayName, m.connected])).toEqual([
+        ['host', true],
+        ['guest', false],
+      ]);
+      // Their player stands still while they are away; the round goes on.
+      const before = room.game?.players[1]?.pos;
+      const tick = room.game?.tick ?? 0;
+      steps(room, 60);
+      expect(room.game?.tick).toBe(tick + 60);
+      expect(room.game?.players[1]?.pos).toEqual(before);
+    });
+
+    it('sends a reconnected member the welcome, the room and the same round again', () => {
+      const room = twoPlayers();
+      play(room);
+      const roundId = room.roundId;
+      dropMember(room, 'guest');
+      steps(room, 30);
+      const out = rejoinMember(room, 'guest');
+      expect(out.map((o) => [o.to, o.message.type])).toEqual([
+        ['guest', 'welcome'],
+        [null, 'lobby'],
+        ['guest', 'roundStart'],
+      ]);
+      expect(messages(out, 'roundStart')[0]).toMatchObject({ roundId, counted: true });
+      expect(messages(out, 'lobby')[0]?.members.every((m) => m.connected)).toBe(true);
+      // Their inputs move their player again.
+      const x = room.game?.players[1]?.pos.x ?? 0;
+      for (let i = 0; i < 20; i++) {
+        walk(room, 'guest', 2);
+        stepRoom(room);
+      }
+      expect(room.game?.players[1]?.pos.x).toBeGreaterThan(x);
+    });
+
+    it('hands the menus to the next connected member while the host is away, and back', () => {
+      const room = twoPlayers();
+      dropMember(room, 'host');
+      expect(hostOf(room)?.sessionId).toBe('guest');
+      menu(room, 'guest', press('kb-left', { interact: true }));
+      expect(room.flow.screen).toBe('intro');
+      rejoinMember(room, 'host');
+      expect(hostOf(room)?.sessionId).toBe('host');
+      menu(room, 'guest', press('kb-left', { interact: true }));
+      expect(room.flow.screen).toBe('intro');
+      menu(room, 'host', press('kb-left', { interact: true }));
+      expect(room.flow.screen).toBe('countdown');
+    });
+
+    it('ignores a drop or rejoin of someone not in the room', () => {
+      const room = twoPlayers();
+      expect(dropMember(room, 'nobody')).toEqual([]);
+      expect(rejoinMember(room, 'nobody')).toEqual([]);
+      dropMember(room, 'guest');
+      expect(dropMember(room, 'guest')).toEqual([]);
+    });
+  });
+
+  describe('a host without a player', () => {
+    it('drives the level select, intro, pause and results', () => {
+      // The host leaves after the lobby; the guest becomes host, and drops: a
+      // member who only watched is the host now, with no player of their own.
+      const room = twoPlayers();
+      joinAs(room, 'watcher');
+      leaveRoom(room, 'host');
+      dropMember(room, 'guest');
+      expect(hostOf(room)?.sessionId).toBe('watcher');
+      expect(playerIdsOf(room, 'watcher')).toEqual([]);
+      menu(room, 'watcher', press('kb-left', { nav: { x: 0, y: 1 } }));
+      expect(room.flow.levelIndex).toBe(1);
+      menu(room, 'watcher', press('kb-left', { nav: { x: 0, y: -1 } }));
+      play(room, 'watcher');
+      menu(room, 'watcher', press('kb-left', { menu: true }));
+      expect(room.flow.screen).toBe('paused');
+      menu(room, 'watcher', press('kb-left', { dash: true }));
+      expect(room.flow.screen).toBe('playing');
+      finish(room);
+      const roundId = room.roundId;
+      menu(room, 'watcher', press('kb-left', { interact: true }));
+      expect(room.roundId).toBe(roundId + 1);
+    });
+  });
+
+  describe('leaving for good', () => {
+    it("keeps a leaver's character until the round ends, then renumbers", () => {
+      const room = twoPlayers();
+      joinAs(room, 'third');
+      // 'third' joins a player between rounds (see late join), so there are three.
+      menu(room, 'third', press('kb-left', { join: true }));
+      expect(playerIdsOf(room, 'third')).toEqual([3]);
+      play(room);
+      leaveRoom(room, 'guest');
+      expect(room.flow.lobby.players.map((p) => p.playerId)).toEqual([1, 2, 3]);
+      expect(room.game?.players).toHaveLength(3);
+      finish(room);
+      expect(room.flow.lobby.players).toHaveLength(3);
+      // Retry (or Next): a fresh round without the leaver.
+      menu(room, 'host', press('kb-left', { interact: true }));
+      expect(playerIdsOf(room, 'host')).toEqual([1]);
+      expect(playerIdsOf(room, 'third')).toEqual([2]);
+      expect(room.game?.players.map((p) => p.id)).toEqual([1, 2]);
+    });
+
+    it("drops a leaver's players right away between rounds", () => {
+      const room = twoPlayers();
+      leaveRoom(room, 'host');
+      expect(room.flow.lobby.players).toEqual([{ playerId: 1, deviceId: 'guest:kb-left' }]);
+      expect(room.flow.screen).toBe('levelSelect');
+    });
+
+    it('goes back to the lobby when no players are left', () => {
+      const room = twoPlayers();
+      joinAs(room, 'watcher');
+      leaveRoom(room, 'host');
+      leaveRoom(room, 'guest');
+      expect(room.flow.screen).toBe('lobby');
+      expect(room.flow.lobby).toEqual({ players: [], started: false });
+    });
+
+    it('goes back to the lobby when the round ends with nobody left who plays', () => {
+      const room = twoPlayers();
+      joinAs(room, 'watcher');
+      play(room);
+      leaveRoom(room, 'host');
+      leaveRoom(room, 'guest');
+      expect(room.game).not.toBeNull();
+      finish(room);
+      menu(room, 'watcher', press('kb-left', { interact: true }));
+      expect(room.flow.screen).toBe('lobby');
+      expect(room.game).toBeNull();
+    });
+  });
+
+  describe('joining while a round runs', () => {
+    it('sends the round to watch, not counted', () => {
+      const room = twoPlayers();
+      play(room);
+      const result = joinRoom(room, 'late', hello(1, 'late'));
+      if (!result.ok) throw new Error(result.reason);
+      expect(messages(result.out, 'roundStart')[0]).toMatchObject({
+        roundId: room.roundId,
+        counted: false,
+      });
+    });
+
+    it('lets them join a player on the results and the level select, not during the round', () => {
+      const room = twoPlayers();
+      play(room);
+      joinAs(room, 'late');
+      menu(room, 'late', press('kb-left', { join: true }));
+      expect(playerIdsOf(room, 'late')).toEqual([]);
+      finish(room);
+      const out = menu(room, 'late', press('kb-left', { join: true, interact: true }));
+      expect(playerIdsOf(room, 'late')).toEqual([3]);
+      expect(messages(out, 'lobby')).toHaveLength(1);
+      // The press only joined: the results are still up.
+      expect(room.flow.screen).toBe('results');
+      // A second press doesn't add another player.
+      menu(room, 'late', press('kb-right', { join: true }));
+      expect(playerIdsOf(room, 'late')).toEqual([3]);
+      // The next round has them.
+      menu(room, 'host', press('kb-left', { interact: true }));
+      expect(room.game?.players.map((p) => p.id)).toEqual([1, 2, 3]);
+    });
+
+    it('lets a member who watched join on the level select', () => {
+      const room = twoPlayers();
+      joinAs(room, 'watcher');
+      menu(room, 'watcher', press('pad-0', { join: true }));
+      expect(playerIdsOf(room, 'watcher')).toEqual([3]);
+      // Players already in can't add more here (Change players is for that).
+      menu(room, 'host', press('kb-right', { join: true }));
+      expect(playerIdsOf(room, 'host')).toEqual([1]);
+    });
+
+    it('records the round for members who were there at the start, also when they left', () => {
+      const room = twoPlayers();
+      play(room);
+      joinAs(room, 'late', LATE);
+      leaveRoom(room, 'guest');
+      finish(room);
+      const writes = takeProfileWrites(room);
+      expect(writes.map((w) => [w.userId, w.displayName])).toEqual([
+        [ADA, 'host'],
+        [GRACE, 'guest'],
+      ]);
+      const late = room.members.find((m) => m.sessionId === 'late');
+      expect(late?.levels).toEqual({});
+    });
+  });
+
+  describe('message budget', () => {
+    it('drops a flood and lets messages through again once it refills', () => {
+      const room = twoPlayers();
+      const ping = { type: 'ping', id: 1, clientTimeMs: 0 };
+      let answered = 0;
+      for (let i = 0; i < NET_MESSAGE_BURST + 40; i++) {
+        answered += handleMessage(room, 'guest', ping).length;
+      }
+      expect(answered).toBe(NET_MESSAGE_BURST);
+      const guest = room.members.find((m) => m.sessionId === 'guest');
+      expect(guest?.dropped).toBe(40);
+      // A second's worth of ticks refills the budget (up to the burst).
+      steps(room, TICKS_PER_SECOND);
+      answered = 0;
+      for (let i = 0; i < NET_MESSAGE_BURST + 40; i++) {
+        answered += handleMessage(room, 'guest', ping).length;
+      }
+      expect(answered).toBe(Math.min(NET_MESSAGE_BURST, NET_MAX_MESSAGES_PER_SECOND));
+      // Others aren't affected.
+      expect(handleMessage(room, 'host', ping)).toHaveLength(1);
+    });
+
+    it('keeps up with a client sending every tick', () => {
+      const room = twoPlayers();
+      let answered = 0;
+      for (let i = 0; i < TICKS_PER_SECOND * 5; i++) {
+        answered += handleMessage(room, 'guest', { type: 'ping', id: i, clientTimeMs: 0 }).length;
+        stepRoom(room);
+      }
+      expect(answered).toBe(TICKS_PER_SECOND * 5);
+    });
+  });
+
+  describe('idle rooms', () => {
+    const idleTicks = Math.ceil(NET_ROOM_IDLE_MS / TICK_MS);
+
+    it('closes after a long time without a press or a move', () => {
+      const room = twoPlayers();
+      const start = room.serverTick;
+      let out: Outgoing[] = [];
+      while (room.closing === null && room.serverTick < start + idleTicks + 10) {
+        out = stepRoom(room);
+      }
+      expect(room.closing).toBe('idle');
+      expect(messages(out, 'closing')).toEqual([{ type: 'closing', reason: 'idle' }]);
+      expect(room.serverTick - start).toBeLessThanOrEqual(idleTicks);
+    });
+
+    it("stays open while someone does something, pings alone don't count", () => {
+      const room = twoPlayers();
+      steps(room, idleTicks - 100);
+      handleMessage(room, 'host', { type: 'ping', id: 1, clientTimeMs: 0 });
+      menu(room, 'host', press('kb-left', { nav: { x: 0, y: 1 } }));
+      steps(room, 200);
+      expect(room.closing).toBeNull();
+    });
   });
 });

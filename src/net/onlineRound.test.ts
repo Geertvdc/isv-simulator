@@ -27,6 +27,8 @@ function snapshot(serverTick: number, events: GameEvent[] = [], x?: number): Sna
 function roundStart(serverTick = 10): RoundStartMessage {
   return {
     type: 'roundStart',
+    roundId: 1,
+    counted: true,
     levelId: game.levelId,
     level: game.level,
     snapshot: snapshot(serverTick),

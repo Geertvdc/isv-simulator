@@ -127,6 +127,7 @@ export function applyServerMessage(state: OnlineState, message: ServerMessage): 
       return true;
     case 'pong':
     case 'error':
+    case 'closing':
       return false;
   }
 }
