@@ -119,4 +119,4 @@ countdownEndTick(countdownStartMs); // the round's first sim tick
 - [x] `?predict=0` turns it off
 - [x] `npm run verify:online` still passes
 - [x] `npm run check`, `npm run build` and `npm run build:server` pass; the suite passes several runs in a row
-- [ ] CI is green
+- [x] CI is green
