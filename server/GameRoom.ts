@@ -28,8 +28,7 @@ import {
   takeProfileWrites,
 } from './roomLogic';
 
-/** The room type clients create and join: `client.create(GAME_ROOM, hello)`. */
-export const GAME_ROOM = 'game';
+export { GAME_ROOM } from '../src/net/protocol';
 
 /**
  * HTTP-style status for a refused join. The SDK rejects the join with this
