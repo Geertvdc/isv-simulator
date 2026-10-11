@@ -5,22 +5,27 @@
  * the DevTools protocol: menus with key presses, moments of a round with
  * `?scene=<id>` (built in `src/sim/scenes.ts`, frozen once they're there).
  *
- * Usage: start `npm run dev`, then
- *   npm run screenshots -- [--base=http://localhost:5173] [--only=pipeline]
- * `--only` takes shots whose name contains the text. Set CHROME to the
- * Chrome binary if it isn't in the usual place.
+ * Usage: start `npm run dev:online` (or `npm run dev` and skip the online
+ * shots with `--only`), then
+ *   npm run screenshots -- [--base=http://localhost:5173] [--server=http://localhost:2567] [--only=pipeline]
+ * `--only` takes shots whose name contains the text. `--server` is the game
+ * server the page talks to; a second room member joins it from here for the
+ * online lobby shot. Set CHROME to the Chrome binary if it isn't in the usual
+ * place.
  */
 
 import { type ChildProcess, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { helloFor, joinRoomByCode } from '../src/net/client';
 import { SCENES } from '../src/sim/scenes';
 
 const args = process.argv.slice(2);
 const arg = (name: string): string | undefined =>
   args.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
 const BASE = arg('base') ?? 'http://localhost:5173';
+const SERVER = arg('server') ?? 'http://localhost:2567';
 const ONLY = arg('only');
 const OUT = join(import.meta.dirname, '..', 'docs', 'game', 'images');
 const WIDTH = 1440;
@@ -86,11 +91,15 @@ class Page {
     await sleep(settle);
   }
 
-  /** Presses and releases a key, held long enough for a frame to see it. */
-  async key(code: string, key = code): Promise<void> {
+  /**
+   * Presses and releases a key, held long enough for a frame to see it.
+   * With `text` it types that text too (into a focused text box).
+   */
+  async key(code: string, key = code, text?: string): Promise<void> {
     const vk = VIRTUAL_KEYS[code] ?? 0;
     const base = { code, key, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk };
-    await this.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...base });
+    const down = text === undefined ? { type: 'rawKeyDown' } : { type: 'keyDown', text };
+    await this.send('Input.dispatchKeyEvent', { ...down, ...base });
     await sleep(80);
     await this.send('Input.dispatchKeyEvent', { type: 'keyUp', ...base });
     await sleep(250);
@@ -110,6 +119,7 @@ class Page {
 }
 
 const VIRTUAL_KEYS: Readonly<Record<string, number>> = {
+  Backspace: 8,
   Enter: 13,
   Escape: 27,
   ArrowLeft: 37,
@@ -213,8 +223,8 @@ const SHOTS: Record<string, Shot> = {
     await page.key('Enter');
     await sleep(400);
     await page.shot('screens/title-menu');
-    await page.key('ArrowDown');
-    await page.key('ArrowDown');
+    // Play, Host online, Join online, Settings, Credits.
+    for (let i = 0; i < 4; i++) await page.key('ArrowDown');
     await page.key('Enter');
     await sleep(400);
     await page.shot('screens/credits');
@@ -224,7 +234,7 @@ const SHOTS: Record<string, Shot> = {
     await sleep(400);
     await page.shot('screens/settings');
     await page.key('Escape');
-    await page.key('ArrowUp');
+    for (let i = 0; i < 3; i++) await page.key('ArrowUp');
     await page.key('Enter');
     await page.key('Enter');
     await page.key('Enter');
@@ -235,12 +245,66 @@ const SHOTS: Record<string, Shot> = {
   async 'screens/profile'(page) {
     await page.open('/');
     await page.key('Enter'); // wake the title
-    await page.key('ArrowDown');
+    for (let i = 0; i < 3; i++) await page.key('ArrowDown');
     await page.key('Enter'); // Settings
     for (let i = 0; i < 3; i++) await page.key('ArrowDown');
     await page.key('Enter'); // Online profile
     await sleep(400);
     await page.shot('screens/profile');
+  },
+
+  async 'screens/join-code'(page) {
+    await page.open('/');
+    await page.key('Enter'); // wake the title
+    await page.key('ArrowDown');
+    await page.key('ArrowDown');
+    await page.key('Enter'); // Join online
+    for (const letter of 'zzzz') await page.key(`Key${letter.toUpperCase()}`, letter, letter);
+    await page.key('Enter');
+    await sleep(800);
+    await page.shot('screens/join-code');
+  },
+
+  async 'screens/online-lobby'(page) {
+    // A name rather than "Dev 1234", for the picture.
+    await page.open('/');
+    await page.eval(`localStorage.setItem('isv-simulator.displayName', 'Ada')`);
+    await page.open('/');
+    await page.key('Enter'); // wake the title
+    await page.key('ArrowDown');
+    await page.key('Enter'); // Host online
+    await sleep(1000);
+    const code = await page.eval<string>(
+      `document.querySelector('.online-code')?.textContent ?? ''`,
+    );
+    if (!code) throw new Error(`no room: is the game server running at ${SERVER}?`);
+    await page.key('Enter'); // the host joins with the keyboard
+    // Someone else joins from another machine, with a gamepad.
+    const guest = await joinRoomByCode(
+      SERVER,
+      code,
+      helloFor({ userId: '6f1c2d3e-4b5a-4c6d-8e7f-9a0b1c2d3e4f', displayName: 'Grace' }),
+    );
+    try {
+      guest.send({
+        type: 'menu',
+        presses: [
+          {
+            deviceId: 'pad-0',
+            joinGroup: 'pad-0',
+            join: true,
+            interact: false,
+            dash: false,
+            menu: false,
+            nav: { x: 0, y: 0 },
+          },
+        ],
+      });
+      await sleep(800);
+      await page.shot('screens/online-lobby');
+    } finally {
+      await guest.leave();
+    }
   },
 
   async 'screens/level-select'(page) {

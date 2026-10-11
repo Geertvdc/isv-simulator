@@ -42,7 +42,7 @@ Anywhere: **M** or the speaker button in the top right turns all sound off and o
 
 ### Title
 
-The title waits for any button. After that it shows the main menu.
+The title waits for any button. After that it shows the main menu: Play (couch play on this machine), Host online, Join online, Settings and Credits.
 
 |                                            |                                               |
 | ------------------------------------------ | --------------------------------------------- |
@@ -63,6 +63,16 @@ Settings → Online profile shows this browser's user ID and display name. Copy 
 Press Enter or gamepad A to join. The first Enter joins the left keyboard, the second the right keyboard; every gamepad joins with A. Each player gets a color and a hat shape (circle, triangle, square, diamond) so players can be told apart without color. Player 1 starts with their pick-up button.
 
 ![Lobby with two keyboard players](images/screens/lobby.webp)
+
+### Playing online
+
+Online play needs the game server (`npm run dev:online` runs it with the game). **Host online** creates a room and shows the online lobby with its 4-letter code. **Join online** asks for that code: type it (or paste it), Enter joins. A gamepad turns the letters with up/down and moves with left/right. A wrong code, a full room, another game version or a server that can't be reached each get their own message.
+
+![Join online with a wrong code](images/screens/join-code.webp)
+
+The online lobby shows the code (with Copy), everyone in the room, the host's badge and each machine's couch players in their colors and hats. Couch players on every machine join with Enter or gamepad A, as on the couch (4 players per room in total). The host starts with their pick-up button and picks the level; everyone else sees "Host is choosing a level". Online, only the host's devices drive the level select, the intro card, pause (which pauses the whole room) and the results. Settings and the online profile aren't reachable from an online room. Esc, gamepad B or Leave room leaves.
+
+![Online lobby with two machines](images/screens/online-lobby.webp)
 
 ### Level select
 
