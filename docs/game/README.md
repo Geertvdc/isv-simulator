@@ -74,6 +74,10 @@ The online lobby shows the code (with Copy), everyone in the room, the host's ba
 
 ![Online lobby with two machines](images/screens/online-lobby.webp)
 
+The round itself plays like on the couch: every machine draws the whole office, with everyone's players, the same orders, score and clock. The server runs the round; each machine sends its own players' buttons and draws what the server sends about a tenth of a second behind it, so movement glides smoothly even on a slow connection (your own player answers your keys a little later than on the couch). During a round a small room bar sits over the score with Leave room. When the round ends everyone gets the results, and the round counts for every player's progress, online and in their own browser. The first-level hints only show on the couch.
+
+For trying it out: `ROUND_SECONDS=30 npm run dev:online` makes every online round 30 seconds; `?lag=100&jitter=20` on the game's URL pretends the network is slow (100 ms each way plus up to 20 ms); the ping corner (bottom right, on in dev builds or with `?nethud`) shows the round trip, and `N` turns it on and off.
+
 ### Level select
 
 Four chapters side by side. Left/right picks a chapter, up/down a level. A level opens once the level before it has at least 1 star; a chapter opens once you have enough stars in total (4, 9 and 13). Each card shows your best stars and score.
