@@ -59,3 +59,43 @@ export function deliveryTime(line: LagLine, nowMs: number): number {
   line.lastDeliveryMs = Math.max(line.lastDeliveryMs, at);
   return line.lastDeliveryMs;
 }
+
+/** The clock and timer a lag runner uses (the real ones in the browser and on the server). */
+export interface LagClock {
+  now(): number;
+  setTimer(fn: () => void, delayMs: number): void;
+}
+
+/**
+ * Runs each function handed to it after the simulated lag, in the order
+ * they were handed over. One timer at a time for the oldest waiting one,
+ * rather than a timer per message: timers round their delays, so two
+ * messages a fraction of a millisecond apart could otherwise swap.
+ */
+export function createLagRunner(
+  settings: LagSettings,
+  seed: number,
+  clock: LagClock,
+): (fn: () => void) => void {
+  const line = createLagLine(settings, seed);
+  const queue: { at: number; run: () => void }[] = [];
+  let armed = false;
+
+  const arm = (): void => {
+    const head = queue[0];
+    if (armed || !head) return;
+    armed = true;
+    clock.setTimer(fire, Math.max(0, head.at - clock.now()));
+  };
+  const fire = (): void => {
+    armed = false;
+    const now = clock.now();
+    while (queue[0] && queue[0].at <= now) queue.shift()?.run();
+    arm();
+  };
+
+  return (fn) => {
+    queue.push({ at: deliveryTime(line, clock.now()), run: fn });
+    arm();
+  };
+}

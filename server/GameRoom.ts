@@ -12,7 +12,7 @@
 
 import { randomInt } from 'node:crypto';
 import { type Client, Room, ServerError } from 'colyseus';
-import { type LagLine, type LagSettings, createLagLine, deliveryTime } from '../src/net/lag';
+import { type LagSettings, createLagRunner } from '../src/net/lag';
 import { MAX_PLAYERS } from '../src/sim/level';
 import { releaseJoinCode, reserveJoinCode } from './joinCodes';
 import type { ProfileStore } from './profileStore';
@@ -52,9 +52,13 @@ export class GameRoom extends Room {
   protected store: ProfileStore | null = null;
   /** Set by `gameRoomWith`. */
   protected settings: GameRoomSettings = {};
-  /** The lag simulator's delays for messages in and out, when it's on. */
-  private lagIn: LagLine | null = null;
-  private lagOut: LagLine | null = null;
+  /** Runs message handling and sending, after the simulated lag when it's on. */
+  private lagIn: (fn: () => void) => void = (fn) => {
+    fn();
+  };
+  private lagOut: (fn: () => void) => void = (fn) => {
+    fn();
+  };
 
   onCreate(): void {
     const code = reserveJoinCode();
@@ -62,11 +66,15 @@ export class GameRoom extends Room {
     this.core = createRoomState(code, randomInt(2 ** 31), this.settings);
     const lag = this.settings.lag;
     if (lag) {
-      this.lagIn = createLagLine(lag, randomInt(2 ** 31));
-      this.lagOut = createLagLine(lag, randomInt(2 ** 31));
+      const clock = {
+        now: () => performance.now(),
+        setTimer: (fn: () => void, ms: number) => setTimeout(fn, ms),
+      };
+      this.lagIn = createLagRunner(lag, randomInt(2 ** 31), clock);
+      this.lagOut = createLagRunner(lag, randomInt(2 ** 31), clock);
     }
     this.onMessage('*', (client: Client, _type: string | number, message: unknown) => {
-      this.later(this.lagIn, () => {
+      this.lagIn(() => {
         this.deliver(handleMessage(this.core, client.sessionId, message));
       });
     });
@@ -120,16 +128,6 @@ export class GameRoom extends Room {
     }
   }
 
-  /** Runs `fn` now, or after the simulated lag when the lag simulator is on. */
-  private later(line: LagLine | null, fn: () => void): void {
-    if (!line) {
-      fn();
-      return;
-    }
-    const now = performance.now();
-    setTimeout(fn, deliveryTime(line, now) - now);
-  }
-
   private deliver(out: readonly Outgoing[]): void {
     if (out.length === 0) return;
     const send = (): void => {
@@ -138,7 +136,7 @@ export class GameRoom extends Room {
         else this.clients.get(to)?.send(message.type, message);
       }
     };
-    this.later(this.lagOut, send);
+    this.lagOut(send);
   }
 }
 

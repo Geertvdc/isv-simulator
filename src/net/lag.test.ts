@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_SIMULATED_LAG_MS } from '../sim/balance';
-import { createLagLine, deliveryTime, parseLag } from './lag';
+import { type LagClock, createLagLine, createLagRunner, deliveryTime, parseLag } from './lag';
 
 describe('lag simulator', () => {
   it('reads lag and jitter from text, and ignores junk', () => {
@@ -42,5 +42,33 @@ describe('lag simulator', () => {
     };
     expect(times(3)).toEqual(times(3));
     expect(times(3)).not.toEqual(times(4));
+  });
+
+  it('runs what it is handed after the lag, in order, with one timer at a time', () => {
+    let now = 0;
+    const timers: { at: number; fn: () => void }[] = [];
+    const clock: LagClock = {
+      now: () => now,
+      setTimer: (fn, ms) => timers.push({ at: now + ms, fn }),
+    };
+    const ran: number[] = [];
+    const later = createLagRunner({ lagMs: 50, jitterMs: 30 }, 5, clock);
+    for (let i = 0; i < 20; i++) {
+      later(() => ran.push(i));
+      now += 0.3;
+    }
+    expect(timers).toHaveLength(1);
+    expect(ran).toEqual([]);
+    // Fire timers as a real clock would, a bit late at times.
+    while (timers.length > 0) {
+      const next = timers.shift();
+      if (!next) break;
+      now = Math.max(now, next.at + (ran.length % 3 === 0 ? 0 : 0.7));
+      next.fn();
+      expect(timers.length).toBeLessThanOrEqual(1);
+    }
+    expect(ran).toEqual(Array.from({ length: 20 }, (_, i) => i));
+    expect(now).toBeGreaterThanOrEqual(50);
+    expect(now).toBeLessThanOrEqual(6 + 80 + 1);
   });
 });
