@@ -213,3 +213,24 @@ export function stepPlayer(map: LevelMap, player: Player, rawMove: Vec): void {
     }
   }
 }
+
+const NO_MOVE: Vec = { x: 0, y: 0 };
+
+/**
+ * One player's movement for one tick, as `tick` runs it: a dash starts on the
+ * press of dash (it went from up to down since the last tick), then the
+ * player steps. Mutates the player. Returns whether a dash started.
+ * Client-side prediction runs this same function for the local players.
+ */
+export function movePlayer(
+  map: LevelMap,
+  player: Player,
+  move: Vec = NO_MOVE,
+  dash = false,
+): boolean {
+  const dashPressed = dash && !player.dashHeld;
+  player.dashHeld = dash;
+  const dashed = dashPressed && startDash(player, move);
+  stepPlayer(map, player, move);
+  return dashed;
+}

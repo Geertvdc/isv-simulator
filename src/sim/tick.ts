@@ -1,14 +1,12 @@
 import { finishReviews, interact, newTickWork, work } from './interact';
 import { updateManagers } from './manager';
 import { expireInvites, updateMeetings } from './meetings';
-import { startDash, stepPlayer } from './movement';
+import { movePlayer } from './movement';
 import { expireOrders, updateLevelTimer, updateOrders } from './orders';
 import { updatePipelines } from './pipeline';
 import { separatePlayers } from './push';
 import { updateFlights, updateThrowCharge } from './throw';
 import type { GameState, InputCommand } from './state';
-
-const NO_MOVE = { x: 0, y: 0 };
 
 /**
  * Advances the game by one fixed timestep. Mutates `state`. Players without an
@@ -23,13 +21,9 @@ export function tick(state: GameState, inputs: readonly InputCommand[]): void {
 
   for (const player of state.players) {
     const input = inputs.find((i) => i.playerId === player.id);
-    const move = input?.move ?? NO_MOVE;
-    const dashPressed = (input?.dash ?? false) && !player.dashHeld;
-    player.dashHeld = input?.dash ?? false;
-    if (dashPressed && startDash(player, move)) {
+    if (movePlayer(state.level, player, input?.move, input?.dash)) {
       state.events.push({ type: 'dashed', playerId: player.id });
     }
-    stepPlayer(state.level, player, move);
   }
   for (const shove of separatePlayers(state.level, state.players)) {
     state.events.push({ type: 'shoved', ...shove });
