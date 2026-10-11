@@ -293,4 +293,6 @@ export const PROFILE_TEXT = {
   confirmHint: 'Enter: switch · Esc: cancel',
   ok: 'OK',
   cancel: 'Cancel',
+  badId: 'That is not a user ID (it looks like 8-4-4-4-12 hex digits).',
+  badName: 'A name needs 1 to 24 characters.',
 } as const;

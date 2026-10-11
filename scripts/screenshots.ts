@@ -232,6 +232,17 @@ const SHOTS: Record<string, Shot> = {
     await page.shot('screens/lobby');
   },
 
+  async 'screens/profile'(page) {
+    await page.open('/');
+    await page.key('Enter'); // wake the title
+    await page.key('ArrowDown');
+    await page.key('Enter'); // Settings
+    for (let i = 0; i < 3; i++) await page.key('ArrowDown');
+    await page.key('Enter'); // Online profile
+    await sleep(400);
+    await page.shot('screens/profile');
+  },
+
   async 'screens/level-select'(page) {
     // A fresh save: later chapters still locked.
     await toLevelSelect(page, '');

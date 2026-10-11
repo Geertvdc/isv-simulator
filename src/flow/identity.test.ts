@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { NET_MAX_NAME_LENGTH } from '../sim/balance';
+import { PROFILE_TEXT } from '../sim/content';
 import {
   DISPLAY_NAME_KEY,
   USER_ID_KEY,
@@ -140,6 +142,7 @@ describe('setDisplayName', () => {
     expect(storage.data.get(DISPLAY_NAME_KEY)).toBe('Linus');
     expect(setDisplayName(storage, identity, ' ').ok).toBe(false);
     expect(storage.data.get(DISPLAY_NAME_KEY)).toBe('Linus');
+    expect(PROFILE_TEXT.badName).toContain(String(NET_MAX_NAME_LENGTH));
   });
 });
 
