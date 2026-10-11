@@ -55,8 +55,9 @@ room.send('ping', { type: 'ping', id: 1, clientTimeMs: performance.now() });
 ```
 
 - The `hello` goes in as the join options. A refused join rejects with the `ErrorCode` as its message: `badMessage`, `protocolMismatch` or `roomFull` (a room holds `MAX_PLAYERS` players, counting every member's `localPlayers`). A wrong code rejects too (the room doesn't exist).
-- After joining: `welcome` to the newcomer, `lobby` to everyone (again whenever someone joins, leaves or changes), `roundStart` when a round is loaded (also to someone joining mid-round), `snapshot` every 3 ticks (the flow, plus the round or `null`).
-- `menu` presses carry local device ids (`kb-left`, `pad-0`); the server makes them `<sessionId>:<deviceId>`. A member can't bind more devices than its `localPlayers`.
+- After joining: `welcome` to the newcomer, `lobby` to everyone (members, plus `levels`: the room's unlocks, i.e. the host's progress; again whenever someone joins, leaves or changes, the host's profile arrives or a round ends), `roundStart` when a round is loaded (also to someone joining mid-round), `snapshot` every 3 ticks (the flow, plus the round or `null`).
+- `menu` presses carry local device ids (`kb-left`, `pad-0`); the server makes them `<sessionId>:<deviceId>`. In the lobby a member's `localPlayers` grows by one when another of its devices joins, while the room has space (4 players in total); back presses are ignored there (leaving is the client's business). Only the host's joined devices start the game. On every other screen (level select, intro, pause, results, and pausing a round) only the host's devices count.
+- The browser's side is `src/net/client.ts` (`hostRoom`, `joinRoomByCode`, `helloFor`), a thin wrapper around `@colyseus/sdk` that maps refused joins to `wrongCode`, `roomFull`, `protocolMismatch` or `unreachable`.
 - `inputs` are stamped with the server tick they're meant for (`inputTargetTick` in `src/net/clock.ts`) and only count for players bound to the sender's devices.
 - `hello` again in the room changes the display name and couch player count.
 - The first member is the host; when the host leaves, the earliest joined member left takes over. The room closes when the last member leaves.
