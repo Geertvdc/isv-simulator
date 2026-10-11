@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:online": "concurrently -k -n client,server -c cyan,magenta \"vite\" \"npm:server\"",
-    "server": "vite-node --watch server/main.ts",
+    "server": "node --watch-path=server --watch-path=src --watch-path=maps node_modules/vite-node/dist/cli.mjs server/main.ts",
     "build": "tsc --noEmit && vite build",
     "build:server": "vite build --config vite.server.config.ts",
     "start:server": "node dist-server/main.js",
