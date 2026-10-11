@@ -103,7 +103,16 @@ export function estimateServerTick(clock: ClockSync, nowMs: number): number | nu
  * so it arrives just before. `null` before the first pong.
  */
 export function inputTargetTick(clock: ClockSync, nowMs: number): number | null {
+  const exact = inputTargetTickExact(clock, nowMs);
+  return exact === null ? null : Math.floor(exact);
+}
+
+/**
+ * `inputTargetTick` with its fraction: how far into that tick "now" is on
+ * the server when the input lands. Prediction draws between ticks with it.
+ */
+export function inputTargetTickExact(clock: ClockSync, nowMs: number): number | null {
   const now = estimateServerTick(clock, nowMs);
   if (now === null || clock.rttMs === null) return null;
-  return Math.floor(now + clock.rttMs / 2 / TICK_MS + NET_INPUT_LEAD_TICKS);
+  return now + clock.rttMs / 2 / TICK_MS + NET_INPUT_LEAD_TICKS;
 }

@@ -231,3 +231,12 @@ export const NET_FLOOD_KICK_FACTOR = 5;
 export const NET_ROOM_IDLE_MS = 30 * 60 * 1000;
 /** In the online lobby, a second Esc within this long leaves the room. */
 export const NET_LEAVE_CONFIRM_MS = 3000;
+/**
+ * Client-side prediction of this machine's players: a correction from the
+ * server longer than this many tiles jumps at once instead of gliding.
+ */
+export const NET_PREDICT_SNAP_DISTANCE = 1.5;
+/** A smaller correction glides away with this time constant (about two thirds gone after it). */
+export const NET_PREDICT_SMOOTH_MS = 100;
+/** Prediction never runs more than this many ticks ahead in one go (a stalled tab, a clock jump). */
+export const NET_PREDICT_MAX_TICKS = 60;
