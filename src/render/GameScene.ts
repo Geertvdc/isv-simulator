@@ -201,6 +201,8 @@ export const JOIN_CODE_EVENT = 'join-code';
 
 /** Emitted on `game.events` by the UI: the Leave button of an online room was clicked. */
 export const ONLINE_LEAVE_EVENT = 'online-leave';
+/** This browser picked a new display name (the identity already has it): tell the room. */
+export const ONLINE_RENAME_EVENT = 'online-rename';
 
 /** How the scene reaches the game server; `null` where online play is off (`?scene=`). */
 export interface OnlineOptions {
@@ -522,6 +524,10 @@ export class GameScene extends Phaser.Scene {
     this.game.events.off(ONLINE_LEAVE_EVENT);
     this.game.events.on(ONLINE_LEAVE_EVENT, () => {
       this.leaveOnline();
+    });
+    this.game.events.off(ONLINE_RENAME_EVENT);
+    this.game.events.on(ONLINE_RENAME_EVENT, (displayName: string) => {
+      this.connection?.send({ type: 'rename', displayName });
     });
     this.playerRenderer = new PlayerRenderer(this);
     this.managerRenderer = new ManagerRenderer(this);

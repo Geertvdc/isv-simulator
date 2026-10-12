@@ -21,7 +21,7 @@ import type { Snapshot } from './snapshot';
 export const GAME_ROOM = 'game';
 
 /** Bumped on every incompatible change; the server refuses other versions. */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 // ---------------------------------------------------------------- client → server
 
@@ -63,7 +63,14 @@ export interface MenuMessage {
   presses: DevicePress[];
 }
 
-export type ClientMessage = HelloMessage | InputsMessage | PingMessage | MenuMessage;
+/** A new display name, any time while in the room; everyone's lobby shows it. */
+export interface RenameMessage {
+  type: 'rename';
+  displayName: string;
+}
+
+export type ClientMessage =
+  HelloMessage | InputsMessage | PingMessage | MenuMessage | RenameMessage;
 
 // ---------------------------------------------------------------- server → client
 
@@ -230,14 +237,18 @@ function step(v: unknown, what: string): number {
   return int(v, what, -1, 1);
 }
 
+function displayName(v: unknown): string {
+  const name = str(v, 'displayName', NET_MAX_NAME_LENGTH).trim();
+  if (name.length === 0) fail('displayName must not be empty');
+  return name;
+}
+
 function parseHello(m: Record<string, unknown>): HelloMessage {
-  const displayName = str(m.displayName, 'displayName', NET_MAX_NAME_LENGTH).trim();
-  if (displayName.length === 0) fail('displayName must not be empty');
   return {
     type: 'hello',
     protocol: int(m.protocol, 'protocol', 0),
     userId: id(m.userId, 'userId'),
-    displayName,
+    displayName: displayName(m.displayName),
     localPlayers: int(m.localPlayers, 'localPlayers', 1, MAX_PLAYERS),
   };
 }
@@ -291,6 +302,8 @@ function parse(raw: unknown): ClientMessage {
         type: 'menu',
         presses: array(m.presses, 'presses', NET_MAX_PRESSES_PER_MESSAGE).map(parsePress),
       };
+    case 'rename':
+      return { type: 'rename', displayName: displayName(m.displayName) };
     default:
       return fail(
         `unknown message type ${typeof m.type === 'string' ? m.type.slice(0, 32) : typeof m.type}`,

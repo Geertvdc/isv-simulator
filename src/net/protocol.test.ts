@@ -59,6 +59,10 @@ describe('parseClientMessage', () => {
       clientTimeMs: 1234.5,
     });
     expect(ok({ type: 'menu', presses: [press] })).toEqual({ type: 'menu', presses: [press] });
+    expect(ok({ type: 'rename', displayName: 'Grace' })).toEqual({
+      type: 'rename',
+      displayName: 'Grace',
+    });
   });
 
   it('drops fields it does not know', () => {
@@ -73,6 +77,9 @@ describe('parseClientMessage', () => {
   it('trims the display name and refuses an empty one', () => {
     expect(ok({ ...hello, displayName: '  Ada  ' })).toMatchObject({ displayName: 'Ada' });
     expect(reason({ ...hello, displayName: '   ' })).toMatch(/displayName/);
+    expect(ok({ type: 'rename', displayName: ' Grace ' })).toMatchObject({ displayName: 'Grace' });
+    expect(reason({ type: 'rename', displayName: '' })).toMatch(/displayName/);
+    expect(reason({ type: 'rename', displayName: 'x'.repeat(200) })).toMatch(/displayName/);
   });
 
   it('scales a move longer than 1 down to length 1', () => {
