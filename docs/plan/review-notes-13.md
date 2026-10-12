@@ -116,4 +116,4 @@ PR: `phase-13c-identity` → `phase-13b-server`. A user id and display name per 
 - Change name: type a name (letters like M and E must type, not mute or pick), Enter. Esc cancels. The new name shows up in the `curl`.
 - Play a level, reload (sync), `curl` again: the level is in the profile. Open another browser (or a private window), Settings → Online profile → Use another ID, paste, Enter, Enter: the level select there opens the same levels.
 - Stop the server and reload: the game plays as before; the profile screen says the server isn't reachable.
-- Corrupt `server/data/profiles.json` by hand and restart the server: it starts empty and keeps `profiles.json.corrupt-<time>` next to it.
+- Corrupt `data/profiles.json` by hand and restart the server: it starts empty and keeps `profiles.json.corrupt-<time>` next to it.

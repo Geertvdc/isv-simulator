@@ -12,10 +12,10 @@ npm run dev:online    # the Vite client and the server together
 curl localhost:2567/health
 ```
 
-| Env var              | Default                     | What                                                         |
-| -------------------- | --------------------------- | ------------------------------------------------------------ |
-| `PORT`               | `2567`                      | Port for HTTP and WebSockets                                 |
-| `PROFILE_STORE_PATH` | `server/data/profiles.json` | The online profiles (gitignored; created on the first write) |
+| Env var              | Default                                                       | What                                                         |
+| -------------------- | ------------------------------------------------------------- | ------------------------------------------------------------ |
+| `PORT`               | `2567`                                                        | Port for HTTP and WebSockets                                 |
+| `PROFILE_STORE_PATH` | `data/profiles.json` (repo root, outside the watched folders) | The online profiles (gitignored; created on the first write) |
 
 `npm run dev:online` leaves `PORT` alone: Vite reads it too, so setting it there would put both on one port.
 
