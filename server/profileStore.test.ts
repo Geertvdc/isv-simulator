@@ -180,7 +180,9 @@ describe('the default profile file', () => {
     const pkg = JSON.parse(await readFile('package.json', 'utf8')) as {
       scripts: Record<string, string>;
     };
-    const watched = [...pkg.scripts.server.matchAll(/--watch-path=(\S+)/g)].map((m) => m[1]);
+    const watched = [...(pkg.scripts.server ?? '').matchAll(/--watch-path=(\S+)/g)].map(
+      (m) => m[1],
+    );
     expect(watched.length).toBeGreaterThan(0);
     for (const folder of watched) {
       expect(DEFAULT_PROFILE_STORE_PATH.startsWith(`${folder}/`)).toBe(false);
