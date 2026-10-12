@@ -66,6 +66,7 @@ function inRound(flow: Flow): boolean {
     case 'countdown':
     case 'playing':
     case 'paused':
+    case 'demo':
       return true;
     case 'settings':
       return flow.settingsFrom === 'paused';
@@ -90,6 +91,9 @@ export function musicCue(flow: Flow, ctx: MusicContext): MusicCue {
   if (!inRound(flow)) return { track: 'menu', rate: 1, duck: 1 };
   const track = CHAPTER_TRACKS[ctx.chapterId ?? ''] ?? 'garage';
   const paused =
-    flow.screen !== 'intro' && flow.screen !== 'countdown' && flow.screen !== 'playing';
+    flow.screen !== 'intro' &&
+    flow.screen !== 'countdown' &&
+    flow.screen !== 'playing' &&
+    flow.screen !== 'demo';
   return { track, rate: musicRate(ctx.ticksLeft), duck: paused ? MUSIC_PAUSE_DUCK : 1 };
 }

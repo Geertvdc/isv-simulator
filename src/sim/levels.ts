@@ -283,6 +283,25 @@ export const CHAPTERS: readonly Chapter[] = [
 /** Every level, in level select order: chapter by chapter. */
 export const LEVELS: readonly Level[] = CHAPTERS.flatMap((c) => c.levels);
 
+/**
+ * Demo mode plays these in turn: every level, the chapters mixed up so each
+ * round shows something new, busy levels first.
+ */
+export const DEMO_LEVEL_IDS: readonly string[] = [
+  'hypergrowth',
+  'seed-round',
+  'the-reorg',
+  'open-plan',
+  'middle-management',
+  'on-call',
+  'back-to-back',
+  'scale-up',
+  'hot-desking',
+  'demo-day',
+  'synergy',
+  'garage',
+];
+
 export function levelById(id: string): Level | undefined {
   return LEVELS.find((l) => l.id === id);
 }

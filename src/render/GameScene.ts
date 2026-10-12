@@ -14,6 +14,7 @@ import {
   createFlow,
   editJoinCode,
   enterOnline,
+  finishDemoRound,
   finishRound,
   isRoundRunning,
   joinFailed,
@@ -87,6 +88,8 @@ import {
   writeSave,
 } from '../flow/save';
 import {
+  DEMO_BOTS,
+  DEMO_KIOSK_IDLE_MS,
   NET_MAX_INPUTS_PER_MESSAGE,
   NET_MAX_PRESSES_PER_MESSAGE,
   NET_PING_FAST_COUNT,
@@ -98,7 +101,8 @@ import {
   SFX_VOLUME_MAX,
 } from '../sim/balance';
 import { type LevelMap, type Tile, getTile, isWorkSurface } from '../sim/level';
-import { CHAPTERS, LEVELS } from '../sim/levels';
+import { type Bot, botInput, createBot } from '../sim/bot';
+import { CHAPTERS, DEMO_LEVEL_IDS, LEVELS } from '../sim/levels';
 import type { GameEvent } from '../sim/orders';
 import { type Scene, sceneDone, sceneInputs, sceneState } from '../sim/scenes';
 import { type GameState, type PlayerId, createGame, targetTile } from '../sim/state';
@@ -313,6 +317,8 @@ export interface GameSceneOptions {
   unlockAll: boolean;
   /** `?scene=<id>`: shows that scene (see `src/sim/scenes.ts`) instead of the menus. */
   scene: Scene | null;
+  /** `?demo`: a kiosk for a booth. Starts in the demo, and every menu goes back to it when left alone. */
+  kiosk: boolean;
   online: OnlineOptions | null;
 }
 
@@ -335,6 +341,9 @@ const HOVER_COLOR = 0xffffff;
 /** Over the target block's top, under its label. */
 const TARGET_DEPTH_OFFSET = 0.005;
 const LEVEL_IDS: readonly string[] = LEVELS.map((l) => l.id);
+const DEMO_LEVELS: readonly number[] = DEMO_LEVEL_IDS.map((id) => LEVEL_IDS.indexOf(id)).filter(
+  (i) => i >= 0,
+);
 const CHAPTER_INFO: readonly ChapterInfo[] = CHAPTERS.map((c) => ({
   levelIds: c.levels.map((l) => l.id),
   starGate: c.starGate,
@@ -401,6 +410,8 @@ export class GameScene extends Phaser.Scene {
   private mapLevelIndex = 0;
   /** The round on screen, or `null` in menus outside a round. */
   private loop: GameLoop | null = null;
+  /** The bots playing the round, in the demo. */
+  private bots: Bot[] = [];
   private playerRenderer!: PlayerRenderer;
   private managerRenderer!: ManagerRenderer;
   private meetingRenderer!: MeetingRenderer;
@@ -477,6 +488,8 @@ export class GameScene extends Phaser.Scene {
     if (id) this.mapLevelIndex = Math.max(0, LEVEL_IDS.indexOf(id));
     this.netHudOn = options.online?.netHud ?? false;
     this.prediction = createPrediction(options.online?.predict ?? true);
+    // A kiosk starts as if left alone for a while: straight into the demo.
+    if (options.kiosk) this.flow.lastPressMs = -DEMO_KIOSK_IDLE_MS;
   }
 
   preload(): void {
@@ -603,11 +616,17 @@ export class GameScene extends Phaser.Scene {
       const running = isRoundRunning(this.flow);
       if (running) {
         const scene = this.options.scene;
+        const bots = this.bots;
         if (scene) this.advanceScene(scene, loop, delta, time);
-        else loop.advance(delta, (tick) => buildInputCommands(players, frame.readings, tick));
+        else if (this.flow.screen === 'demo') {
+          loop.advance(delta, () => bots.map((bot) => botInput(loop.state, bot, bots)));
+        } else loop.advance(delta, (tick) => buildInputCommands(players, frame.readings, tick));
         this.followHints(loop);
         const result = loop.state.result;
-        if (result) {
+        if (result && this.flow.screen === 'demo') {
+          finishDemoRound(this.flow, result, time);
+          this.emitFlow(time);
+        } else if (result) {
           this.runEffects(finishRound(this.flow, result, ctx).effects);
           this.emitFlow(time);
           this.countStars(this.flow.results?.stars ?? 0);
@@ -689,6 +708,8 @@ export class GameScene extends Phaser.Scene {
       chapters: CHAPTER_INFO,
       unlockAll: this.options.unlockAll,
       nowMs,
+      // A scene is a picture: no demo.
+      demo: this.options.scene ? undefined : { kiosk: this.options.kiosk, levels: DEMO_LEVELS },
     };
   }
 
@@ -1243,13 +1264,17 @@ export class GameScene extends Phaser.Scene {
     this.effects.shakeEnabled = screenShake;
   }
 
-  /** A fresh round of the loaded level with everyone in the lobby. */
+  /** A fresh round of the loaded level with everyone in the lobby, or bots in the demo. */
   private startRound(): void {
     const level = LEVELS[this.mapLevelIndex];
     if (!level) return;
-    const ids = this.flow.lobby.players.map((p) => p.playerId);
+    const demo = this.flow.screen === 'demo';
+    const ids = demo
+      ? Array.from({ length: DEMO_BOTS }, (_, i) => i + 1)
+      : this.flow.lobby.players.map((p) => p.playerId);
+    this.bots = demo ? ids.map((id) => createBot(id)) : [];
     this.loop = new GameLoop(createGame(level, this.seed, ids));
-    this.hints = startHints(level.id, this.options.save);
+    this.hints = demo ? [] : startHints(level.id, this.options.save);
   }
 
   /** The scene from `?scene=` as a round already playing: no title, lobby or countdown. */
