@@ -18,6 +18,7 @@ import {
   JOIN_CODE_EVENT,
   type JoinCodeInput,
   ONLINE_LEAVE_EVENT,
+  ONLINE_RENAME_EVENT,
   PROFILE_ACTION_EVENT,
   TILE_HOVER_EVENT,
   TOGGLE_SOUND_EVENT,
@@ -155,7 +156,24 @@ const joinCode = mountJoinCode(ui, {
   },
 });
 const leaveOnline = { onLeave: () => game.events.emit(ONLINE_LEAVE_EVENT) };
-const onlineLobby = mountOnlineLobby(ui, leaveOnline);
+/**
+ * Picks a new display name: saved here, on the online profile, and (when in
+ * a room) shown to everyone there. Answers why not, or `null` when it worked.
+ */
+function changeName(text: string): string | null {
+  const change = setDisplayName(storage, identity, text);
+  if (!change.ok) return change.reason;
+  identity = change.identity;
+  void syncProgress();
+  game.events.emit(ONLINE_RENAME_EVENT, identity.displayName);
+  return null;
+}
+const onlineLobby = mountOnlineLobby(ui, {
+  ...leaveOnline,
+  yourName: () => identity.displayName,
+  changeName,
+  onDialog: (open) => game.events.emit(DIALOG_EVENT, open),
+});
 const onlineBar = mountOnlineBar(ui, leaveOnline);
 const netHud = mountNetHud(ui);
 game.events.on(NET_STATS_EVENT, netHud.render);
@@ -172,19 +190,16 @@ const profile = mountProfile(ui, {
     void syncProgress();
     return null;
   },
-  changeName: (text) => {
-    const change = setDisplayName(storage, identity, text);
-    if (!change.ok) return change.reason;
-    identity = change.identity;
-    void syncProgress();
-    return null;
-  },
+  changeName,
   onDialog: (open) => game.events.emit(DIALOG_EVENT, open),
 });
 game.events.on(PROFILE_ACTION_EVENT, (action: ProfileAction) => {
   profile.act(action);
 });
-game.events.on(DIALOG_CANCEL_EVENT, profile.cancelDialog);
+game.events.on(DIALOG_CANCEL_EVENT, () => {
+  profile.cancelDialog();
+  onlineLobby.cancelDialog();
+});
 
 /**
  * Merges this browser's progress with the online profile, both ways. When the

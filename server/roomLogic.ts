@@ -493,6 +493,10 @@ export function handleMessage(room: RoomState, sessionId: string, raw: unknown):
       return [];
     case 'hello':
       return updateMember(room, member, message);
+    case 'rename':
+      if (member.displayName === message.displayName) return [];
+      member.displayName = message.displayName;
+      return [lobbyMessage(room)];
   }
 }
 

@@ -210,6 +210,29 @@ async function main(): Promise<void> {
     const asked = await visible(guest, '.online-lobby .screen-hint.armed');
     const stayed = await visible(guest, '.online-lobby');
     check('one Esc in the online lobby asks before leaving', asked && stayed);
+    // Renaming in the lobby: typed keys stay in the box, everyone sees the name.
+    await guest.eval(`document.querySelector('.online-name-change').click()`);
+    await guest.eval(`document.querySelector('.online-name-input').value = ''`);
+    await guest.send('Input.insertText', { text: 'Grace Hopp' });
+    await guest.key('KeyE', 'e', 'e');
+    await guest.send('Input.insertText', { text: 'r' });
+    await guest.key('Enter', 'Enter', '\r');
+    const renamed = await host
+      .waitFor(
+        `[...document.querySelectorAll('.online-member-name')].some((n) => n.textContent.startsWith('Grace Hopper'))`,
+        'the new name on the host',
+      )
+      .then(() => true)
+      .catch(() => false);
+    await guest.eval(`document.querySelector('.online-name-change').click()`);
+    await guest.key('Escape');
+    const kept = (await visible(guest, '.online-lobby')) && (await visible(host, '.online-lobby'));
+    const closedBox = !(await visible(guest, '.online-name-edit'));
+    check(
+      'a guest renames in the lobby; E, Enter and Esc in the box only edit the name',
+      renamed && kept && closedBox,
+      `host sees it: ${renamed}, both still in the lobby: ${kept}, box closed by Esc: ${closedBox}`,
+    );
     await host.key('Enter');
     await guest.key('Enter');
     await host.waitFor(`document.querySelectorAll('.online-player').length === 2`, 'two players');

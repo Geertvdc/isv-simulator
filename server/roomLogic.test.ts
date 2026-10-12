@@ -285,6 +285,42 @@ describe('messages', () => {
   });
 });
 
+describe('renaming', () => {
+  it('changes the name everyone sees, without touching the couch players', () => {
+    const room = createRoomState('ABCD', 1);
+    join(room, 'a');
+    join(room, 'b');
+    menu(room, 'a', press('kb-left', { join: true }), press('pad-0', { join: true }));
+    const out = handleMessage(room, 'a', { type: 'rename', displayName: '  Grace ' });
+    const lobby = messages(out, 'lobby').at(-1);
+    expect(lobby?.members.map((m) => m.displayName)).toEqual(['Grace', 'b']);
+    expect(lobby?.members[0]?.localPlayers).toBe(2);
+    expect(playerIdsOf(room, 'a')).toEqual([1, 2]);
+  });
+
+  it('works mid-round and sends nothing when the name is the same', () => {
+    const room = playingRoom();
+    const [first] = room.members;
+    if (!first) throw new Error('no member');
+    expect(
+      handleMessage(room, first.sessionId, { type: 'rename', displayName: 'Lin' }),
+    ).toHaveLength(1);
+    expect(first.displayName).toBe('Lin');
+    expect(handleMessage(room, first.sessionId, { type: 'rename', displayName: 'Lin' })).toEqual(
+      [],
+    );
+  });
+
+  it('refuses an empty name', () => {
+    const room = createRoomState('ABCD', 1);
+    join(room, 'a');
+    expect(handleMessage(room, 'a', { type: 'rename', displayName: ' ' })).toMatchObject([
+      { message: { type: 'error', code: 'badMessage' } },
+    ]);
+    expect(room.members[0]?.displayName).toBe('a');
+  });
+});
+
 describe('who drives the menus', () => {
   /** Host and guest joined with a keyboard each; the guest joined first, so is player 1. */
   function lobbyRoom(): RoomState {

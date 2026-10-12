@@ -293,3 +293,13 @@ PR: `phase-13g-prediction` → `phase-13f-resilience`. Your own developer is pre
   About 20–30 ms is one to two frames: the key is seen on the next frame and drawn on it. (13e quoted ~90 ms and ~340 ms without prediction measured another way; this script measures from the keydown event, so the numbers are a bit higher.) Standing still afterwards the drawn player is exactly where the server has it (0.0000 tiles) in every setting. Also checked: the guest sees the host's walk interpolated without jitter; a pause pressed while walking with lag stops the player where the server stopped it (it glides back at most ~0.2 tiles a frame, under the pause screen) and it stays there; a ticket picked up from the inbox is drawn on the predicted body while walking with lag (screenshot); walking into the guest and pushing them: 0 backward steps, 0 snaps, 0 corrections; a restarted round's countdown: standing still, then moving with no backward steps or snaps.
 
 - `npm run verify:online` still passes (12/12). CI is green.
+
+## 13h player names
+
+Asked for after the stack was built: set your multiplayer name from the online lobby.
+
+- **Your name** row in the online lobby with **Change name**: a text box (Enter saves, Esc cancels, max 24 characters). The name is saved in this browser (same as Settings → Online profile), synced to the profile, and shown to everyone in the room right away, mid-round too.
+- New client message `rename { displayName }` (protocol version 4). It doesn't reuse `hello`, which also carries the couch player count and would trip the room's capacity check once couch players have joined.
+- While the box is open, game keys and menu presses pause (same as the profile dialog), so typing E or Esc never starts a level or leaves the room.
+- Found while verifying: an Esc in a text box without `preventDefault` runs Chrome's own Esc action, which in headless Chrome stopped the page's frames. The box prevents it, like the profile dialog.
+- `verify:online` has a rename step: the guest renames, the host sees it, Esc closes the box and both stay in the room.

@@ -23,6 +23,7 @@ import {
   reconnectingMembers,
 } from '../flow/online';
 import { playerCssColor } from '../render/playerColors';
+import { NET_MAX_NAME_LENGTH } from '../sim/balance';
 import { ONLINE_TEXT } from '../sim/content';
 import { el } from './dom';
 import { deviceLabel } from './lobby';
@@ -33,6 +34,20 @@ import type { ScreenView } from './screens';
 export interface OnlineDeps {
   /** The Leave (or Back) button was clicked. */
   onLeave: () => void;
+}
+
+export interface OnlineLobbyDeps extends OnlineDeps {
+  /** This browser's display name. */
+  yourName: () => string;
+  /** Picks a new display name. Answers why not, or `null` when it worked. */
+  changeName: (text: string) => string | null;
+  /** The name box opened or closed: game keys pause while typing. */
+  onDialog: (open: boolean) => void;
+}
+
+/** Can be closed from outside, e.g. by gamepad B. */
+export interface OnlineLobbyView extends ScreenView {
+  cancelDialog: () => void;
 }
 
 function button(className: string, text: string, onClick: () => void): HTMLButtonElement {
@@ -73,7 +88,7 @@ function lobbyHint(online: OnlineState): string {
   return isOnlineHost(online) ? ONLINE_TEXT.hostStartHint : ONLINE_TEXT.guestWaitHint;
 }
 
-export function mountOnlineLobby(root: HTMLElement, deps: OnlineDeps): ScreenView {
+export function mountOnlineLobby(root: HTMLElement, deps: OnlineLobbyDeps): OnlineLobbyView {
   const screen = el('div', 'screen online-lobby');
   screen.hidden = true;
 
@@ -89,6 +104,74 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineDeps): ScreenVie
   codeCard.append(el('div', 'profile-label', ONLINE_TEXT.codeLabel), code, copy, copied);
 
   const status = el('div', 'online-status');
+
+  // Your name: shown with a Change button, or as a text box while editing.
+  const nameRow = el('div', 'online-name');
+  const nameValue = el('span', 'online-name-value');
+  const nameShow = el('div', 'online-name-show');
+  const nameEdit = el('div', 'online-name-edit');
+  const nameInput = document.createElement('input');
+  nameInput.className = 'profile-input online-name-input';
+  nameInput.spellcheck = false;
+  nameInput.autocomplete = 'off';
+  nameInput.maxLength = NET_MAX_NAME_LENGTH;
+  const nameError = el('div', 'profile-dialog-error online-name-error');
+  let editing = false;
+
+  const closeName = (): void => {
+    if (!editing) return;
+    editing = false;
+    nameEdit.hidden = true;
+    nameShow.hidden = false;
+    nameInput.blur();
+    deps.onDialog(false);
+  };
+  const openName = (): void => {
+    editing = true;
+    nameInput.value = deps.yourName();
+    nameError.textContent = '';
+    nameShow.hidden = true;
+    nameEdit.hidden = false;
+    deps.onDialog(true);
+    nameInput.focus();
+    nameInput.select();
+  };
+  const saveName = (): void => {
+    const problem = deps.changeName(nameInput.value);
+    if (problem) {
+      nameError.textContent = problem;
+      return;
+    }
+    nameValue.textContent = deps.yourName();
+    closeName();
+  };
+  nameInput.addEventListener('keydown', (event) => {
+    // Typing must not reach the game (E, Esc and Enter mean something there).
+    event.stopPropagation();
+    if (event.repeat) return;
+    // Without preventDefault Chrome also runs Esc's own action (stop loading).
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      saveName();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      closeName();
+    }
+  });
+  nameShow.append(
+    el('span', 'profile-label', ONLINE_TEXT.nameLabel),
+    nameValue,
+    button('online-name-change', ONLINE_TEXT.changeName, openName),
+  );
+  nameEdit.append(
+    nameInput,
+    button('online-name-save', ONLINE_TEXT.saveName, saveName),
+    button('online-name-cancel', ONLINE_TEXT.cancelName, closeName),
+    nameError,
+  );
+  nameEdit.hidden = true;
+  nameRow.append(nameShow, nameEdit);
+
   const members = el('div', 'online-members');
   const hint = el('div', 'lobby-hint');
   const leave = button('online-leave', ONLINE_TEXT.leave, deps.onLeave);
@@ -97,6 +180,7 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineDeps): ScreenVie
     el('h1', 'lobby-title', ONLINE_TEXT.lobbyTitle),
     codeCard,
     status,
+    nameRow,
     members,
     hint,
     leave,
@@ -108,15 +192,20 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineDeps): ScreenVie
   let drawn = '';
 
   return {
+    cancelDialog: closeName,
     render: (view) => {
       const online = view?.online ?? null;
       screen.hidden = !online || !showsLobby(online);
       if (!online || screen.hidden) {
         drawn = '';
         copied.textContent = '';
+        closeName();
         return;
       }
       const closed = online.status === 'closed';
+      nameRow.hidden = closed;
+      if (closed) closeName();
+      if (!editing) nameValue.textContent = deps.yourName();
       codeCard.hidden = online.joinCode === null;
       code.textContent = online.joinCode ?? '';
       status.textContent = statusText(online);

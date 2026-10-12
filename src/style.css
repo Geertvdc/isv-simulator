@@ -1246,6 +1246,36 @@ body {
   color: #ff8a80;
 }
 
+.online-name-show,
+.online-name-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.online-name-show[hidden],
+.online-name-edit[hidden],
+.online-name[hidden] {
+  display: none;
+}
+
+.online-name-value {
+  font-size: 1.375rem;
+  font-weight: 700;
+}
+
+.online-name-input {
+  width: min(18rem, 70vw);
+  font-size: 1.25rem;
+}
+
+.online-name-error {
+  flex-basis: 100%;
+  text-align: center;
+}
+
 .online-members {
   display: flex;
   flex-direction: column;
