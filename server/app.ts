@@ -50,7 +50,7 @@ export interface RunningServer {
 }
 
 export interface GameServerOptions {
-  /** Where profiles live; `PROFILE_STORE_PATH` (or `server/data/profiles.json`) by default. */
+  /** Where profiles live; `PROFILE_STORE_PATH` (or `data/profiles.json`) by default. */
   store?: ProfileStore;
 }
 

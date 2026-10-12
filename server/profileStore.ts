@@ -17,7 +17,11 @@ import { defaultDisplayName, normalizeDisplayName } from '../src/flow/identity';
 import { type LevelRecord, mergeLevels, parseLevels, recordLevel } from '../src/flow/save';
 import type { LevelResult } from '../src/sim/orders';
 
-export const DEFAULT_PROFILE_STORE_PATH = 'server/data/profiles.json';
+/**
+ * Outside `server/`, `src/` and `maps/` on purpose: `npm run server` restarts on
+ * any change there, so a profile write would restart the server mid-game.
+ */
+export const DEFAULT_PROFILE_STORE_PATH = 'data/profiles.json';
 const FILE_VERSION = 1;
 const EPOCH = new Date(0).toISOString();
 
@@ -212,7 +216,7 @@ export class JsonFileProfileStore extends MemoryProfileStore {
   }
 }
 
-/** The store `npm run server` uses: `PROFILE_STORE_PATH`, or `server/data/profiles.json`. */
+/** The store `npm run server` uses: `PROFILE_STORE_PATH`, or `data/profiles.json`. */
 export function profileStoreFromEnv(env: NodeJS.ProcessEnv = process.env): JsonFileProfileStore {
   return new JsonFileProfileStore(env.PROFILE_STORE_PATH || DEFAULT_PROFILE_STORE_PATH);
 }

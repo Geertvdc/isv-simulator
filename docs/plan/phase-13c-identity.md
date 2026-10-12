@@ -53,7 +53,7 @@ Built without a review round (the product owner was away); decisions are in `rev
 ## Done when
 
 - [x] A user id is created on first boot, kept in `localStorage`, shown under Settings → Online profile with Copy, Use another ID and Change name
-- [x] `npm run server` serves `GET`/`PUT /profiles/:userId` backed by `server/data/profiles.json` (gitignored, atomic writes, survives a corrupt file)
+- [x] `npm run server` serves `GET`/`PUT /profiles/:userId` backed by `data/profiles.json` (gitignored, atomic writes, survives a corrupt file)
 - [x] With the server running, booting the game merges local progress into the profile and back; without it, the game plays as before
 - [x] A room uses the host's profile for unlocks and records a finished round for every member
 - [x] `npm run check` and `npm run build` pass

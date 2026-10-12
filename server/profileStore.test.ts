@@ -3,7 +3,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { defaultDisplayName } from '../src/flow/identity';
-import { JsonFileProfileStore, MemoryProfileStore, type ProfileStore } from './profileStore';
+import {
+  DEFAULT_PROFILE_STORE_PATH,
+  JsonFileProfileStore,
+  MemoryProfileStore,
+  type ProfileStore,
+} from './profileStore';
 
 const ID_A = '3f2b8c1e-9d4a-4e6b-8a1c-2b3c4d5e6f70';
 const ID_B = 'a1b2c3d4-e5f6-4a7b-9c8d-0e1f2a3b4c5d';
@@ -165,5 +170,20 @@ describe('JsonFileProfileStore', () => {
       updatedAt: new Date(0).toISOString(),
     });
     expect(await store.get(ID_B)).toBeNull();
+  });
+});
+
+describe('the default profile file', () => {
+  it('sits outside every folder `npm run server` watches', async () => {
+    // A profile write inside a watched folder restarts the dev server, which
+    // drops every room ("The server is restarting").
+    const pkg = JSON.parse(await readFile('package.json', 'utf8')) as {
+      scripts: Record<string, string>;
+    };
+    const watched = [...pkg.scripts.server.matchAll(/--watch-path=(\S+)/g)].map((m) => m[1]);
+    expect(watched.length).toBeGreaterThan(0);
+    for (const folder of watched) {
+      expect(DEFAULT_PROFILE_STORE_PATH.startsWith(`${folder}/`)).toBe(false);
+    }
   });
 });

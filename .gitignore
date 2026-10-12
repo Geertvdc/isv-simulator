@@ -33,4 +33,5 @@ sfx-candidates/
 music-candidates/
 
 # online profiles written by the game server (`PROFILE_STORE_PATH`)
+data/
 server/data/
