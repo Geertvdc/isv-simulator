@@ -24,6 +24,7 @@ import {
   TOGGLE_SOUND_EVENT,
   type TicketStore,
 } from './render/GameScene';
+import { mountDemo } from './ui/demo';
 import { mountGameHud } from './ui/game';
 import { mountHud } from './ui/hud';
 import { mountCountdown, mountIntro } from './ui/intro';
@@ -94,6 +95,8 @@ const scene = new GameScene({
   // For testing: every level open, without touching the save.
   unlockAll: params.has('unlockAll'),
   scene: shownScene,
+  // `?demo`: a kiosk for a booth, bots play whenever nobody does.
+  kiosk: !shownScene && params.has('demo'),
   // A scene is a picture: it never goes online.
   online: shownScene
     ? null
@@ -134,6 +137,7 @@ const lobby = mountLobby(ui);
 const levelSelect = mountLevelSelect(ui);
 const intro = mountIntro(ui);
 const countdown = mountCountdown(ui);
+const demo = mountDemo(ui);
 const screens = {
   title: mountTitle(ui),
   paused: mountPause(ui),
@@ -229,6 +233,7 @@ game.events.on(FLOW_EVENT, (view: FlowView) => {
   levelSelect.render(screen === 'levelSelect' ? view : null);
   intro.render(view);
   countdown.render(view);
+  demo.render(view);
   for (const [name, mounted] of Object.entries(screens)) {
     mounted.render(name === screen ? view : null);
   }

@@ -515,6 +515,116 @@ body {
   opacity: 0.55;
 }
 
+/* Demo mode: bots play on a big screen. A bar along the bottom between
+   score and clock says how to join in; the pause hint makes room for it. */
+.demo-mode .hud-pause-hint {
+  display: none;
+}
+
+.demo-mode .hud-alerts {
+  bottom: 4.5rem;
+}
+
+.demo-bar {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.375rem 1.125rem 0.375rem 0.375rem;
+  border-radius: 0.75rem;
+  background: rgba(0, 0, 0, 0.7);
+  font-size: 1.5rem;
+  white-space: nowrap;
+}
+
+.demo-bar[hidden],
+.demo-card[hidden] {
+  display: none;
+}
+
+.demo-tag {
+  padding: 0.125rem 0.625rem;
+  border-radius: 0.5rem;
+  background: #c4180e;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.demo-game {
+  font-weight: 900;
+  color: #ffd166;
+}
+
+.demo-level {
+  color: var(--text-muted);
+}
+
+.demo-press {
+  font-weight: 700;
+  animation: blink 1.2s ease-in-out infinite;
+}
+
+/* Between score and clock on a window narrower than a TV (the UI scales with
+   the height): only the tag and how to play. */
+@media (max-aspect-ratio: 7/5) {
+  .demo-game,
+  .demo-level {
+    display: none;
+  }
+}
+
+.demo-card {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem 3rem;
+  border: 3px solid #ffd166;
+  border-radius: 1.25rem;
+  background: var(--menu-bg);
+  text-align: center;
+  animation: screen-fade var(--screen-fade, 250ms) ease-out;
+}
+
+.demo-card-level {
+  font-size: 2.5rem;
+  font-weight: 800;
+}
+
+.demo-card-stars {
+  display: flex;
+  gap: 0.1em;
+  font-size: 5rem;
+}
+
+.demo-card-star {
+  color: #4a5060;
+}
+
+.demo-card-star.earned {
+  color: #ffd166;
+}
+
+.demo-card-score {
+  max-width: 24em;
+  font-size: 1.75rem;
+}
+
+.demo-card-press {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #ffd166;
+  animation: blink 1.2s ease-in-out infinite;
+}
+
 /* Full-screen menus: title, lobby, level select, pause, results, settings, credits.
    Big text, so it reads from the couch. */
 .screen {

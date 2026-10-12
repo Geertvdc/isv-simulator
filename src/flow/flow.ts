@@ -2,7 +2,8 @@
  * The screens around a round, as a plain-data state machine: title, lobby,
  * level select, the level intro card and countdown, the round itself,
  * pause, results, settings (with the online profile), credits, and the way
- * into an online room (typing a join code). The server runs the same flow
+ * into an online room (typing a join code), and the demo (bots play while
+ * nobody does, for a big screen at a booth). The server runs the same flow
  * for a room (`flow.online`), with a few online rules.
  * `updateFlow` turns this frame's button presses into a new screen and a
  * list of effects for the scene to run (start a round, save, ...). Like the
@@ -17,6 +18,9 @@ import { JOIN_CODE_ALPHABET, normalizeJoinCode } from '../net/joinCode';
 import {
   COUNTDOWN_STEPS,
   COUNTDOWN_STEP_MS,
+  DEMO_IDLE_MS,
+  DEMO_KIOSK_IDLE_MS,
+  DEMO_RESULTS_MS,
   END_SCREEN_INPUT_DELAY_MS,
   NET_JOIN_CODE_LENGTH,
   SFX_VOLUME_MAX,
@@ -49,7 +53,9 @@ export type Screen =
   /** Typing a join code to join an online room. */
   | 'joinCode'
   /** In an online room: the screens come from the server, this flow waits. */
-  | 'online';
+  | 'online'
+  /** Bots play a round while nobody does; any button goes back to the title. */
+  | 'demo';
 
 /** One line in a vertical menu. */
 export type MenuItem =
@@ -133,6 +139,24 @@ export const TITLE_ITEMS: readonly MenuItem[] = [
   'credits',
 ];
 
+/** How a demo round went, shown once it's over until the next one starts. */
+export interface DemoEnd {
+  score: number;
+  stars: number;
+  /** When the round ended, in the caller's clock. */
+  atMs: number;
+}
+
+/** Screens a kiosk leaves for the demo when nobody presses anything for a while. */
+const KIOSK_IDLE_SCREENS: readonly Screen[] = [
+  'lobby',
+  'levelSelect',
+  'intro',
+  'results',
+  'paused',
+  'credits',
+];
+
 /** Screens that can open the settings, and get them back after. */
 export type SettingsFrom = 'title' | 'paused';
 
@@ -159,6 +183,20 @@ export interface Flow {
    * settings or quit.
    */
   online: boolean;
+  /** When any device last pressed a button, in the caller's clock; the demo starts after a while without. */
+  lastPressMs: number;
+  /** Demo rounds started so far: picks the next demo level. */
+  demoRounds: number;
+  /** Set once the demo round on screen is over. */
+  demoEnd: DemoEnd | null;
+}
+
+/** Demo mode: bots play when nobody has pressed a button for a while. */
+export interface DemoOptions {
+  /** `?demo`, for a booth: the other menus go to the demo too, not only the title. */
+  kiosk: boolean;
+  /** The levels the demo plays in turn, as indexes into `levelIds`. */
+  levels: readonly number[];
 }
 
 export interface FlowContext {
@@ -174,6 +212,8 @@ export interface FlowContext {
   nowMs: number;
   /** Who may start the game from the lobby; player 1 when left out. */
   canStart?: (deviceId: DeviceId) => boolean;
+  /** Demo mode; left out for none (an online room). */
+  demo?: DemoOptions;
 }
 
 export type FlowEffect =
@@ -214,6 +254,9 @@ export function createFlow(): Flow {
     countdownStartMs: 0,
     joinCode: emptyJoinCode(),
     online: false,
+    lastPressMs: 0,
+    demoRounds: 0,
+    demoEnd: null,
   };
 }
 
@@ -245,7 +288,7 @@ export function menuItems(flow: Flow): MenuItem[] {
 
 /** Whether the round should advance this frame. */
 export function isRoundRunning(flow: Flow): boolean {
-  return flow.screen === 'playing';
+  return flow.screen === 'playing' || (flow.screen === 'demo' && flow.demoEnd === null);
 }
 
 /** How long the whole countdown lasts, in ms. */
@@ -284,6 +327,7 @@ function goTo(flow: Flow, screen: Screen, menuIndex = 0): void {
   flow.screen = screen;
   flow.menuIndex = menuIndex;
   if (screen !== 'results') flow.results = null;
+  if (screen !== 'demo') flow.demoEnd = null;
 }
 
 /** Back on the title with nobody joined. */
@@ -310,6 +354,9 @@ export function updateFlow(
   ctx: FlowContext,
 ): FlowUpdate {
   const update: FlowUpdate = { changed: false, effects: [] };
+  if (presses.some(hasAnything)) flow.lastPressMs = ctx.nowMs;
+  if (flow.screen === 'demo') return updateDemo(flow, presses, ctx);
+  if (isIdle(flow, ctx)) return startDemo(flow, ctx);
   if (flow.screen === 'lobby') return updateLobbyScreen(flow, presses, ctx);
   if (flow.screen === 'joinCode') return updateJoinCodeScreen(flow, presses);
   // Online, the server's flow drives the screens; this one waits for the room to end.
@@ -348,6 +395,47 @@ export function updateFlow(
     if (flow.screen !== screen) update.changed = true;
   }
   return update;
+}
+
+/** Whether nobody pressed anything for long enough that the demo should start. */
+function isIdle(flow: Flow, ctx: FlowContext): boolean {
+  if (!ctx.demo || ctx.demo.levels.length === 0) return false;
+  const idleMs = ctx.nowMs - flow.lastPressMs;
+  if (flow.screen === 'title') return idleMs >= DEMO_IDLE_MS;
+  return ctx.demo.kiosk && KIOSK_IDLE_SCREENS.includes(flow.screen) && idleMs >= DEMO_KIOSK_IDLE_MS;
+}
+
+/** Bots start a round of the next demo level; whoever had joined is let go. */
+function startDemo(flow: Flow, ctx: FlowContext): FlowUpdate {
+  const levels = ctx.demo?.levels ?? [];
+  const levelIndex = levels[flow.demoRounds % levels.length];
+  if (levelIndex === undefined) return { changed: false, effects: [] };
+  flow.demoRounds++;
+  flow.levelIndex = levelIndex;
+  flow.lobby = createLobby();
+  flow.demoEnd = null;
+  goTo(flow, 'demo');
+  return { changed: true, effects: [{ type: 'startLevel', levelIndex }] };
+}
+
+/** Any button ends the demo on the title, menu up; a finished demo round moves on to the next. */
+function updateDemo(flow: Flow, presses: readonly DevicePress[], ctx: FlowContext): FlowUpdate {
+  if (presses.some(hasAnything)) {
+    flow.awake = true;
+    quitToTitle(flow);
+    return { changed: true, effects: [{ type: 'stopRound' }] };
+  }
+  if (flow.demoEnd && ctx.nowMs - flow.demoEnd.atMs >= DEMO_RESULTS_MS) {
+    return startDemo(flow, ctx);
+  }
+  return { changed: false, effects: [] };
+}
+
+/** The demo round ended: its score shows until the next one starts. Nothing is saved. */
+export function finishDemoRound(flow: Flow, result: LevelResult, nowMs: number): FlowUpdate {
+  if (flow.screen !== 'demo' || flow.demoEnd) return { changed: false, effects: [] };
+  flow.demoEnd = { score: result.score, stars: result.stars, atMs: nowMs };
+  return { changed: true, effects: [] };
 }
 
 function updateLobbyScreen(

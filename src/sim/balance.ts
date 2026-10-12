@@ -129,6 +129,15 @@ export const ORDER_URGENT_TICKS = 10 * TICKS_PER_SECOND;
 /** The end screen ignores presses this long, so mashing at the buzzer doesn't restart. */
 export const END_SCREEN_INPUT_DELAY_MS = 1500;
 
+/** Demo mode: the title starts a round of bots after this long without a button press. */
+export const DEMO_IDLE_MS = 30 * 1000;
+/** Kiosk (`?demo`): the other menus (lobby, level select, results, pause) go to the demo after this long. */
+export const DEMO_KIOSK_IDLE_MS = 60 * 1000;
+/** Bots playing a demo round. */
+export const DEMO_BOTS = 4;
+/** How long a demo round's score stays up before the next demo round starts. */
+export const DEMO_RESULTS_MS = 8 * 1000;
+
 /** Ticks a finished build may sit in the pipeline before the pipeline breaks. */
 export const PIPELINE_FAIL_TICKS = 10 * TICKS_PER_SECOND;
 /** The pipeline flashes a warning for this many ticks before it breaks. */

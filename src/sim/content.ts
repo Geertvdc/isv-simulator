@@ -148,6 +148,13 @@ export const GAME_TITLE = 'ISV Simulator';
 export const GAME_TAGLINE = 'Ship it before the customer notices.';
 /** On the title screen until someone presses a button. */
 export const PRESS_ANY_BUTTON_TEXT = 'Press any button';
+/** Demo mode: the tag in the corner while bots play. */
+export const DEMO_TAG = 'Demo';
+export const DEMO_PRESS_TEXT = 'Press any button to play';
+/** Demo mode: when the bots' round is over. */
+export function demoScoreText(score: number): string {
+  return `The bots scored ${score}. Think you can beat them?`;
+}
 
 /** Menu lines, by the flow's menu item. */
 export const MENU_LABELS = {

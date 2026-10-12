@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ORDER_RATE_BY_PLAYERS } from './balance';
+import { DEMO_BOTS, ORDER_RATE_BY_PLAYERS } from './balance';
 import { MAX_PLAYERS, getTile } from './level';
-import { GARAGE, LEVELS, levelById, orderRate, settingsForPlayers } from './levels';
+import { DEMO_LEVEL_IDS, GARAGE, LEVELS, levelById, orderRate, settingsForPlayers } from './levels';
 import { createGame } from './state';
 
 describe('settingsForPlayers', () => {
@@ -107,4 +107,11 @@ describe('levels', () => {
       if (level.reviewShare > 0) expect(map.tiles).toContain('review');
     });
   }
+});
+
+describe('demo levels', () => {
+  it('play every level once, and fit the demo bots', () => {
+    expect([...DEMO_LEVEL_IDS].sort()).toEqual(LEVELS.map((l) => l.id).sort());
+    for (const level of LEVELS) expect(level.map.spawns.length).toBeGreaterThanOrEqual(DEMO_BOTS);
+  });
 });
