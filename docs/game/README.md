@@ -12,6 +12,7 @@ An Overcooked-style couch co-op game about shipping software. 2 to 4 players sha
 | [Tickets and events](mechanics.md) | Features, reviews, bugs, hotfixes, the pipeline breaking, throwing, the manager, meetings, scoring          |
 | [Levels](levels.md)                | All 12 levels in 4 chapters: layout, map, what's new, star targets                                          |
 | This page                          | How a round works, controls, and every screen from title to results                                         |
+| [The 3D look](3d.md)               | Every picture in these docs again, in the 3D look (`?render=3d`)                                            |
 
 ## How a round works
 
