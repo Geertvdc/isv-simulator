@@ -9,6 +9,11 @@ export default defineConfig({
   preview: { allowedHosts },
   // Phaser alone is ~1.4 MB minified; don't warn about it.
   build: { chunkSizeWarningLimit: 2000 },
+  // The 3D look is loaded lazily; bundle its libraries up front so the dev
+  // server never finds them mid-session (two copies of three.js otherwise).
+  optimizeDeps: {
+    include: ['three', 'three/addons/environments/RoomEnvironment.js', 'postprocessing', 'n8ao'],
+  },
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts', 'server/**/*.test.ts'],
