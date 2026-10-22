@@ -59,3 +59,7 @@
 - **Lost tickets** also pop "Back in the backlog" over their queue.
 - **2D gaps** show a lower floor (apart from the dark void), a shadow under the far edge and a thicker railing with posts. **3D belts** glide middle to middle and stop short of a taken tile.
 - More tests: belts in every direction, a loop, merging belts, a belt into a pipeline, a ticket's own time on a tile.
+
+## Review round 2 fixes
+
+3D tickets on belts only stop short when they will really wait (`beltWaits`: the tile ahead won't take them, or the belt ahead waits too); a full line or loop glides on. A ticket leaving the map is reported where it left, and lands on that tile when it's floor. Tests for `beltWaits` and a side belt feeding a loop with one free tile. Two review rounds done; left over: `BELT_TAKERS` in `level.ts` repeats what `interact.ts` takes (kept apart to avoid an import cycle), and online the belt glide steps at the snapshot rate.
