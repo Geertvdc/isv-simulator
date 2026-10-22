@@ -436,6 +436,33 @@ export const SCENES: readonly Scene[] = [
       state.tickets.some((t) => t.location.kind === 'flying' && t.location.pos.x > 6.6),
   },
   {
+    // The test benches are across the atrium: player 1 throws the coded ticket over the gap.
+    id: 'gap-throw',
+    levelId: 'lab-shapes',
+    players: 2,
+    setup(state) {
+      give(workOn(openOrder(state, 'feature', 'Ship the new onboarding'), 1), 1);
+      stand(state, 1, { x: 10, y: 5 }, { x: 1, y: 0 });
+      stand(state, 2, { x: 14, y: 5 }, { x: -1, y: 0 });
+    },
+    input: (state) => [command(state, 1, { interact: true })],
+    until: (state) =>
+      state.tickets.some((t) => t.location.kind === 'flying' && t.location.pos.x > 12),
+  },
+  {
+    // The conveyor bridge carries tickets across the atrium to the test side.
+    id: 'conveyor',
+    levelId: 'lab-shapes',
+    players: 2,
+    setup(state) {
+      putOn(workOn(openOrder(state, 'feature', 'Add SSO'), 1), { x: 7, y: 3 });
+      putOn(workOn(openOrder(state, 'feature', 'Dark mode, again'), 1), { x: 10, y: 3 });
+      stand(state, 1, { x: 6, y: 2 }, { x: 0, y: 1 });
+      stand(state, 2, { x: 14, y: 3 }, { x: -1, y: 0 });
+    },
+    ticks: 50,
+  },
+  {
     // The manager walks along the row, straight into player 1.
     id: 'manager',
     levelId: 'middle-management',

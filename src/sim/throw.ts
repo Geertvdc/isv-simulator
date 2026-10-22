@@ -1,9 +1,10 @@
 /**
  * Throwing: a carried ticket flies along the thrower's facing, over floor,
- * counters and other furniture. It lands on the first counter or station
- * that would take it, stops in front of walls, and otherwise drops on the
- * floor once it has flown `THROW_RANGE` tiles. Another empty-handed player
- * facing it catches it on the way.
+ * counters, other furniture, gaps and the void. It lands on the first
+ * counter or station that would take it, stops in front of walls, and
+ * otherwise comes down once it has flown `THROW_RANGE` tiles: on the floor,
+ * or, over a gap or off the edge, it's lost (back to its queue, its work
+ * gone). Another empty-handed player facing it catches it on the way.
  */
 
 import {
@@ -14,9 +15,9 @@ import {
   TICKS_PER_SECOND,
 } from './balance';
 import { canPutDown } from './interact';
-import { type GridPoint, getTile } from './level';
+import { type GridPoint, getTile, isDrop } from './level';
 import { type GameState, type Player, type PlayerId, getPlayer } from './state';
-import { type Ticket, ticketCarriedBy } from './tickets';
+import { type Ticket, loseTicket, ticketCarriedBy } from './tickets';
 
 const STEP = THROW_SPEED / TICKS_PER_SECOND;
 
@@ -78,8 +79,13 @@ function fly(state: GameState, ticket: Ticket): void {
   const at = tileOf(pos);
   const tile = getTile(state.level, at.x, at.y);
 
-  if (tile === null || tile === 'wall') {
+  if (tile === 'wall') {
     land(state, ticket, loc.lastFloor);
+    return;
+  }
+  // Off the map is outside the office, like the void.
+  if (tile === null) {
+    loseTicket(state, ticket, at);
     return;
   }
   loc.pos = pos;
@@ -96,7 +102,9 @@ function fly(state: GameState, ticket: Ticket): void {
     return;
   }
   const travelled = Math.hypot(pos.x - loc.from.x, pos.y - loc.from.y);
-  if (travelled >= THROW_RANGE && tile === 'floor') land(state, ticket, at);
+  if (travelled < THROW_RANGE) return;
+  if (tile === 'floor') land(state, ticket, at);
+  else if (isDrop(tile)) loseTicket(state, ticket, at);
 }
 
 /** Lands on tile `at`: the counter or station it found, or the floor. */

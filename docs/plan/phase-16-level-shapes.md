@@ -4,11 +4,11 @@
 
 ## New map tiles
 
-| Char            | Tile       | Walk | Throw over                                 | What it is                                                                                                                                                                                                                              |
-| --------------- | ---------- | ---- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ` ` (space)     | `void`     | no   | yes, and a ticket that stops there is lost | Outside the office: lets a map have any outline (L shapes, islands, notches). Drawn as nothing (3D: the surroundings show).                                                                                                             |
-| `~`             | `gap`      | no   | yes, and a ticket that stops there is lost | An atrium or stairwell inside the office: splits a level into areas you can only reach by throwing. Drawn with a glass railing and a drop.                                                                                              |
-| `>` `<` `^` `v` | `conveyor` | no   | lands on it like a counter                 | A belt (the "message queue"): a ticket put on it moves one tile every `CONVEYOR_TICKS` along its arrow, onto the next conveyor, counter or station if that's free; it waits when the next one is full. Picking up works like a counter. |
+| Char            | Tile       | Walk | Throw over                                                                  | What it is                                                                                                                                                                                                                              |
+| --------------- | ---------- | ---- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ` ` (space)     | `void`     | no   | yes, and a ticket that stops there is lost (back to its queue, work undone) | Outside the office: lets a map have any outline (L shapes, islands, notches). Drawn as nothing (3D: the surroundings show).                                                                                                             |
+| `~`             | `gap`      | no   | yes, and a ticket that stops there is lost                                  | An atrium or stairwell inside the office: splits a level into areas you can only reach by throwing. Drawn with a glass railing and a drop.                                                                                              |
+| `>` `<` `^` `v` | `conveyor` | no   | lands on it like a counter                                                  | A belt (the "message queue"): a ticket put on it moves one tile every `CONVEYOR_TICKS` along its arrow, onto the next conveyor, counter or station if that's free; it waits when the next one is full. Picking up works like a counter. |
 
 ## Sim
 
@@ -38,7 +38,16 @@
 
 ## Done when
 
-- [ ] A level can be any outline and have areas reachable only by throwing
-- [ ] Conveyors move tickets and can be loaded and emptied by players
-- [ ] 2D and 3D draw everything
-- [ ] `npm run check` passes
+- [x] A level can be any outline and have areas reachable only by throwing
+- [x] Conveyors move tickets and can be loaded and emptied by players
+- [x] 2D and 3D draw everything
+- [x] `npm run check` passes
+
+## Implementation
+
+- `src/sim/level.ts`: tiles `void`, `gap`, `conveyor`; `LevelMap.conveyors`; `isDrop`, `isBlock`, `conveyorAt`; `BlockTile` for things drawn as a block.
+- `src/sim/conveyor.ts`: `Belt` state per conveyor tile (`GameState.belts`), `updateConveyors` (repeated passes so a full line moves as one, each ticket at most a tile a tick), `beltProgress` for drawing.
+- `src/sim/throw.ts` and `tickets.loseTicket`: flights cross drops; coming down over one, or flying off the map, sends the ticket back to its queue with its work undone (`ticketLost`, popup "git reset --hard").
+- `maps/lab-shapes.txt` and `LAB_LEVELS`: a level outside the campaign (L-shaped, split by an atrium gap, a conveyor bridge) for the `gap-throw` and `conveyor` scenes; `GameScene` loads a scene's own level.
+- 2D: the void isn't drawn, gaps are dark with a railing, belts are blocks with a chevron. 3D: the slab follows the outline, gaps are shafts with a lower floor and glass railings, belts have hazard rails and a stripe texture that runs toward their arrow; tickets glide along. The ground outside goes round the level, never under it.
+- `PROTOCOL_VERSION` 5.

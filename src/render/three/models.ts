@@ -1,4 +1,4 @@
-import type { Tile } from '../../sim/level';
+import type { BlockTile } from '../../sim/level';
 import type { TicketKind } from '../../sim/tickets';
 import type { FloorTheme, WallTheme } from '../MapRenderer';
 import type { WallPiece } from '../mapShape';
@@ -21,7 +21,8 @@ const DARK = 0x2b2f38;
 const STEEL = 0x8b939e;
 const PAPER = 0xf7f3ea;
 
-export type StationTile = Exclude<Tile, 'floor' | 'wall'>;
+/** Tiles that get a station model: counters and stations (walls, belts and drops have their own). */
+export type StationTile = Exclude<BlockTile, 'wall' | 'conveyor'>;
 
 /**
  * A station: the `base` (counter and what lies on it) turns to face the
@@ -347,6 +348,31 @@ export const STATION_MODELS: Readonly<Record<StationTile, () => StationModel>> =
   ship: shipStation,
   bin,
 };
+
+/**
+ * A conveyor belt's frame: a steel body like a counter with hazard-striped
+ * rails and rollers at the ends; the running surface (with its moving
+ * stripes) is drawn by `MapView`. Built carrying toward +z.
+ */
+export function conveyorModel(): Model {
+  const b = new ModelBuilder();
+  const steel = PALETTE.conveyor;
+  b.slab(0.86, 0.06, 0.86, tint(steel, -0.5), 0, 0, 0);
+  b.slab(0.94, TOP - 0.1, 0.96, steel, 0, 0.06, 0);
+  // Rails either side of the belt, yellow and black.
+  for (const x of [-0.38, 0.38]) {
+    b.box(0.14, 0.08, 1, 0x3a3f4a, { at: [x, TOP - 0.02, 0] }, 0.02);
+    for (let i = 0; i < 4; i++) {
+      b.box(0.141, 0.02, 0.12, 0xffd166, { at: [x, TOP + 0.02, -0.375 + i * 0.25] }, 0);
+    }
+  }
+  // Rollers under the belt, showing at the ends.
+  for (const z of [-0.47, 0.47]) {
+    b.cylinder(0.05, 0.05, 0.62, STEEL, { at: [0, TOP - 0.04, z], rot: [0, 0, Math.PI / 2] }, 12);
+  }
+  b.box(0.62, 0.04, 1, DARK, { at: [0, TOP - 0.018, 0] }, 0);
+  return b.build();
+}
 
 /** One wall piece in a theme, `height` tall. */
 export function wallModel(theme: WallTheme, piece: WallPiece): Model {

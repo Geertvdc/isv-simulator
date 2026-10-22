@@ -176,3 +176,13 @@ export function enqueueTicket(
   state.tickets.push(ticket);
   return ticket;
 }
+
+/**
+ * A ticket that fell into a gap or off the edge: back in its queue, every
+ * step undone ("git reset --hard"). Its order can still be met.
+ */
+export function loseTicket(state: GameState, ticket: Ticket, at: { x: number; y: number }): void {
+  for (const step of ticket.steps) step.progress = 0;
+  ticket.location = { kind: 'queue', queue: QUEUE_OF[ticket.kind] };
+  state.events.push({ type: 'ticketLost', ticketId: ticket.id, x: at.x, y: at.y });
+}

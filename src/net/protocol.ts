@@ -21,7 +21,7 @@ import type { Snapshot } from './snapshot';
 export const GAME_ROOM = 'game';
 
 /** Bumped on every incompatible change; the server refuses other versions. */
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 // ---------------------------------------------------------------- client → server
 

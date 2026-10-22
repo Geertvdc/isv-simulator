@@ -5,7 +5,8 @@
  */
 
 import { PLAYER_RADIUS, THROW_HOLD_TICKS, THROW_RANGE } from '../../sim/balance';
-import { type LevelMap, type Tile, getTile } from '../../sim/level';
+import { beltProgress } from '../../sim/conveyor';
+import { type LevelMap, type Tile, conveyorAt, getTile, isBlock } from '../../sim/level';
 import type { GameState, PlayerId } from '../../sim/state';
 import { QUEUE_TILE, type QueueKind, type Ticket, queuedTickets } from '../../sim/tickets';
 import { isFrontWall } from '../mapShape';
@@ -38,13 +39,19 @@ const WIND_UP_BACK = 0.7;
 const WIND_UP_SIDE = 0.3;
 /** How far in front of the carrier's center the carried ticket floats. */
 export const CARRY_REACH = PLAYER_RADIUS + 0.1;
+/**
+ * How much of a tile a ticket glides across on a belt: the whole tile, from
+ * its back edge to its front, so moving on to the next belt is seamless (a
+ * ticket waiting for a full tile waits at the front edge).
+ */
+const BELT_GLIDE = 1;
 /** Extra height at the top of a throw's arc. */
 export const THROW_ARC = 0.5;
 
 /** Height of the block on tile (x, y): 0 for floor and outside the map. */
 export function blockHeight(map: LevelMap, x: number, y: number): number {
   const tile = getTile(map, x, y);
-  if (tile === null || tile === 'floor') return 0;
+  if (!isBlock(tile)) return 0;
   if (tile === 'wall') return isFrontWall(map, x, y) ? FRONT_WALL_HEIGHT : WALL_HEIGHT;
   return STATION_HEIGHT;
 }
@@ -151,13 +158,19 @@ export function placeTicket(
         carried: false,
       };
     }
-    case 'tile':
+    case 'tile': {
+      // On a belt it glides from the tile's back edge toward the next tile.
+      const belt = conveyorAt(state.level, loc.x, loc.y);
+      const ride = belt ? beltProgress(state, loc.x, loc.y) - 0.5 : 0;
+      const x = loc.x + (belt ? belt.dir.x * ride * BELT_GLIDE : 0);
+      const y = loc.y + (belt ? belt.dir.y * ride * BELT_GLIDE : 0);
       return {
-        pos: gridToWorld(loc.x, loc.y, blockHeight(state.level, loc.x, loc.y)),
-        yaw: 0,
+        pos: gridToWorld(x, y, blockHeight(state.level, loc.x, loc.y)),
+        yaw: belt ? facingYaw(belt.dir) : 0,
         visible: true,
         carried: false,
       };
+    }
     case 'flying': {
       const flown = Math.hypot(loc.pos.x - loc.from.x, loc.pos.y - loc.from.y);
       const arc = Math.sin(Math.PI * Math.min(1, flown / THROW_RANGE)) * THROW_ARC;

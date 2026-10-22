@@ -1,3 +1,4 @@
+import { updateConveyors } from './conveyor';
 import { finishReviews, interact, newTickWork, work } from './interact';
 import { updateManagers } from './manager';
 import { expireInvites, updateMeetings } from './meetings';
@@ -42,6 +43,7 @@ export function tick(state: GameState, inputs: readonly InputCommand[]): void {
   }
   finishReviews(state, tickWork);
   updateFlights(state);
+  updateConveyors(state);
 
   updatePipelines(state);
   updateOrders(state);

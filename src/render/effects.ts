@@ -9,6 +9,7 @@ import {
   MEETING_DONE_TEXT,
   PIPELINE_FIXED_TEXT,
   SHOVE_TEXTS,
+  TICKET_LOST_TEXT,
 } from '../sim/content';
 import { PIPELINE_FAIL_TICKS, PIPELINE_WARN_TICKS } from '../sim/balance';
 import type { GameEvent } from '../sim/orders';
@@ -21,6 +22,7 @@ export const SHAKE_SHOVE = { ms: 90, intensity: 0.003 };
 
 export const POPUP_GAIN_COLOR = '#7cf07c';
 export const POPUP_INFO_COLOR = '#ffffff';
+export const POPUP_LOST_COLOR = '#ff8a7a';
 
 export type Effect =
   | { kind: 'shake'; ms: number; intensity: number }
@@ -48,6 +50,10 @@ export function effectsFor(state: GameState, events: readonly GameEvent[]): Effe
       // The HUD already says so by the score.
       case 'pipelineBroke':
         shake(SHAKE_PIPELINE_BROKE);
+        break;
+      case 'ticketLost':
+        popup({ x: event.x, y: event.y }, TICKET_LOST_TEXT, POPUP_LOST_COLOR);
+        shake(SHAKE_SHOVE);
         break;
       case 'pipelineRepaired':
         popup({ x: event.x, y: event.y }, PIPELINE_FIXED_TEXT, POPUP_GAIN_COLOR);

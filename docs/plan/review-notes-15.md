@@ -19,3 +19,13 @@ Decisions made without the product owner, who asked for the work to go ahead on 
 - **Clutter on wall tops** only on some full-height walls, never next to a counter or station and never where it could hide a player behind it; no laptops or sticky notes (they read as things to pick up).
 - **No front row** in front of the level: it would sit between the camera and the play.
 - **Left after two review rounds:** at 16:9 the side far rows (where the car and other rare props stand) sit at the very edge of the screen, partly cut off; near props at the far ends of the back row can lose their shadow at the edge of the sun's shadow box. Both are cosmetic.
+
+## Phase 16: level shapes
+
+- **A ticket that falls is not destroyed:** it goes back to its queue with all its work undone ("git reset --hard"), so the order can still be met. Harsh enough to teach "don't throw into the atrium", without the order becoming impossible.
+- **Flying off the map counts as falling** (only possible through the void: old levels are walled in).
+- **Conveyors don't ship or bin:** they hand tickets to counters, stations and other belts. A pipeline at the end of a belt takes a ticket only when it would (ready and not broken), like a player's put-down.
+- **Belt speed** is half a second a tile (`CONVEYOR_TICKS`), a bit slower than walking, so carrying is still faster but the belt frees your hands.
+- **Uneven map rows still fail to parse:** an outline is drawn with spaces, so a map file must keep its trailing spaces (editors that strip them break the map, loudly).
+- **A lab level** (`lab-shapes`, not in the level select) shows the features on their own, for scenes and tests, until the Big Tech chapter (18) uses them.
+- In 2D, a ticket on a belt jumps from tile to tile (3D glides).

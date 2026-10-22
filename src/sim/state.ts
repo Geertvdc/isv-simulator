@@ -3,6 +3,7 @@
  */
 
 import { INTERACT_REACH } from './balance';
+import { type Belt, createBelts } from './conveyor';
 import type { GridPoint, LevelMap } from './level';
 import { type Level, type LevelSettings, settingsForPlayers } from './levels';
 import { type Manager, createManagers } from './manager';
@@ -71,6 +72,8 @@ export interface GameState {
   tickets: Ticket[];
   /** One per pipeline tile: whether it's broken and how long its build has waited. */
   pipelines: Pipeline[];
+  /** One per conveyor tile: how long the ticket on it has been riding. */
+  belts: Belt[];
   nextTicketId: number;
   orders: Order[];
   nextOrderId: number;
@@ -131,6 +134,7 @@ export function createGame(level: Level, seed: number, playerIds: readonly Playe
     managers: createManagers(map),
     tickets: [],
     pipelines: createPipelines(map),
+    belts: createBelts(map),
     nextTicketId: 1,
     orders: [],
     nextOrderId: 1,

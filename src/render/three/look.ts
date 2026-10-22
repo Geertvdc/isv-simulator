@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import type { LevelMap, Tile } from '../../sim/level';
+import type { BlockTile, LevelMap } from '../../sim/level';
 import type { FloorTheme, WallTheme } from '../MapRenderer';
 import { gridToWorld } from '../projection';
 
@@ -29,7 +29,8 @@ export const PALETTE = {
     pipeline: 0xe9804f,
     ship: 0x3fd6a6,
     bin: 0x5d6168,
-  } satisfies Readonly<Record<Exclude<Tile, 'floor' | 'wall' | 'counter'>, number>>,
+  } satisfies Readonly<Record<Exclude<BlockTile, 'wall' | 'counter' | 'conveyor'>, number>>,
+  conveyor: 0x4a505c,
   ticket: { feature: 0xf6f1e4, bug: 0xf6c4bd, incident: 0xff6b57 },
   manager: 0x3b3f4a,
   skin: 0xf2c6a0,

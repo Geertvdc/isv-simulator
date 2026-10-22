@@ -76,6 +76,10 @@ export type GameEvent =
   | { type: 'pickedUp'; playerId: PlayerId; ticketId: number }
   | { type: 'putDown'; playerId: PlayerId; ticketId: number }
   | { type: 'binned'; playerId: PlayerId; ticketId: number }
+  /** A ticket came down in a gap or off the edge: it's back in its queue, its work lost. */
+  | { type: 'ticketLost'; ticketId: number; x: number; y: number }
+  /** A conveyor moved a ticket onto tile (x, y). */
+  | { type: 'conveyed'; ticketId: number; x: number; y: number }
   | { type: 'dashed'; playerId: PlayerId }
   | { type: 'thrown'; playerId: PlayerId; ticketId: number }
   | { type: 'caught'; playerId: PlayerId; ticketId: number }

@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import garage from '../../maps/level-01-garage.txt?raw';
-import { type Tile, getTile, isSolid, isWorkSurface, parseLevelMap } from './level';
+import {
+  type Tile,
+  conveyorAt,
+  getTile,
+  isBlock,
+  isDrop,
+  isSolid,
+  isWorkSurface,
+  parseLevelMap,
+} from './level';
 
 /** Wraps rows in a wall border with the four spawns on the bottom row. */
 function level(...rows: string[]): string {
@@ -54,8 +63,7 @@ describe('parseLevelMap', () => {
     expect(() => parseLevelMap(level('.Z.'))).toThrow("Unknown map char 'Z' at line 2, column 3");
   });
 
-  it('rejects spaces and digits that are not spawns', () => {
-    expect(() => parseLevelMap(level('. .'))).toThrow("Unknown map char ' '");
+  it('rejects digits that are not spawns', () => {
     expect(() => parseLevelMap(level('.5.'))).toThrow("Unknown map char '5'");
     expect(() => parseLevelMap(level('.0.'))).toThrow("Unknown map char '0'");
   });
@@ -158,6 +166,34 @@ describe('isSolid', () => {
 
   it('treats out of bounds as solid', () => {
     expect(isSolid(null)).toBe(true);
+  });
+});
+
+describe('level shapes', () => {
+  const map = parseLevelMap(['  ####', '  #12#', '###~.#', '#3>v4#', '######'].join('\n'));
+
+  it('reads spaces as void, ~ as a gap and arrows as conveyors with their direction', () => {
+    expect(getTile(map, 0, 0)).toBe('void');
+    expect(getTile(map, 3, 2)).toBe('gap');
+    expect(getTile(map, 2, 3)).toBe('conveyor');
+    expect(map.conveyors).toEqual([
+      { x: 2, y: 3, dir: { x: 1, y: 0 } },
+      { x: 3, y: 3, dir: { x: 0, y: 1 } },
+    ]);
+    expect(conveyorAt(map, 3, 3)?.dir).toEqual({ x: 0, y: 1 });
+    expect(conveyorAt(map, 4, 3)).toBeUndefined();
+  });
+
+  it('blocks walking on void, gaps and belts; only belts are work surfaces and blocks', () => {
+    for (const tile of ['void', 'gap', 'conveyor'] as const) expect(isSolid(tile)).toBe(true);
+    expect(isWorkSurface('conveyor')).toBe(true);
+    expect(isWorkSurface('gap')).toBe(false);
+    expect(isWorkSurface('void')).toBe(false);
+    expect(isBlock('conveyor')).toBe(true);
+    expect(isBlock('gap')).toBe(false);
+    expect(isDrop('void')).toBe(true);
+    expect(isDrop('gap')).toBe(true);
+    expect(isDrop('floor')).toBe(false);
   });
 });
 

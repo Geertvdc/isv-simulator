@@ -25,7 +25,7 @@ import { WorldFx } from './WorldFx';
 import { blockHeight, levelBox, pickTile, placeTicket } from './layout';
 import { createLights, dressScene } from './look';
 import { kitMaterials } from './kit';
-import { buildMap } from './MapView';
+import { type MapView, buildMap } from './MapView';
 import { ticketModel } from './models';
 import { type Stage, disposeTree, getStage } from './stage';
 
@@ -60,6 +60,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
   private readonly fx: WorldFx;
   private readonly people: People;
   private readonly surroundings: Surroundings;
+  private readonly mapView: MapView;
   private readonly carrierYaw = (id: PlayerId): number | undefined => this.people.yawOf(id);
   /** The last round frame, placed again every render with the camera as it is then. */
   private frame: RoundFrame | null = null;
@@ -78,7 +79,8 @@ export class ThreeRoundRenderer implements RoundRenderer {
     if (!parent) throw new Error('The game canvas has no parent');
     this.stage = getStage(parent);
     dressScene(this.world, this.stage.renderer);
-    this.world.add(...createLights(map), buildMap(map, look));
+    this.mapView = buildMap(map, look);
+    this.world.add(...createLights(map), this.mapView.root);
     this.hover = new THREE.LineLoop(
       new THREE.BufferGeometry().setFromPoints([
         new THREE.Vector3(-0.5, 0, -0.5),
@@ -179,6 +181,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
     if (frame) this.overlays.sync(frame.view, frame.hints, frame.hintsVisible, timeMs, project);
     this.overlays.place(project, timeMs);
     this.surroundings.update(timeMs, this.stage.currentQuality !== 'low');
+    this.mapView.update(timeMs);
     this.stage.render(this.world, deltaMs);
   }
 

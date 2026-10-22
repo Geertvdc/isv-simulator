@@ -14,6 +14,7 @@ import hotDeskingMap from '../../maps/level-09-hot-desking.txt?raw';
 import backToBackMap from '../../maps/level-10-back-to-back.txt?raw';
 import synergyMap from '../../maps/level-11-synergy.txt?raw';
 import theReorgMap from '../../maps/level-12-the-reorg.txt?raw';
+import labShapesMap from '../../maps/lab-shapes.txt?raw';
 import {
   CHAPTER_STAR_GATES,
   ORDER_RATE_BY_PLAYERS,
@@ -303,8 +304,17 @@ export const DEMO_LEVEL_IDS: readonly string[] = [
 ];
 
 export function levelById(id: string): Level | undefined {
-  return LEVELS.find((l) => l.id === id);
+  return LEVELS.find((l) => l.id === id) ?? LAB_LEVELS.find((l) => l.id === id);
 }
+
+/**
+ * Levels outside the campaign, to show and test a feature on its own (in
+ * scenes and tests): not in the level select.
+ */
+export const LAB_LEVELS: readonly Level[] = [
+  // An L-shaped office split by an atrium gap, with a conveyor bridge across it.
+  level('lab-shapes', labShapesMap, GARAGE_SETTINGS),
+];
 
 /** Order rate multiplier for a number of players. */
 export function orderRate(playerCount: number): number {
