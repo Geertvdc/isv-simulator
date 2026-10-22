@@ -33,8 +33,9 @@ const OVERLAY_SCALE = 1.5;
 /** Ticket cards float this far over the ticket. */
 const CARD_LIFT = 0.28;
 /** Over a carrier's head, the card; the calendar invite goes over that. */
-const HEAD_CARD_HEIGHT = BODY_HEIGHT + 0.42;
-const HEAD_INVITE_HEIGHT = BODY_HEIGHT + 0.6;
+const HEAD_CARD_HEIGHT = BODY_HEIGHT + 0.4;
+/** The invite is drawn around its middle, so it sits higher to clear the head and hat. */
+const HEAD_INVITE_HEIGHT = BODY_HEIGHT + 0.85;
 /** Over a carrier, the invite goes over the card and its title: this many overlay pixels up. */
 const INVITE_OVER_CARD = 78;
 /** Popups start over the head and its card. */
