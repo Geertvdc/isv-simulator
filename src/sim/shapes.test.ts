@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CONVEYOR_TICKS, THROW_HOLD_TICKS, THROW_RANGE } from './balance';
-import { parseLevelMap } from './level';
-import { levelWithMap } from './levels';
+import { getTile, parseLevelMap } from './level';
+import { LEVELS, levelWithMap } from './levels';
 import { type GameState, type PlayerId, type Vec, createGame, getPlayer } from './state';
 import { cmd, give } from './testing';
 import { tick } from './tick';
@@ -56,7 +56,7 @@ function throwFrom(state: GameState, ticket: Ticket, pos: Vec, dir: Vec): void {
 }
 
 describe('throwing over gaps', () => {
-  it('flies over a gap and lands on the counter across it', () => {
+  it('flies over a gap and comes down on the floor past it', () => {
     const state = newGame();
     const ticket = newTicket(state);
     throwFrom(state, ticket, { x: 4, y: 2 }, { x: 1, y: 0 });
@@ -80,7 +80,13 @@ describe('throwing over gaps', () => {
     tick(state, []);
     expect(ticket.location).toEqual({ kind: 'queue', queue: 'feature' });
     expect(ticket.steps.every((s) => s.progress === 0)).toBe(true);
-    expect(state.events).toContainEqual({ type: 'ticketLost', ticketId: ticket.id, x: 5, y: 1 });
+    expect(state.events).toContainEqual({
+      type: 'ticketLost',
+      ticketId: ticket.id,
+      x: 5,
+      y: 1,
+      queue: 'feature',
+    });
   });
 
   it('loses a ticket thrown off the edge into the void', () => {
@@ -158,5 +164,147 @@ describe('conveyors', () => {
       return JSON.stringify(state);
     };
     expect(run()).toEqual(run());
+  });
+});
+
+const isFlying = (t: Ticket): boolean => t.location.kind === 'flying';
+
+describe('throwing on the old levels', () => {
+  it('never loses a ticket: every throw from every floor tile, every way, lands', () => {
+    const dirs: Vec[] = [
+      { x: 1, y: 0 },
+      { x: -1, y: 0 },
+      { x: 0, y: 1 },
+      { x: 0, y: -1 },
+    ];
+    for (const level of LEVELS) {
+      const state = createGame(level, 1, [1]);
+      state.nextOrderTick = Number.MAX_SAFE_INTEGER;
+      state.nextIncidentTick = null;
+      state.nextMeetingTick = null;
+      for (let y = 0; y < level.map.height; y++) {
+        for (let x = 0; x < level.map.width; x++) {
+          if (getTile(level.map, x, y) !== 'floor') continue;
+          for (const dir of dirs) {
+            const ticket = newTicket(state);
+            ticket.location = {
+              kind: 'flying',
+              pos: { x, y },
+              from: { x, y },
+              dir,
+              thrownBy: 1,
+              lastFloor: { x, y },
+            };
+            let lost = false;
+            for (let i = 0; i < 100 && isFlying(ticket); i++) {
+              tick(state, []);
+              lost ||= state.events.some((e) => e.type === 'ticketLost');
+            }
+            expect(lost, `${level.id} from ${x},${y} toward ${dir.x},${dir.y}`).toBe(false);
+            state.tickets = state.tickets.filter((t) => t !== ticket);
+          }
+        }
+      }
+    }
+  });
+});
+
+describe('conveyor maps', () => {
+  /** A 2-high strip of belts and counters between walls, for belt tests. */
+  function beltGame(rows: string[]): GameState {
+    const map = [
+      '#'.repeat(rows[0]?.length ?? 0),
+      ...rows,
+      '#1234'.padEnd(rows[0]?.length ?? 0, '.'),
+    ];
+    const state = createGame(levelWithMap(parseLevelMap(map.join('\n'))), 1, [1]);
+    state.nextOrderTick = Number.MAX_SAFE_INTEGER;
+    return state;
+  }
+
+  function on(state: GameState, x: number, y: number): Ticket {
+    const t = newTicket(state);
+    t.location = { kind: 'tile', x, y };
+    return t;
+  }
+
+  it('rejects a belt that points at the floor, a wall or off the map', () => {
+    expect(() =>
+      parseLevelMap(['#####', '#>..#', '#1234'].join('\n').replace('#1234', '1234#')),
+    ).toThrow('points at floor');
+    expect(() => parseLevelMap(['#####', '#.>##', '1234#'].join('\n'))).toThrow('points at wall');
+  });
+
+  it('carries left, down and up too', () => {
+    const state = beltGame(['#C<<.', '#.^C.', '#.^v.', '#.^C.'].map((r) => r.padEnd(6, '#')));
+    const left = on(state, 3, 1);
+    const up = on(state, 2, 4);
+    const down = on(state, 3, 3);
+    for (let i = 0; i < CONVEYOR_TICKS * 6; i++) tick(state, []);
+    expect(left.location).toEqual({ kind: 'tile', x: 1, y: 1 });
+    expect(down.location).toEqual({ kind: 'tile', x: 3, y: 4 });
+    // Up the column and onto the belt running left, then the counter at its end... which is taken.
+    expect(up.location.kind).toBe('tile');
+  });
+
+  it('turns a full loop all at once instead of jamming', () => {
+    const state = beltGame(['#>v##', '#^<##']);
+    const tickets = [on(state, 1, 1), on(state, 2, 1), on(state, 2, 2), on(state, 1, 2)];
+    for (let i = 0; i < CONVEYOR_TICKS; i++) tick(state, []);
+    expect(
+      tickets.map((t) => (t.location.kind === 'tile' ? [t.location.x, t.location.y] : null)),
+    ).toEqual([
+      [2, 1],
+      [2, 2],
+      [1, 2],
+      [1, 1],
+    ]);
+  });
+
+  it('lets two belts merging into one take turns', () => {
+    const state = beltGame(['#>v<#', '##v##', '##C##']);
+    const arrived = { L: 0, R: 0 };
+    // Both feeders kept full; whatever reaches the counter is counted and cleared.
+    for (let i = 0; i < 600; i++) {
+      for (const [x, title] of [
+        [1, 'L'],
+        [3, 'R'],
+      ] as const) {
+        if (!ticketOnTile(state, x, 1)) on(state, x, 1).title = title;
+      }
+      tick(state, []);
+      const done = ticketOnTile(state, 2, 3);
+      if (done) {
+        if (done.title === 'L') arrived.L++;
+        else arrived.R++;
+        state.tickets = state.tickets.filter((t) => t !== done);
+      }
+    }
+    expect(arrived.L).toBeGreaterThan(5);
+    expect(Math.abs(arrived.L - arrived.R)).toBeLessThanOrEqual(2);
+  });
+
+  it('hands a ticket to a pipeline only when it would take it', () => {
+    const state = beltGame(['#>P##']);
+    const ready = newTicket(state, 2);
+    ready.location = { kind: 'tile', x: 1, y: 1 };
+    for (let i = 0; i < CONVEYOR_TICKS; i++) tick(state, []);
+    expect(ready.location).toEqual({ kind: 'tile', x: 2, y: 1 });
+    const early = beltGame(['#>P##']);
+    const notCoded = newTicket(early, 0);
+    notCoded.location = { kind: 'tile', x: 1, y: 1 };
+    for (let i = 0; i < CONVEYOR_TICKS * 3; i++) tick(early, []);
+    expect(notCoded.location).toEqual({ kind: 'tile', x: 1, y: 1 });
+  });
+
+  it('gives a ticket put on a belt its own time on the tile', () => {
+    const state = beltGame(['#>>C#']);
+    const first = on(state, 1, 1);
+    for (let i = 0; i < CONVEYOR_TICKS - 1; i++) tick(state, []);
+    // Swapped for a fresh one just before it would have moved.
+    state.tickets = state.tickets.filter((t) => t !== first);
+    const second = on(state, 1, 1);
+    tick(state, []);
+    expect(second.location).toEqual({ kind: 'tile', x: 1, y: 1 });
   });
 });

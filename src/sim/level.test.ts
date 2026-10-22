@@ -170,7 +170,7 @@ describe('isSolid', () => {
 });
 
 describe('level shapes', () => {
-  const map = parseLevelMap(['  ####', '  #12#', '###~.#', '#3>v4#', '######'].join('\n'));
+  const map = parseLevelMap(['  ####', '  #12#', '###~4#', '#3>vC#', '###C##'].join('\n'));
 
   it('reads spaces as void, ~ as a gap and arrows as conveyors with their direction', () => {
     expect(getTile(map, 0, 0)).toBe('void');

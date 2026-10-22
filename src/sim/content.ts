@@ -47,6 +47,8 @@ export const PIPELINE_BROKE_TEXT = 'Build server down!';
 export const PIPELINE_FIXED_TEXT = 'Fixed!';
 /** Over a ticket that fell into a gap or off the edge: all its work is gone. */
 export const TICKET_LOST_TEXT = 'git reset --hard';
+/** Over the queue a lost ticket went back to. */
+export const BACKLOG_TEXT = 'Back in the backlog';
 
 /** Pops up over a player who got shoved by a dash; one is picked per shove. */
 export const SHOVE_TEXTS: readonly string[] = ['Oof!', 'Hey!', 'Rude!', 'Watch it!', 'Not cool'];

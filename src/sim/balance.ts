@@ -123,7 +123,7 @@ export const BUG_CHANCE = 0.25;
 export const BUG_CHANCE_UNTESTED = 0.75;
 /** Ticks between shipping a buggy ticket and its bug arriving in the bug queue. */
 export const BUG_DELAY_TICKS = 6 * TICKS_PER_SECOND;
-/** Conveyor belts carry a ticket one tile this often: about a walking pace and a half slower. */
+/** Conveyor belts carry a ticket one tile this often: 2 tiles a second, far slower than walking (5) or throwing (12). */
 export const CONVEYOR_TICKS = Math.round(0.5 * TICKS_PER_SECOND);
 
 /** Order cards flash once this few ticks are left. */

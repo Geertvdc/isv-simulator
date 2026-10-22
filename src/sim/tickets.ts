@@ -183,6 +183,7 @@ export function enqueueTicket(
  */
 export function loseTicket(state: GameState, ticket: Ticket, at: { x: number; y: number }): void {
   for (const step of ticket.steps) step.progress = 0;
-  ticket.location = { kind: 'queue', queue: QUEUE_OF[ticket.kind] };
-  state.events.push({ type: 'ticketLost', ticketId: ticket.id, x: at.x, y: at.y });
+  const queue = QUEUE_OF[ticket.kind];
+  ticket.location = { kind: 'queue', queue };
+  state.events.push({ type: 'ticketLost', ticketId: ticket.id, x: at.x, y: at.y, queue });
 }

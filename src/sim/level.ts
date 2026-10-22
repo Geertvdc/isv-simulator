@@ -73,6 +73,16 @@ const CHAR_TO_TILE: Readonly<Record<string, Tile>> = {
   '~': 'gap',
 };
 
+/** What a conveyor can hand a ticket to: another belt, a counter or a station that takes tickets. */
+const BELT_TAKERS: ReadonlySet<Tile> = new Set<Tile>([
+  'conveyor',
+  'counter',
+  'keyboard',
+  'testBench',
+  'review',
+  'pipeline',
+]);
+
 /** Conveyor chars and the way they carry (screen-relative: `v` runs toward the camera). */
 const CONVEYOR_DIRS: Readonly<Record<string, GridPoint>> = {
   '>': { x: 1, y: 0 },
@@ -142,6 +152,18 @@ export function parseLevelMap(text: string): LevelMap {
       tiles.push(tile);
     }
   });
+
+  // Every belt must hand its tickets to something that takes them, or they'd wait there forever.
+  for (const belt of conveyors) {
+    const x = belt.x + belt.dir.x;
+    const y = belt.y + belt.dir.y;
+    const next = x >= 0 && x < width && y >= 0 ? tiles[y * width + x] : undefined;
+    if (next === undefined || !BELT_TAKERS.has(next)) {
+      throw new Error(
+        `Conveyor at line ${belt.y + 1}, column ${belt.x + 1} points at ${next ?? 'nothing'}`,
+      );
+    }
+  }
 
   const result: GridPoint[] = [];
   for (let i = 0; i < MAX_PLAYERS; i++) {
