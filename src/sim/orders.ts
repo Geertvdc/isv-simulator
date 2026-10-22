@@ -233,10 +233,14 @@ export function expireOrders(state: GameState): void {
     state.orders = state.orders.filter((o) => o !== order);
     const penalty = Math.min(expiredPenalty(order.kind), state.score);
     state.score -= penalty;
-    // Its waiting ticket leaves the queue too (both parts of a full-stack feature).
-    const kinds = order.kind === 'fullstack' ? PART_KINDS : [order.kind];
+    // Its waiting ticket leaves the queue too: for a full-stack feature a waiting merged
+    // ticket (lost and back), or else both of its parts.
+    const waitingOf = (kind: TicketKind) =>
+      queuedTickets(state, QUEUE_OF[kind]).find((t) => t.kind === kind);
+    const merged = order.kind === 'fullstack' ? waitingOf('fullstack') : undefined;
+    const kinds = order.kind === 'fullstack' && !merged ? PART_KINDS : [order.kind];
     for (const kind of kinds) {
-      const waiting = queuedTickets(state, QUEUE_OF[kind]).find((t) => t.kind === kind);
+      const waiting = waitingOf(kind);
       if (waiting) state.tickets = state.tickets.filter((t) => t !== waiting);
     }
     state.events.push({ type: 'orderExpired', order, penalty });

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { stationWorkStep } from '../sim/interact';
 import { THROW_RANGE } from '../sim/balance';
+import { PAIRING_TEXT } from '../sim/content';
 import { type BlockTile, getTile } from '../sim/level';
 import type { GameState } from '../sim/state';
 import {
@@ -113,10 +114,17 @@ export class TicketRenderer {
       const bar = progress > 0 && progress < 1 ? progress : null;
 
       sprite.g.setPosition(placed.x, placed.y).setDepth(placed.depth);
+      // Over a carried card its title; over a keyboard two players code at, that they're pairing.
+      const paired = isPaired(state, ticket);
       sprite.title
-        .setPosition(placed.x, placed.y - CARD_HEIGHT - 2)
+        .setText(paired ? PAIRING_TEXT : ticket.title)
+        .setColor(paired ? PAIRING_COLOR : '#ffffff')
+        .setPosition(
+          placed.x,
+          placed.y - CARD_HEIGHT - (bar === null ? 2 : BAR_HEIGHT + BAR_GAP + 4),
+        )
         .setDepth(placed.depth)
-        .setVisible(carried && placed.visible);
+        .setVisible((carried || paired) && placed.visible);
       sprite.g.setVisible(placed.visible);
       const key = `${ticket.steps.map((s) => s.progress >= 1).join()}|${bar ?? ''}`;
       if (key !== sprite.drawn) {
@@ -266,6 +274,15 @@ export class TicketRenderer {
       .setOrigin(0.5, 1)
       .setVisible(false);
   }
+}
+
+/** The label over a ticket being pair-programmed, and its color. */
+export const PAIRING_COLOR = '#ffd166';
+
+/** Whether two players are coding `ticket` together right now (pair programming). */
+export function isPaired(state: GameState, ticket: Ticket): boolean {
+  const loc = ticket.location;
+  return loc.kind === 'tile' && state.pairing.some((p) => p.x === loc.x && p.y === loc.y);
 }
 
 /** Draws the card with its bottom center at (0, 0), and the progress bar above it if any. */

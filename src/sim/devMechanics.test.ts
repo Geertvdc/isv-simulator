@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { DESIGN_RATE, PAIR_RATE, WORK_RATE } from './balance';
+import {
+  DESIGNED_CODE_FACTOR,
+  DESIGN_RATE,
+  PAIR_RATE,
+  THROW_HOLD_TICKS,
+  WORK_RATE,
+} from './balance';
 import { canPutDown, interact } from './interact';
 import { parseLevelMap } from './level';
 import { type LevelSettings, levelWithMap } from './levels';
-import { createOrder, shipTicket } from './orders';
+import { createOrder, expireOrders, shipTicket } from './orders';
 import { type GameState, type PlayerId, type Vec, createGame, getPlayer } from './state';
 import { cmd } from './testing';
 import { tick } from './tick';
@@ -163,7 +169,104 @@ describe('merging a front end and a back end', () => {
   });
 });
 
+describe('design pays off', () => {
+  it('codes a designed feature faster', () => {
+    const state = newGame();
+    const t = ticket(state, 'feature', 1, DESIGNED_FEATURE_STEPS);
+    t.location = { kind: 'tile', x: 6, y: 1 };
+    place(state, 1, { x: 6, y: 2 }, { x: 0, y: -1 });
+    workFor(state, 10, 1);
+    expect(t.steps[1]?.progress).toBeCloseTo(WORK_RATE * DESIGNED_CODE_FACTOR * 10);
+  });
+});
+
+describe('merging on the way', () => {
+  it('merges a coded part thrown onto the station holding its other half', () => {
+    const state = newGame();
+    const front = ticket(state, 'frontend', 1);
+    front.location = { kind: 'tile', x: 4, y: 1 };
+    const back = ticket(state, 'backend', 1);
+    back.location = { kind: 'player', playerId: 1 };
+    // Thrown up the column at the merge station from two tiles below.
+    place(state, 1, { x: 4, y: 3 }, { x: 0, y: -1 });
+    for (let i = 0; i < THROW_HOLD_TICKS + 1; i++) {
+      tick(state, [cmd(state, 1, { interact: true })]);
+    }
+    tick(state, [cmd(state, 1, {})]);
+    for (let i = 0; i < 60; i++) tick(state, []);
+    expect(ticketOnTile(state, 4, 1)?.kind).toBe('fullstack');
+  });
+
+  it('lets an uncoded part fly over the merge station', () => {
+    const state = newGame();
+    const raw = ticket(state, 'frontend', 0);
+    raw.location = {
+      kind: 'flying',
+      pos: { x: 4, y: 2.4 },
+      from: { x: 4, y: 3 },
+      dir: { x: 0, y: -1 },
+      thrownBy: 1,
+      lastFloor: { x: 4, y: 2 },
+    };
+    for (let i = 0; i < 30; i++) tick(state, []);
+    // It hits the wall behind and drops back on the floor in front.
+    expect(raw.location).toEqual({ kind: 'tile', x: 4, y: 2 });
+  });
+
+  it('merges a part a conveyor brings to the merge station', () => {
+    const state = createGame(
+      levelWithMap(parseLevelMap(['######', '#>G..#', '#1234#', '######'].join('\n'))),
+      1,
+      [1],
+    );
+    state.nextOrderTick = Number.MAX_SAFE_INTEGER;
+    const front = ticket(state, 'frontend', 1);
+    front.location = { kind: 'tile', x: 2, y: 1 };
+    const back = ticket(state, 'backend', 1);
+    back.location = { kind: 'tile', x: 1, y: 1 };
+    for (let i = 0; i < 60; i++) tick(state, []);
+    expect(ticketOnTile(state, 2, 1)?.kind).toBe('fullstack');
+  });
+});
+
+describe('full-stack orders running out', () => {
+  it('take both waiting parts with them', () => {
+    const state = newGame();
+    const order = createOrder(state, 'fullstack', 'Checkout');
+    state.tick = order.expiresTick;
+    expireOrders(state);
+    expect(queuedTickets(state, 'feature')).toEqual([]);
+  });
+
+  it('take a merged ticket that fell back into the queue instead of two parts', () => {
+    const state = newGame();
+    const order = createOrder(state, 'fullstack', 'Checkout');
+    const merged = ticket(state, 'fullstack', 2);
+    loseTicket(state, merged, { x: 0, y: 0 });
+    state.tick = order.expiresTick;
+    expireOrders(state);
+    expect(
+      queuedTickets(state, 'feature')
+        .map((t) => t.kind)
+        .sort(),
+    ).toEqual(['backend', 'frontend']);
+  });
+});
+
 describe('pair programming', () => {
+  it('marks the keyboard as pairing while two code there, and stops when one lets go', () => {
+    const state = newGame({ pairing: true });
+    const t = ticket(state, 'feature', 0);
+    t.location = { kind: 'tile', x: 6, y: 4 };
+    place(state, 1, { x: 6, y: 3 }, { x: 0, y: 1 });
+    place(state, 2, { x: 6, y: 5 }, { x: 0, y: -1 });
+    workFor(state, 10, 1, 2);
+    expect(t.steps[0]?.progress).toBeCloseTo(PAIR_RATE * 10);
+    expect(state.pairing).toEqual([{ x: 6, y: 4 }]);
+    workFor(state, 1, 1);
+    expect(state.pairing).toEqual([]);
+  });
+
   it('codes at PAIR_RATE with two players at one keyboard, on levels with pairing', () => {
     const state = newGame({ pairing: true });
     const t = ticket(state, 'feature', 0);

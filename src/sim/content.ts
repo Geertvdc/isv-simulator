@@ -1,5 +1,7 @@
 /** Text content. Add jokes freely. */
 
+import type { TicketKind } from './tickets';
+
 /** Flavour titles for tickets; they don't change how a ticket plays. */
 export const TICKET_TITLES: readonly string[] = [
   'Fix login button',
@@ -49,6 +51,19 @@ export const PIPELINE_FIXED_TEXT = 'Fixed!';
 export const TICKET_LOST_TEXT = 'git reset --hard';
 /** Over the queue a lost ticket went back to. */
 export const BACKLOG_TEXT = 'Back in the backlog';
+/** Over a ticket two players are coding together. */
+export const PAIRING_TEXT = 'Pairing ×1.9';
+
+/** What each kind of order (and ticket) is called on its card. */
+export const ORDER_KIND_LABELS: Readonly<Record<TicketKind, string>> = {
+  feature: 'Feature',
+  bug: 'Bug',
+  incident: 'Incident!',
+  frontend: 'Front end',
+  backend: 'Back end',
+  fullstack: 'Full-stack',
+};
+
 /** Over a merge station when a front end and a back end come together. */
 export const MERGED_TEXT = 'Merged!';
 

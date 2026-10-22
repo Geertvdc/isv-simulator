@@ -3,7 +3,14 @@
  * working the keyboard and test bench, and repairing broken pipelines.
  */
 
-import { DESIGN_RATE, PAIR_RATE, REVIEWERS_NEEDED, REVIEW_RATE, WORK_RATE } from './balance';
+import {
+  DESIGNED_CODE_FACTOR,
+  DESIGN_RATE,
+  PAIR_RATE,
+  REVIEWERS_NEEDED,
+  REVIEW_RATE,
+  WORK_RATE,
+} from './balance';
 import { type Tile, getTile } from './level';
 import { shipTicket } from './orders';
 import { isBroken, isBuilding, repairPipeline } from './pipeline';
@@ -189,13 +196,14 @@ export function work(state: GameState, playerId: PlayerId, tickWork: TickWork): 
     return true;
   }
   if (tile === 'keyboard' && state.settings.pairing) {
-    // Pairing: everyone at the keyboard signs up; `finishCoding` advances it once.
-    const ticket = ticketOnTile(state, x, y);
-    if (!ticket || !stationWorkStep(ticket, tile)) return false;
-    tickWork.coders.set(key, [...(tickWork.coders.get(key) ?? []), playerId]);
-    return true;
+    // Pairing: everyone at the keyboard signs up. The first one codes right away (like
+    // alone); `finishCoding` adds the pair's extra once a second one joined.
+    const coders = tickWork.coders.get(key) ?? [];
+    tickWork.coders.set(key, [...coders, playerId]);
+    if (coders.length > 0) return true;
+  } else if (worked.has(key)) {
+    return false;
   }
-  if (worked.has(key)) return false;
   if (tile === 'pipeline') {
     if (!repairPipeline(state, x, y)) return false;
     worked.add(key);
@@ -206,9 +214,17 @@ export function work(state: GameState, playerId: PlayerId, tickWork: TickWork): 
   const ticket = ticketOnTile(state, x, y);
   const step = ticket && stationWorkStep(ticket, tile);
   if (!step) return false;
-  advanceStep(step, HAND_RATE[tile] ?? WORK_RATE);
+  advanceStep(step, handRate(ticket, tile));
   worked.add(key);
   return true;
+}
+
+/** How fast `tile` works its step on `ticket` by hand: coding goes faster once it's been designed. */
+function handRate(ticket: Ticket, tile: Tile): number {
+  const rate = HAND_RATE[tile] ?? WORK_RATE;
+  if (tile !== 'keyboard') return rate;
+  const designed = ticket.steps.some((s) => s.kind === 'design' && s.progress >= 1);
+  return designed ? rate * DESIGNED_CODE_FACTOR : rate;
 }
 
 /**
@@ -217,12 +233,17 @@ export function work(state: GameState, playerId: PlayerId, tickWork: TickWork): 
  */
 export function finishCoding(state: GameState, tickWork: TickWork): void {
   const { width } = state.level;
+  state.pairing = [];
   for (const [key, players] of tickWork.coders) {
+    if (players.length < 2) continue;
     const x = key % width;
     const y = Math.floor(key / width);
     const ticket = ticketOnTile(state, x, y);
     const step = ticket && stationWorkStep(ticket, 'keyboard');
-    if (step) advanceStep(step, players.length >= 2 ? PAIR_RATE : WORK_RATE);
+    if (!ticket || !step) continue;
+    const solo = handRate(ticket, 'keyboard');
+    advanceStep(step, solo * (PAIR_RATE / WORK_RATE) - solo);
+    state.pairing.push({ x, y });
   }
 }
 

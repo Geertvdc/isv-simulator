@@ -45,7 +45,7 @@ export const BLOCK_STYLES: Readonly<Record<BlockTile, BlockStyle>> = {
   bin: { color: 0x5a5a5a, height: STATION_HEIGHT, label: 'X' },
   conveyor: { color: 0x4a505c, height: STATION_HEIGHT },
   whiteboard: { color: 0xdfe6ee, height: STATION_HEIGHT, label: 'W' },
-  merge: { color: 0xf0883e, height: STATION_HEIGHT, label: 'G' },
+  merge: { color: 0xe8459a, height: STATION_HEIGHT, label: 'G' },
 };
 
 /** Wall looks a level can pick; each has the three pieces in `WALL_PIECES`. */
