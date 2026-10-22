@@ -22,7 +22,7 @@ import {
   screenToGround,
 } from '../projection';
 import type { RoundFrame, RoundRenderer } from '../RoundRenderer';
-import { Overlays, type ScreenPoint, overlayScale } from './Overlays';
+import { Overlays, POPUP_HEIGHT, type ScreenPoint, overlayScale } from './Overlays';
 import { WorldFx } from './WorldFx';
 import {
   BODY_HEIGHT,
@@ -54,7 +54,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
   private readonly players = new Map<PlayerId, THREE.Group>();
   private readonly managers = new Map<number, THREE.Group>();
   private readonly tickets = new Map<number, THREE.Mesh>();
-  private readonly targets = new Map<PlayerId, THREE.Mesh>();
+  private readonly targets = new Map<PlayerId, THREE.Group>();
   private readonly hover: THREE.LineLoop;
   private readonly overlays: Overlays;
   private readonly fx: WorldFx;
@@ -65,6 +65,8 @@ export class ThreeRoundRenderer implements RoundRenderer {
     nose: new THREE.SphereGeometry(0.08, 12, 8),
     card: new THREE.BoxGeometry(CARD_SIZE.width, CARD_SIZE.thickness, CARD_SIZE.depth),
     target: new THREE.PlaneGeometry(0.96, 0.96).rotateX(-Math.PI / 2),
+    targetFrame: squareFrame(0.5, 0.42),
+    targetRim: squareFrame(0.42, 0.39),
     ring: new THREE.RingGeometry(RING.inner, RING.outer, 40).rotateX(-Math.PI / 2),
   };
 
@@ -158,7 +160,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
     }
     this.dropMissing(this.tickets, seenTickets);
 
-    for (const player of state.players) this.updateTarget(player.id, targetTile(state, player.id));
+    for (const id of seenPlayers) this.updateTarget(id, targetTile(state, id));
     this.dropMissing(this.targets, seenPlayers);
     this.fx.sync(state, timeMs);
 
@@ -172,10 +174,10 @@ export class ThreeRoundRenderer implements RoundRenderer {
           break;
         case 'popup':
           this.overlays.popup(
-            gridToWorld(effect.at.x, effect.at.y, BODY_HEIGHT),
+            gridToWorld(effect.at.x, effect.at.y, POPUP_HEIGHT),
             effect.text,
             effect.color,
-            this.project(this.pose),
+            timeMs,
           );
           break;
       }
@@ -185,7 +187,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
   render(timeMs: number, deltaMs: number): void {
     const { width, height } = this.scene.scale;
     this.stage.resize(width, height);
-    const shake = this.fx.update(timeMs, height);
+    const shake = this.fx.update(timeMs, { width, height });
     const pose = {
       ...this.pose,
       principal: { x: this.pose.principal.x + shake.x, y: this.pose.principal.y + shake.y },
@@ -194,7 +196,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
     const project = this.project(pose);
     const frame = this.frame;
     if (frame) this.overlays.sync(frame.view, frame.hints, frame.hintsVisible, timeMs, project);
-    this.overlays.place(project);
+    this.overlays.place(project, timeMs);
     this.stage.watchFrame(deltaMs, this.world);
     this.stage.render(this.world, deltaMs);
   }
@@ -279,14 +281,15 @@ export class ThreeRoundRenderer implements RoundRenderer {
   private updateTarget(id: PlayerId, target: Point): void {
     let mesh = this.targets.get(id);
     if (!mesh) {
-      mesh = new THREE.Mesh(
-        this.shared.target,
-        new THREE.MeshBasicMaterial({
-          color: playerColor(id),
-          transparent: true,
-          opacity: 0.45,
-          depthWrite: false,
-        }),
+      // A light tint, a thick frame in the player's color and a thin white one inside it,
+      // so it shows even on a block of the same color.
+      const flat = (color: number, opacity: number) =>
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false });
+      mesh = new THREE.Group();
+      mesh.add(
+        new THREE.Mesh(this.shared.target, flat(playerColor(id), 0.3)),
+        new THREE.Mesh(this.shared.targetFrame, flat(playerColor(id), 1)),
+        new THREE.Mesh(this.shared.targetRim, flat(0xffffff, 0.9)),
       );
       this.world.add(mesh);
       this.targets.set(id, mesh);
@@ -311,6 +314,25 @@ export class ThreeRoundRenderer implements RoundRenderer {
       objects.delete(key);
     }
   }
+}
+
+/** A flat square frame on the floor plane, `outer` and `inner` half-widths. */
+function squareFrame(outer: number, inner: number): THREE.ShapeGeometry {
+  const shape = new THREE.Shape([
+    new THREE.Vector2(-outer, -outer),
+    new THREE.Vector2(outer, -outer),
+    new THREE.Vector2(outer, outer),
+    new THREE.Vector2(-outer, outer),
+  ]);
+  shape.holes.push(
+    new THREE.Path([
+      new THREE.Vector2(-inner, -inner),
+      new THREE.Vector2(-inner, inner),
+      new THREE.Vector2(inner, inner),
+      new THREE.Vector2(inner, -inner),
+    ]),
+  );
+  return new THREE.ShapeGeometry(shape).rotateX(-Math.PI / 2);
 }
 
 /** Puts `obj` at world point `p` (from `gridToWorld`, so grid ↔ world stays in projection.ts). */

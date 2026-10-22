@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { GARAGE } from '../../sim/levels';
 import { type GameState, createGame } from '../../sim/state';
 import type { Ticket } from '../../sim/tickets';
+import { fitCamera3d, projectPoint, screenToGround } from '../projection';
 import type { RoundView } from '../roundView';
 import {
   CARRY_HEIGHT,
@@ -103,5 +104,33 @@ describe('3D layout', () => {
     if (!first || !second) throw new Error('not placed');
     expect(first.pos.y).toBeGreaterThan(second.pos.y);
     expect(placed.map((p) => p?.visible)).toEqual([true, true, true, true, false, false]);
+  });
+
+  it('picks a wall from a point high on its front face, seen through the real camera', () => {
+    const pose = fitCamera3d(
+      levelBox(map),
+      { width: 1440, height: 810 },
+      {
+        top: 120,
+        right: 32,
+        bottom: 80,
+        left: 32,
+      },
+    );
+    const wall = tilesOf(map, 'wall').find(
+      (t) => t.y === 0 && blockHeight(map, t.x, t.y + 1) === 0,
+    );
+    if (!wall) throw new Error('garage changed');
+    for (const h of [0.2, 0.6, WALL_HEIGHT - 0.05]) {
+      // On the wall's face toward the camera.
+      const s = projectPoint(pose, { x: wall.x, y: h, z: wall.y + 0.49 });
+      expect(pickTile(map, (height) => screenToGround(pose, s.x, s.y, height))).toEqual(wall);
+    }
+    // And the floor in front of it.
+    const s = projectPoint(pose, { x: wall.x, y: 0, z: wall.y + 1 });
+    expect(pickTile(map, (height) => screenToGround(pose, s.x, s.y, height))).toEqual({
+      x: wall.x,
+      y: wall.y + 1,
+    });
   });
 });

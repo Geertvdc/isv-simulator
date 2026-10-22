@@ -57,9 +57,9 @@ export function levelBox(map: LevelMap): Box3 {
 const PICK_HEIGHTS = [WALL_HEIGHT, STATION_HEIGHT, FRONT_WALL_HEIGHT];
 
 /**
- * The tile whose top a view ray hits first. `ground(h)` is where the ray
- * crosses height `h` (or `null`); the ray meets higher tops before lower
- * ones, so the first height whose tile is that tall wins, else the floor.
+ * The tile whose block a view ray hits first. `ground(h)` is where the ray
+ * crosses height `h` (or `null`). Going down from the tallest height, the
+ * first tile at least that tall is where the ray entered a block; else the floor.
  */
 export function pickTile(
   map: LevelMap,
@@ -69,7 +69,8 @@ export function pickTile(
     const g = ground(h);
     if (!g) continue;
     const tile = { x: Math.round(g.x) + 0, y: Math.round(g.y) + 0 };
-    if (blockHeight(map, tile.x, tile.y) === h) return tile;
+    // At least that tall: the ray is inside the block there (through its top or its front face).
+    if (blockHeight(map, tile.x, tile.y) >= h) return tile;
   }
   const g = ground(0);
   return g && { x: Math.round(g.x) + 0, y: Math.round(g.y) + 0 };
