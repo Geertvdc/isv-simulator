@@ -48,7 +48,7 @@ const people: Entry[] = [
     () => {
       const c = createManager(materials);
       const pose = playerPose(IDLE, 0);
-      pose.rightHand = { x: 0.24, y: 0.5, z: 0.2 };
+      pose.rightHand = { x: 0.42, y: 0.55, z: 0.3 };
       applyPose(c, pose);
       return c.root;
     },

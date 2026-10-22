@@ -27,6 +27,12 @@ The sun comes from behind and left (shadows fall forward and right, where they s
 - No decorations on walls behind stations and counters.
 - `/models.html`: game camera tilt and lights, wider spacing, tickets and inner walls.
 
+## Second review round
+
+- A broken pipeline's whole top goes dark (the plate sits over the conveyor), its alarm is bigger and on a pole above a ticket's checklist, the smoke darker.
+- Letter badges stand on the front-left of each station's top, 0.3 across, leaning back square on to the camera.
+- Overlays over the back row are pushed down below the HUD's order cards.
+
 ## Not done: ForgeGUI trial
 
 The plan had a ForgeGUI trial for two or three hero props. It needs an account (and generations on free credits may land in its public catalog), which only the product owner can set up. Everything was built in code instead. To try it later: generate a GLB, run it through `@gltf-transform/cli` (simplify under 3k triangles, meshopt), put it in `public/assets/models/`, load it with `GLTFLoader` in `MapView` for that station, and list it in `CREDITS.md`.

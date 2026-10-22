@@ -175,8 +175,8 @@ export function createManager(materials: KitMaterials): Character {
     // A boxy jacket with shoulder pads.
     .box(0.56, 0.38, 0.38, suit, { at: [0, 0.4, 0] }, 0.08)
     .box(0.6, 0.1, 0.36, suit, { at: [0, 0.56, 0] }, 0.05)
-    // A white collar all round (shows from behind too), shirt, tie and lapels in front.
-    .torus(0.14, 0.04, PALETTE.white, { at: [0, NECK + 0.02, -0.01], rot: [Math.PI / 2, 0, 0] })
+    // A thin white collar all round, low on the neck (shows from behind), shirt, tie and lapels in front.
+    .torus(0.15, 0.025, PALETTE.white, { at: [0, NECK - 0.05, -0.01], rot: [Math.PI / 2, 0, 0] })
     .cone(0.1, 0.22, PALETTE.white, { at: [0, NECK - 0.09, 0.19], rot: [Math.PI, 0, 0] }, 3)
     .box(0.055, 0.24, 0.03, 0xd2322d, { at: [0, NECK - 0.18, 0.205] }, 0)
     .box(0.08, 0.05, 0.035, 0xd2322d, { at: [0, NECK - 0.05, 0.2] }, 0)
@@ -189,8 +189,8 @@ export function createManager(materials: KitMaterials): Character {
     .sphere(r, skin, { at: [0, r * 0.9 + lift, 0] }, [1, 0.95, 1])
     // Slicked-back grey hair, glasses and a stern brow.
     .sphere(r * 1.04, 0x9aa0aa, { at: [0, r * 1.12 + lift, -0.05] }, [1, 0.75, 0.95])
-    .torus(0.045, 0.01, PALETTE.ink, { at: [-0.075, r + lift, r * 0.92] })
-    .torus(0.045, 0.01, PALETTE.ink, { at: [0.075, r + lift, r * 0.92] })
+    .torus(0.045, 0.018, PALETTE.ink, { at: [-0.075, r + lift, r * 0.92] })
+    .torus(0.045, 0.018, PALETTE.ink, { at: [0.075, r + lift, r * 0.92] })
     .sphere(0.022, PALETTE.ink, { at: [-0.075, r + lift, r * 0.9] })
     .sphere(0.022, PALETTE.ink, { at: [0.075, r + lift, r * 0.9] })
     .box(
@@ -224,9 +224,10 @@ export function createManager(materials: KitMaterials): Character {
     .cylinder(0.052, 0.052, 0.004, 0x5a3a22, { at: [0, 0.135, 0.03] })
     .build().body;
   const clipboard = new ModelBuilder()
-    .box(0.2, 0.28, 0.02, 0x8c5f3d, { at: [0, 0.08, 0.04], rot: [-0.4, 0, 0] }, 0)
-    .box(0.17, 0.22, 0.01, PALETTE.white, { at: [0, 0.07, 0.055], rot: [-0.4, 0, 0] }, 0)
-    .box(0.08, 0.03, 0.03, 0xb8bec8, { at: [0, 0.2, 0.0], rot: [-0.4, 0, 0] }, 0)
+    // Held flat-ish, face up toward the camera.
+    .box(0.2, 0.02, 0.28, 0x8c5f3d, { at: [0, 0.02, 0.1], rot: [0.5, 0, 0] }, 0)
+    .box(0.17, 0.01, 0.22, PALETTE.white, { at: [0, 0.035, 0.1], rot: [0.5, 0, 0] }, 0)
+    .box(0.08, 0.03, 0.03, 0xb8bec8, { at: [0, 0.1, -0.02], rot: [0.5, 0, 0] }, 0)
     .build().body;
   for (const [geometry, hand] of [
     [mug, c.rightHand],

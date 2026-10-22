@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { type LevelMap, type Tile, getTile } from '../../sim/level';
 import type { MapLook } from '../MapRenderer';
 import { tileHash, wallDeco, wallPiece } from '../mapShape';
-import { type Vec3, gridToWorld } from '../projection';
+import { VIEW3D_PITCH, type Vec3, gridToWorld } from '../projection';
 import { type KitMaterials, type Model, kitMaterials } from './kit';
 import { SLAB_DEPTH, STATION_HEIGHT, facingYaw, heroPlacement, stationFacing } from './layout';
 import { PALETTE, matte } from './look';
@@ -66,6 +66,7 @@ export function buildMap(map: LevelMap, look: MapLook): THREE.Group {
     return model;
   };
   const badges = new Map<string, THREE.MeshBasicMaterial>();
+  const badgeGeometry = new THREE.PlaneGeometry(BADGE_SIZE, BADGE_SIZE).rotateX(-VIEW3D_PITCH);
   const place = (key: string, model: () => Model, p: Placement) => {
     let entry = placements.get(key);
     if (!entry) {
@@ -113,8 +114,10 @@ export function buildMap(map: LevelMap, look: MapLook): THREE.Group {
       const letter = STATION_LETTERS[tile];
       if (letter) {
         const b = heroPlacement(yaw, BADGE_AT);
-        const at = gridToWorld(x + b.dx, y + b.dz, STATION_HEIGHT + 0.004);
-        root.add(letterBadge(badges, letter, at));
+        // Its bottom edge on the top, leaning back to face the camera.
+        const lift = (BADGE_SIZE / 2) * Math.sin(VIEW3D_PITCH);
+        const at = gridToWorld(x + b.dx, y + b.dz, STATION_HEIGHT + lift);
+        root.add(letterBadge(badgeGeometry, badges, letter, at));
       }
     }
   }
@@ -159,15 +162,16 @@ function instances(
 }
 
 /** Where the letter badge lies on a station's top: the front left corner, in the station's space. */
-const BADGE_AT: [number, number] = [-0.36, 0.36];
-const BADGE_SIZE = 0.22;
-const badgeGeometry = new THREE.PlaneGeometry(BADGE_SIZE, BADGE_SIZE).rotateX(-Math.PI / 2);
+const BADGE_AT: [number, number] = [-0.32, 0.36];
+const BADGE_SIZE = 0.3;
 
 /**
- * A round badge with the station's letter lying on its top, upright for the
- * camera, like the HUD's order cards. One material per letter, shared.
+ * A round badge with the station's letter standing on its top, square on to
+ * the camera like a sign, matching the HUD's order cards. One material per
+ * letter, shared.
  */
 function letterBadge(
+  geometry: THREE.BufferGeometry,
   materials: Map<string, THREE.MeshBasicMaterial>,
   text: string,
   at: Vec3,
@@ -177,7 +181,7 @@ function letterBadge(
     material = new THREE.MeshBasicMaterial({ map: letterTexture(text), transparent: true });
     materials.set(text, material);
   }
-  const mesh = new THREE.Mesh(badgeGeometry, material);
+  const mesh = new THREE.Mesh(geometry, material);
   put(mesh, at);
   return mesh;
 }

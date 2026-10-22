@@ -117,7 +117,7 @@ export class People {
       };
       const pose = playerPose(input, timeMs);
       // The coffee stays level in front: only the free hand swings.
-      pose.rightHand = { x: 0.24, y: 0.5, z: 0.2 };
+      pose.rightHand = { x: 0.42, y: 0.55, z: 0.3 };
       applyPose(person.character, pose);
     }
     this.drop(this.managers, seenManagers);

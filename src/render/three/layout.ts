@@ -29,9 +29,13 @@ export const CARD_SIZE = { width: 0.42, depth: 0.32, thickness: 0.05 };
 export const QUEUE_STACK_MAX = 4;
 /** Height of the carried ticket's bottom above the floor: held out in front at chest height. */
 export const CARRY_HEIGHT = 0.62;
-/** A full throw wind-up lifts the carried ticket this much and pulls it this far back, over the shoulder. */
-const WIND_UP_LIFT = 0.33;
-const WIND_UP_BACK = 0.6;
+/**
+ * A full throw wind-up swings the carried ticket up, back and out to the
+ * right, over the shoulder and clear of the head.
+ */
+const WIND_UP_LIFT = 0.68;
+const WIND_UP_BACK = 0.7;
+const WIND_UP_SIDE = 0.3;
 /** How far in front of the carrier's center the carried ticket floats. */
 export const CARRY_REACH = PLAYER_RADIUS + 0.1;
 /** Extra height at the top of a throw's arc. */
@@ -172,10 +176,13 @@ export function placeTicket(
       // Held where the hands are: turned like the carrier is drawn, pulled back in a wind-up.
       const yaw = carrierYaw?.(player.id) ?? facingYaw(player.facing);
       const hold = carryPoint(Math.min(1, player.throwCharge / THROW_HOLD_TICKS));
+      // The hold point is in the carrier's space (x to their right, z ahead); turn it by yaw.
+      const cos = Math.cos(yaw);
+      const sin = Math.sin(yaw);
       return {
         pos: gridToWorld(
-          pos.x + Math.sin(yaw) * hold.reach,
-          pos.y + Math.cos(yaw) * hold.reach,
+          pos.x + hold.side * cos + hold.reach * sin,
+          pos.y - hold.side * sin + hold.reach * cos,
           hold.height,
         ),
         yaw,
@@ -191,10 +198,11 @@ export function placeTicket(
  * bottom and `reach` in front. A throw wind-up (0 to 1) swings it back over
  * the shoulder. The carrier's hands hold it there (`pose.ts`).
  */
-export function carryPoint(windUp: number): { height: number; reach: number } {
+export function carryPoint(windUp: number): { height: number; reach: number; side: number } {
   return {
     height: CARRY_HEIGHT + WIND_UP_LIFT * windUp,
     reach: CARRY_REACH - WIND_UP_BACK * windUp,
+    side: WIND_UP_SIDE * windUp,
   };
 }
 

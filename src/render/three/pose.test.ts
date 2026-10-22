@@ -68,12 +68,26 @@ describe('playerPose', () => {
       const p = playerPose({ ...still, carrying: true, windUp }, 0);
       expect(p.leftHand.z).toBeCloseTo(hold.reach);
       expect(p.rightHand.z).toBeCloseTo(hold.reach);
-      expect(p.leftHand.y - hold.height).toBeGreaterThan(0);
-      expect(p.leftHand.y - hold.height).toBeLessThan(0.1);
+      expect(p.leftHand.y + p.bob - hold.height).toBeGreaterThan(0);
+      expect(p.leftHand.y + p.bob - hold.height).toBeLessThan(0.1);
       // Just outside the card's short sides.
-      expect(p.rightHand.x).toBeGreaterThan(CARD_SIZE.width / 2 - 0.05);
-      expect(p.rightHand.x).toBeLessThan(CARD_SIZE.width / 2 + 0.1);
+      const half = (p.rightHand.x - p.leftHand.x) / 2;
+      expect((p.rightHand.x + p.leftHand.x) / 2).toBeCloseTo(hold.side);
+      expect(half).toBeGreaterThan(CARD_SIZE.width / 2 - 0.05);
+      expect(half).toBeLessThan(CARD_SIZE.width / 2 + 0.1);
     }
+  });
+
+  it('keeps a wound-up ticket and the hands clear of the head', () => {
+    // Head center with the body leaned back in a full wind-up, about 0.3 across.
+    const head = { x: 0, y: 0.92, z: -0.29 };
+    const hold = carryPoint(1);
+    const p = playerPose({ ...still, carrying: true, windUp: 1 }, 0);
+    const dist = (a: { x: number; y: number; z: number }) =>
+      Math.hypot(a.x - head.x, a.y - head.y, a.z - head.z);
+    expect(dist({ x: hold.side, y: hold.height, z: hold.reach })).toBeGreaterThan(0.4);
+    expect(dist(p.leftHand)).toBeGreaterThan(0.33);
+    expect(dist(p.rightHand)).toBeGreaterThan(0.33);
   });
 
   it('wobbles after a shove and settles', () => {

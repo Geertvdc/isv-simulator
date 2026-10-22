@@ -29,7 +29,7 @@ export interface ScreenPoint {
 export type Project = (p: Vec3) => ScreenPoint;
 
 /** Overlays over the 3D world are a bit bigger than in 2D: the camera is further out, and they must read from the couch. */
-const OVERLAY_SCALE = 1.5;
+export const OVERLAY_SCALE = 1.5;
 /** Ticket cards float this far over the ticket. */
 const CARD_LIFT = 0.28;
 /** Over a carrier's head, the card; the calendar invite goes over that. */

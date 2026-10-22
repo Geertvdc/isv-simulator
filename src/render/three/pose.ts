@@ -86,9 +86,10 @@ export function playerPose(input: PoseInput, timeMs: number): Pose {
     // Holding the ticket by its sides where `carryPoint` puts it: out front, or over
     // the shoulder in a throw wind-up.
     const hold = carryPoint(windUp);
-    const y = hold.height + 0.03;
-    leftHand = { x: -CARRY_HALF_GAP, y, z: hold.reach };
-    rightHand = { x: CARRY_HALF_GAP, y, z: hold.reach };
+    // `applyPose` adds the walk bob to hands; the ticket doesn't bob, so take it off again.
+    const y = hold.height + 0.03 - bob;
+    leftHand = { x: hold.side - CARRY_HALF_GAP, y, z: hold.reach };
+    rightHand = { x: hold.side + CARRY_HALF_GAP, y, z: hold.reach };
   }
 
   if (input.working) {
