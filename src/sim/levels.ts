@@ -14,6 +14,10 @@ import hotDeskingMap from '../../maps/level-09-hot-desking.txt?raw';
 import backToBackMap from '../../maps/level-10-back-to-back.txt?raw';
 import synergyMap from '../../maps/level-11-synergy.txt?raw';
 import theReorgMap from '../../maps/level-12-the-reorg.txt?raw';
+import theAtriumMap from '../../maps/level-13-the-atrium.txt?raw';
+import designSprintMap from '../../maps/level-14-design-sprint.txt?raw';
+import monorepoMap from '../../maps/level-15-monorepo.txt?raw';
+import hackathonMap from '../../maps/level-16-hackathon.txt?raw';
 import labShapesMap from '../../maps/lab-shapes.txt?raw';
 import labDevMap from '../../maps/lab-dev.txt?raw';
 import {
@@ -280,12 +284,51 @@ function chapter(id: string, index: number, levels: readonly Level[]): Chapter {
   return { id, name: CHAPTER_NAMES[id] ?? id, levels, starGate: CHAPTER_STAR_GATES[index] ?? 0 };
 }
 
+// ---- Big Tech: atriums, belts, design, merges and pairing ----
+// Star thresholds here are estimates, not `npm run sim` runs (the bots don't
+// play the new mechanics yet): set from the nearest old level and the extra
+// throwing and walking. See docs/plan/review-notes-15.md.
+
+/** Two office halves across an atrium: throw across it, or use the belts. */
+export const THE_ATRIUM: Level = level('the-atrium', theAtriumMap, {
+  ...GARAGE_SETTINGS,
+  starThresholds: [50, 100, 150],
+});
+
+/** An L-shaped floor round a courtyard: whiteboards first, keyboards built for pairs. */
+export const DESIGN_SPRINT: Level = level('design-sprint', designSprintMap, {
+  ...GARAGE_SETTINGS,
+  starThresholds: [50, 100, 150],
+  designShare: 0.6,
+  pairing: true,
+});
+
+/** Front-end and back-end sides split by an atrium, the merge station where they meet. */
+export const MONOREPO: Level = level('monorepo', monorepoMap, {
+  ...GARAGE_SETTINGS,
+  orderSchedule: { ...GARAGE_SETTINGS.orderSchedule, intervalTicks: 24 * SECOND },
+  starThresholds: [55, 110, 165],
+  fullstackShare: 0.6,
+  pairing: true,
+});
+
+/** A belt carousel round a courtyard and everything new at once, with incidents. */
+export const HACKATHON: Level = level('hackathon', hackathonMap, {
+  ...GARAGE_SETTINGS,
+  starThresholds: [50, 100, 150],
+  designShare: 0.3,
+  fullstackShare: 0.4,
+  pairing: true,
+  incidents: CALM_INCIDENTS,
+});
+
 /** The campaign, in order. */
 export const CHAPTERS: readonly Chapter[] = [
   chapter('garage', 0, [GARAGE, OPEN_PLAN, DOWN_THE_HALL]),
   chapter('startup', 1, [SEED_ROUND, DEMO_DAY, ON_CALL]),
   chapter('scale-up', 2, [MIDDLE_MANAGEMENT, HYPERGROWTH, HOT_DESKING]),
   chapter('enterprise', 3, [BACK_TO_BACK, SYNERGY, THE_REORG]),
+  chapter('big-tech', 4, [THE_ATRIUM, DESIGN_SPRINT, MONOREPO, HACKATHON]),
 ];
 
 /** Every level, in level select order: chapter by chapter. */

@@ -169,7 +169,7 @@ export const STARS_TO_UNLOCK = 1;
  * Scale-Up, Enterprise), on top of the previous level's star. Reachable
  * with 1 to 2 stars per level.
  */
-export const CHAPTER_STAR_GATES: readonly number[] = [0, 4, 9, 13];
+export const CHAPTER_STAR_GATES: readonly number[] = [0, 4, 9, 13, 18];
 /** Sound volume setting runs from 0 (off) to this, in whole steps. */
 export const SFX_VOLUME_MAX = 10;
 /** Sound volume on a fresh save. */
