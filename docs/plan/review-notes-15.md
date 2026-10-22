@@ -30,3 +30,12 @@ Decisions made without the product owner, who asked for the work to go ahead on 
 - **Uneven map rows still fail to parse:** an outline is drawn with spaces, so a map file must keep its trailing spaces (editors that strip them break the map, loudly).
 - **A lab level** (`lab-shapes`, not in the level select) shows the features on their own, for scenes and tests, until the Big Tech chapter (18) uses them.
 - In 2D, a ticket on a belt jumps from tile to tile (3D glides).
+
+## Phase 17: dev mechanics
+
+- **Both parts of a full-stack feature only need coding** (the plan had the back end tested too): one extra step per part made the merge feel like busywork in the lab level. The merged ticket gets tested as a whole.
+- **Any front end merges with any back end**, like a bun with any patty: tracking which pair belongs to which order would be invisible on screen.
+- **Full-stack orders** pay 35 (a feature pays 20) and last 1.5× as long: two tickets' work.
+- **Pairing is a level setting**, not global, so the old levels' balance doesn't change. Two coders go 1.75× as fast, a third adds nothing.
+- **"Working" detection for a pair** comes for free: both players show the typing pose. No extra "pairing" spark yet.
+- **Design takes as long as coding** (`DESIGN_RATE`), so a designed feature is a 25% longer recipe for the same points; levels that use it give more time.

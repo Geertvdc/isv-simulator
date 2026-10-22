@@ -47,7 +47,9 @@ import {
 
 /** Where each step gets done. */
 const STEP_TILE: Readonly<Record<StepKind, Tile>> = {
+  design: 'whiteboard',
   code: 'keyboard',
+  merge: 'merge',
   review: 'review',
   test: 'testBench',
   pipeline: 'pipeline',

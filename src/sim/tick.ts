@@ -1,5 +1,5 @@
 import { updateConveyors } from './conveyor';
-import { finishReviews, interact, newTickWork, work } from './interact';
+import { finishCoding, finishReviews, interact, newTickWork, work } from './interact';
 import { updateManagers } from './manager';
 import { expireInvites, updateMeetings } from './meetings';
 import { movePlayer } from './movement';
@@ -42,6 +42,7 @@ export function tick(state: GameState, inputs: readonly InputCommand[]): void {
     if (input?.work) work(state, player.id, tickWork);
   }
   finishReviews(state, tickWork);
+  finishCoding(state, tickWork);
   updateFlights(state);
   updateConveyors(state);
 

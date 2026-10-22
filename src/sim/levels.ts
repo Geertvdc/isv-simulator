@@ -15,6 +15,7 @@ import backToBackMap from '../../maps/level-10-back-to-back.txt?raw';
 import synergyMap from '../../maps/level-11-synergy.txt?raw';
 import theReorgMap from '../../maps/level-12-the-reorg.txt?raw';
 import labShapesMap from '../../maps/lab-shapes.txt?raw';
+import labDevMap from '../../maps/lab-dev.txt?raw';
 import {
   CHAPTER_STAR_GATES,
   ORDER_RATE_BY_PLAYERS,
@@ -77,6 +78,12 @@ export interface LevelSettings {
   incidents: IncidentSchedule | null;
   /** Calendar invites, or `null` for none. Needs meeting tiles (`m`) on the map. */
   meetings: MeetingSchedule | null;
+  /** Share of feature orders that start with a design at the whiteboard (0 to 1); 0 when left out. */
+  designShare?: number;
+  /** Share of feature orders that come as a front end and a back end to merge (0 to 1); 0 when left out. */
+  fullstackShare?: number;
+  /** Whether two players at one keyboard code faster (pair programming). */
+  pairing?: boolean;
 }
 
 export interface Level extends LevelSettings {
@@ -314,6 +321,13 @@ export function levelById(id: string): Level | undefined {
 export const LAB_LEVELS: readonly Level[] = [
   // An L-shaped office split by an atrium gap, with a conveyor bridge across it.
   level('lab-shapes', labShapesMap, GARAGE_SETTINGS),
+  // Whiteboards, a merge station between counters, keyboards for pairing.
+  level('lab-dev', labDevMap, {
+    ...GARAGE_SETTINGS,
+    designShare: 0.4,
+    fullstackShare: 0.3,
+    pairing: true,
+  }),
 ];
 
 /** Order rate multiplier for a number of players. */
@@ -343,6 +357,9 @@ export function settingsForPlayers(level: LevelSettings, playerCount: number): L
       number,
     ],
     reviewShare: playerCount >= REVIEWERS_NEEDED ? level.reviewShare : 0,
+    designShare: level.designShare ?? 0,
+    fullstackShare: level.fullstackShare ?? 0,
+    pairing: level.pairing ?? false,
     incidents: level.incidents,
     meetings: level.meetings && {
       ...level.meetings,

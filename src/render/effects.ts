@@ -7,6 +7,7 @@
 import {
   MANAGER_BUMP_TEXTS,
   MEETING_DONE_TEXT,
+  MERGED_TEXT,
   PIPELINE_FIXED_TEXT,
   SHOVE_TEXTS,
   TICKET_LOST_TEXT,
@@ -53,6 +54,9 @@ export function effectsFor(state: GameState, events: readonly GameEvent[]): Effe
       // The HUD already says so by the score.
       case 'pipelineBroke':
         shake(SHAKE_PIPELINE_BROKE);
+        break;
+      case 'merged':
+        popup({ x: event.x, y: event.y }, MERGED_TEXT, POPUP_GAIN_COLOR);
         break;
       case 'ticketLost': {
         popup({ x: event.x, y: event.y }, TICKET_LOST_TEXT, POPUP_LOST_COLOR);

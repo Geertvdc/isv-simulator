@@ -87,11 +87,21 @@ export const WORK_RATE = 1 / (2.5 * TICKS_PER_SECOND);
 export const REVIEWERS_NEEDED = 2;
 /** Review progress per tick while enough players work it: a review takes ~3 s. */
 export const REVIEW_RATE = 1 / (3 * TICKS_PER_SECOND);
+/**
+ * Two players coding at one keyboard (on levels with pairing): faster than
+ * one, not twice as fast, so splitting up still makes sense sometimes.
+ */
+export const PAIR_RATE = WORK_RATE * 1.75;
+/** Designing at the whiteboard takes about as long as coding. */
+export const DESIGN_RATE = 1 / (2.5 * TICKS_PER_SECOND);
 /** Ticks a ticket builds in the pipeline before its pipeline step is done. */
 export const PIPELINE_BUILD_TICKS = 4 * TICKS_PER_SECOND;
 
 /** Points for shipping an order, before the speed bonus. */
 export const ORDER_POINTS = 20;
+/** A full-stack feature is two tickets' work: it pays more and lasts longer. */
+export const FULLSTACK_ORDER_POINTS = 35;
+export const FULLSTACK_TIME_FACTOR = 1.5;
 /** Extra points for shipping with the whole timer left; scales down linearly to 0. */
 export const ORDER_SPEED_BONUS_MAX = 10;
 /** Points lost when an order runs out. */

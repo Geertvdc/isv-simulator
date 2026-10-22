@@ -6,7 +6,7 @@
  */
 
 import { CONVEYOR_TICKS } from './balance';
-import { canPutDown } from './interact';
+import { canPutDown, settleOn } from './interact';
 import { type LevelMap, conveyorAt, getTile } from './level';
 import type { GameState } from './state';
 import { type Ticket, ticketOnTile } from './tickets';
@@ -76,9 +76,10 @@ function nextMove(
 
 /** Moves `ticket` one tile on to (x, y), resetting the timers of the belts it leaves and enters. */
 function move(state: GameState, ticket: Ticket, x: number, y: number, moved: Set<number>): void {
-  ticket.location = { kind: 'tile', x, y };
-  moved.add(ticket.id);
-  state.events.push({ type: 'conveyed', ticketId: ticket.id, x, y });
+  // Onto a merge station holding its other half, it becomes the merged ticket.
+  const placed = settleOn(state, ticket, x, y);
+  moved.add(placed.id);
+  state.events.push({ type: 'conveyed', ticketId: placed.id, x, y });
 }
 
 /**

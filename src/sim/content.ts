@@ -49,6 +49,8 @@ export const PIPELINE_FIXED_TEXT = 'Fixed!';
 export const TICKET_LOST_TEXT = 'git reset --hard';
 /** Over the queue a lost ticket went back to. */
 export const BACKLOG_TEXT = 'Back in the backlog';
+/** Over a merge station when a front end and a back end come together. */
+export const MERGED_TEXT = 'Merged!';
 
 /** Pops up over a player who got shoved by a dash; one is picked per shove. */
 export const SHOVE_TEXTS: readonly string[] = ['Oof!', 'Hey!', 'Rude!', 'Watch it!', 'Not cool'];
@@ -94,6 +96,7 @@ export const LEVEL_NAMES: Readonly<Record<string, string>> = {
   garage: 'The Garage',
   // Lab levels: outside the campaign, for scenes and tests.
   'lab-shapes': 'Lab: shapes',
+  'lab-dev': 'Lab: dev mechanics',
   'open-plan': 'Open Plan Office',
   // Id from before the Scale-Up chapter; kept so saves still count.
   'scale-up': 'Down the Hall',

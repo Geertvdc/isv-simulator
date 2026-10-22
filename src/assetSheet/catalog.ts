@@ -58,6 +58,9 @@ const TILE_NOTES: Readonly<Record<BlockTile, string>> = {
   pipeline: 'CI/CD pipeline: builds a ticket on its own. Can break, see pipeline states.',
   ship: 'Ship to the customer: drop a finished ticket here. Sits in the front wall.',
   bin: 'Bin: throw a ticket away.',
+  whiteboard: 'Whiteboard: hold work here to do the "design" step, before coding.',
+  merge:
+    'Merge station (git merge): put a coded front end and a coded back end here and they become one full-stack ticket.',
   conveyor:
     'Conveyor belt (the message queue): carries a ticket along its arrow to the next counter or station.',
 };

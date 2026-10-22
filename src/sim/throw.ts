@@ -14,7 +14,7 @@ import {
   THROW_SPEED,
   TICKS_PER_SECOND,
 } from './balance';
-import { canPutDown } from './interact';
+import { canPutDown, settleOn } from './interact';
 import { type GridPoint, getTile, isDrop } from './level';
 import { type GameState, type Player, type PlayerId, getPlayer } from './state';
 import { type Ticket, loseTicket, ticketCarriedBy } from './tickets';
@@ -113,8 +113,9 @@ function fly(state: GameState, ticket: Ticket): void {
 
 /** Lands on tile `at`: the counter or station it found, or the floor. */
 function land(state: GameState, ticket: Ticket, at: GridPoint): void {
-  ticket.location = { kind: 'tile', x: at.x, y: at.y };
-  state.events.push({ type: 'landed', ticketId: ticket.id, ...at });
+  // Onto a merge station holding its other half, it becomes the merged ticket.
+  const placed = settleOn(state, ticket, at.x, at.y);
+  state.events.push({ type: 'landed', ticketId: placed.id, ...at });
 }
 
 /**
