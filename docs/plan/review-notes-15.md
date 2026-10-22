@@ -18,3 +18,4 @@ Decisions made without the product owner, who asked for the work to go ahead on 
 - **No colors of the players outside:** props avoid the player red, blue, yellow and green.
 - **Clutter on wall tops** only on some full-height walls, never next to a counter or station and never where it could hide a player behind it; no laptops or sticky notes (they read as things to pick up).
 - **No front row** in front of the level: it would sit between the camera and the play.
+- **Left after two review rounds:** at 16:9 the side far rows (where the car and other rare props stand) sit at the very edge of the screen, partly cut off; near props at the far ends of the back row can lose their shadow at the edge of the sun's shadow box. Both are cosmetic.

@@ -34,3 +34,7 @@
 ## Review round 1 fixes
 
 Rows no longer cross at the corners (sides run from the back edge forward, the back rows run past both sides; a test checks no two props overlap), the walkers' lane is clear, spacing and turns vary per prop and the same piece never stands twice running, rare props (the car, the cat, the hoop, the neon sign, the lobby sign) show once, far-row props cast no shadow, chairs stand behind the people at desks. See the review notes for the rest.
+
+## Review round 2 fixes
+
+The prop order no longer cycles (the hash is mixed before picking), rare props go in the side far rows (in view from the back edge), the back rows stop just past the sides, no people along the back (their heads bobbed over the back wall by the stations), each row has its own pieces, and the last player colors outside are gone (bikes, sofas, the hoop). Two rounds of review done; what's left is in the review notes.

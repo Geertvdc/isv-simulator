@@ -51,6 +51,25 @@ describe('placeSetPieces', () => {
     for (const piece of rare) expect(placed.filter((p) => p.piece === piece)).toHaveLength(1);
   });
 
+  it('does not repeat the same short pattern down a row', () => {
+    const left = placeSetPieces('enterprise', 14, 30)
+      .filter((p) => p.side === 'left' && p.row === 'near')
+      .map((p) => p.piece);
+    // Not one sequence of 4 over and over, and never the same piece twice running.
+    const periodic = left.slice(4).every((piece, i) => piece === left[i]);
+    expect(periodic).toBe(false);
+    for (let i = 1; i < left.length; i++) expect(left[i]).not.toBe(left[i - 1]);
+  });
+
+  it('puts the rare props where the camera sees them: in the side far rows', () => {
+    const placed = placeSetPieces('garage', 14, 10);
+    const rare = SETTINGS.garage?.rare ?? [];
+    for (const piece of rare) {
+      const p = placed.find((q) => q.piece === piece);
+      expect(p?.side).not.toBe('back');
+    }
+  });
+
   it('places the same props in the same places every time', () => {
     expect(placeSetPieces('garage', 14, 10)).toEqual(placeSetPieces('garage', 14, 10));
   });

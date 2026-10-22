@@ -95,8 +95,8 @@ const bike: SetPiece = {
     for (const z of [-0.3, 0.3]) {
       b.torus(0.18, 0.025, INK, { at: [0, 0.2, z], rot: [0, Math.PI / 2, 0] });
     }
-    b.box(0.03, 0.03, 0.6, 0xe0402f, { at: [0, 0.32, 0], rot: [0.3, 0, 0] }, 0);
-    b.box(0.03, 0.25, 0.03, 0xe0402f, { at: [0, 0.35, 0.12] }, 0);
+    b.box(0.03, 0.03, 0.6, 0x5a6470, { at: [0, 0.32, 0], rot: [0.3, 0, 0] }, 0);
+    b.box(0.03, 0.25, 0.03, 0x5a6470, { at: [0, 0.35, 0.12] }, 0);
     b.box(0.06, 0.03, 0.14, INK, { at: [0, 0.48, 0.1] }, 0);
     b.box(0.32, 0.025, 0.025, STEEL, { at: [0, 0.48, -0.26] }, 0);
     return b.build();
@@ -156,7 +156,7 @@ const hoop: SetPiece = {
     const b = new ModelBuilder();
     b.cylinder(0.05, 0.05, 2, STEEL, { at: [0, 1, -0.2] }, 10);
     b.box(0.8, 0.55, 0.05, WHITE, { at: [0, 2, -0.1] }, 0.02);
-    b.box(0.3, 0.22, 0.01, 0xe0402f, { at: [0, 1.92, -0.07] }, 0);
+    b.box(0.3, 0.22, 0.01, 0x8a6a5a, { at: [0, 1.92, -0.07] }, 0);
     b.torus(0.18, 0.02, 0xff7a2f, { at: [0, 1.78, 0.12], rot: [Math.PI / 2, 0, 0] });
     b.sphere(0.12, 0xff7a2f, { at: [0.3, 0.12, 0.4] });
     return b.build();
@@ -270,7 +270,7 @@ const arcade: SetPiece = {
   size: [1, 1],
   model: () => {
     const b = new ModelBuilder();
-    b.box(0.6, 1.5, 0.55, 0x6a3fc0, { at: [0, 0.75, 0] }, 0.04);
+    b.box(0.6, 1.5, 0.55, 0x5a4a78, { at: [0, 0.75, 0] }, 0.04);
     b.box(0.5, 0.42, 0.06, INK, { at: [0, 1.15, 0.26] }, 0.01);
     b.screen(0.42, 0.34, 0x5cf0ff, { at: [0, 1.15, 0.295] });
     b.box(0.5, 0.1, 0.25, DARK, { at: [0, 0.8, 0.35] }, 0);
@@ -337,12 +337,12 @@ const sofa: SetPiece = {
   size: [2, 1],
   model: () => {
     const b = new ModelBuilder();
-    const fabric = 0x4f7aa8;
+    const fabric = 0x6a7466;
     b.box(1.6, 0.35, 0.7, fabric, { at: [0, 0.25, 0] }, 0.08);
     b.box(1.6, 0.45, 0.2, tint(fabric, -0.15), { at: [0, 0.55, -0.28] }, 0.08);
     for (const x of [-0.78, 0.78])
       b.box(0.18, 0.5, 0.7, tint(fabric, -0.1), { at: [x, 0.35, 0] }, 0.08);
-    b.box(0.3, 0.2, 0.08, 0xffd166, { at: [-0.4, 0.55, -0.12], rot: [-0.3, 0, 0] }, 0.05);
+    b.box(0.3, 0.2, 0.08, 0xb89a7a, { at: [-0.4, 0.55, -0.12], rot: [-0.3, 0, 0] }, 0.05);
     return b.build();
   },
 };
@@ -444,8 +444,8 @@ export const SETTINGS: Readonly<Record<string, Setting>> = {
   garage: {
     ground: 0x3e5a35,
     path: 0x3a3e46,
-    near: [shelves, bike, drums, bushes],
-    far: [tree, bushes, tree, bushes],
+    near: [shelves, bike, drums],
+    far: [tree, bushes],
     rare: [car, cat, hoop],
     walkers: 0,
   },
@@ -454,15 +454,15 @@ export const SETTINGS: Readonly<Record<string, Setting>> = {
     ground: 0x3a3f47,
     path: null,
     near: [bigPlant, coffeeBar, arcade, beanbags],
-    far: [bigPlant, beanbags, pingPong],
+    far: [pingPong, sofa],
     rare: [neonSign],
     walkers: 1,
   },
   'scale-up': {
     ground: 0x485666,
     path: 0x3f4b5a,
-    near: [teamDesk, bigPlant, sofa, screenWall],
-    far: [meetingPod, bigPlant, sofa],
+    near: [teamDesk, sofa, screenWall],
+    far: [meetingPod, bigPlant],
     rare: [],
     walkers: 2,
   },
@@ -470,7 +470,7 @@ export const SETTINGS: Readonly<Record<string, Setting>> = {
     ground: 0x6b6253,
     path: 0x5a5245,
     near: [cubicle, printer, cabinets, waterCooler],
-    far: [cubicle, bigPlant, cabinets],
+    far: [meetingPod, bigPlant],
     rare: [lobbySign],
     walkers: 2,
   },

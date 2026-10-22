@@ -42,6 +42,7 @@ export interface Placement {
   at: Vec3;
   yaw: number;
   row: Row;
+  side: 'left' | 'right' | 'back';
 }
 
 /** A background person and what they do. */
@@ -53,9 +54,18 @@ interface Extra {
   walk?: { from: number; to: number; z: number };
 }
 
+/** `tileHash` stirred, so its low bits don't cycle (a plain `% 4` of it does). */
+function mixed(i: number, salt: number): number {
+  let h = tileHash(i, salt);
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x45d9f3b);
+  h ^= h >>> 16;
+  return h >>> 0;
+}
+
 /** A number from 0 to 1 for slot `i` of row `salt`. */
 function unit(i: number, salt: number): number {
-  return (tileHash(i * 31 + 7, salt) % 1000) / 1000;
+  return (mixed(i * 31 + 7, salt) % 1000) / 1000;
 }
 
 /**
@@ -75,27 +85,28 @@ export function placeSetPieces(setting: string, width: number, height: number): 
   const right = width - 0.5;
   const back = -0.5;
   const rare = [...s.rare];
-  /** The pieces of a row in order: a rare one first in far rows, never the same twice running. */
-  const pick = (row: readonly SetPiece[], kind: Row, salt: number) => {
+  /**
+   * The pieces of a row in order, never the same twice running. Side far rows
+   * (in view from the back edge forward) take the rare pieces at slots 0 and 2.
+   */
+  const pick = (row: readonly SetPiece[], takesRare: boolean, salt: number) => {
     let last: SetPiece | null = null;
     let i = 0;
     return (): SetPiece | null => {
-      if (kind === 'far' && i === 0 && rare.length > 0) {
-        i++;
+      const slot = i++;
+      if (takesRare && (slot === 0 || slot === 2) && rare.length > 0) {
         return (last = rare.shift() ?? null);
       }
-      for (let tries = 0; tries < 4; tries++) {
-        const piece = row[tileHash(i++, salt) % row.length] ?? null;
-        if (piece && (piece !== last || row.length === 1)) return (last = piece);
-      }
-      return null;
+      let index = mixed(slot, salt) % row.length;
+      if (row[index] === last && row.length > 1) index = (index + 1) % row.length;
+      return (last = row[index] ?? null);
     };
   };
   const jitter = (i: number, salt: number) => (unit(i, salt + 1) * 2 - 1) * YAW_JITTER;
   // Down the sides, from the back edge forward: the prop's front (+z) turns toward the office.
   const side = (row: readonly SetPiece[], kind: Row, dir: -1 | 1, salt: number) => {
     if (row.length === 0) return;
-    const next = pick(row, kind, salt);
+    const next = pick(row, kind === 'far', salt);
     const gap = kind === 'near' ? NEAR_GAP : FAR_GAP;
     let z = back;
     for (let i = 0; z < height + RUN_OVER; i++) {
@@ -105,28 +116,30 @@ export function placeSetPieces(setting: string, width: number, height: number): 
       // Turned a quarter, the prop's depth (sz) runs across x and its width along z.
       const x = dir < 0 ? left - gap - sz / 2 : right + gap + sz / 2;
       const yaw = (dir * -Math.PI) / 2 + jitter(i, salt);
-      out.push({ piece, at: gridToWorld(x, z + sx / 2, GROUND_Y), yaw, row: kind });
+      const at = gridToWorld(x, z + sx / 2, GROUND_Y);
+      out.push({ piece, at, yaw, row: kind, side: dir < 0 ? 'left' : 'right' });
       z += sx + ROW_GAP_MIN + unit(i, salt) * (ROW_GAP_MAX - ROW_GAP_MIN);
     }
   };
-  // Along the back, past both sides' far rows.
+  // Along the back, out past the sides' rows of the same kind (and no further: off screen).
   const along = (row: readonly SetPiece[], kind: Row, salt: number) => {
     if (row.length === 0) return;
-    const next = pick(row, kind, salt);
+    const next = pick(row, false, salt);
     const gap = kind === 'near' ? NEAR_GAP : FAR_GAP;
-    let x = left - FAR_GAP - 2 - RUN_OVER;
-    for (let i = 0; x < right + FAR_GAP + 2 + RUN_OVER; i++) {
+    const reach = gap + 2 + 1;
+    let x = left - reach;
+    for (let i = 0; x < right + reach; i++) {
       const piece = next();
       if (!piece) break;
       const [sx, sz] = piece.size;
       const at = gridToWorld(x + sx / 2, back - gap - sz / 2, GROUND_Y);
-      out.push({ piece, at, yaw: jitter(i, salt), row: kind });
+      out.push({ piece, at, yaw: jitter(i, salt), row: kind, side: 'back' });
       x += sx + ROW_GAP_MIN + unit(i, salt) * (ROW_GAP_MAX - ROW_GAP_MIN);
     }
   };
-  along(s.far, 'far', 67);
   side(s.far, 'far', -1, 37);
   side(s.far, 'far', 1, 41);
+  along(s.far, 'far', 67);
   along(s.near, 'near', 53);
   side(s.near, 'near', -1, 11);
   side(s.near, 'near', 1, 23);
@@ -168,7 +181,7 @@ export class Surroundings {
         new THREE.PlaneGeometry(2.6, height + 2 * RUN_OVER + 6).rotateX(-Math.PI / 2),
         matte(s.path, 0.9),
       );
-      put(path, gridToWorld(-0.5 - FAR_GAP - 1, cz, GROUND_Y + 0.004));
+      put(path, gridToWorld(-0.5 - FAR_GAP - 2 - 1.3, cz, GROUND_Y + 0.004));
       path.receiveShadow = true;
       this.root.add(path);
     }
@@ -178,7 +191,8 @@ export class Surroundings {
     let n = 0;
     // People only in the near rows (further out they'd only be clutter), and not too many.
     for (const p of placements) {
-      if (p.row !== 'near') continue;
+      // Not along the back either: heads would bob over the back wall, by the stations.
+      if (p.row !== 'near' || p.side === 'back') continue;
       for (const seat of p.piece.seats ?? []) {
         if (n >= MAX_EXTRAS - s.walkers) break;
         const cos = Math.cos(p.yaw);
