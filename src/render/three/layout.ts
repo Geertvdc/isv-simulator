@@ -8,7 +8,13 @@ import { PLAYER_RADIUS, THROW_HOLD_TICKS, THROW_RANGE } from '../../sim/balance'
 import { beltProgress } from '../../sim/conveyor';
 import { type LevelMap, type Tile, conveyorAt, getTile, isBlock } from '../../sim/level';
 import type { GameState, PlayerId } from '../../sim/state';
-import { QUEUE_TILE, type QueueKind, type Ticket, queuedTickets } from '../../sim/tickets';
+import {
+  QUEUE_TILE,
+  type QueueKind,
+  type Ticket,
+  queuedTickets,
+  ticketOnTile,
+} from '../../sim/tickets';
 import { isFrontWall } from '../mapShape';
 import { type Box3, type Vec3, gridToWorld } from '../projection';
 import type { RoundView } from '../roundView';
@@ -39,12 +45,10 @@ const WIND_UP_BACK = 0.7;
 const WIND_UP_SIDE = 0.3;
 /** How far in front of the carrier's center the carried ticket floats. */
 export const CARRY_REACH = PLAYER_RADIUS + 0.1;
-/**
- * How much of a tile a ticket glides across on a belt: the whole tile, from
- * its back edge to its front, so moving on to the next belt is seamless (a
- * ticket waiting for a full tile waits at the front edge).
- */
+/** How much of a tile a ticket glides across on a belt each step: middle to middle. */
 const BELT_GLIDE = 1;
+/** A ticket waiting for the next tile to free up waits just short of the edge. */
+const BELT_WAIT = 0.4;
 /** Extra height at the top of a throw's arc. */
 export const THROW_ARC = 0.5;
 
@@ -159,9 +163,13 @@ export function placeTicket(
       };
     }
     case 'tile': {
-      // On a belt it glides from the tile's back edge toward the next tile.
+      // On a belt it glides from this tile's middle toward the next one's, stopping
+      // short at the edge when the next tile is taken.
       const belt = conveyorAt(state.level, loc.x, loc.y);
-      const ride = belt ? beltProgress(state, loc.x, loc.y) - 0.5 : 0;
+      const blocked =
+        belt !== undefined &&
+        ticketOnTile(state, loc.x + belt.dir.x, loc.y + belt.dir.y) !== undefined;
+      const ride = belt ? Math.min(beltProgress(state, loc.x, loc.y), blocked ? BELT_WAIT : 1) : 0;
       const x = loc.x + (belt ? belt.dir.x * ride * BELT_GLIDE : 0);
       const y = loc.y + (belt ? belt.dir.y * ride * BELT_GLIDE : 0);
       return {

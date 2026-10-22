@@ -51,3 +51,11 @@
 - `maps/lab-shapes.txt` and `LAB_LEVELS`: a level outside the campaign (L-shaped, split by an atrium gap, a conveyor bridge) for the `gap-throw` and `conveyor` scenes; `GameScene` loads a scene's own level.
 - 2D: the void isn't drawn, gaps are dark with a railing, belts are blocks with a chevron. 3D: the slab follows the outline, gaps are shafts with a lower floor and glass railings, belts have hazard rails and a stripe texture that runs toward their arrow; tickets glide along. The ground outside goes round the level, never under it.
 - `PROTOCOL_VERSION` 5.
+
+## Review round 1 fixes
+
+- **Regression fixed:** a throw that crosses a station on the map's edge (ship, inbox, a full counter) and leaves the map drops back on the last floor, as before; only a ticket leaving over the void or a gap is lost. A test throws from every floor tile of every campaign level in every direction and checks none is lost.
+- **Belts:** the timer belongs to the ticket on the tile (a fresh one starts from 0); the longest-waiting ticket moves first and tiles freed by the one ahead go to whoever waited longest, so merging belts take turns; a full loop turns all at once instead of jamming. A belt must point at something that takes tickets (another belt, a counter or a station), or the map doesn't parse.
+- **Lost tickets** also pop "Back in the backlog" over their queue.
+- **2D gaps** show a lower floor (apart from the dark void), a shadow under the far edge and a thicker railing with posts. **3D belts** glide middle to middle and stop short of a taken tile.
+- More tests: belts in every direction, a loop, merging belts, a belt into a pipeline, a ticket's own time on a tile.

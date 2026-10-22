@@ -10,10 +10,13 @@ import {
   PIPELINE_FIXED_TEXT,
   SHOVE_TEXTS,
   TICKET_LOST_TEXT,
+  BACKLOG_TEXT,
 } from '../sim/content';
 import { PIPELINE_FAIL_TICKS, PIPELINE_WARN_TICKS } from '../sim/balance';
 import type { GameEvent } from '../sim/orders';
 import { type GameState, type Vec, getPlayer } from '../sim/state';
+import { QUEUE_TILE } from '../sim/tickets';
+import { firstGroup } from './mapShape';
 
 /** Screen shakes: how long (ms) and how hard (share of the screen). */
 export const SHAKE_PIPELINE_BROKE = { ms: 350, intensity: 0.012 };
@@ -51,10 +54,15 @@ export function effectsFor(state: GameState, events: readonly GameEvent[]): Effe
       case 'pipelineBroke':
         shake(SHAKE_PIPELINE_BROKE);
         break;
-      case 'ticketLost':
+      case 'ticketLost': {
         popup({ x: event.x, y: event.y }, TICKET_LOST_TEXT, POPUP_LOST_COLOR);
+        // And where it went: back on top of its queue.
+        const queue = firstGroup(state.level, QUEUE_TILE[event.queue]);
+        const at = queue[0];
+        if (at) popup(at, BACKLOG_TEXT, POPUP_INFO_COLOR);
         shake(SHAKE_SHOVE);
         break;
+      }
       case 'pipelineRepaired':
         popup({ x: event.x, y: event.y }, PIPELINE_FIXED_TEXT, POPUP_GAIN_COLOR);
         break;

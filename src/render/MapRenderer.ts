@@ -125,7 +125,8 @@ const SIDE_SHADE: Readonly<Record<Side, number>> = {
 };
 
 const FLOOR_COLOR = 0x3a4a5c;
-const GAP_COLOR = 0x0e1015;
+/** A gap shows the floor below: darker than the office, apart from the page behind the void. */
+const GAP_COLOR = 0x2a3442;
 const RAILING_COLOR = 0xb8c4d0;
 const BELT_ARROW_COLOR = 0xffd166;
 const GRID_LINE_COLOR = 0x000000;
@@ -221,10 +222,18 @@ export class MapRenderer {
     const g = this.scene.add.graphics().setDepth(FLOOR_DEPTH);
     this.forEachTile((x, y, tile) => {
       if (tile !== 'gap') return;
+      // The floor below, darker, with a drop shadow along the far edge.
       g.fillStyle(GAP_COLOR);
       g.fillPoints(vectors(tileCorners(x, y)), true);
       const [bl, br, fr, fl] = tileCorners(x, y);
-      g.lineStyle(3, RAILING_COLOR);
+      if (getTile(this.map, x, y - 1) !== 'gap') {
+        g.fillStyle(0x000000, 0.5);
+        g.fillPoints(
+          vectors([bl, br, tileToScreen(x + 0.5, y - 0.2), tileToScreen(x - 0.5, y - 0.2)]),
+          true,
+        );
+      }
+      g.lineStyle(5, RAILING_COLOR);
       // A railing on each edge that borders something other than another gap.
       const edges: [number, number, Point, Point][] = [
         [0, -1, bl, br],
@@ -235,6 +244,9 @@ export class MapRenderer {
       for (const [dx, dy, a, b] of edges) {
         if (getTile(this.map, x + dx, y + dy) === 'gap') continue;
         g.lineBetween(a.x, a.y, b.x, b.y);
+        g.fillStyle(RAILING_COLOR);
+        g.fillCircle(a.x, a.y, 3.5);
+        g.fillCircle(b.x, b.y, 3.5);
       }
     });
   }

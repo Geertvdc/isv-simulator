@@ -83,9 +83,11 @@ function fly(state: GameState, ticket: Ticket): void {
     land(state, ticket, loc.lastFloor);
     return;
   }
-  // Off the map is outside the office, like the void.
   if (tile === null) {
-    loseTicket(state, ticket, at);
+    // Off the map: outside the office if it left over the void or a gap; otherwise it
+    // crossed a station on the map's edge (the ship hatch, the inbox) and drops back in.
+    if (isDrop(getTile(state.level, before.x, before.y))) loseTicket(state, ticket, at);
+    else land(state, ticket, loc.lastFloor);
     return;
   }
   loc.pos = pos;
