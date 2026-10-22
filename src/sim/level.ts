@@ -18,6 +18,10 @@ export type Tile =
   | 'pipeline'
   | 'ship'
   | 'bin'
+  /** Design is sketched here, by hand, before coding. */
+  | 'whiteboard'
+  /** Where a front end and a back end come together (git merge). */
+  | 'merge'
   /** Outside the office: nothing there. Lets a map have any outline. */
   | 'void'
   /** A drop inside the office (an atrium): tickets fly over it, nobody walks it. */
@@ -69,6 +73,8 @@ const CHAR_TO_TILE: Readonly<Record<string, Tile>> = {
   P: 'pipeline',
   S: 'ship',
   X: 'bin',
+  W: 'whiteboard',
+  G: 'merge',
   ' ': 'void',
   '~': 'gap',
 };
@@ -81,6 +87,8 @@ const BELT_TAKERS: ReadonlySet<Tile> = new Set<Tile>([
   'testBench',
   'review',
   'pipeline',
+  'whiteboard',
+  'merge',
 ]);
 
 /** Conveyor chars and the way they carry (screen-relative: `v` runs toward the camera). */

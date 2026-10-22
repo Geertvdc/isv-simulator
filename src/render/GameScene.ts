@@ -362,6 +362,7 @@ const LEVEL_LOOKS: Readonly<Record<string, MapLook>> = {
   'the-reorg': { walls: 'glass', floor: 'carpet' },
   // Lab levels have no chapter: they borrow a world.
   'lab-shapes': { walls: 'glass', floor: 'carpet', setting: 'scale-up' },
+  'lab-dev': { walls: 'wood', floor: 'parquet', setting: 'startup' },
 };
 
 /** The level's look, with `?walls=` and `?floor=` overriding it to preview others. */

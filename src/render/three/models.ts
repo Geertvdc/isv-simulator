@@ -336,6 +336,67 @@ function bin(): StationModel {
   return { base: b.build(), hero: null, heroAt: [0, 0] };
 }
 
+function whiteboardStation(): StationModel {
+  const color = PALETTE.station.whiteboard;
+  const base = counter(new ModelBuilder(), 0x8a96a3, tint(color, 0.2));
+  // Markers and an eraser on the top.
+  for (const [x, c] of [
+    [-0.32, 0x3a7be0],
+    [-0.22, 0xe0402f],
+    [-0.12, 0x2f9a5c],
+  ] as const) {
+    base.capsule(0.02, 0.1, c, { at: [x, TOP + 0.02, 0.3], rot: [0, 0, Math.PI / 2] });
+  }
+  base.box(0.14, 0.04, 0.06, 0x3a3f4a, { at: [0.3, TOP + 0.02, 0.3] }, 0.01);
+  // The hero: a big whiteboard on legs, a sketch of boxes and arrows on it.
+  const hero = new ModelBuilder();
+  for (const x of [-0.42, 0.42]) {
+    hero.box(0.04, 0.95, 0.04, 0xb8bec8, { at: [x, TOP + 0.47, 0] }, 0);
+    hero.box(0.04, 0.04, 0.3, 0xb8bec8, { at: [x, TOP + 0.02, 0] }, 0);
+  }
+  hero.box(0.92, 0.6, 0.04, 0xb8bec8, { at: [0, TOP + 0.62, 0] }, 0.015);
+  hero.box(0.86, 0.54, 0.01, 0xfbfbf8, { at: [0, TOP + 0.62, 0.025] }, 0);
+  const ink = (w: number, h: number, x: number, y: number, c: number, rot = 0) =>
+    hero.box(w, h, 0.004, c, { at: [x, TOP + y, 0.032], rot: [0, 0, rot] }, 0);
+  // Three boxes with arrows between them, and a stick figure: a user flow.
+  for (const [x, y] of [
+    [-0.28, 0.72],
+    [0.02, 0.72],
+    [0.28, 0.52],
+  ] as const) {
+    ink(0.16, 0.012, x, y + 0.05, 0x3a7be0);
+    ink(0.16, 0.012, x, y - 0.05, 0x3a7be0);
+    ink(0.012, 0.1, x - 0.08, y, 0x3a7be0);
+    ink(0.012, 0.1, x + 0.08, y, 0x3a7be0);
+  }
+  ink(0.12, 0.012, -0.13, 0.72, 0xe0402f);
+  ink(0.16, 0.012, 0.17, 0.62, 0xe0402f, -0.8);
+  ink(0.012, 0.08, -0.28, 0.48, 0x2f9a5c);
+  ink(0.06, 0.012, -0.28, 0.5, 0x2f9a5c);
+  hero.sphere(0.025, 0x2f9a5c, { at: [-0.28, TOP + 0.55, 0.032] }, [1, 1, 0.2]);
+  return { base: base.build(), hero: hero.build(), heroAt: [0, -0.32] };
+}
+
+function mergeStation(): StationModel {
+  const color = PALETTE.station.merge;
+  const base = counter(new ModelBuilder(), color);
+  // Two landing pads on the top, one for each part.
+  base.box(0.36, 0.012, 0.34, 0x5a2e10, { at: [-0.22, TOP + 0.006, 0.08] }, 0);
+  base.box(0.36, 0.012, 0.34, 0x5a2e10, { at: [0.22, TOP + 0.006, 0.08] }, 0);
+  // The hero: a glowing git branch sign, two branches joining into one.
+  const hero = new ModelBuilder();
+  hero.box(0.05, 0.3, 0.05, DARK, { at: [0, TOP + 0.15, 0] }, 0);
+  hero.box(0.56, 0.5, 0.06, INK, { at: [0, TOP + 0.55, 0] }, 0.03);
+  const glow = 0xffb070;
+  hero.screen(0.04, 0.36, glow, { at: [0.08, TOP + 0.55, 0.032] });
+  hero.screen(0.04, 0.22, glow, { at: [-0.06, TOP + 0.6, 0.032], rot: [0, 0, -0.65] });
+  // The commits: the main line white, the front end blue, the back end green.
+  hero.led(0.045, 0xffffff, { at: [0.08, TOP + 0.38, 0.04] });
+  hero.led(0.045, 0x7ab8f0, { at: [0.08, TOP + 0.72, 0.04] });
+  hero.led(0.045, 0x6cbf7a, { at: [-0.14, TOP + 0.7, 0.04] });
+  return { base: base.build(), hero: hero.build(), heroAt: [0, -0.32] };
+}
+
 /** Every station and the counter, by tile. */
 export const STATION_MODELS: Readonly<Record<StationTile, () => StationModel>> = {
   counter: plainCounter,
@@ -347,6 +408,8 @@ export const STATION_MODELS: Readonly<Record<StationTile, () => StationModel>> =
   bugQueue: bugQueueStation,
   ship: shipStation,
   bin,
+  whiteboard: whiteboardStation,
+  merge: mergeStation,
 };
 
 /**
@@ -505,11 +568,17 @@ export function floorModel(theme: FloorTheme): Model {
   return b.build();
 }
 
-/** Folder colors: a feature is a manila folder, a bug pink, an incident red. */
+/**
+ * Folder colors: a feature is a manila folder, a bug pink, an incident red;
+ * a front end sky blue, a back end green, and the two merged purple.
+ */
 const FOLDER_COLORS: Readonly<Record<TicketKind, number>> = {
   feature: 0xe8c77a,
   bug: 0xf29aa0,
   incident: 0xe8402f,
+  frontend: 0x7ab8f0,
+  backend: 0x6cbf7a,
+  fullstack: 0x9a7ae0,
 };
 
 /** A ticket: a folder with a tab and a sheet peeking out, lying flat, its bottom at y = 0. */

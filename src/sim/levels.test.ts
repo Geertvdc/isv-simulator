@@ -13,6 +13,9 @@ describe('settingsForPlayers', () => {
       orderSchedule,
       starThresholds,
       reviewShare,
+      designShare: 0,
+      fullstackShare: 0,
+      pairing: false,
       incidents,
       meetings,
     });

@@ -6,10 +6,21 @@
 import type { Tile } from './level';
 import type { GameState, PlayerId, Vec } from './state';
 
-export type StepKind = 'code' | 'review' | 'test' | 'pipeline';
+/**
+ * `design` is sketched at a whiteboard before coding; `merge` is done the
+ * moment a front end and a back end come together at the merge station.
+ */
+export type StepKind = 'design' | 'code' | 'review' | 'test' | 'merge' | 'pipeline';
 
-/** Features are new work; bugs come back after shipping; incidents are production on fire. */
-export type TicketKind = 'feature' | 'bug' | 'incident';
+/**
+ * Features are new work; bugs come back after shipping; incidents are
+ * production on fire. A full-stack feature comes in as two parts, a
+ * `frontend` and a `backend`, that become one `fullstack` ticket when merged.
+ */
+export type TicketKind = 'feature' | 'bug' | 'incident' | 'frontend' | 'backend' | 'fullstack';
+
+/** The two parts of a full-stack feature, and the ticket they become. */
+export const PART_KINDS: readonly TicketKind[] = ['frontend', 'backend'];
 
 /** The queues tickets wait in: the inbox and the bug queue. */
 export type QueueKind = 'feature' | 'bug';
@@ -21,7 +32,15 @@ export const TICKET_STEPS: Readonly<Record<TicketKind, readonly StepKind[]>> = {
   bug: ['test', 'code', 'test', 'pipeline'],
   // A hotfix: no time to test, straight to production.
   incident: ['code', 'pipeline'],
+  // Each part of a full-stack feature is coded on its own...
+  frontend: ['code'],
+  backend: ['code'],
+  // ...then merged (both parts' code counts as the one `code` step), tested and built.
+  fullstack: ['code', 'merge', 'test', 'pipeline'],
 };
+
+/** Steps of a feature order that starts with a design at the whiteboard. */
+export const DESIGNED_FEATURE_STEPS: readonly StepKind[] = ['design', 'code', 'test', 'pipeline'];
 
 /** Steps of a feature order that needs a code review: two people at the review station. */
 export const REVIEWED_FEATURE_STEPS: readonly StepKind[] = ['code', 'review', 'test', 'pipeline'];
@@ -40,10 +59,20 @@ export const QUEUE_OF: Readonly<Record<TicketKind, QueueKind>> = {
   feature: 'feature',
   bug: 'bug',
   incident: 'bug',
+  frontend: 'feature',
+  backend: 'feature',
+  fullstack: 'feature',
 };
 
 /** Within a queue, lower goes first: incidents jump the line. */
-const QUEUE_PRIORITY: Readonly<Record<TicketKind, number>> = { incident: 0, bug: 1, feature: 1 };
+const QUEUE_PRIORITY: Readonly<Record<TicketKind, number>> = {
+  incident: 0,
+  bug: 1,
+  feature: 1,
+  frontend: 1,
+  backend: 1,
+  fullstack: 1,
+};
 
 export interface TicketStep {
   kind: StepKind;
@@ -179,11 +208,50 @@ export function enqueueTicket(
 
 /**
  * A ticket that fell into a gap or off the edge: back in its queue, every
- * step undone ("git reset --hard"). Its order can still be met.
+ * step undone ("git reset --hard"), except a merge. Its order can still be met.
  */
 export function loseTicket(state: GameState, ticket: Ticket, at: { x: number; y: number }): void {
-  for (const step of ticket.steps) step.progress = 0;
+  // A merged ticket keeps its merge (its parts are gone): only the work since is lost.
+  const merged = ticket.steps.findIndex((s) => s.kind === 'merge');
+  ticket.steps.forEach((step, i) => {
+    if (i > merged) step.progress = 0;
+  });
   const queue = QUEUE_OF[ticket.kind];
   ticket.location = { kind: 'queue', queue };
   state.events.push({ type: 'ticketLost', ticketId: ticket.id, x: at.x, y: at.y, queue });
+}
+
+/** Whether `ticket` is one part of a full-stack feature (it can't ship on its own). */
+export function isPart(ticket: Pick<Ticket, 'kind'>): boolean {
+  return PART_KINDS.includes(ticket.kind);
+}
+
+/**
+ * Whether two tickets are the two halves of a full-stack feature, both coded,
+ * ready to merge.
+ */
+export function canMerge(a: Ticket, b: Ticket): boolean {
+  return isPart(a) && isPart(b) && a.kind !== b.kind && isFinished(a) && isFinished(b);
+}
+
+/**
+ * Merges two parts into one full-stack ticket on tile (x, y): the code and
+ * the merge done, test and pipeline to go. Takes the front end's title.
+ */
+export function mergeParts(state: GameState, a: Ticket, b: Ticket, x: number, y: number): Ticket {
+  const front = a.kind === 'frontend' ? a : b;
+  state.tickets = state.tickets.filter((t) => t !== a && t !== b);
+  const merged: Ticket = {
+    id: state.nextTicketId++,
+    kind: 'fullstack',
+    title: front.title,
+    steps: TICKET_STEPS.fullstack.map((kind) => ({
+      kind,
+      progress: kind === 'code' || kind === 'merge' ? 1 : 0,
+    })),
+    location: { kind: 'tile', x, y },
+  };
+  state.tickets.push(merged);
+  state.events.push({ type: 'merged', ticketId: merged.id, parts: [a.id, b.id], x, y });
+  return merged;
 }

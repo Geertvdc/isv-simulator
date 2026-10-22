@@ -68,6 +68,7 @@ export function soundFor(event: GameEvent): SoundKey | null {
     case 'ticketLost':
       return 'order-expired';
     case 'inviteSent':
+    case 'merged':
       return 'build-done';
     case 'pipelineBroke':
       return 'pipeline-broke';

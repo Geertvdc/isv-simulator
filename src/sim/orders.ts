@@ -13,6 +13,8 @@ import {
   EXPIRED_PENALTY,
   INCIDENT_EXPIRED_PENALTY,
   INCIDENT_POINTS,
+  FULLSTACK_ORDER_POINTS,
+  FULLSTACK_TIME_FACTOR,
   ORDER_POINTS,
   ORDER_SPEED_BONUS_MAX,
 } from './balance';
@@ -21,6 +23,8 @@ import type { Invite } from './meetings';
 import * as rng from './rng';
 import type { GameState, PlayerId } from './state';
 import {
+  DESIGNED_FEATURE_STEPS,
+  PART_KINDS,
   REVIEWED_FEATURE_STEPS,
   type StepKind,
   TICKET_STEPS,
@@ -29,6 +33,7 @@ import {
   type TicketKind,
   QUEUE_OF,
   enqueueTicket,
+  isPart,
   isShippable,
   queuedTickets,
   skippedShare,
@@ -79,6 +84,8 @@ export type GameEvent =
   | { type: 'binned'; playerId: PlayerId; ticketId: number }
   /** A ticket came down in a gap or off the edge: it's back in its queue, its work lost. */
   | { type: 'ticketLost'; ticketId: number; x: number; y: number; queue: QueueKind }
+  /** A front end and a back end became full-stack ticket `ticketId` on tile (x, y). */
+  | { type: 'merged'; ticketId: number; parts: [number, number]; x: number; y: number }
   /** A conveyor moved a ticket onto tile (x, y). */
   | { type: 'conveyed'; ticketId: number; x: number; y: number }
   | { type: 'dashed'; playerId: PlayerId }
@@ -111,11 +118,18 @@ export function bugChance(ticket: Ticket): number {
  */
 export function shipPoints(order: Order, tick: number): number {
   if (order.kind === 'bug') return BUG_ORDER_POINTS;
+  if (order.kind === 'fullstack') {
+    return FULLSTACK_ORDER_POINTS + Math.round(ORDER_SPEED_BONUS_MAX * timeShare(order, tick));
+  }
+  const base = order.kind === 'incident' ? INCIDENT_POINTS : ORDER_POINTS;
+  return base + Math.round(ORDER_SPEED_BONUS_MAX * timeShare(order, tick));
+}
+
+/** Share of an order's time still left at `tick`, 0 to 1. */
+function timeShare(order: Order, tick: number): number {
   const limit = order.expiresTick - order.createdTick;
   const left = Math.max(0, order.expiresTick - tick);
-  const share = limit > 0 ? Math.min(1, left / limit) : 0;
-  const base = order.kind === 'incident' ? INCIDENT_POINTS : ORDER_POINTS;
-  return base + Math.round(ORDER_SPEED_BONUS_MAX * share);
+  return limit > 0 ? Math.min(1, left / limit) : 0;
 }
 
 /** Points lost when an order of `kind` runs out. */
@@ -130,6 +144,7 @@ function timeLimit(state: GameState, kind: TicketKind): number {
   const { orderSchedule, incidents } = state.settings;
   if (kind === 'bug') return orderSchedule.bugTimeLimitTicks;
   if (kind === 'incident') return incidents?.timeLimitTicks ?? orderSchedule.bugTimeLimitTicks;
+  if (kind === 'fullstack') return Math.round(orderSchedule.timeLimitTicks * FULLSTACK_TIME_FACTOR);
   return orderSchedule.timeLimitTicks;
 }
 
@@ -171,7 +186,12 @@ export function createOrder(
     expiresTick: state.tick + limit,
   };
   state.orders.push(order);
-  enqueueTicket(state, kind, title, steps);
+  if (kind === 'fullstack') {
+    // It arrives as its two parts, to be coded apart and merged.
+    for (const part of PART_KINDS) enqueueTicket(state, part, title);
+  } else {
+    enqueueTicket(state, kind, title, steps);
+  }
   state.events.push({ type: 'orderCreated', order });
   return order;
 }
@@ -184,7 +204,8 @@ export function createOrder(
  * shipped.
  */
 export function shipTicket(state: GameState, playerId: PlayerId, ticket: Ticket): boolean {
-  if (!isShippable(ticket)) return false;
+  // Half a full-stack feature can't ship: merge it with its other half first.
+  if (!isShippable(ticket) || isPart(ticket)) return false;
   const order = matchingOrders(state, ticket)[0] ?? null;
 
   const points = order ? shipPoints(order, state.tick) : 0;
@@ -212,8 +233,12 @@ export function expireOrders(state: GameState): void {
     state.orders = state.orders.filter((o) => o !== order);
     const penalty = Math.min(expiredPenalty(order.kind), state.score);
     state.score -= penalty;
-    const waiting = queuedTickets(state, QUEUE_OF[order.kind]).find((t) => t.kind === order.kind);
-    if (waiting) state.tickets = state.tickets.filter((t) => t !== waiting);
+    // Its waiting ticket leaves the queue too (both parts of a full-stack feature).
+    const kinds = order.kind === 'fullstack' ? PART_KINDS : [order.kind];
+    for (const kind of kinds) {
+      const waiting = queuedTickets(state, QUEUE_OF[kind]).find((t) => t.kind === kind);
+      if (waiting) state.tickets = state.tickets.filter((t) => t !== waiting);
+    }
     state.events.push({ type: 'orderExpired', order, penalty });
   }
 }
@@ -234,12 +259,15 @@ export function updateOrders(state: GameState): void {
   if (openIncident(state)) return;
 
   const { orderSchedule } = state.settings;
-  const openFeatures = state.orders.filter((o) => o.kind === 'feature').length;
+  const openFeatures = state.orders.filter(
+    (o) => o.kind === 'feature' || o.kind === 'fullstack',
+  ).length;
   if (state.tick >= state.nextOrderTick && openFeatures < orderSchedule.maxOpenOrders) {
     const [title, s1] = rng.pick(state.rngState, TICKET_TITLES);
     const [jitter, s2] = rng.int(s1, -orderSchedule.jitterTicks, orderSchedule.jitterTicks);
     state.rngState = s2;
-    createOrder(state, 'feature', title, featureSteps(state));
+    if (isFullstackNext(state)) createOrder(state, 'fullstack', title);
+    else createOrder(state, 'feature', title, featureSteps(state));
     state.nextOrderTick = state.tick + orderSchedule.intervalTicks + jitter;
   }
 }
@@ -263,13 +291,31 @@ function updateIncidents(state: GameState): void {
   state.nextIncidentTick = state.tick + schedule.intervalTicks + jitter;
 }
 
-/** Steps for the next feature order: with a review for `reviewShare` of them. */
+/**
+ * Steps for the next feature order: with a review for `reviewShare` of them,
+ * else a design first for `designShare` of them.
+ */
 function featureSteps(state: GameState): readonly StepKind[] {
-  // No roll at all without reviews, so levels without them keep their order sequence.
-  if (state.settings.reviewShare <= 0) return TICKET_STEPS.feature;
-  const [roll, s] = rng.next(state.rngState);
+  // No roll at all without reviews or designs, so levels without them keep their order sequence.
+  if (state.settings.reviewShare > 0 && roll(state) < state.settings.reviewShare) {
+    return REVIEWED_FEATURE_STEPS;
+  }
+  const design = state.settings.designShare ?? 0;
+  if (design > 0 && roll(state) < design) return DESIGNED_FEATURE_STEPS;
+  return TICKET_STEPS.feature;
+}
+
+/** Whether the next feature order comes as a full-stack feature, in two parts. */
+function isFullstackNext(state: GameState): boolean {
+  const share = state.settings.fullstackShare ?? 0;
+  return share > 0 && roll(state) < share;
+}
+
+/** A number from 0 to 1 off the level's RNG. */
+function roll(state: GameState): number {
+  const [value, s] = rng.next(state.rngState);
   state.rngState = s;
-  return roll < state.settings.reviewShare ? REVIEWED_FEATURE_STEPS : TICKET_STEPS.feature;
+  return value;
 }
 
 /** Ends the level once its duration is up. */

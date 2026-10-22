@@ -21,7 +21,7 @@
 
 ## 2. Merge (front end + back end, `G`)
 
-- A **full-stack order** comes in as two tickets in the inbox: a **front end** part and a **back end** part (`frontend` and `backend` kinds), each needing `code` (and the back end also `test`).
+- A **full-stack order** comes in as two tickets in the inbox: a **front end** part and a **back end** part (`frontend` and `backend` kinds), each needing `code`.
 - The **merge station** (`G`, a git-branch logo): put one finished part on it, then the other; they combine into one **full-stack** ticket that still needs `test → pipeline` and ships for the order. An unfinished part can't go on it, and two of the same part don't merge.
 - 2D: a block with a branch icon; 3D: a desk with two screens joined by a glowing branch line, the parts sliding together.
 
@@ -32,7 +32,7 @@
 
 ## Sim
 
-- `tickets.ts`: step kind `design`; ticket kinds `frontend`, `backend` and `fullstack` (steps per kind); `TICKET_STEPS` and the queue for each.
+- `tickets.ts`: step kinds `design` and `merge`; ticket kinds `frontend`, `backend` and `fullstack` (steps per kind); `TICKET_STEPS` and the queue for each.
 - `level.ts`: tiles `whiteboard` (`W`) and `merge` (`G`).
 - `interact.ts`: the whiteboard works `design` by hand; putting a part on the merge station with its other half combines them (`merged` event); pairing counts workers per keyboard.
 - `orders.ts`: `fullstack` orders create both parts; `designShare` and `fullstackShare` per level, like `reviewShare`.
@@ -51,6 +51,16 @@
 
 ## Done when
 
-- [ ] Each mechanic works in 2D and 3D, with an intro picture and HUD letters
-- [ ] Existing levels unchanged
-- [ ] `npm run check` passes
+- [x] Each mechanic works in 2D and 3D, with HUD letters (intro pictures come with the levels in phase 18)
+- [x] Existing levels unchanged (no new RNG rolls on levels without the new shares)
+- [x] `npm run check` passes
+
+## Implementation
+
+- `tickets.ts`: step kinds `design` and `merge`; ticket kinds `frontend`, `backend`, `fullstack` (`fullstack` steps are `code → merge → test → pipeline`, code and merge done when merged); `DESIGNED_FEATURE_STEPS`; `isPart`, `canMerge`, `mergeParts`. A lost merged ticket keeps its merge.
+- `level.ts`: tiles `whiteboard` (`W`) and `merge` (`G`).
+- `interact.ts`: the whiteboard works `design` by hand at `DESIGN_RATE`; `canPutDown` on a merge station takes a coded part, then its other half; `settleOn` (used by put-down, throw landings and conveyors) merges them; on levels with `pairing`, everyone coding at a keyboard signs up and `finishCoding` advances it at `PAIR_RATE` for two or more.
+- `orders.ts`: `fullstack` orders (35 points, 1.5× the time) open as both parts in the inbox; parts can't ship; `designShare` and `fullstackShare` roll only on levels that use them; an expired full-stack order takes its waiting parts with it.
+- `levels.ts`: optional `designShare`, `fullstackShare`, `pairing` settings; lab level `lab-dev`.
+- 2D: whiteboard and merge blocks (W, G); card colors for the new kinds. 3D: a whiteboard on legs with a user-flow sketch, a merge desk with a glowing git branch sign; sky-blue, green and purple folders. HUD: W and G letters, "Front end", "Back end", "Full-stack" labels. Popup "Merged!".
+- Scenes: `design`, `merge`, `pairing`.

@@ -34,6 +34,8 @@ const STATION_LETTERS: Partial<Record<Tile, string>> = {
   review: 'R',
   pipeline: 'P',
   ship: 'S',
+  whiteboard: 'W',
+  merge: 'G',
 };
 /** Each floor tile's brightness wobbles by up to this much, so the floor doesn't look printed. */
 const FLOOR_WOBBLE = 0.06;

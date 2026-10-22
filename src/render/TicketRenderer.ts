@@ -23,18 +23,26 @@ const CARD_COLOR: Readonly<Record<TicketKind, number>> = {
   feature: 0xf4f1e8,
   bug: 0xf6c4bd,
   incident: 0xff6b57,
+  frontend: 0xcfe6ff,
+  backend: 0xd3f0d0,
+  fullstack: 0xe6d9ff,
 };
 const OUTLINE_COLOR: Readonly<Record<TicketKind, number>> = {
   feature: 0x1a1d24,
   bug: 0xb02a2a,
   incident: 0x5c0000,
+  frontend: 0x2a5d9a,
+  backend: 0x2f6a3a,
+  fullstack: 0x5a3a9a,
 };
 const ICON_SPACING = 11;
 const ICON_RADIUS = 4.5;
 const ICON_TODO_COLOR = 0xc9c4b5;
 /** Each step's icon takes the color of the station that does it. */
 const STEP_STATION: Readonly<Record<StepKind, BlockTile>> = {
+  design: 'whiteboard',
   code: 'keyboard',
+  merge: 'merge',
   review: 'review',
   test: 'testBench',
   pipeline: 'pipeline',

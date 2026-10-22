@@ -23,7 +23,13 @@ import {
   getPlayer,
 } from './state';
 import { tick } from './tick';
-import { REVIEWED_FEATURE_STEPS, TICKET_STEPS, type Ticket, type TicketKind } from './tickets';
+import {
+  DESIGNED_FEATURE_STEPS,
+  REVIEWED_FEATURE_STEPS,
+  TICKET_STEPS,
+  type Ticket,
+  type TicketKind,
+} from './tickets';
 
 export interface Scene {
   id: string;
@@ -96,9 +102,17 @@ export function openOrder(
   state: GameState,
   kind: TicketKind,
   title: string,
-  { review = false, left = 0.8 }: { review?: boolean; left?: number } = {},
+  {
+    review = false,
+    design = false,
+    left = 0.8,
+  }: { review?: boolean; design?: boolean; left?: number } = {},
 ): Ticket {
-  const steps = review ? REVIEWED_FEATURE_STEPS : TICKET_STEPS[kind];
+  const steps = review
+    ? REVIEWED_FEATURE_STEPS
+    : design
+      ? DESIGNED_FEATURE_STEPS
+      : TICKET_STEPS[kind];
   const order = createOrder(state, kind, title, steps);
   const limit = order.expiresTick - order.createdTick;
   order.createdTick = state.tick - Math.round(limit * (1 - left));
@@ -106,6 +120,14 @@ export function openOrder(
   const ticket = state.tickets[state.tickets.length - 1];
   if (!ticket) throw new Error('createOrder made no ticket');
   return ticket;
+}
+
+/** The front end and back end waiting for a full-stack order just opened. */
+function fullstackParts(state: GameState): [Ticket, Ticket] {
+  const front = state.tickets.filter((t) => t.kind === 'frontend').pop();
+  const back = state.tickets.filter((t) => t.kind === 'backend').pop();
+  if (!front || !back) throw new Error('No full-stack parts');
+  return [front, back];
 }
 
 /** Finishes the ticket's first `done` steps and sets the next one to `progress`. */
@@ -434,6 +456,51 @@ export const SCENES: readonly Scene[] = [
     input: (state) => [command(state, 1, { interact: true })],
     until: (state) =>
       state.tickets.some((t) => t.location.kind === 'flying' && t.location.pos.x > 6.6),
+  },
+  {
+    // Sketching the feature at the whiteboard before anyone codes it.
+    id: 'design',
+    levelId: 'lab-dev',
+    players: 2,
+    setup(state) {
+      openOrder(state, 'feature', 'Onboarding wizard', { design: true, left: 0.7 });
+      const board = tileAt(state, 'whiteboard');
+      putOn(workOn(openOrder(state, 'feature', 'Settings page', { design: true }), 0, 0.3), board);
+      standBeside(state, 1, board);
+    },
+    input: holdWork(1),
+    ticks: 40,
+  },
+  {
+    // The back end lands on the merge station next to its front end: one full-stack ticket.
+    id: 'merge',
+    levelId: 'lab-dev',
+    players: 2,
+    setup(state) {
+      openOrder(state, 'fullstack', 'Checkout flow', { left: 0.75 });
+      const [front, back] = fullstackParts(state);
+      const merge = tileAt(state, 'merge');
+      putOn(workOn(front, 1), merge);
+      give(workOn(back, 1), 1);
+      stand(state, 1, { x: merge.x, y: merge.y - 1 }, { x: 0, y: 1 });
+      stand(state, 2, { x: merge.x + 2, y: merge.y + 1 }, { x: -1, y: 0 });
+    },
+    input: pressOnce(1),
+    until: has('merged'),
+  },
+  {
+    // Two players at one keyboard, pair programming: it codes faster.
+    id: 'pairing',
+    levelId: 'lab-dev',
+    players: 2,
+    setup(state) {
+      const keyboard = tileAt(state, 'keyboard', 2);
+      putOn(workOn(openOrder(state, 'feature', 'Rewrite it in Rust'), 0, 0.2), keyboard);
+      stand(state, 1, { x: keyboard.x, y: keyboard.y - 1 }, { x: 0, y: 1 });
+      stand(state, 2, { x: keyboard.x, y: keyboard.y + 1 }, { x: 0, y: -1 });
+    },
+    input: holdWork(1, 2),
+    ticks: 40,
   },
   {
     // The test benches are across the atrium: player 1 throws the coded ticket over the gap.

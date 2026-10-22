@@ -3,7 +3,7 @@
  * working the keyboard and test bench, and repairing broken pipelines.
  */
 
-import { REVIEWERS_NEEDED, REVIEW_RATE, WORK_RATE } from './balance';
+import { DESIGN_RATE, PAIR_RATE, REVIEWERS_NEEDED, REVIEW_RATE, WORK_RATE } from './balance';
 import { type Tile, getTile } from './level';
 import { shipTicket } from './orders';
 import { isBroken, isBuilding, repairPipeline } from './pipeline';
@@ -13,6 +13,10 @@ import {
   type Ticket,
   type TicketStep,
   advanceStep,
+  canMerge,
+  isFinished,
+  isPart,
+  mergeParts,
   queueAt,
   queuedTickets,
   ticketCarriedBy,
@@ -24,6 +28,8 @@ import {
 const PICK_UP_FROM: ReadonlySet<Tile> = new Set([
   'counter',
   'conveyor',
+  'whiteboard',
+  'merge',
   'keyboard',
   'testBench',
   'pipeline',
@@ -34,6 +40,7 @@ const PICK_UP_FROM: ReadonlySet<Tile> = new Set([
 const PUT_DOWN_ON: ReadonlySet<Tile> = new Set([
   'counter',
   'conveyor',
+  'whiteboard',
   'keyboard',
   'testBench',
   'review',
@@ -41,13 +48,20 @@ const PUT_DOWN_ON: ReadonlySet<Tile> = new Set([
 
 /** The step each station advances. */
 const STATION_STEP: Partial<Record<Tile, StepKind>> = {
+  whiteboard: 'design',
   keyboard: 'code',
   review: 'review',
   testBench: 'test',
   pipeline: 'pipeline',
 };
 /** Stations that need a player holding work; the rest run on their own. */
-const WORKED_BY_HAND: ReadonlySet<Tile> = new Set(['keyboard', 'testBench']);
+const WORKED_BY_HAND: ReadonlySet<Tile> = new Set(['keyboard', 'testBench', 'whiteboard']);
+/** How fast each hand-worked station advances its step. */
+const HAND_RATE: Partial<Record<Tile, number>> = {
+  keyboard: WORK_RATE,
+  testBench: WORK_RATE,
+  whiteboard: DESIGN_RATE,
+};
 
 /** The step a station advances, or `undefined` for tiles that aren't stations. */
 export function stationStep(tile: Tile | null): StepKind | undefined {
@@ -71,7 +85,13 @@ export function isAtItsStation(ticket: Ticket, tile: Tile | null): boolean {
  */
 export function canPutDown(state: GameState, ticket: Ticket, x: number, y: number): boolean {
   const tile = getTile(state.level, x, y);
-  if (tile === null || ticketOnTile(state, x, y)) return false;
+  const onTile = ticketOnTile(state, x, y);
+  // The merge station takes a coded part, and then its other half (which merges them).
+  if (tile === 'merge') {
+    if (!isPart(ticket) || !isFinished(ticket)) return false;
+    return !onTile || canMerge(onTile, ticket);
+  }
+  if (tile === null || onTile) return false;
   return (
     PUT_DOWN_ON.has(tile) ||
     (tile === 'pipeline' && isAtItsStation(ticket, tile) && !isBroken(state, { x, y }))
@@ -98,8 +118,8 @@ export function interact(state: GameState, playerId: PlayerId): boolean {
     }
     if (tile === 'ship') return shipTicket(state, playerId, carried);
     if (canPutDown(state, carried, x, y)) {
-      carried.location = { kind: 'tile', x, y };
       state.events.push({ type: 'putDown', playerId, ticketId: carried.id });
+      settleOn(state, carried, x, y);
       return true;
     }
     return false;
@@ -118,6 +138,20 @@ export function interact(state: GameState, playerId: PlayerId): boolean {
   return true;
 }
 
+/**
+ * Puts `ticket` on tile (x, y), which `canPutDown` allowed: on a merge
+ * station holding its other half, the two become one full-stack ticket.
+ * Returns the ticket now on the tile.
+ */
+export function settleOn(state: GameState, ticket: Ticket, x: number, y: number): Ticket {
+  const onTile = ticketOnTile(state, x, y);
+  if (onTile && onTile !== ticket && canMerge(onTile, ticket)) {
+    return mergeParts(state, onTile, ticket, x, y);
+  }
+  ticket.location = { kind: 'tile', x, y };
+  return ticket;
+}
+
 function standingTile(state: GameState, playerId: PlayerId): [number, number] {
   const p = getPlayer(state, playerId);
   return p ? [Math.round(p.pos.x), Math.round(p.pos.y)] : [-1, -1];
@@ -129,10 +163,12 @@ export interface TickWork {
   worked: Set<number>;
   /** Players holding work at each review station with a ticket to review. */
   reviewers: Map<number, PlayerId[]>;
+  /** On levels with pairing: players coding at each keyboard this tick. */
+  coders: Map<number, PlayerId[]>;
 }
 
 export function newTickWork(): TickWork {
-  return { worked: new Set(), reviewers: new Map() };
+  return { worked: new Set(), reviewers: new Map(), coders: new Map() };
 }
 
 /**
@@ -152,6 +188,13 @@ export function work(state: GameState, playerId: PlayerId, tickWork: TickWork): 
     reviewers.set(key, [...(reviewers.get(key) ?? []), playerId]);
     return true;
   }
+  if (tile === 'keyboard' && state.settings.pairing) {
+    // Pairing: everyone at the keyboard signs up; `finishCoding` advances it once.
+    const ticket = ticketOnTile(state, x, y);
+    if (!ticket || !stationWorkStep(ticket, tile)) return false;
+    tickWork.coders.set(key, [...(tickWork.coders.get(key) ?? []), playerId]);
+    return true;
+  }
   if (worked.has(key)) return false;
   if (tile === 'pipeline') {
     if (!repairPipeline(state, x, y)) return false;
@@ -163,9 +206,24 @@ export function work(state: GameState, playerId: PlayerId, tickWork: TickWork): 
   const ticket = ticketOnTile(state, x, y);
   const step = ticket && stationWorkStep(ticket, tile);
   if (!step) return false;
-  advanceStep(step, WORK_RATE);
+  advanceStep(step, HAND_RATE[tile] ?? WORK_RATE);
   worked.add(key);
   return true;
+}
+
+/**
+ * On levels with pairing, advances each keyboard someone coded at this tick:
+ * at `PAIR_RATE` with two or more players, else at the normal rate.
+ */
+export function finishCoding(state: GameState, tickWork: TickWork): void {
+  const { width } = state.level;
+  for (const [key, players] of tickWork.coders) {
+    const x = key % width;
+    const y = Math.floor(key / width);
+    const ticket = ticketOnTile(state, x, y);
+    const step = ticket && stationWorkStep(ticket, 'keyboard');
+    if (step) advanceStep(step, players.length >= 2 ? PAIR_RATE : WORK_RATE);
+  }
 }
 
 /** Advances every review that `REVIEWERS_NEEDED` players worked on this tick; more don't speed it up. */

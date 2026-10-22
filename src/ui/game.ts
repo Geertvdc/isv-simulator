@@ -19,7 +19,9 @@ import { playerBadge } from './playerBadge';
 
 /** Each step shows as the letter of its station on the map, in that station's color. */
 export const STEP_LABEL: Readonly<Record<StepKind, { letter: string; color: string }>> = {
+  design: { letter: 'W', color: cssColor(tileColor('whiteboard')) },
   code: { letter: 'K', color: cssColor(tileColor('keyboard')) },
+  merge: { letter: 'G', color: cssColor(tileColor('merge')) },
   review: { letter: 'R', color: cssColor(tileColor('review')) },
   test: { letter: 'T', color: cssColor(tileColor('testBench')) },
   pipeline: { letter: 'P', color: cssColor(tileColor('pipeline')) },
@@ -29,6 +31,9 @@ const ORDER_KIND_LABEL: Readonly<Record<Order['kind'], string>> = {
   feature: 'Feature',
   bug: 'Bug',
   incident: 'Incident!',
+  frontend: 'Front end',
+  backend: 'Back end',
+  fullstack: 'Full-stack',
 };
 
 /** How long a "+25" or "-10" floats by the score. */
