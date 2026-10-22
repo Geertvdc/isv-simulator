@@ -65,11 +65,22 @@ export class PhaserRoundRenderer implements RoundRenderer {
     this.pipelineRenderer.sync(state, timeMs);
     this.effects.play(state, events);
     for (const player of state.players) this.updateTarget(view, player.id);
+    // A player who left (online) takes their highlight along.
+    for (const [id, highlight] of this.targets) {
+      if (state.players.some((p) => p.id === id)) continue;
+      highlight.g.destroy();
+      this.targets.delete(id);
+    }
     this.hintRenderer.sync(hints, hintsVisible, timeMs);
   }
 
   render(): void {
     // Phaser draws its game objects by itself.
+  }
+
+  destroy(): void {
+    // Phaser destroys the scene's game objects itself.
+    this.targets.clear();
   }
 
   setShake(enabled: boolean): void {

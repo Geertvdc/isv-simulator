@@ -477,7 +477,11 @@ export class GameScene extends Phaser.Scene {
     // Restarts reuse this object; the old sprites went with the old scene.
     this.hovered = null;
     const createRenderer = this.options.roundRenderer ?? createPhaserRoundRenderer;
-    this.roundRenderer = createRenderer(this, this.map, mapLook(level.id));
+    const roundRenderer = createRenderer(this, this.map, mapLook(level.id));
+    this.roundRenderer = roundRenderer;
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      roundRenderer.destroy();
+    });
     this.devices ??= new InputDevices(window);
     if (!this.music) {
       this.music = new MusicPlayer(this.game);
