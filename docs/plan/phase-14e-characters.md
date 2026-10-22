@@ -20,6 +20,12 @@
 - A calmer walk (1.6 to 2.2 cycles a second with speed), a bigger waddle; dashing keeps the head round and flings the hands back where they show.
 - "Working" is render-only memory (`noteWork`): the step in front moved on the same ticket while standing still. Deliberately no sim change for it (gameplay is out of scope); two players at one station both look busy.
 
+## Second review round
+
+- A full throw wind-up swings the ticket up, back and over the right shoulder, clear of the head (tested); hands don't bob off a carried ticket.
+- The manager's collar sits low and thin (it read as a beard), thicker glasses, a clipboard held face up, the coffee hand out in front of the jacket.
+- Left for later (nice-to-haves): fewer per-frame allocations in posing, and moving a ticket's checklist off the hero prop of the station being worked.
+
 ## Tests
 
 - `three/People.test.ts`: `noteWork` (shows and holds, ignores switching tickets and walking past), the layout's hat top matches the model's

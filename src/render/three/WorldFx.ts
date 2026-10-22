@@ -10,7 +10,7 @@ import { PIPELINE_SERVER_AT } from './models';
 const WARN_COLOR = 0xff3030;
 const BROKEN_COLOR = 0x111317;
 /** Dark, so it reads against light walls. */
-const SMOKE_COLOR = 0x3a3d44;
+const SMOKE_COLOR = 0x26282d;
 const SPARK_COLOR = 0xffd166;
 const ALARM_COLOR = 0xff3020;
 /** Height of the build server's top over the block's top (see `models.ts`). */
@@ -168,7 +168,7 @@ export class WorldFx {
         ),
       );
       puff.scale.setScalar(0.18 + phase * 0.22);
-      puff.material.opacity = 0.85 * (1 - phase * 0.8);
+      puff.material.opacity = 0.95 * (1 - phase * 0.7);
     });
     // Sparks blink in a fixed pattern.
     const spark = Math.floor(t * 12);
@@ -222,15 +222,23 @@ export class WorldFx {
     );
     const server = { x: pipeline.x + h.dx, y: pipeline.y + h.dz };
     const alarm = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.06, 0.07, 0.09, 16),
+      new THREE.CylinderGeometry(0.09, 0.1, 0.16, 16),
       new THREE.MeshBasicMaterial({ color: ALARM_COLOR, toneMapped: false }),
     );
-    putAt(alarm, gridToWorld(server.x, server.y, top + SERVER_TOP + 0.045));
+    // On a short pole over the server, high enough to clear a ticket's checklist on the block.
+    putAt(alarm, gridToWorld(server.x, server.y, top + SERVER_TOP + 0.38));
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.015, 0.015, 0.3, 8),
+      new THREE.MeshBasicMaterial({ color: 0x2b2f38 }),
+    );
+    pole.position.y = -0.23;
+    alarm.add(pole);
     alarm.visible = false;
     this.root.add(alarm);
     return {
       warn: plate(WARN_COLOR, 0.5, 0.012),
-      broken: plate(BROKEN_COLOR, 0.88, 0.011),
+      // Over the conveyor and the server's foot: the whole top goes dark.
+      broken: plate(BROKEN_COLOR, 0.88, 0.08),
       smoke,
       sparks,
       alarm,

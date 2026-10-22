@@ -18,7 +18,7 @@ import {
   screenToGround,
 } from '../projection';
 import type { RoundFrame, RoundRenderer } from '../RoundRenderer';
-import { Overlays, POPUP_HEIGHT, type ScreenPoint, overlayScale } from './Overlays';
+import { OVERLAY_SCALE, Overlays, POPUP_HEIGHT, type ScreenPoint, overlayScale } from './Overlays';
 import { People } from './People';
 import { WorldFx } from './WorldFx';
 import { blockHeight, levelBox, pickTile, placeTicket } from './layout';
@@ -35,6 +35,10 @@ const HOVER_COLOR = 0xffffff;
  * and the back wall may reach under it.
  */
 const HUD_TOP_3D = 0.1;
+/** How far down the HUD's order cards reach, as a share of the height. */
+const HUD_ORDERS_BAND = 0.135;
+/** About how tall an overlay drawn up from its point is (a card and its title), in overlay pixels. */
+const OVERLAY_TALL = 52;
 
 /**
  * The 3D look (`?render=3d`): the level and round drawn with three.js on the
@@ -193,9 +197,14 @@ export class ThreeRoundRenderer implements RoundRenderer {
   /** Canvas point, overlay scale and draw order of world points seen from `pose`. */
   private project(pose: CameraPose): (p: Vec3) => ScreenPoint {
     const f = focalLength(pose);
+    // The HUD's order cards cover the top band: overlays over the back row are pushed
+    // down to stay under it (most are drawn up from their point, about this tall).
+    const hudBottom = pose.viewport.height * HUD_ORDERS_BAND;
     return (p) => {
       const s = projectPoint(pose, p);
-      return { x: s.x, y: s.y, scale: overlayScale(f / s.depth), depth: 1000 - s.depth };
+      const scale = overlayScale(f / s.depth);
+      const y = Math.max(s.y, hudBottom + OVERLAY_TALL * scale * OVERLAY_SCALE);
+      return { x: s.x, y, scale, depth: 1000 - s.depth };
     };
   }
 
