@@ -87,6 +87,12 @@ let identity = loadIdentity(storage, () =>
     ? crypto.randomUUID()
     : uuidFromBytes(crypto.getRandomValues(new Uint8Array(16))),
 );
+// `?render=3d`: the 3D look (phase 14). three.js loads only then.
+const render3d = params.get('render') === '3d';
+const roundRenderer = render3d
+  ? (await import('./render/three/ThreeRoundRenderer')).createThreeRoundRenderer
+  : undefined;
+
 const gameServerUrl = serverUrl(import.meta.env.VITE_SERVER_URL, window.location);
 const profileApi = createProfileApi(gameServerUrl, (url, init) => fetch(url, init));
 const scene = new GameScene({
@@ -97,6 +103,7 @@ const scene = new GameScene({
   scene: shownScene,
   // `?demo`: a kiosk for a booth, bots play whenever nobody does.
   kiosk: !shownScene && params.has('demo'),
+  roundRenderer,
   // A scene is a picture: it never goes online.
   online: shownScene
     ? null
@@ -116,6 +123,8 @@ const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: getElement('game'),
   backgroundColor: '#14161c',
+  // In 3D, three.js draws the level on its own canvas under this one.
+  transparent: render3d,
   scale: {
     mode: Phaser.Scale.RESIZE,
     width: window.innerWidth,
