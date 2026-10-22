@@ -3,11 +3,13 @@ import type { LevelMap } from '../../sim/level';
 import { type Pipeline, pipelineWarning } from '../../sim/pipeline';
 import type { GameState, Vec } from '../../sim/state';
 import { pipelinePulse } from '../effects';
+import { type Vec3, gridToWorld } from '../projection';
 import { blockHeight } from './layout';
 
 const WARN_COLOR = 0xff3030;
-const BROKEN_COLOR = 0x1a1d24;
-const SMOKE_COLOR = 0x9aa3b5;
+const BROKEN_COLOR = 0x111317;
+/** Dark, so it reads against light walls. */
+const SMOKE_COLOR = 0x3a3d44;
 const SPARK_COLOR = 0xffd166;
 const RUG_COLOR = 0x8e6bd8;
 const RUG_OPACITY = 0.35;
@@ -31,6 +33,8 @@ interface Puff {
   from: THREE.Vector3;
   to: THREE.Vector3;
   startMs: number;
+  /** Radius at the start; it grows as it fades. */
+  size: number;
 }
 
 /**
@@ -61,7 +65,7 @@ export class WorldFx {
     const tile = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
     for (const t of map.meetingTiles) {
       const mesh = new THREE.Mesh(tile, this.rug);
-      mesh.position.set(t.x, 0.004, t.y);
+      putAt(mesh, gridToWorld(t.x, t.y, 0.004));
       this.root.add(mesh);
     }
   }
@@ -77,15 +81,18 @@ export class WorldFx {
   puff(at: Vec, facing: Vec, timeMs: number): void {
     for (let i = 0; i < PUFF_COUNT; i++) {
       const spread = (i - (PUFF_COUNT - 1) / 2) * 0.25;
-      const from = new THREE.Vector3(at.x - facing.y * spread, 0.1, at.y + facing.x * spread);
-      const to = from.clone().add(new THREE.Vector3(-facing.x * 0.6, 0.15, -facing.y * 0.6));
+      const sx = at.x - facing.y * spread;
+      const sy = at.y + facing.x * spread;
+      const from = vector(gridToWorld(sx, sy, 0.1));
+      const to = vector(gridToWorld(sx - facing.x * 0.6, sy - facing.y * 0.6, 0.25));
       const mesh = new THREE.Mesh(
         this.puffGeometry,
         new THREE.MeshStandardMaterial({ color: PUFF_COLOR, transparent: true, roughness: 1 }),
       );
-      mesh.scale.setScalar(0.08 + 0.025 * (i % 2));
+      const size = 0.08 + 0.025 * (i % 2);
+      mesh.scale.setScalar(size);
       this.root.add(mesh);
-      this.puffs.push({ mesh, from, to, startMs: timeMs });
+      this.puffs.push({ mesh, from, to, startMs: timeMs, size });
     }
   }
 
@@ -96,7 +103,7 @@ export class WorldFx {
   }
 
   /** Moves puffs along; returns this frame's shake offset in canvas pixels. */
-  update(timeMs: number, canvasHeight: number): { x: number; y: number } {
+  update(timeMs: number, canvas: { width: number; height: number }): { x: number; y: number } {
     for (let i = this.puffs.length - 1; i >= 0; i--) {
       const puff = this.puffs[i];
       if (!puff) continue;
@@ -108,12 +115,16 @@ export class WorldFx {
         continue;
       }
       puff.mesh.position.lerpVectors(puff.from, puff.to, t);
-      puff.mesh.scale.setScalar((0.08 + 0.025 * (i % 2)) * (1 + 0.8 * t));
+      puff.mesh.scale.setScalar(puff.size * (1 + 0.8 * t));
       puff.mesh.material.opacity = 0.8 * (1 - t);
     }
     if (timeMs >= this.shake.untilMs) return { x: 0, y: 0 };
-    const amount = this.shake.intensity * canvasHeight * SHAKE_SCALE;
-    return { x: (Math.random() * 2 - 1) * amount, y: (Math.random() * 2 - 1) * amount };
+    // Like Phaser's shake: a share of the canvas on each axis.
+    const k = this.shake.intensity * SHAKE_SCALE;
+    return {
+      x: (Math.random() * 2 - 1) * k * canvas.width,
+      y: (Math.random() * 2 - 1) * k * canvas.height,
+    };
   }
 
   private syncPipeline(pipeline: Pipeline, timeMs: number): void {
@@ -134,20 +145,31 @@ export class WorldFx {
       if (!pipeline.broken) return;
       // Smoke puffs drift up and fade.
       const phase = (t * 0.8 + i / 3) % 1;
-      puff.position.set(pipeline.x - 0.15 + i * 0.15, top + 0.1 + phase * 0.6, pipeline.y);
-      puff.scale.setScalar(0.07 + phase * 0.09);
-      puff.material.opacity = 0.7 * (1 - phase);
+      putAt(
+        puff,
+        gridToWorld(
+          pipeline.x - 0.15 + i * 0.15,
+          pipeline.y - phase * 0.2,
+          top + 0.15 + phase * 0.8,
+        ),
+      );
+      puff.scale.setScalar(0.1 + phase * 0.14);
+      puff.material.opacity = 0.85 * (1 - phase * 0.8);
     });
     // Sparks blink in a fixed pattern.
     const spark = Math.floor(t * 12);
     fx.sparks.forEach((s, i) => {
-      s.visible = pipeline.broken && (spark + i * 3) % 5 === 0;
+      // Two of the four always show; they jump around in a fixed pattern.
+      s.visible = pipeline.broken && (spark + i) % 4 < 2;
       if (!s.visible) return;
       const angle = ((spark * 7 + i * 13) % 16) * (Math.PI / 8);
-      s.position.set(
-        pipeline.x + Math.cos(angle) * 0.15,
-        top + 0.08 + Math.abs(Math.sin(angle)) * 0.12,
-        pipeline.y + Math.sin(angle) * 0.15,
+      putAt(
+        s,
+        gridToWorld(
+          pipeline.x + Math.cos(angle) * 0.22,
+          pipeline.y + Math.sin(angle) * 0.22,
+          top + 0.12 + Math.abs(Math.sin(angle)) * 0.18,
+        ),
       );
       s.rotation.set(0, angle, angle);
     });
@@ -160,7 +182,7 @@ export class WorldFx {
         new THREE.PlaneGeometry(0.98, 0.98).rotateX(-Math.PI / 2),
         new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false }),
       );
-      mesh.position.set(pipeline.x, top + lift, pipeline.y);
+      putAt(mesh, gridToWorld(pipeline.x, pipeline.y, top + lift));
       mesh.visible = false;
       this.root.add(mesh);
       return mesh;
@@ -173,7 +195,7 @@ export class WorldFx {
       this.root.add(mesh);
       return mesh;
     });
-    const sparkGeometry = new THREE.BoxGeometry(0.16, 0.025, 0.025);
+    const sparkGeometry = new THREE.BoxGeometry(0.26, 0.04, 0.04);
     const sparkMaterial = new THREE.MeshBasicMaterial({ color: SPARK_COLOR });
     const sparks = Array.from({ length: 4 }, () => {
       const mesh = new THREE.Mesh(sparkGeometry, sparkMaterial);
@@ -182,9 +204,17 @@ export class WorldFx {
     });
     return {
       warn: plate(WARN_COLOR, 0.5, 0.012),
-      broken: plate(BROKEN_COLOR, 0.65, 0.011),
+      broken: plate(BROKEN_COLOR, 0.88, 0.011),
       smoke,
       sparks,
     };
   }
+}
+
+function putAt(obj: THREE.Object3D, p: Vec3): void {
+  obj.position.set(p.x, p.y, p.z);
+}
+
+function vector(p: Vec3): THREE.Vector3 {
+  return new THREE.Vector3(p.x, p.y, p.z);
 }

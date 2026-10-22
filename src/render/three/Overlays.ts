@@ -29,12 +29,16 @@ export interface ScreenPoint {
 export type Project = (p: Vec3) => ScreenPoint;
 
 /** Overlays over the 3D world are a bit bigger than in 2D: the camera is further out, and they must read from the couch. */
-const OVERLAY_SCALE = 1.15;
+const OVERLAY_SCALE = 1.5;
 /** Ticket cards float this far over the ticket. */
 const CARD_LIFT = 0.28;
 /** Over a carrier's head, the card; the calendar invite goes over that. */
 const HEAD_CARD_HEIGHT = BODY_HEIGHT + 0.42;
-const HEAD_INVITE_HEIGHT = BODY_HEIGHT + 0.95;
+const HEAD_INVITE_HEIGHT = BODY_HEIGHT + 0.6;
+/** Over a carrier, the invite goes over the card and its title: this many overlay pixels up. */
+const INVITE_OVER_CARD = 78;
+/** Popups start over the head and its card. */
+export const POPUP_HEIGHT = BODY_HEIGHT + 0.5;
 const HINT_LIFT = 0.15;
 const HINT_BOB = 0.08;
 const HINT_BOB_MS = 700;
@@ -73,6 +77,9 @@ export class Overlays {
   private readonly hints = new Map<HintId, Phaser.GameObjects.Container>();
   private readonly debugLabels: { text: Phaser.GameObjects.Text; at: Vec3 }[] = [];
   private readonly meetingLabel: { text: Phaser.GameObjects.Text; at: Vec3 } | null = null;
+  private readonly popups: { label: Phaser.GameObjects.Text; at: Vec3; startMs: number }[] = [];
+  /** Where each hint points, worked out once. */
+  private readonly hintAnchors = new Map<HintId, { at: Vec3; tileX: number } | null>();
   private debug = false;
 
   constructor(
@@ -120,8 +127,22 @@ export class Overlays {
     this.syncHints(hints, hintsVisible, timeMs, project);
   }
 
-  /** The overlays that show outside rounds too (labels on the map). */
-  place(project: Project): void {
+  /** The overlays that show outside rounds too (labels on the map), and popups. */
+  place(project: Project, timeMs: number): void {
+    for (let i = this.popups.length - 1; i >= 0; i--) {
+      const popup = this.popups[i];
+      if (!popup) continue;
+      const t = (timeMs - popup.startMs) / POPUP_MS;
+      if (t >= 1) {
+        popup.label.destroy();
+        this.popups.splice(i, 1);
+        continue;
+      }
+      // Re-projected every frame, so it shakes and resizes along with the world.
+      const p = project(popup.at);
+      place(popup.label, { ...p, y: p.y - POPUP_RISE * p.scale * t }, 1e6);
+      popup.label.setAlpha(1 - t * t * t);
+    }
     if (this.meetingLabel) place(this.meetingLabel.text, project(this.meetingLabel.at));
     for (const { text, at } of this.debugLabels) {
       text.setVisible(this.debug);
@@ -130,31 +151,21 @@ export class Overlays {
   }
 
   /** Text that floats up from world point `at` and fades out. */
-  popup(at: Vec3, text: string, color: string, project: Project): void {
-    const p = project(at);
+  popup(at: Vec3, text: string, color: string, timeMs: number): void {
     const label = this.text(text, 20, color).setOrigin(0.5, 1).setStroke('#000000', 4);
-    place(label, p, 1e6);
-    this.scene.tweens.add({
-      targets: label,
-      y: p.y - POPUP_RISE * p.scale,
-      alpha: 0,
-      ease: 'Cubic.easeIn',
-      duration: POPUP_MS,
-      onComplete: () => {
-        label.destroy();
-      },
-    });
+    this.popups.push({ label, at, startMs: timeMs });
   }
 
   private syncCards(view: RoundView, project: Project): void {
     const { state } = view;
     const seen = new Set<number>();
+    // Only a queue's top card shows its checklist; the rest is a stack.
+    const queueTops = new Set([queuedTickets(state, 'feature')[0], queuedTickets(state, 'bug')[0]]);
     for (const ticket of state.tickets) {
+      const loc = ticket.location;
+      if (loc.kind === 'queue' && !queueTops.has(ticket)) continue;
       const placed = placeTicket(view, ticket);
       if (!placed?.visible) continue;
-      // Only the queue's top card shows its checklist; the rest is a stack.
-      const loc = ticket.location;
-      if (loc.kind === 'queue' && queuedTickets(state, loc.queue)[0] !== ticket) continue;
       seen.add(ticket.id);
       let card = this.cards.get(ticket.id);
       if (!card) {
@@ -224,7 +235,17 @@ export class Overlays {
         this.invites.set(invite.id, g);
       }
       drawInvite(g, state, invite);
-      place(g, project(gridToWorld(pos.x, pos.y, HEAD_INVITE_HEIGHT)));
+      const carrying = state.tickets.some(
+        (t) => t.location.kind === 'player' && t.location.playerId === invite.playerId,
+      );
+      if (carrying) {
+        // Stacked over the carried card and its title, in screen space so they never overlap.
+        const card = project(gridToWorld(pos.x, pos.y, HEAD_CARD_HEIGHT));
+        const lift = INVITE_OVER_CARD * card.scale * OVERLAY_SCALE;
+        place(g, { ...card, y: card.y - lift });
+      } else {
+        place(g, project(gridToWorld(pos.x, pos.y, HEAD_INVITE_HEIGHT)));
+      }
     }
     for (const [id, g] of this.invites) {
       if (seen.has(id)) continue;
@@ -267,20 +288,34 @@ export class Overlays {
     }
     const bob = Math.sin((timeMs / HINT_BOB_MS) * Math.PI) * HINT_BOB;
     for (const id of open) {
-      const group = firstGroup(this.map, HINT_TILES[id]);
-      const first = group[0];
-      if (!first) continue;
+      const anchor = this.hintAnchor(id);
+      if (!anchor) continue;
       let marker = this.hints.get(id);
       if (!marker) {
-        marker = createHintMarker(this.scene, HINT_TEXTS[id], hintLabelOrigin(first.x, this.map));
+        const origin = hintLabelOrigin(anchor.tileX, this.map);
+        marker = createHintMarker(this.scene, HINT_TEXTS[id], origin);
         this.hints.set(id, marker);
       }
       marker.setVisible(visible);
+      place(marker, project({ ...anchor.at, y: anchor.at.y + bob }), 1e6 + 1);
+    }
+  }
+
+  /** Over the middle of the first group of the hint's blocks. */
+  private hintAnchor(id: HintId): { at: Vec3; tileX: number } | null {
+    const known = this.hintAnchors.get(id);
+    if (known !== undefined) return known;
+    const group = firstGroup(this.map, HINT_TILES[id]);
+    const first = group[0];
+    let anchor: { at: Vec3; tileX: number } | null = null;
+    if (first) {
       const x = group.reduce((sum, t) => sum + t.x, 0) / group.length;
       const y = group.reduce((sum, t) => sum + t.y, 0) / group.length;
       const top = blockHeight(this.map, first.x, first.y);
-      place(marker, project(gridToWorld(x, y, top + HINT_LIFT + bob)), 1e6 + 1);
+      anchor = { at: gridToWorld(x, y, top + HINT_LIFT), tileX: first.x };
     }
+    this.hintAnchors.set(id, anchor);
+    return anchor;
   }
 
   private text(text: string, size: number, color: string): Phaser.GameObjects.Text {
