@@ -300,6 +300,7 @@ export class Overlays {
       marker.setVisible(visible);
       place(marker, project({ ...anchor.at, y: anchor.at.y + bob }), 1e6 + 1);
     }
+    unstackHintLabels([...this.hints.values()]);
   }
 
   /** Over the middle of the first group of the hint's blocks. */
@@ -341,4 +342,40 @@ function place(
 /** Overlay scale for `pixelsPerUnit` world-unit pixels: the 2D look has `TILE_SIZE` per tile at zoom 1. */
 export function overlayScale(pixelsPerUnit: number): number {
   return pixelsPerUnit / TILE_SIZE;
+}
+
+/** Gap kept between hint labels that would overlap, in canvas pixels. */
+const HINT_LABEL_GAP = 4;
+const HINT_LABEL_BASE_Y = 'baseY';
+
+/**
+ * Lifts hint labels that would cover each other (stations next to each
+ * other in depth project close together): the lower one stays, the one
+ * above moves up. Only the label moves; each arrow keeps pointing at its
+ * station.
+ */
+function unstackHintLabels(markers: readonly Phaser.GameObjects.Container[]): void {
+  const labels: { label: Phaser.GameObjects.Text; marker: Phaser.GameObjects.Container }[] = [];
+  for (const marker of markers) {
+    const label = marker.list[1];
+    if (!(label instanceof Phaser.GameObjects.Text) || !marker.visible) continue;
+    const base: unknown = label.getData(HINT_LABEL_BASE_Y);
+    if (typeof base === 'number') label.y = base;
+    else label.setData(HINT_LABEL_BASE_Y, label.y);
+    labels.push({ label, marker });
+  }
+  // Bottom of the screen first: those keep their place.
+  const bounds = (l: Phaser.GameObjects.Text) => l.getBounds();
+  labels.sort((a, b) => bounds(b.label).bottom - bounds(a.label).bottom);
+  const kept: Phaser.Geom.Rectangle[] = [];
+  for (const { label, marker } of labels) {
+    let r = bounds(label);
+    for (const other of kept) {
+      if (!Phaser.Geom.Rectangle.Overlaps(r, other)) continue;
+      const lift = r.bottom - other.top + HINT_LABEL_GAP;
+      label.y -= lift / marker.scaleY;
+      r = bounds(label);
+    }
+    kept.push(r);
+  }
 }
