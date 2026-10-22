@@ -26,6 +26,8 @@ const CHAPTER_TRACKS: Readonly<Record<string, MusicTrack>> = {
   startup: 'startup',
   'scale-up': 'scale-up',
   enterprise: 'enterprise',
+  // No track of its own yet: the Scale-Up one, upbeat and busy.
+  'big-tech': 'scale-up',
 };
 
 /** How loud each track plays at full music volume, 0 to 1; evens out the files. */

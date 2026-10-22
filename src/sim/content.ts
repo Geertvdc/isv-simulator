@@ -127,6 +127,10 @@ export const LEVEL_NAMES: Readonly<Record<string, string>> = {
   'back-to-back': 'Back to Back',
   synergy: 'Synergy',
   'the-reorg': 'The Reorg',
+  'the-atrium': 'The Atrium',
+  'design-sprint': 'Design Sprint',
+  monorepo: 'Monorepo',
+  hackathon: 'Hackathon',
 };
 
 /** One line under each level's name on the level select, by level id. */
@@ -143,6 +147,10 @@ export const LEVEL_BLURBS: Readonly<Record<string, string>> = {
   'back-to-back': 'Calendar invites! Go sit in the meeting room or lose points.',
   synergy: 'Meetings, a manager and incidents. Lots of synergy.',
   'the-reorg': 'Everything, everywhere, all at once.',
+  'the-atrium': 'A campus with an atrium in the middle. Throw it across, or let the belt take it.',
+  'design-sprint': 'Whiteboards before keyboards. Pair up to code faster.',
+  monorepo: 'Front end on one side, back end on the other. Merge in the middle.',
+  hackathon: 'A carousel of tickets, every new idea, and 3 minutes to ship it all.',
 };
 
 /** Chapter names, by chapter id. */
@@ -151,6 +159,7 @@ export const CHAPTER_NAMES: Readonly<Record<string, string>> = {
   startup: 'Startup',
   'scale-up': 'Scale-Up',
   enterprise: 'Enterprise',
+  'big-tech': 'Big Tech',
 };
 
 /** One line under each chapter's name: its new mechanic. */
@@ -159,6 +168,7 @@ export const CHAPTER_BLURBS: Readonly<Record<string, string>> = {
   startup: 'New: production incidents',
   'scale-up': 'New: the wandering manager',
   enterprise: 'New: meetings',
+  'big-tech': 'New: atriums, belts, design, merges and pairing',
 };
 
 /** Shown on the results when the score beats the best so far. */
@@ -249,7 +259,17 @@ export const LOBBY_BACK_HINT = 'Esc or gamepad B: back to the title';
 export const PAUSE_HINT = 'Esc or Start: pause';
 
 /** The picture on a level's intro card that shows its new mechanic. */
-export type IntroPicture = 'basics' | 'throw' | 'review' | 'incident' | 'manager' | 'meeting';
+export type IntroPicture =
+  | 'basics'
+  | 'throw'
+  | 'review'
+  | 'incident'
+  | 'manager'
+  | 'meeting'
+  | 'atrium'
+  | 'design'
+  | 'merge'
+  | 'carousel';
 
 /** On the intro card of a level that teaches something new: one line and a picture. */
 export const LEVEL_INTRO_TIPS: Readonly<Record<string, { text: string; picture: IntroPicture }>> = {
@@ -272,6 +292,22 @@ export const LEVEL_INTRO_TIPS: Readonly<Record<string, { text: string; picture: 
   'middle-management': {
     picture: 'manager',
     text: 'The manager wanders the office and walks right into you. Go around.',
+  },
+  'the-atrium': {
+    picture: 'atrium',
+    text: 'Throw tickets across the atrium, or put them on a belt. Drop one in and its work is gone: git reset --hard.',
+  },
+  'design-sprint': {
+    picture: 'design',
+    text: 'Some features start at the whiteboard (W): design them first and they code faster. Two at one keyboard code faster too.',
+  },
+  monorepo: {
+    picture: 'merge',
+    text: 'Full-stack features come as a front end and a back end. Code both, then put them together on the merge station (G).',
+  },
+  hackathon: {
+    picture: 'carousel',
+    text: 'A belt runs round the middle: put a ticket on and it comes round to the other side.',
   },
   'back-to-back': {
     picture: 'meeting',
