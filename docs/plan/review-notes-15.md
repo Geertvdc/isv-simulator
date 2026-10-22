@@ -10,3 +10,11 @@ Decisions made without the product owner, who asked for the work to go ahead on 
 - **Star thresholds for the new levels are estimates**, not tuned with `npm run sim` (the bots can't play them). They're set from the closest old level and the extra walking or throwing. Playtest and adjust.
 - **Protocol version goes up** in 16, so an old client and a new server refuse each other instead of failing on an unknown tile.
 - **Every new tile is drawn in 2D too**, with placeholders like the rest of 2D, so the new levels are playable without `?render=3d`.
+
+## Phase 15: atmosphere
+
+- **The surroundings are a third darker than the office** (their own dimmed materials), and their screens and signs glow softly instead of blooming, so the eye stays on the play area. No extra "light pool" over the office: the dimming does that job without another light to tune.
+- **Background people:** at most 14 per level, only in the near rows, 85% of a player's size, muted hoodies, bare hands (players wear white gloves), no hats. They type at desks, chat and walk the lane behind the office; nobody sits down yet (no sitting pose).
+- **No colors of the players outside:** props avoid the player red, blue, yellow and green.
+- **Clutter on wall tops** only on some full-height walls, never next to a counter or station and never where it could hide a player behind it; no laptops or sticky notes (they read as things to pick up).
+- **No front row** in front of the level: it would sit between the camera and the play.

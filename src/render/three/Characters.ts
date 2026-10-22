@@ -73,13 +73,17 @@ export function createDeveloper(id: PlayerId, materials: KitMaterials): Characte
       skin: SKIN[i] ?? PALETTE.skin,
       hair: HAIR[i] ?? HAIR[0],
       hat: playerShape(id),
+      hands: GLOVE,
+      scale: CHARACTER_SCALE,
     },
     materials,
   );
 }
 
-/** Muted hoodie colors for people in the background, so they never look like players. */
-const EXTRA_COLORS = [0x7d8a96, 0x9a8c7a, 0x6f8a7a, 0x8c7a8f, 0xa39274, 0x6c7a91] as const;
+/** Muted, darker hoodie colors for people in the background, so they never look like players. */
+const EXTRA_COLORS = [0x5f6a74, 0x7a6e60, 0x56685e, 0x6e6072, 0x7f735c, 0x545f70] as const;
+/** People in the background are a little smaller than the players. */
+const EXTRA_SCALE = 0.85 * CHARACTER_SCALE;
 
 /**
  * Someone in the background (`seed` picks their look): no hat, a muted
@@ -87,12 +91,16 @@ const EXTRA_COLORS = [0x7d8a96, 0x9a8c7a, 0x6f8a7a, 0x8c7a8f, 0xa39274, 0x6c7a91
  */
 export function createExtra(seed: number, materials: KitMaterials): Character {
   const n = Math.abs(Math.floor(seed));
+  const skin = SKIN[(n >> 2) % SKIN.length] ?? PALETTE.skin;
+  // Bare hands, not the players' white gloves.
   return createPerson(
     {
       color: EXTRA_COLORS[n % EXTRA_COLORS.length] ?? EXTRA_COLORS[0],
-      skin: SKIN[(n >> 2) % SKIN.length] ?? PALETTE.skin,
+      skin,
       hair: HAIR[(n >> 4) % HAIR.length] ?? HAIR[0],
       hat: null,
+      hands: skin,
+      scale: EXTRA_SCALE,
     },
     materials,
   );
@@ -103,6 +111,8 @@ interface PersonLook {
   skin: number;
   hair: number;
   hat: PlayerShape | null;
+  hands: number;
+  scale: number;
 }
 
 function createPerson(look: PersonLook, materials: KitMaterials): Character {
@@ -140,8 +150,8 @@ function createPerson(look: PersonLook, materials: KitMaterials): Character {
   if (look.hat) hat(head, look.hat, color);
   const headGeometry = head.build().body;
 
-  const handGeometry = glove(GLOVE);
-  return assemble(torso, headGeometry, handGeometry, materials, CHARACTER_SCALE);
+  const handGeometry = glove(look.hands);
+  return assemble(torso, headGeometry, handGeometry, materials, look.scale);
 }
 
 /** The player's hat, sitting on top of the head, big enough to tell apart. */

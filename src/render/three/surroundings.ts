@@ -3,7 +3,7 @@ import type { LevelMap } from '../../sim/level';
 import { tileHash } from '../mapShape';
 import { type Vec3, gridToWorld } from '../projection';
 import { type Character, applyPose, createExtra } from './Characters';
-import { type KitMaterials, type Model } from './kit';
+import { type KitMaterials, type Model, kitMaterials } from './kit';
 import { SLAB_DEPTH } from './layout';
 import { matte } from './look';
 import { type Pose, type PoseInput, playerPose } from './pose';
@@ -19,19 +19,29 @@ import { SETTINGS, type SeatPose, type SetPiece } from './setDressing';
 /** The ground outside sits at the foot of the level's slab. */
 export const GROUND_Y = -SLAB_DEPTH - 0.013;
 const GROUND_SIZE = 90;
-/** Space between the slab and the near row, and between the rows. */
-const NEAR_GAP = 0.45;
-const FAR_GAP = 3.1;
-const ROW_GAP = 0.35;
-/** How far the rows run past the level's corners, in tiles. */
+/** Space between the slab and the near row, and between the slab and the far row. */
+const NEAR_GAP = 0.9;
+/** Far enough out for the deepest near-row prop (2 tiles) and a 1-tile lane for walkers. */
+const FAR_GAP = NEAR_GAP + 2 + 1;
+/** Space between props in a row: varies from prop to prop, so rows don't read as a grid. */
+const ROW_GAP_MIN = 0.35;
+const ROW_GAP_MAX = 1.2;
+/** Loose props turn up to this much either way from facing the office. */
+const YAW_JITTER = 0.2;
+/** How far the rows run past the level, in tiles. */
 const RUN_OVER = 3;
 const WALK_SPEED = 0.9;
+/** Most background people in a level: enough for life, few enough to never crowd the players. */
+const MAX_EXTRAS = 14;
 
-/** One prop placed in the world: where its center goes and how it's turned. */
+export type Row = 'near' | 'far';
+
+/** One prop placed in the world: where its center goes, how it's turned, and in which row. */
 export interface Placement {
   piece: SetPiece;
   at: Vec3;
   yaw: number;
+  row: Row;
 }
 
 /** A background person and what they do. */
@@ -43,10 +53,19 @@ interface Extra {
   walk?: { from: number; to: number; z: number };
 }
 
+/** A number from 0 to 1 for slot `i` of row `salt`. */
+function unit(i: number, salt: number): number {
+  return (tileHash(i * 31 + 7, salt) % 1000) / 1000;
+}
+
 /**
- * Where a chapter's props go around a `width` × `height` level: a near and a
- * far row down each side (facing the office) and along the back. Pure and
- * deterministic, so it can be tested; nothing lands on the slab.
+ * Where a chapter's props go around a `width` × `height` level: a near and
+ * a far row down each side (facing the office, from the back edge forward)
+ * and along the back (running out past both sides, so the corners are
+ * covered without the rows crossing). Spacing and turn vary per prop, the
+ * same piece never stands twice in a row, and each rare piece (the car, the
+ * cat) shows once, at the start of a far row. Pure and deterministic; no
+ * two props overlap and nothing lands on the slab.
  */
 export function placeSetPieces(setting: string, width: number, height: number): Placement[] {
   const s = SETTINGS[setting];
@@ -55,35 +74,62 @@ export function placeSetPieces(setting: string, width: number, height: number): 
   const left = -0.5;
   const right = width - 0.5;
   const back = -0.5;
-  // Down the sides: the prop's front (+z) turns toward the office.
-  const side = (row: readonly SetPiece[], gap: number, dir: -1 | 1, salt: number) => {
-    let z = -RUN_OVER;
-    for (let i = 0; z < height + RUN_OVER && row.length > 0; i++) {
-      const piece = row[tileHash(i, salt) % row.length];
+  const rare = [...s.rare];
+  /** The pieces of a row in order: a rare one first in far rows, never the same twice running. */
+  const pick = (row: readonly SetPiece[], kind: Row, salt: number) => {
+    let last: SetPiece | null = null;
+    let i = 0;
+    return (): SetPiece | null => {
+      if (kind === 'far' && i === 0 && rare.length > 0) {
+        i++;
+        return (last = rare.shift() ?? null);
+      }
+      for (let tries = 0; tries < 4; tries++) {
+        const piece = row[tileHash(i++, salt) % row.length] ?? null;
+        if (piece && (piece !== last || row.length === 1)) return (last = piece);
+      }
+      return null;
+    };
+  };
+  const jitter = (i: number, salt: number) => (unit(i, salt + 1) * 2 - 1) * YAW_JITTER;
+  // Down the sides, from the back edge forward: the prop's front (+z) turns toward the office.
+  const side = (row: readonly SetPiece[], kind: Row, dir: -1 | 1, salt: number) => {
+    if (row.length === 0) return;
+    const next = pick(row, kind, salt);
+    const gap = kind === 'near' ? NEAR_GAP : FAR_GAP;
+    let z = back;
+    for (let i = 0; z < height + RUN_OVER; i++) {
+      const piece = next();
       if (!piece) break;
       const [sx, sz] = piece.size;
       // Turned a quarter, the prop's depth (sz) runs across x and its width along z.
       const x = dir < 0 ? left - gap - sz / 2 : right + gap + sz / 2;
-      out.push({ piece, at: gridToWorld(x, z + sx / 2, GROUND_Y), yaw: (dir * -Math.PI) / 2 });
-      z += sx + ROW_GAP;
+      const yaw = (dir * -Math.PI) / 2 + jitter(i, salt);
+      out.push({ piece, at: gridToWorld(x, z + sx / 2, GROUND_Y), yaw, row: kind });
+      z += sx + ROW_GAP_MIN + unit(i, salt) * (ROW_GAP_MAX - ROW_GAP_MIN);
     }
   };
-  const along = (row: readonly SetPiece[], gap: number, salt: number) => {
-    let x = -RUN_OVER - 2;
-    for (let i = 0; x < width + RUN_OVER + 2 && row.length > 0; i++) {
-      const piece = row[tileHash(salt, i) % row.length];
+  // Along the back, past both sides' far rows.
+  const along = (row: readonly SetPiece[], kind: Row, salt: number) => {
+    if (row.length === 0) return;
+    const next = pick(row, kind, salt);
+    const gap = kind === 'near' ? NEAR_GAP : FAR_GAP;
+    let x = left - FAR_GAP - 2 - RUN_OVER;
+    for (let i = 0; x < right + FAR_GAP + 2 + RUN_OVER; i++) {
+      const piece = next();
       if (!piece) break;
       const [sx, sz] = piece.size;
-      out.push({ piece, at: gridToWorld(x + sx / 2, back - gap - sz / 2, GROUND_Y), yaw: 0 });
-      x += sx + ROW_GAP;
+      const at = gridToWorld(x + sx / 2, back - gap - sz / 2, GROUND_Y);
+      out.push({ piece, at, yaw: jitter(i, salt), row: kind });
+      x += sx + ROW_GAP_MIN + unit(i, salt) * (ROW_GAP_MAX - ROW_GAP_MIN);
     }
   };
-  side(s.near, NEAR_GAP, -1, 11);
-  side(s.near, NEAR_GAP, 1, 23);
-  side(s.far, FAR_GAP, -1, 37);
-  side(s.far, FAR_GAP, 1, 41);
-  along(s.near, NEAR_GAP, 53);
-  along(s.far, FAR_GAP, 67);
+  along(s.far, 'far', 67);
+  side(s.far, 'far', -1, 37);
+  side(s.far, 'far', 1, 41);
+  along(s.near, 'near', 53);
+  side(s.near, 'near', -1, 11);
+  side(s.near, 'near', 1, 23);
   return out;
 }
 
@@ -96,11 +142,13 @@ export class Surroundings {
   private readonly extras: Extra[] = [];
   private readonly geometries: THREE.BufferGeometry[] = [];
 
-  constructor(
-    map: LevelMap,
-    setting: string | undefined,
-    private readonly materials: KitMaterials,
-  ) {
+  /**
+   * The surroundings' own materials: the kit's, a third darker, and screens
+   * that glow softly instead of blooming, so nothing out here outshines the office.
+   */
+  private readonly materials: KitMaterials = dimmedMaterials();
+
+  constructor(map: LevelMap, setting: string | undefined) {
     const s = setting === undefined ? undefined : SETTINGS[setting];
     if (!s) return;
     const { width, height } = map;
@@ -128,8 +176,11 @@ export class Surroundings {
     const placements = placeSetPieces(setting ?? '', width, height);
     this.addProps(placements);
     let n = 0;
+    // People only in the near rows (further out they'd only be clutter), and not too many.
     for (const p of placements) {
+      if (p.row !== 'near') continue;
       for (const seat of p.piece.seats ?? []) {
+        if (n >= MAX_EXTRAS - s.walkers) break;
         const cos = Math.cos(p.yaw);
         const sin = Math.sin(p.yaw);
         const [sx, sz] = seat.at;
@@ -141,10 +192,10 @@ export class Surroundings {
         this.addExtra(n++, at, p.yaw + seat.yaw, seat.pose);
       }
     }
-    // Walkers pace the lane between the back rows.
+    // Walkers pace the lane between the back rows, out past the sides.
     for (let i = 0; i < s.walkers; i++) {
-      const z = -0.5 - (NEAR_GAP + FAR_GAP) / 2 - 0.6 - i * 0.5;
-      const lane = { from: -RUN_OVER, to: width - 1 + RUN_OVER, z };
+      const z = -0.5 - NEAR_GAP - 2 - 0.5 - (i % 2) * 0.3;
+      const lane = { from: -0.5 - FAR_GAP, to: width - 0.5 + FAR_GAP, z };
       this.addExtra(n++, gridToWorld(lane.from, z, GROUND_Y), Math.PI / 2, 'walking', lane);
     }
   }
@@ -170,18 +221,36 @@ export class Surroundings {
 
   destroy(): void {
     for (const g of this.geometries) g.dispose();
+    const { body, glow, glass } = this.materials;
+    for (const m of [body, glow, glass]) m.dispose();
     for (const extra of this.extras) for (const g of extra.character.geometries) g.dispose();
   }
 
   private addProps(placements: readonly Placement[]): void {
-    const byPiece = new Map<SetPiece, Placement[]>();
-    for (const p of placements) byPiece.set(p.piece, [...(byPiece.get(p.piece) ?? []), p]);
+    // One instanced mesh per piece and row: far props cast no shadow (they're
+    // outside the sun's shadow map anyway, and it'd cut off with a hard line).
+    const groups = new Map<string, { piece: SetPiece; row: Row; at: Placement[] }>();
+    const models = new Map<SetPiece, Model>();
+    const ids = new Map<SetPiece, number>();
+    for (const p of placements) {
+      const id = ids.get(p.piece) ?? ids.size;
+      ids.set(p.piece, id);
+      const key = `${id}:${p.row}`;
+      const group = groups.get(key) ?? { piece: p.piece, row: p.row, at: [] };
+      group.at.push(p);
+      groups.set(key, group);
+    }
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0);
     const one = new THREE.Vector3(1, 1, 1);
-    for (const [piece, at] of byPiece) {
-      const model: Model = piece.model();
+    for (const { piece, row, at } of groups.values()) {
+      let model = models.get(piece);
+      if (!model) {
+        model = piece.model();
+        models.set(piece, model);
+        for (const g of [model.body, model.glow, model.glass]) if (g) this.geometries.push(g);
+      }
       const layers: [THREE.BufferGeometry | null, THREE.Material, boolean][] = [
         [model.body, this.materials.body, true],
         [model.glow, this.materials.glow, false],
@@ -189,13 +258,12 @@ export class Surroundings {
       ];
       for (const [geometry, material, lit] of layers) {
         if (!geometry?.getAttribute('position')) continue;
-        this.geometries.push(geometry);
         const mesh = new THREE.InstancedMesh(geometry, material, at.length);
         at.forEach((p, i) => {
           q.setFromAxisAngle(up, p.yaw);
           mesh.setMatrixAt(i, m.compose(new THREE.Vector3(p.at.x, p.at.y, p.at.z), q, one));
         });
-        mesh.castShadow = lit;
+        mesh.castShadow = lit && row === 'near';
         mesh.receiveShadow = lit;
         this.root.add(mesh);
       }
@@ -212,6 +280,9 @@ export class Surroundings {
     const character = createExtra(n * 7 + 3, this.materials);
     put(character.root, at);
     character.root.rotation.y = yaw;
+    // Hands are too small to matter in a shadow out here.
+    character.leftHand.castShadow = false;
+    character.rightHand.castShadow = false;
     this.root.add(character.root);
     const extra: Extra = { character, pose, phase: (n * 0.61) % 1, ...(walk ? { walk } : {}) };
     this.extras.push(extra);
@@ -250,4 +321,19 @@ function poseFor(extra: Extra, timeMs: number): Pose {
 
 function put(obj: THREE.Object3D, p: Vec3): void {
   obj.position.set(p.x, p.y, p.z);
+}
+
+/** How much darker the world outside is than the office. */
+const DIM = 0.66;
+/** Screens outside glow at this, well under the bloom threshold. */
+const OUTSIDE_GLOW = 0.55;
+
+function dimmedMaterials(): KitMaterials {
+  const m = kitMaterials();
+  m.body.color.setScalar(DIM);
+  m.glass.color.setScalar(DIM);
+  // Not boosted by the stage: these never bloom.
+  m.glow.userData = {};
+  m.glow.color.setScalar(OUTSIDE_GLOW);
+  return m;
 }

@@ -93,7 +93,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
     this.overlays = new Overlays(scene, map);
     this.fx = new WorldFx(this.world, map);
     this.people = new People(this.world, this.materials);
-    this.surroundings = new Surroundings(map, look.setting, this.materials);
+    this.surroundings = new Surroundings(map, look.setting);
     this.world.add(this.surroundings.root);
 
     this.pose = this.fit();

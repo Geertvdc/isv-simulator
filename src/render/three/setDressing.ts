@@ -51,11 +51,11 @@ function desk(b: ModelBuilder, screen: number, top = 0xe8dcc4): ModelBuilder {
   b.screen(0.44, 0.26, screen, { at: [0, 0.75, -0.277] });
   b.box(0.06, 0.18, 0.04, DARK, { at: [0, 0.6, -0.32] }, 0);
   b.box(0.36, 0.02, 0.12, 0x3a3f4a, { at: [0, 0.535, -0.04] }, 0);
-  // The chair behind where they stand.
-  b.box(0.42, 0.08, 0.4, 0x3a3f4a, { at: [0, 0.4, 0.42] }, 0.03);
-  b.box(0.42, 0.42, 0.07, 0x3a3f4a, { at: [0, 0.68, 0.62] }, 0.03);
-  b.cylinder(0.03, 0.03, 0.3, STEEL, { at: [0, 0.22, 0.42] }, 8);
-  b.cylinder(0.2, 0.2, 0.03, DARK, { at: [0, 0.03, 0.42] }, 12);
+  // The chair pushed back behind where they stand.
+  b.box(0.42, 0.08, 0.4, 0x3a3f4a, { at: [0, 0.4, 0.8] }, 0.03);
+  b.box(0.42, 0.42, 0.07, 0x3a3f4a, { at: [0, 0.68, 1.0] }, 0.03);
+  b.cylinder(0.03, 0.03, 0.3, STEEL, { at: [0, 0.22, 0.8] }, 8);
+  b.cylinder(0.2, 0.2, 0.03, DARK, { at: [0, 0.03, 0.8] }, 12);
   return b;
 }
 
@@ -67,7 +67,7 @@ const car: SetPiece = {
   size: [2, 3],
   model: () => {
     const b = new ModelBuilder();
-    const paint = 0x3f86c8;
+    const paint = 0x9aa4ae;
     b.box(1.5, 0.45, 2.6, paint, { at: [0, 0.42, 0] }, 0.18);
     b.box(1.3, 0.42, 1.4, paint, { at: [0, 0.82, -0.15] }, 0.16);
     b.pane(1.32, 0.34, 1.2, 0xbfe2f0, { at: [0, 0.84, -0.15] });
@@ -108,7 +108,8 @@ const shelves: SetPiece = {
   model: () => {
     const b = new ModelBuilder();
     for (const x of [-0.85, 0.85]) b.box(0.06, 1.4, 0.4, STEEL, { at: [x, 0.7, 0] }, 0);
-    const colors = [0xc8955a, 0xe0402f, 0x3f86c8, 0xffd166, 0x6cbf5a, 0xc8955a];
+    // Cardboard and dull tins: nothing in a player's color.
+    const colors = [0xc8955a, 0x9a7a6a, 0x8a96a3, 0xb8a67a, 0x7a8a7a, 0xc8955a];
     for (let s = 0; s < 3; s++) {
       const y = 0.15 + s * 0.45;
       b.box(1.7, 0.04, 0.4, STEEL, { at: [0, y, 0] }, 0);
@@ -166,9 +167,9 @@ const drums: SetPiece = {
   size: [1, 1],
   model: () => {
     const b = new ModelBuilder();
-    b.cylinder(0.22, 0.22, 0.6, 0x3f86c8, { at: [-0.15, 0.3, 0] }, 16);
-    b.cylinder(0.2, 0.2, 0.55, 0x3f9a5c, { at: [0.25, 0.28, 0.1] }, 16);
-    b.torus(0.21, 0.015, tint(0x3f86c8, -0.3), { at: [-0.15, 0.45, 0], rot: [Math.PI / 2, 0, 0] });
+    b.cylinder(0.22, 0.22, 0.6, 0x7a6a5a, { at: [-0.15, 0.3, 0] }, 16);
+    b.cylinder(0.2, 0.2, 0.55, 0x6a7a6a, { at: [0.25, 0.28, 0.1] }, 16);
+    b.torus(0.21, 0.015, tint(0x7a6a5a, -0.3), { at: [-0.15, 0.45, 0], rot: [Math.PI / 2, 0, 0] });
     return b.build();
   },
 };
@@ -194,12 +195,12 @@ const beanbags: SetPiece = {
   size: [2, 1],
   model: () => {
     const b = new ModelBuilder();
-    b.sphere(0.32, 0xe0402f, { at: [-0.45, 0.22, 0] }, [1, 0.7, 1]);
-    b.sphere(0.3, 0xffd166, { at: [0.4, 0.2, 0.1] }, [1, 0.7, 1]);
+    // Muted purple and teal: never a player's red, blue, yellow or green.
+    b.sphere(0.32, 0x7a5a8c, { at: [-0.45, 0.22, 0] }, [1, 0.7, 1]);
+    b.sphere(0.3, 0x4f8a80, { at: [0.4, 0.2, 0.1] }, [1, 0.7, 1]);
     b.box(0.6, 0.05, 0.4, WOOD, { at: [0, 0.03, 0.45] }, 0.02);
     return b.build();
   },
-  seats: [{ at: [-0.45, 0.25], yaw: 0.4, pose: 'idle' }],
 };
 
 const pingPong: SetPiece = {
@@ -433,37 +434,44 @@ export interface Setting {
   /** Props near the office walls, and further out. */
   near: readonly SetPiece[];
   far: readonly SetPiece[];
+  /** Props that show once per level (the car, the cat), at the start of a far row. */
+  rare: readonly SetPiece[];
   /** How many background people walk a loop. */
   walkers: number;
 }
 
 export const SETTINGS: Readonly<Record<string, Setting>> = {
   garage: {
-    ground: 0x52803f,
-    path: 0x4a4e57,
-    near: [shelves, bike, drums, cat, shelves, bushes],
-    far: [car, tree, hoop, bushes, tree],
+    ground: 0x3e5a35,
+    path: 0x3a3e46,
+    near: [shelves, bike, drums, bushes],
+    far: [tree, bushes, tree, bushes],
+    rare: [car, cat, hoop],
     walkers: 0,
   },
   startup: {
-    ground: 0x5e4434,
+    // Polished concrete: apart from the wood walls and the slab's edge.
+    ground: 0x3a3f47,
     path: null,
-    near: [beanbags, bigPlant, coffeeBar, arcade, bigPlant, beanbags],
-    far: [pingPong, neonSign, bigPlant, beanbags],
+    near: [bigPlant, coffeeBar, arcade, beanbags],
+    far: [bigPlant, beanbags, pingPong],
+    rare: [neonSign],
     walkers: 1,
   },
   'scale-up': {
     ground: 0x485666,
-    path: 0x4f5d6e,
-    near: [teamDesk, bigPlant, sofa, teamDesk, screenWall],
-    far: [meetingPod, teamDesk, screenWall, bigPlant],
+    path: 0x3f4b5a,
+    near: [teamDesk, bigPlant, sofa, screenWall],
+    far: [meetingPod, bigPlant, sofa],
+    rare: [],
     walkers: 2,
   },
   enterprise: {
     ground: 0x6b6253,
-    path: 0x6f6656,
-    near: [cubicle, printer, cabinets, cubicle, waterCooler],
-    far: [cubicle, lobbySign, cubicle, bigPlant],
+    path: 0x5a5245,
+    near: [cubicle, printer, cabinets, waterCooler],
+    far: [cubicle, bigPlant, cabinets],
+    rare: [lobbySign],
     walkers: 2,
   },
 };
@@ -473,23 +481,14 @@ export const WALL_TOP_PROPS: readonly (() => Model)[] = [
   () => plantPot(new ModelBuilder(), 0, 0, 0.55).build(),
   () => {
     const b = new ModelBuilder();
-    const spines = [0xe0402f, 0x3f86c8, 0xffd166, 0x3f9a5c, 0x6a3fc0];
+    const spines = [0x9a6a5a, 0x5a6a8a, 0xb8a67a, 0x6a7a6a, 0x7a5a8c];
     spines.forEach((c, i) =>
       b.box(0.06, 0.24 - (i % 2) * 0.04, 0.18, c, { at: [-0.14 + i * 0.07, 0.12, 0] }, 0),
     );
     return b.build();
   },
-  () => {
-    const b = new ModelBuilder();
-    b.cylinder(0.05, 0.045, 0.1, WHITE, { at: [0, 0.05, 0] });
-    b.torus(0.03, 0.01, WHITE, { at: [0.055, 0.055, 0], rot: [0, 0, Math.PI / 2] });
-    b.box(0.12, 0.004, 0.12, 0xffe066, { at: [0.15, 0.002, 0.05], rot: [0, 0.3, 0] }, 0);
-    return b.build();
-  },
-  () => {
-    const b = new ModelBuilder();
-    b.box(0.34, 0.08, 0.24, 0x3a3f4a, { at: [0, 0.04, 0] }, 0.02);
-    b.box(0.3, 0.02, 0.2, 0x5c6470, { at: [0, 0.09, 0.03], rot: [-0.6, 0, 0] }, 0);
-    return b.build();
-  },
+  () =>
+    plantPot(new ModelBuilder(), 0, 0, 0.4)
+      .cylinder(0.04, 0.035, 0.09, WHITE, { at: [0.2, 0.045, 0.05] })
+      .build(),
 ];

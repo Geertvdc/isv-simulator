@@ -17,7 +17,7 @@
 
 - No sim change; the camera still frames the level box. Surroundings fill the margins and run off the screen edge.
 - One instanced mesh per prop kind; background people reuse the character models (no hats, muted colors, so they never look like players).
-- Low quality drops the background people's animation and half the clutter.
+- Low quality stops the background people's animation.
 
 ## Tests
 
@@ -26,7 +26,11 @@
 
 ## Done when
 
-- [ ] Every level shows its chapter's surroundings, filling the screen at 16:9
-- [ ] People and machines move in the background without pulling the eye off the play
-- [ ] Gameplay and frame rate are unaffected (quality steps still work)
-- [ ] `npm run check` passes
+- [x] Every level shows its chapter's surroundings, filling the screen at 16:9
+- [x] People and machines move in the background without pulling the eye off the play
+- [x] Gameplay and frame rate are unaffected (quality steps still work)
+- [x] `npm run check` passes
+
+## Review round 1 fixes
+
+Rows no longer cross at the corners (sides run from the back edge forward, the back rows run past both sides; a test checks no two props overlap), the walkers' lane is clear, spacing and turns vary per prop and the same piece never stands twice running, rare props (the car, the cat, the hoop, the neon sign, the lobby sign) show once, far-row props cast no shadow, chairs stand behind the people at desks. See the review notes for the rest.
