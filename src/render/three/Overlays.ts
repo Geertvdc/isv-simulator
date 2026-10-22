@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { HintId } from '../../flow/hints';
 import { stationWorkStep } from '../../sim/interact';
-import { HINT_TEXTS, MEETING_ROOM_TEXT } from '../../sim/content';
+import { HINT_TEXTS, MEETING_ROOM_TEXT, PAIRING_TEXT } from '../../sim/content';
 import { type LevelMap, getTile } from '../../sim/level';
 import { pipelineWarning } from '../../sim/pipeline';
 import type { GameState } from '../../sim/state';
@@ -13,7 +13,7 @@ import { drawInvite } from '../MeetingRenderer';
 import { drawBadge } from '../PipelineRenderer';
 import { TILE_SIZE, type Vec3, gridToWorld } from '../projection';
 import type { RoundView } from '../roundView';
-import { drawProgressBar, drawTicketCard } from '../TicketRenderer';
+import { PAIRING_COLOR, drawProgressBar, drawTicketCard, isPaired } from '../TicketRenderer';
 import { HAT_TOP, blockHeight, placeTicket, queueAnchor } from './layout';
 
 /** Where a world point lands on the canvas and how big things drawn there are. */
@@ -195,8 +195,14 @@ export class Overlays {
         : { ...placed.pos, y: placed.pos.y + CARD_LIFT };
       const p = project(at);
       place(card.g, p);
-      card.title.setVisible(placed.carried);
-      if (placed.carried) place(card.title, { ...p, y: p.y - 26 * p.scale * OVERLAY_SCALE });
+      // Over a carried card its title; over a keyboard two players code at, that they're pairing.
+      const paired = isPaired(state, ticket);
+      card.title
+        .setText(paired ? PAIRING_TEXT : ticket.title)
+        .setColor(paired ? PAIRING_COLOR : '#ffffff')
+        .setVisible(placed.carried || paired);
+      const lift = (bar === null ? 26 : 40) * p.scale * OVERLAY_SCALE;
+      if (placed.carried || paired) place(card.title, { ...p, y: p.y - lift });
     }
     for (const [id, card] of this.cards) {
       if (seen.has(id)) continue;

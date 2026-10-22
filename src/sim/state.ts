@@ -74,6 +74,8 @@ export interface GameState {
   pipelines: Pipeline[];
   /** One per conveyor tile: how long the ticket on it has been riding. */
   belts: Belt[];
+  /** Keyboards two or more players coded at together last tick (pair programming), for drawing. */
+  pairing: GridPoint[];
   nextTicketId: number;
   orders: Order[];
   nextOrderId: number;
@@ -135,6 +137,7 @@ export function createGame(level: Level, seed: number, playerIds: readonly Playe
     tickets: [],
     pipelines: createPipelines(map),
     belts: createBelts(map),
+    pairing: [],
     nextTicketId: 1,
     orders: [],
     nextOrderId: 1,

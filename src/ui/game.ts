@@ -4,6 +4,7 @@ import { ORDER_URGENT_TICKS } from '../sim/balance';
 import {
   INCIDENT_BANNER_TEXT,
   MEETING_MISSED_TEXT,
+  ORDER_KIND_LABELS,
   PAUSE_HINT,
   inviteText,
   PIPELINE_BROKE_TEXT,
@@ -12,7 +13,7 @@ import {
 import type { Invite } from '../sim/meetings';
 import { type Order, openIncident, ticksLeft } from '../sim/orders';
 import type { GameState } from '../sim/state';
-import type { StepKind } from '../sim/tickets';
+import { PART_KINDS, type StepKind, type TicketKind } from '../sim/tickets';
 import { playerCssColor } from '../render/playerColors';
 import { formatClock } from './format';
 import { playerBadge } from './playerBadge';
@@ -25,15 +26,6 @@ export const STEP_LABEL: Readonly<Record<StepKind, { letter: string; color: stri
   review: { letter: 'R', color: cssColor(tileColor('review')) },
   test: { letter: 'T', color: cssColor(tileColor('testBench')) },
   pipeline: { letter: 'P', color: cssColor(tileColor('pipeline')) },
-};
-
-const ORDER_KIND_LABEL: Readonly<Record<Order['kind'], string>> = {
-  feature: 'Feature',
-  bug: 'Bug',
-  incident: 'Incident!',
-  frontend: 'Front end',
-  backend: 'Back end',
-  fullstack: 'Full-stack',
 };
 
 /** How long a "+25" or "-10" floats by the score. */
@@ -50,14 +42,21 @@ function el(tag: string, className: string, text = ''): HTMLElement {
   return node;
 }
 
-/** A row of station letters in their colors, like on the order cards. */
-export function stepChips(steps: readonly StepKind[]): HTMLElement {
+/**
+ * A row of station letters in their colors, like on the order cards. A
+ * full-stack recipe codes twice before its merge: a front end (blue mark)
+ * and a back end (green mark), so its `code` shows as two chips.
+ */
+export function stepChips(steps: readonly StepKind[], kind?: TicketKind): HTMLElement {
   const row = el('div', 'order-steps');
   for (const step of steps) {
-    const label = STEP_LABEL[step];
-    const icon = el('span', 'order-step', label.letter);
-    icon.style.setProperty('--step-color', label.color);
-    row.append(icon);
+    const parts = kind === 'fullstack' && step === 'code' ? PART_KINDS : [null];
+    for (const part of parts) {
+      const label = STEP_LABEL[step];
+      const icon = el('span', part ? `order-step order-step-${part}` : 'order-step', label.letter);
+      icon.style.setProperty('--step-color', label.color);
+      row.append(icon);
+    }
   }
   return row;
 }
@@ -141,8 +140,8 @@ export function mountGameHud(root: HTMLElement): GameHud {
 
   function createCard(order: Order): OrderCard {
     const card = el('div', `order order-${order.kind}`);
-    card.append(el('div', 'order-kind', ORDER_KIND_LABEL[order.kind]));
-    const steps = stepChips(order.steps);
+    card.append(el('div', 'order-kind', ORDER_KIND_LABELS[order.kind]));
+    const steps = stepChips(order.steps, order.kind);
     const timer = el('div', 'order-timer');
     const fill = el('div', 'order-timer-fill');
     timer.append(fill);

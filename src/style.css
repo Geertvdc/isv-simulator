@@ -269,6 +269,20 @@ body {
   text-shadow: 0 0 3px #000;
 }
 
+/* A full-stack recipe's two code chips: a mark in the part's folder color. */
+.order-step-frontend,
+.order-step-backend {
+  box-shadow: inset 0 -0.25rem 0 var(--part-color);
+}
+
+.order-step-frontend {
+  --part-color: #7ab8f0;
+}
+
+.order-step-backend {
+  --part-color: #6cbf7a;
+}
+
 .order-timer {
   height: 0.5rem;
   border-radius: 0.25rem;

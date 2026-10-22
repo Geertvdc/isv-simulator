@@ -35,7 +35,9 @@ Decisions made without the product owner, who asked for the work to go ahead on 
 
 - **Both parts of a full-stack feature only need coding** (the plan had the back end tested too): one extra step per part made the merge feel like busywork in the lab level. The merged ticket gets tested as a whole.
 - **Any front end merges with any back end**, like a bun with any patty: tracking which pair belongs to which order would be invisible on screen.
-- **Full-stack orders** pay 35 (a feature pays 20) and last 1.5× as long: two tickets' work.
-- **Pairing is a level setting**, not global, so the old levels' balance doesn't change. Two coders go 1.75× as fast, a third adds nothing.
+- **Full-stack orders** pay 30 (a feature pays 20) and last 1.5× as long: two tickets' work, though they can be coded in parallel.
+- **Pairing is a level setting**, not global, so the old levels' balance doesn't change. Two coders go 1.9× as fast, a third adds nothing.
 - **"Working" detection for a pair** comes for free: both players show the typing pose. No extra "pairing" spark yet.
-- **Design takes as long as coding** (`DESIGN_RATE`), so a designed feature is a 25% longer recipe for the same points; levels that use it give more time.
+- **Design takes as long as coding** (`DESIGN_RATE`) but makes the coding after it 1.6× faster, so a designed feature costs about a second more than a plain one.
+- **Bots still don't know the new stations:** a bot holding a part would bin it. They only play the old levels (the demo), so this only matters once bots learn the new chapter.
+- **Parts look alike from afar** (sky-blue and green folders); an icon on each (`</>` and a database) is a follow-up.

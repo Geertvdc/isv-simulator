@@ -27,7 +27,7 @@
 
 ## 3. Pair programming
 
-- Two players working the **same keyboard** at once code faster (`PAIR_RATE`, about 1.75× one player, not 2×), on levels with `pairing: true`.
+- Two players working the **same keyboard** at once code faster (`PAIR_RATE`, 1.9× one player, not 2×), on levels with `pairing: true`.
 - 3D: both type; a small "pairing" spark over the keyboard. 2D: a "×2" badge on the station's progress bar.
 
 ## Sim
@@ -41,7 +41,7 @@
 ## Tests
 
 - Design is worked by hand at a whiteboard and only when it's the next step
-- Merge: two finished complementary parts combine into one ticket with the right steps; unfinished, same-kind or mismatched parts are refused; the order ships with the merged ticket
+- Merge: two finished complementary parts combine into one ticket with the right steps; unfinished or same-kind parts are refused (any front end merges with any back end); the order ships with the merged ticket
 - Pairing: two players at one keyboard advance it by `PAIR_RATE`, three don't add more, off on levels without `pairing`
 - Orders: full-stack orders create both parts in the inbox; shares by level
 
@@ -64,3 +64,13 @@
 - `levels.ts`: optional `designShare`, `fullstackShare`, `pairing` settings; lab level `lab-dev`.
 - 2D: whiteboard and merge blocks (W, G); card colors for the new kinds. 3D: a whiteboard on legs with a user-flow sketch, a merge desk with a glowing git branch sign; sky-blue, green and purple folders. HUD: W and G letters, "Front end", "Back end", "Full-stack" labels. Popup "Merged!".
 - Scenes: `design`, `merge`, `pairing`.
+
+## Review round 1 fixes
+
+- **Merge is raspberry** (it was nearly the pipeline's orange): the G chip, the 2D block and the 3D station.
+- **Full-stack order cards** show both parts: two K chips with a front-end blue and a back-end green mark, then G, T, P. Order kind labels live in `content.ts`.
+- **Pairing shows:** the sim keeps the keyboards being paired last tick (`GameState.pairing`), and both looks put "Pairing ×1.9" over the ticket. The first coder codes right away (nothing is lost if someone grabs the ticket mid-tick); the pair's extra comes on top. `PAIR_RATE` is 1.9×.
+- **Design pays off:** a designed feature codes 1.6× faster (`DESIGNED_CODE_FACTOR`), so the whiteboard is a choice of where to spend time, not "code again somewhere else".
+- **Balance:** full-stack orders pay 30 (from 35).
+- **Fixes:** an expired full-stack order takes a waiting merged ticket (lost and back) instead of two parts; conveyors and throw landings report the merged ticket's id.
+- **More tests:** a part thrown onto its other half, an uncoded part flying over G, a conveyor feeding G, full-stack expiry, designed coding, the pairing marker.

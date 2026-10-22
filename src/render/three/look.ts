@@ -30,7 +30,8 @@ export const PALETTE = {
     ship: 0x3fd6a6,
     bin: 0x5d6168,
     whiteboard: 0xdfe6ee,
-    merge: 0xf0883e,
+    // Raspberry: apart from the pipeline's orange and the review's purple.
+    merge: 0xe8459a,
   } satisfies Readonly<Record<Exclude<BlockTile, 'wall' | 'counter' | 'conveyor'>, number>>,
   conveyor: 0x4a505c,
   ticket: {
