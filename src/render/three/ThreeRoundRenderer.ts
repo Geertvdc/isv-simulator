@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import * as THREE from 'three';
-import { CAMERA_FIT_PADDING, CAMERA_HUD_BOTTOM, PLAYER_RADIUS } from '../../sim/balance';
+import { CAMERA_FIT_PADDING, CAMERA_HUD_BOTTOM } from '../../sim/balance';
 import { type LevelMap, getTile, isWorkSurface } from '../../sim/level';
 import { type PlayerId, targetTile } from '../../sim/state';
 import type { TicketKind } from '../../sim/tickets';
@@ -19,9 +19,10 @@ import {
 } from '../projection';
 import type { RoundFrame, RoundRenderer } from '../RoundRenderer';
 import { Overlays, POPUP_HEIGHT, type ScreenPoint, overlayScale } from './Overlays';
+import { People } from './People';
 import { WorldFx } from './WorldFx';
-import { BODY_HEIGHT, blockHeight, facingYaw, levelBox, pickTile, placeTicket } from './layout';
-import { createLights, dressScene, matte, PALETTE } from './look';
+import { blockHeight, levelBox, pickTile, placeTicket } from './layout';
+import { createLights, dressScene } from './look';
 import { kitMaterials } from './kit';
 import { buildMap } from './MapView';
 import { ticketModel } from './models';
@@ -34,8 +35,6 @@ const HOVER_COLOR = 0xffffff;
  * and the back wall may reach under it.
  */
 const HUD_TOP_3D = 0.1;
-/** The ring on the floor around each player, in their color. */
-const RING = { inner: PLAYER_RADIUS * 0.95, outer: PLAYER_RADIUS * 1.25, lift: 0.006 };
 
 /**
  * The 3D look (`?render=3d`): the level and round drawn with three.js on the
@@ -47,8 +46,6 @@ export class ThreeRoundRenderer implements RoundRenderer {
   private readonly stage: Stage;
   private readonly world = new THREE.Scene();
   private pose: CameraPose;
-  private readonly players = new Map<PlayerId, THREE.Group>();
-  private readonly managers = new Map<number, THREE.Group>();
   private readonly tickets = new Map<number, THREE.Mesh>();
   private readonly ticketGeometries = new Map<TicketKind, THREE.BufferGeometry>();
   private readonly materials = kitMaterials();
@@ -56,15 +53,13 @@ export class ThreeRoundRenderer implements RoundRenderer {
   private readonly hover: THREE.LineLoop;
   private readonly overlays: Overlays;
   private readonly fx: WorldFx;
+  private readonly people: People;
   /** The last round frame, placed again every render with the camera as it is then. */
   private frame: RoundFrame | null = null;
   private readonly shared = {
-    body: new THREE.CapsuleGeometry(PLAYER_RADIUS * 0.8, BODY_HEIGHT - PLAYER_RADIUS * 1.6, 6, 16),
-    nose: new THREE.SphereGeometry(0.08, 12, 8),
     target: new THREE.PlaneGeometry(0.96, 0.96).rotateX(-Math.PI / 2),
     targetFrame: squareFrame(0.5, 0.42),
     targetRim: squareFrame(0.42, 0.39),
-    ring: new THREE.RingGeometry(RING.inner, RING.outer, 40).rotateX(-Math.PI / 2),
   };
 
   constructor(
@@ -90,6 +85,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
     this.world.add(this.hover);
     this.overlays = new Overlays(scene, map);
     this.fx = new WorldFx(this.world, map);
+    this.people = new People(this.world, this.materials);
 
     this.pose = this.fit();
     scene.scale.on(Phaser.Scale.Events.RESIZE, this.onResize);
@@ -97,6 +93,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
 
   destroy(): void {
     this.scene.scale.off(Phaser.Scale.Events.RESIZE, this.onResize);
+    this.people.destroy();
     for (const geometry of Object.values(this.shared)) geometry.dispose();
     for (const geometry of this.ticketGeometries.values()) geometry.dispose();
     const { body, glow, glass } = this.materials;
@@ -113,35 +110,8 @@ export class ThreeRoundRenderer implements RoundRenderer {
     const { state } = view;
     this.frame = frame;
 
-    const seenPlayers = new Set<PlayerId>();
-    for (const player of state.players) {
-      const pos = view.renderPos(player.id);
-      if (!pos) continue;
-      seenPlayers.add(player.id);
-      let g = this.players.get(player.id);
-      if (!g) {
-        g = this.createPlayer(player.id);
-        this.players.set(player.id, g);
-      }
-      putAt(g, gridToWorld(pos.x, pos.y));
-      g.rotation.y = facingYaw(player.facing);
-    }
-    this.dropMissing(this.players, seenPlayers);
-
-    const seenManagers = new Set<number>();
-    for (const manager of state.managers) {
-      const pos = view.renderManagerPos(manager.id);
-      if (!pos) continue;
-      seenManagers.add(manager.id);
-      let g = this.managers.get(manager.id);
-      if (!g) {
-        g = this.createManager();
-        this.managers.set(manager.id, g);
-      }
-      putAt(g, gridToWorld(pos.x, pos.y));
-      g.rotation.y = facingYaw(manager.facing);
-    }
-    this.dropMissing(this.managers, seenManagers);
+    this.people.sync(view, events, timeMs);
+    const seenPlayers = new Set(state.players.filter((p) => view.renderPos(p.id)).map((p) => p.id));
 
     const seenTickets = new Set<number>();
     for (const ticket of state.tickets) {
@@ -246,36 +216,6 @@ export class ThreeRoundRenderer implements RoundRenderer {
         left: CAMERA_FIT_PADDING,
       },
     );
-  }
-
-  private createPlayer(id: PlayerId): THREE.Group {
-    const g = new THREE.Group();
-    const material = matte(playerColor(id), 0.6);
-    const body = new THREE.Mesh(this.shared.body, material);
-    body.position.y = BODY_HEIGHT / 2;
-    body.castShadow = true;
-    const nose = new THREE.Mesh(this.shared.nose, matte(PALETTE.white, 0.5));
-    nose.position.set(0, BODY_HEIGHT * 0.72, PLAYER_RADIUS * 0.8);
-    nose.castShadow = true;
-    const ring = new THREE.Mesh(
-      this.shared.ring,
-      new THREE.MeshBasicMaterial({ color: playerColor(id), transparent: true, opacity: 0.9 }),
-    );
-    ring.position.y = RING.lift;
-    g.add(body, nose, ring);
-    this.world.add(g);
-    return g;
-  }
-
-  private createManager(): THREE.Group {
-    const g = new THREE.Group();
-    const body = new THREE.Mesh(this.shared.body, matte(PALETTE.manager, 0.6));
-    body.scale.set(1.1, 1.15, 1.1);
-    body.position.y = (BODY_HEIGHT * 1.15) / 2;
-    body.castShadow = true;
-    g.add(body);
-    this.world.add(g);
-    return g;
   }
 
   /** A see-through plate in the player's color on the block they face; nothing for floor and walls. */

@@ -18,8 +18,8 @@ export const WALL_HEIGHT = 1.15;
 export const FRONT_WALL_HEIGHT = 0.3;
 /** Counters and stations: about hip height on a developer. */
 export const STATION_HEIGHT = 0.55;
-/** A developer's height without the hat. */
-export const BODY_HEIGHT = 0.9;
+/** A developer's height without the hat (the head top, at `CHARACTER_SCALE`). */
+export const BODY_HEIGHT = 1.0;
 /** How far the level's slab reaches below the floor (the diorama's front face). */
 export const SLAB_DEPTH = 0.45;
 
