@@ -15,7 +15,7 @@ import type { RoundView } from '../roundView';
 /** Full walls: a little taller than a developer. */
 export const WALL_HEIGHT = 1.15;
 /** Walls on the camera side are cut down so they never hide what's behind. */
-export const FRONT_WALL_HEIGHT = 0.3;
+export const FRONT_WALL_HEIGHT = 0.2;
 /** Counters and stations: about hip height on a developer. */
 export const STATION_HEIGHT = 0.55;
 /** A developer's height without the hat (the head top, at `CHARACTER_SCALE`). */
@@ -196,7 +196,9 @@ export function queueCounts(state: GameState): Record<QueueKind, number> {
 
 /**
  * Which way a station on tile (x, y) faces: toward the floor a player
- * works it from. Prefers facing the camera, then the sides, then away.
+ * works it from, the camera side first, then the sides. Never away from
+ * the camera: a station worked only from behind still faces it, or its
+ * props would turn their backs and hide the ticket.
  * A grid direction; turn models with `facingYaw`.
  */
 export function stationFacing(map: LevelMap, x: number, y: number): { x: number; y: number } {
@@ -204,9 +206,30 @@ export function stationFacing(map: LevelMap, x: number, y: number): { x: number;
     [0, 1],
     [1, 0],
     [-1, 0],
-    [0, -1],
   ] as const) {
     if (getTile(map, x + dx, y + dy) === 'floor') return { x: dx, y: dy };
   }
   return { x: 0, y: 1 };
+}
+
+/** How far a station's hero prop may turn away from the camera, radians. */
+const HERO_MAX_TURN = Math.PI / 4;
+
+/**
+ * Where a station's hero prop stands and how it's turned, for a station
+ * turned by `yaw` with the hero at `heroAt` (x, z in the station's space):
+ * it moves with the station but turns at most 45° away from the camera.
+ */
+export function heroPlacement(
+  yaw: number,
+  heroAt: readonly [number, number],
+): { dx: number; dz: number; yaw: number } {
+  const [x, z] = heroAt;
+  const cos = Math.cos(yaw);
+  const sin = Math.sin(yaw);
+  return {
+    dx: x * cos + z * sin,
+    dz: -x * sin + z * cos,
+    yaw: Math.max(-HERO_MAX_TURN, Math.min(HERO_MAX_TURN, yaw)),
+  };
 }

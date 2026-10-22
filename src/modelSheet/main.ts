@@ -6,14 +6,22 @@
 
 import * as THREE from 'three';
 import { applyPose, createDeveloper, createManager } from '../render/three/Characters';
-import { type Model, kitMaterials } from '../render/three/kit';
+import { type KitMaterials, type Model, kitMaterials } from '../render/three/kit';
 import { type PoseInput, playerPose } from '../render/three/pose';
-import { dressScene } from '../render/three/look';
-import { GLOW_BOOST } from '../render/three/MapView';
-import { STATION_MODELS, WALL_DECO_MODELS, floorModel, wallModel } from '../render/three/models';
+import { createLights, dressScene } from '../render/three/look';
+import {
+  STATION_MODELS,
+  type StationModel,
+  WALL_DECO_MODELS,
+  floorModel,
+  ticketModel,
+  wallModel,
+} from '../render/three/models';
+import { VIEW3D_PITCH } from '../render/projection';
+import { STATION_HEIGHT } from '../render/three/layout';
 import { FLOOR_THEMES, WALL_THEMES } from '../render/MapRenderer';
 
-const SPACING = 1.7;
+const SPACING = 2.2;
 const COLUMNS = 7;
 
 /** A model, or a character in a pose (a group of its own). */
@@ -58,12 +66,57 @@ const IDLE: PoseInput = {
   phase: 0,
 };
 
+/** A station's base with its hero prop standing on it. */
+function station(model: StationModel, materials: KitMaterials): THREE.Object3D {
+  const group = new THREE.Group();
+  group.add(meshes(model.base, materials));
+  if (model.hero) {
+    const hero = meshes(model.hero, materials);
+    hero.position.set(model.heroAt[0], 0, model.heroAt[1]);
+    group.add(hero);
+  }
+  return group;
+}
+
+function meshes(model: Model, materials: KitMaterials): THREE.Group {
+  const group = new THREE.Group();
+  const layers: [THREE.BufferGeometry | null, THREE.Material][] = [
+    [model.body, materials.body],
+    [model.glow, materials.glow],
+    [model.glass, materials.glass],
+  ];
+  for (const [geometry, material] of layers) {
+    if (!geometry?.getAttribute('position')) continue;
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.castShadow = material === materials.body;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  }
+  return group;
+}
+
 const entries: Entry[] = [
-  ...Object.entries(STATION_MODELS),
+  ...Object.entries(STATION_MODELS).map(([name, make]): Entry => [
+    name,
+    () => station(make(), materials),
+  ]),
+  ...(['feature', 'bug', 'incident'] as const).map((kind): Entry => [
+    `ticket ${kind}`,
+    () => {
+      // On a plain counter, as on a level, and bigger so it shows.
+      const group = station(STATION_MODELS.counter(), materials);
+      const ticket = meshes(ticketModel(kind), materials);
+      ticket.position.y = STATION_HEIGHT;
+      ticket.scale.setScalar(1.5);
+      group.add(ticket);
+      return group;
+    },
+  ]),
   ...people,
   ...WALL_THEMES.flatMap((theme): Entry[] => [
     [`wall ${theme}`, () => wallModel(theme, 'wall')],
     [`wall-front ${theme}`, () => wallModel(theme, 'wall-front')],
+    [`wall-inner ${theme}`, () => wallModel(theme, 'wall-inner')],
   ]),
   ...FLOOR_THEMES.map((theme): [string, () => Model] => [
     `floor ${theme}`,
@@ -94,7 +147,6 @@ function merge(a: THREE.BufferGeometry, b: THREE.BufferGeometry): THREE.BufferGe
 }
 
 const materials = kitMaterials();
-materials.glow.color.setScalar(GLOW_BOOST);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -104,40 +156,20 @@ document.body.prepend(renderer.domElement);
 
 const scene = new THREE.Scene();
 dressScene(scene, renderer);
-scene.add(new THREE.HemisphereLight(0xc9dcff, 0x6e5a48, 0.75));
-const sun = new THREE.DirectionalLight(0xffe9c7, 3.2);
-sun.position.set(-4, 9, 8);
-sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
-Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14 });
-scene.add(sun);
-
 const rows = Math.ceil(entries.length / COLUMNS);
+// The game's lights, fitted to the grid as if it were a level.
+scene.add(...createLights({ width: COLUMNS * SPACING, height: rows * SPACING }));
+
 const turntables: THREE.Group[] = [];
 const labels = document.getElementById('labels');
 const labelEls: [HTMLDivElement, THREE.Vector3][] = [];
 entries.forEach(([name, make], i) => {
   const made = make();
   const table = new THREE.Group();
-  const x = ((i % COLUMNS) - (COLUMNS - 1) / 2) * SPACING;
-  const z = (Math.floor(i / COLUMNS) - (rows - 1) / 2) * SPACING;
+  const x = (i % COLUMNS) * SPACING;
+  const z = Math.floor(i / COLUMNS) * SPACING;
   table.position.set(x, 0, z);
-  if (made instanceof THREE.Object3D) {
-    table.add(made);
-  } else {
-    const layers: [THREE.BufferGeometry | null, THREE.Material][] = [
-      [made.body, materials.body],
-      [made.glow, materials.glow],
-      [made.glass, materials.glass],
-    ];
-    for (const [geometry, material] of layers) {
-      if (!geometry?.getAttribute('position')) continue;
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.castShadow = material === materials.body;
-      mesh.receiveShadow = true;
-      table.add(mesh);
-    }
-  }
+  table.add(made instanceof THREE.Object3D ? made : meshes(made, materials));
   const plate = new THREE.Mesh(
     new THREE.CylinderGeometry(0.8, 0.8, 0.04, 40),
     new THREE.MeshStandardMaterial({ color: 0x3a4256, roughness: 0.9 }),
@@ -164,9 +196,12 @@ function resize(): void {
   // Same tilt as the game camera, far enough back for the whole grid.
   const span = Math.max((COLUMNS * SPACING) / camera.aspect, rows * SPACING * 1.2);
   const distance = span / (2 * Math.tan((camera.fov * Math.PI) / 360)) + 4;
-  const pitch = (56 * Math.PI) / 180;
-  camera.position.set(0, Math.sin(pitch) * distance, Math.cos(pitch) * distance);
-  camera.lookAt(0, 0, 0);
+  // The game camera's tilt, looking at the middle of the grid.
+  const pitch = VIEW3D_PITCH;
+  const cx = ((COLUMNS - 1) * SPACING) / 2;
+  const cz = ((rows - 1) * SPACING) / 2;
+  camera.position.set(cx, Math.sin(pitch) * distance, cz + Math.cos(pitch) * distance);
+  camera.lookAt(cx, 0, cz);
   camera.updateProjectionMatrix();
 }
 window.addEventListener('resize', resize);

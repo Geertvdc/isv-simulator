@@ -18,6 +18,7 @@ import {
   pickTile,
   placeTicket,
   queueAnchor,
+  heroPlacement,
   stationFacing,
   tilesOf,
 } from './layout';
@@ -140,5 +141,19 @@ describe('3D layout', () => {
     const m = parseLevelMap(['#####', '#K1T#', '#2#3#', '#P4.#', '#####'].join('\n'));
     expect(stationFacing(m, 1, 1)).toEqual({ x: 0, y: 1 });
     expect(stationFacing(m, 1, 3)).toEqual({ x: 1, y: 0 });
+  });
+
+  it('never turns a station away from the camera', () => {
+    const m = parseLevelMap(['#####', '#1234', '##K##', '#####'].join('\n'));
+    expect(stationFacing(m, 2, 2)).toEqual({ x: 0, y: 1 });
+  });
+
+  it('moves a hero prop with its station but turns it at most 45° from the camera', () => {
+    const side = heroPlacement(Math.PI / 2, [0, -0.3]);
+    // A station facing +x has its back toward -x.
+    expect(side.dx).toBeCloseTo(-0.3);
+    expect(side.dz).toBeCloseTo(0);
+    expect(side.yaw).toBeCloseTo(Math.PI / 4);
+    expect(heroPlacement(0, [0.2, -0.3])).toEqual({ dx: 0.2, dz: -0.3, yaw: 0 });
   });
 });
