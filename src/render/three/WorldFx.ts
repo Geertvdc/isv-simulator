@@ -145,15 +145,16 @@ export class WorldFx {
       if (!pipeline.broken) return;
       // Smoke puffs drift up and fade.
       const phase = (t * 0.8 + i / 3) % 1;
+      // From the back right corner, high enough to clear a ticket card on the block.
       putAt(
         puff,
         gridToWorld(
-          pipeline.x - 0.15 + i * 0.15,
-          pipeline.y - phase * 0.2,
-          top + 0.15 + phase * 0.8,
+          pipeline.x + 0.25 + i * 0.05,
+          pipeline.y - 0.25 - phase * 0.3,
+          top + 0.9 + phase * 0.9,
         ),
       );
-      puff.scale.setScalar(0.1 + phase * 0.14);
+      puff.scale.setScalar(0.18 + phase * 0.22);
       puff.material.opacity = 0.85 * (1 - phase * 0.8);
     });
     // Sparks blink in a fixed pattern.
@@ -195,7 +196,7 @@ export class WorldFx {
       this.root.add(mesh);
       return mesh;
     });
-    const sparkGeometry = new THREE.BoxGeometry(0.26, 0.04, 0.04);
+    const sparkGeometry = new THREE.BoxGeometry(0.4, 0.045, 0.045);
     const sparkMaterial = new THREE.MeshBasicMaterial({ color: SPARK_COLOR });
     const sparks = Array.from({ length: 4 }, () => {
       const mesh = new THREE.Mesh(sparkGeometry, sparkMaterial);

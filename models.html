@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ISV Simulator models</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #14161c;
+        color: #e6e6e6;
+        font:
+          13px system-ui,
+          sans-serif;
+        overflow: hidden;
+      }
+      #labels {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+      }
+      #labels div {
+        position: absolute;
+        transform: translate(-50%, 0);
+        white-space: nowrap;
+        text-shadow: 0 1px 2px #000;
+      }
+      header {
+        position: fixed;
+        top: 8px;
+        left: 12px;
+        z-index: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      Office kit (phase 14d): every model built in <code>src/render/three/models.ts</code>. Drag
+      nothing; it turns by itself. <code>?still</code> stops it.
+    </header>
+    <div id="labels"></div>
+    <script type="module" src="/src/modelSheet/main.ts"></script>
+  </body>
+</html>

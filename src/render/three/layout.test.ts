@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { parseLevelMap } from '../../sim/level';
 import { GARAGE } from '../../sim/levels';
 import { type GameState, createGame } from '../../sim/state';
 import type { Ticket } from '../../sim/tickets';
@@ -17,6 +18,7 @@ import {
   pickTile,
   placeTicket,
   queueAnchor,
+  stationFacing,
   tilesOf,
 } from './layout';
 
@@ -132,5 +134,11 @@ describe('3D layout', () => {
       x: wall.x,
       y: wall.y + 1,
     });
+  });
+
+  it('turns stations toward the floor they are worked from, the camera side first', () => {
+    const m = parseLevelMap(['#####', '#K1T#', '#2#3#', '#P4.#', '#####'].join('\n'));
+    expect(stationFacing(m, 1, 1)).toEqual({ x: 0, y: 1 });
+    expect(stationFacing(m, 1, 3)).toEqual({ x: 1, y: 0 });
   });
 });

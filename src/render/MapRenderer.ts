@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { type LevelMap, type Tile, getTile } from '../sim/level';
-import { type WallPiece, isFrontWall, wallPiece } from './mapShape';
+import { WALL_DECOS, type WallPiece, isFrontWall, wallDeco, wallPiece } from './mapShape';
 import {
   type Point,
   type Side,
@@ -56,17 +56,6 @@ export const DEFAULT_LOOK: MapLook = { walls: 'plaster', floor: 'concrete' };
 
 const WALL_PIECES: readonly WallPiece[] = ['wall', 'wall-front', 'wall-inner'];
 
-/** Things hung on walls that show their front face, per theme. */
-const WALL_DECOS: Readonly<Record<WallTheme, readonly string[]>> = {
-  plaster: ['poster', 'whiteboard', 'clock', 'kanban', 'dashboard', 'plants'],
-  wood: ['poster', 'whiteboard', 'clock', 'kanban', 'dashboard', 'plants'],
-  glass: ['whiteboard', 'clock', 'dashboard'],
-};
-/** One in this many front-facing walls gets a decoration. */
-const WALL_DECO_EVERY = 3;
-/** Decoration center above the tile center: the middle of the wall's face, over the skirting. */
-const WALL_DECO_LIFT = 12;
-
 /** Tiles drawn from `public/assets/tiles/<tile>.png`; walls come from `walls/<theme>/`. */
 const TILE_SPRITES: readonly Exclude<Tile, 'floor' | 'wall'>[] = [
   'counter',
@@ -89,6 +78,9 @@ const SPRITE_PATHS: readonly string[] = [
 ];
 
 /** Sprite pixel that sits on the front edge of the tile's floor, bottom center. */
+/** Decoration center above the tile center: the middle of the wall's face, over the skirting. */
+const WALL_DECO_LIFT = 12;
+
 const SPRITE_ANCHOR = { x: 32, y: 80 };
 const SPRITE_SIZE = { width: 64, height: 96 };
 
@@ -107,11 +99,6 @@ export function preloadMapSprites(scene: Phaser.Scene): void {
       scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
     });
   }
-}
-
-/** Small deterministic hash of a tile, so decorations stay put between runs. */
-function tileHash(x: number, y: number): number {
-  return (Math.imul(x, 73856093) ^ Math.imul(y, 19349663)) >>> 0;
 }
 
 /** Placeholder color of a block, so other renderers can match it. */
@@ -229,11 +216,9 @@ export class MapRenderer {
 
   /** Maybe hangs a decoration on the front face of the wall on tile (x, y). */
   private drawWallDeco(x: number, y: number): void {
-    const decos = WALL_DECOS[this.look.walls];
-    const hash = tileHash(x, y);
-    if (hash % WALL_DECO_EVERY !== 0 || decos.length === 0) return;
-    const deco = decos[Math.floor(hash / WALL_DECO_EVERY) % decos.length];
-    const key = spriteKey(`walls/deco/${deco ?? ''}`);
+    const deco = wallDeco(x, y, this.look.walls);
+    if (!deco) return;
+    const key = spriteKey(`walls/deco/${deco}`);
     if (!this.scene.textures.exists(key)) return;
     const c = tileToScreen(x, y);
     this.scene.add

@@ -118,9 +118,9 @@ export function screenDirToGrid(dir: Point): Point {
  */
 
 /** Camera tilt down from the horizon. */
-export const VIEW3D_PITCH = (56 * Math.PI) / 180;
+export const VIEW3D_PITCH = (50 * Math.PI) / 180;
 /** Vertical field of view: narrow, so the back of the room is only a little smaller. */
-export const VIEW3D_FOV = (28 * Math.PI) / 180;
+export const VIEW3D_FOV = (24 * Math.PI) / 180;
 
 export interface Vec3 {
   x: number;

@@ -13,6 +13,7 @@ declare module 'n8ao' {
       halfRes: boolean;
       gammaCorrection: boolean;
       screenSpaceRadius: boolean;
+      transparencyAware: boolean;
     };
     setQualityMode(mode: 'Performance' | 'Low' | 'Medium' | 'High' | 'Ultra'): void;
   }

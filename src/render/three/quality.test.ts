@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createFrameWatch, initialQuality, watchFrame } from './quality';
+import {
+  createFrameWatch,
+  initialQuality,
+  pixelRatioFor,
+  rewarm,
+  stepDown,
+  watchFrame,
+} from './quality';
 
 function run(w: ReturnType<typeof createFrameWatch>, frames: number, ms: number): number {
   let drops = 0;
@@ -13,11 +20,19 @@ describe('frame watch', () => {
     expect(run(w, 120, 50)).toBe(0);
   });
 
-  it('drops the quality once after a window of slow frames, never again', () => {
+  it('steps down after a window of slow frames', () => {
     const w = createFrameWatch();
     run(w, 120, 16);
     expect(run(w, 90, 40)).toBe(1);
-    expect(run(w, 1000, 40)).toBe(0);
+  });
+
+  it('warms up again after a step, so the new quality gets judged fresh', () => {
+    const w = createFrameWatch();
+    run(w, 120, 16);
+    run(w, 90, 40);
+    rewarm(w);
+    expect(run(w, 120, 40)).toBe(0);
+    expect(run(w, 90, 40)).toBe(1);
   });
 
   it('keeps the quality when only a few frames hitch', () => {
@@ -36,10 +51,25 @@ describe('frame watch', () => {
 
   it('does not watch when the quality was asked for', () => {
     expect(initialQuality('low')).toEqual({ quality: 'low', watch: false });
-    expect(initialQuality('high').watch).toBe(false);
+    expect(initialQuality('medium').watch).toBe(false);
     expect(initialQuality(null)).toEqual({ quality: 'high', watch: true });
     const w = createFrameWatch(false);
     run(w, 120, 16);
     expect(run(w, 500, 100)).toBe(0);
+  });
+});
+
+describe('quality steps', () => {
+  it('goes high, medium, low and stops', () => {
+    expect(stepDown('high')).toBe('medium');
+    expect(stepDown('medium')).toBe('low');
+    expect(stepDown('low')).toBeNull();
+  });
+
+  it('caps the pixel ratio on big screens and only uses it on high', () => {
+    expect(pixelRatioFor('high', 2, 1440, 810)).toBe(1.5);
+    expect(pixelRatioFor('high', 2, 3840, 2160)).toBe(1);
+    expect(pixelRatioFor('high', 1, 1440, 810)).toBe(1);
+    expect(pixelRatioFor('medium', 2, 1440, 810)).toBe(1);
   });
 });

@@ -17,8 +17,8 @@ export const PALETTE = {
   backdropInner: 0x2b3756,
   backdropOuter: 0x12141b,
   /** Counter tops (light laminate) over darker fronts. */
-  counterTop: 0xd9c7a3,
-  counterFront: 0x5d6878,
+  counterTop: 0xf0e6d2,
+  counterFront: 0x8a6448,
   /** Every station keeps the color players learned in 2D. */
   station: {
     inbox: 0x4fa3e0,
@@ -40,23 +40,23 @@ export const PALETTE = {
 
 /** Floor colors per theme: base and the alternate tile for a gentle checker. */
 export const FLOOR_COLORS: Readonly<Record<FloorTheme, readonly [number, number]>> = {
-  concrete: [0x9c968b, 0x948e83],
+  concrete: [0xb8a487, 0xab977b],
   carpet: [0x4f6a88, 0x4a6482],
   parquet: [0xb5824f, 0xab7947],
 };
 
 /** Wall colors per theme: face and top. */
 export const WALL_COLORS: Readonly<Record<WallTheme, { face: number; top: number }>> = {
-  plaster: { face: 0xe4d7c1, top: 0x9d8f7c },
-  wood: { face: 0xa36f45, top: 0x6b4529 },
-  glass: { face: 0xbfe2f0, top: 0x6c7f90 },
+  plaster: { face: 0x8fa3b8, top: 0xd3dde6 },
+  wood: { face: 0xa36f45, top: 0xd9b88a },
+  glass: { face: 0xd6f0fa, top: 0xe6ecf0 },
 };
 
 /** Sun direction and strength: from the front left and high up, so shadows fall back and right. */
-const SUN = { color: 0xffe9c7, intensity: 3.2 };
-const SKY = { sky: 0xc9dcff, ground: 0x6e5a48, intensity: 0.75 };
-/** A weak cool light from the back right that lifts the shadow sides. */
-const FILL = { color: 0xbfd4ff, intensity: 0.5 };
+const SUN = { color: 0xffe9c7, intensity: 3.6 };
+const SKY = { sky: 0xc9dcff, ground: 0x6e5a48, intensity: 0.6 };
+/** A weak cool light from the camera side that lifts the shadow sides. */
+const FILL = { color: 0xbfd4ff, intensity: 0.6 };
 /** How much the soft room reflections show on materials. */
 const ENVIRONMENT_INTENSITY = 0.2;
 
@@ -68,8 +68,9 @@ export function createLights(map: LevelMap): THREE.Object3D[] {
   const sky = new THREE.HemisphereLight(SKY.sky, SKY.ground, SKY.intensity);
 
   const sun = new THREE.DirectionalLight(SUN.color, SUN.intensity);
-  // Lowish, so shadows are long enough to read under people and props.
-  put(sun, gridToWorld(cx - width * 0.35, cy + height * 0.7, 9));
+  // From behind and left, about 58° up: shadows fall forward and right, toward the
+  // camera, where they show under people and props instead of hiding behind them.
+  put(sun, gridToWorld(cx - width * 0.3, cy - height * 0.45, 12));
   put(sun.target, gridToWorld(cx, cy));
   sun.castShadow = true;
   const reach = Math.max(width, height) * 0.72;
@@ -86,7 +87,8 @@ export function createLights(map: LevelMap): THREE.Object3D[] {
   sun.shadow.normalBias = 0.025;
 
   const fill = new THREE.DirectionalLight(FILL.color, FILL.intensity);
-  put(fill, gridToWorld(cx + width, cy - height, 6));
+  // From the camera side, so the front faces the sun leaves in shade aren't black.
+  put(fill, gridToWorld(cx + width * 0.6, cy + height * 1.2, 6));
   put(fill.target, gridToWorld(cx, cy));
   return [sky, sun, sun.target, fill, fill.target];
 }
