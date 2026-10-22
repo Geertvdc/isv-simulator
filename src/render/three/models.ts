@@ -24,6 +24,20 @@ const PAPER = 0xf7f3ea;
 export type StationTile = Exclude<Tile, 'floor' | 'wall'>;
 
 /**
+ * A station: the `base` (counter and what lies on it) turns to face the
+ * floor it's worked from; the `hero` prop that says what the station is
+ * (a monitor, a magnifier, a mailbox) stands at `heroAt` on it, in the
+ * station's own space, and turns toward the camera instead, so it never
+ * shows its back or its edge.
+ */
+export interface StationModel {
+  base: Model;
+  hero: Model | null;
+  /** Where the hero stands on the top, x and z in the station's space (front is +z). */
+  heroAt: [number, number];
+}
+
+/**
  * The counter every station is built on: a body in `color` with a top
  * overhanging the front. Stations get a light top in their own color, so
  * they read from above; plain counters a laminate one.
@@ -42,221 +56,287 @@ function counter(b: ModelBuilder, color: number, top: number = stationTop(color)
   return b;
 }
 
-/** A monitor on a stand at the back of a desk, its screen in `glow`. */
-function monitor(
-  b: ModelBuilder,
-  x: number,
-  z: number,
-  w: number,
-  h: number,
-  glow: number,
-  turn = 0,
-): void {
-  const sin = Math.sin(turn);
-  const cos = Math.cos(turn);
-  b.cylinder(0.09, 0.11, 0.02, DARK, { at: [x, TOP + 0.01, z] });
-  b.box(0.04, 0.14, 0.03, DARK, { at: [x, TOP + 0.08, z] }, 0.01);
-  const cy = TOP + 0.14 + h / 2;
-  b.box(w + 0.05, h + 0.05, 0.045, INK, { at: [x, cy, z], rot: [0, turn, 0] }, 0.015);
-  b.screen(w, h, glow, { at: [x + sin * 0.024, cy, z + cos * 0.024], rot: [0, turn, 0] });
-}
-
-function keyboardStation(): Model {
-  const b = counter(new ModelBuilder(), PALETTE.station.keyboard);
-  monitor(b, -0.08, -0.3, 0.42, 0.26, 0x6cf0a8);
-  // Lines of "code" on the screen, a little brighter.
-  for (let i = 0; i < 4; i++) {
-    const w = [0.22, 0.3, 0.16, 0.26][i] ?? 0.2;
-    b.screen(w, 0.025, 0xd9ffe9, {
-      at: [-0.26 + w / 2 + (i % 2) * 0.04, TOP + 0.37 - i * 0.05, -0.27],
-    });
-  }
-  // Keyboard and mouse in front of the monitor, mug on the side.
-  b.box(0.38, 0.025, 0.13, 0x3a3f4a, { at: [-0.08, TOP + 0.013, -0.08] }, 0.01);
-  for (let r = 0; r < 3; r++)
-    b.box(0.34, 0.006, 0.025, 0x9aa3b5, { at: [-0.08, TOP + 0.028, -0.12 + r * 0.035] }, 0.002);
-  b.sphere(0.035, 0x3a3f4a, { at: [0.17, TOP + 0.015, -0.08] }, [0.8, 0.45, 1.2]);
-  b.cylinder(0.045, 0.04, 0.1, 0xffffff, { at: [0.33, TOP + 0.05, -0.28] });
-  b.torus(0.03, 0.01, 0xffffff, { at: [0.375, TOP + 0.055, -0.28], rot: [0, 0, Math.PI / 2] });
-  b.cylinder(0.038, 0.038, 0.004, 0x5a3a22, { at: [0.33, TOP + 0.098, -0.28] });
-  return b.build();
-}
-
-function testBench(): Model {
-  const b = counter(new ModelBuilder(), PALETTE.station.testBench);
-  // Two screens: a pass and a fail.
-  monitor(b, -0.2, -0.3, 0.26, 0.2, 0x5cf08a, 0.2);
-  monitor(b, 0.2, -0.3, 0.26, 0.2, 0xff5f57, -0.2);
-  // A tick and a cross on them, in white.
-  b.screen(0.08, 0.02, 0xffffff, { at: [-0.215, TOP + 0.24, -0.27], rot: [0, 0.2, -0.8] });
-  b.screen(0.04, 0.02, 0xffffff, { at: [-0.255, TOP + 0.225, -0.272], rot: [0, 0.2, 0.8] });
-  b.screen(0.09, 0.02, 0xffffff, { at: [0.215, TOP + 0.24, -0.27], rot: [0, -0.2, 0.8] });
-  b.screen(0.09, 0.02, 0xffffff, { at: [0.215, TOP + 0.24, -0.268], rot: [0, -0.2, -0.8] });
-  // A test phone lying flat.
-  b.box(0.09, 0.015, 0.17, INK, { at: [0.36, TOP + 0.008, 0.05], rot: [0, 0.3, 0] }, 0.01);
-  b.screen(0.075, 0.15, 0x7ab8ff, {
-    at: [0.36, TOP + 0.017, 0.05],
-    rot: [-Math.PI / 2, 0, 0.3],
-  });
-  return b.build();
-}
-
-function reviewStation(): Model {
-  const b = counter(new ModelBuilder(), PALETTE.station.review);
-  // A pile of printouts with red marks, and a big magnifying glass.
-  for (let i = 0; i < 4; i++) {
-    b.box(
-      0.26,
-      0.012,
-      0.32,
-      PAPER,
-      { at: [-0.22, TOP + 0.006 + i * 0.013, -0.22], rot: [0, i % 2 ? 0.08 : -0.05, 0] },
-      0.003,
-    );
-  }
-  b.box(0.12, 0.004, 0.015, 0xe0402f, { at: [-0.2, TOP + 0.06, -0.2] }, 0.001);
-  b.box(0.08, 0.004, 0.015, 0xe0402f, { at: [-0.24, TOP + 0.06, -0.15] }, 0.001);
-  b.torus(0.09, 0.018, 0x3a2a1a, { at: [0.2, TOP + 0.2, -0.28], rot: [0, -0.4, 0] });
-  b.pane(0.15, 0.15, 0.01, 0xcfefff, { at: [0.2, TOP + 0.2, -0.28], rot: [0, -0.4, 0] });
-  b.box(
-    0.035,
-    0.17,
-    0.035,
-    0x3a2a1a,
-    { at: [0.25, TOP + 0.06, -0.24], rot: [0, -0.4, -0.5] },
-    0.012,
-  );
-  return b.build();
-}
-
-function pipelineStation(): Model {
-  const b = counter(new ModelBuilder(), PALETTE.station.pipeline);
-  // A conveyor across the top, with rollers peeking out at the ends.
-  b.box(0.98, 0.03, 0.5, DARK, { at: [0, TOP + 0.015, 0.06] }, 0.01);
-  for (const x of [-0.47, 0.47]) {
-    b.cylinder(0.035, 0.035, 0.52, STEEL, { at: [x, TOP + 0.015, 0.06], rot: [Math.PI / 2, 0, 0] });
-  }
-  for (let i = 0; i < 6; i++)
-    b.box(0.02, 0.004, 0.46, 0x4a505c, { at: [-0.4 + i * 0.16, TOP + 0.032, 0.06] }, 0.001);
-  // A little build server at the back with blinking lights.
-  b.box(0.5, 0.3, 0.2, 0x3a3f4a, { at: [0, TOP + 0.15, -0.33] }, 0.02);
-  for (let i = 0; i < 3; i++) {
-    b.box(0.44, 0.06, 0.01, INK, { at: [0, TOP + 0.07 + i * 0.08, -0.225] }, 0.004);
-    b.led(0.014, i === 1 ? 0xffc04a : 0x5cf08a, { at: [0.17, TOP + 0.07 + i * 0.08, -0.218] });
-    b.led(0.014, 0x5cf08a, { at: [0.13, TOP + 0.07 + i * 0.08, -0.218] });
-  }
-  return b.build();
-}
-
-/** A low tray in the middle of the top for queued tickets, and something on the back. */
-function trayStation(color: number): ModelBuilder {
-  const b = counter(new ModelBuilder(), color);
-  const wall = tint(color, -0.25);
-  b.box(0.62, 0.05, 0.03, wall, { at: [0, TOP + 0.025, 0.24] }, 0.01);
-  b.box(0.62, 0.05, 0.03, wall, { at: [0, TOP + 0.025, -0.24] }, 0.01);
-  b.box(0.03, 0.05, 0.5, wall, { at: [-0.3, TOP + 0.025, 0] }, 0.01);
-  b.box(0.03, 0.05, 0.5, wall, { at: [0.3, TOP + 0.025, 0] }, 0.01);
-  return b;
-}
-
-function inboxStation(): Model {
-  const b = trayStation(PALETTE.station.inbox);
-  // An envelope standing in a letter holder at the back.
-  b.box(0.3, 0.12, 0.06, tint(PALETTE.station.inbox, -0.3), { at: [0, TOP + 0.06, -0.39] }, 0.015);
-  b.box(0.24, 0.16, 0.012, PAPER, { at: [0, TOP + 0.13, -0.39], rot: [-0.08, 0, 0] }, 0.004);
-  b.cone(
-    0.12,
-    0.06,
-    0xe4ddcc,
-    { at: [0, TOP + 0.18, -0.382], rot: [Math.PI / 2 - 0.08, 0, Math.PI] },
-    3,
-  );
-  return b.build();
-}
-
-function bugQueueStation(): Model {
-  const b = trayStation(PALETTE.station.bugQueue);
-  // A big friendly bug sits on the back edge.
-  const bug = 0x2b2f38;
-  b.sphere(0.09, bug, { at: [0.3, TOP + 0.08, -0.36] }, [1, 0.7, 1.25]);
-  b.sphere(0.05, bug, { at: [0.3, TOP + 0.1, -0.24] });
-  b.sphere(0.07, 0xd33b2c, { at: [0.3, TOP + 0.12, -0.38] }, [1.05, 0.5, 1.1]);
-  for (const s of [-1, 1]) {
-    b.sphere(0.014, 0xffffff, { at: [0.3 + s * 0.02, TOP + 0.12, -0.2] });
-    b.cylinder(0.006, 0.006, 0.1, bug, {
-      at: [0.3 + s * 0.03, TOP + 0.17, -0.22],
-      rot: [0.5, 0, s * 0.4],
-    });
-    for (let i = 0; i < 3; i++) {
-      b.cylinder(0.008, 0.008, 0.1, bug, {
-        at: [0.3 + s * 0.09, TOP + 0.04, -0.38 + i * 0.06],
-        rot: [0, 0, s * 1.1],
-      });
-    }
-  }
-  return b.build();
-}
-
-function shipStation(): Model {
-  const b = counter(new ModelBuilder(), PALETTE.station.ship);
-  // A hatch in the top with a chute, a rocket for luck and a big red button.
-  b.box(0.56, 0.012, 0.5, INK, { at: [0, TOP + 0.002, 0.04] }, 0.004);
-  b.box(0.6, 0.03, 0.04, tint(PALETTE.station.ship, -0.4), { at: [0, TOP + 0.015, 0.3] }, 0.01);
-  b.box(0.6, 0.03, 0.04, tint(PALETTE.station.ship, -0.4), { at: [0, TOP + 0.015, -0.22] }, 0.01);
-  b.cylinder(0.06, 0.06, 0.03, 0xe8e2d6, { at: [0.38, TOP + 0.015, -0.36] });
-  b.cylinder(0.045, 0.05, 0.035, 0xe0402f, { at: [0.38, TOP + 0.045, -0.36] });
-  b.cylinder(0.04, 0.04, 0.16, 0xf2efe8, { at: [-0.36, TOP + 0.1, -0.36] });
-  b.cone(0.04, 0.08, 0xe0402f, { at: [-0.36, TOP + 0.22, -0.36] });
-  for (let i = 0; i < 3; i++) {
-    const a = (i / 3) * Math.PI * 2;
-    b.box(
-      0.02,
-      0.06,
-      0.05,
-      0xe0402f,
-      {
-        at: [-0.36 + Math.cos(a) * 0.045, TOP + 0.05, -0.36 + Math.sin(a) * 0.045],
-        rot: [0, -a, 0],
-      },
-      0.005,
-    );
-  }
-  b.sphere(0.018, 0x7ab8ff, { at: [-0.36, TOP + 0.14, -0.322] });
-  return b.build();
-}
-
-function plainCounter(): Model {
-  return counter(new ModelBuilder(), PALETTE.counterFront, PALETTE.counterTop).build();
-}
-
 function stationTop(color: number): number {
   return tint(color, 0.4);
 }
 
-function bin(): Model {
-  const b = new ModelBuilder();
-  const color = PALETTE.station.bin;
-  b.cylinder(0.27, 0.22, TOP - 0.06, color, { at: [0, (TOP - 0.06) / 2, 0] }, 24);
-  for (let i = 0; i < 12; i++) {
-    const a = (i / 12) * Math.PI * 2;
-    b.box(
-      0.02,
-      TOP - 0.14,
-      0.02,
-      tint(color, -0.3),
-      { at: [Math.cos(a) * 0.25, (TOP - 0.06) / 2, Math.sin(a) * 0.25] },
-      0.005,
+/** A big monitor on a stand, its foot at the origin, screen toward +z, in `glow`. */
+function monitor(b: ModelBuilder, w: number, h: number, glow: number, x = 0): ModelBuilder {
+  b.cylinder(0.11, 0.13, 0.025, DARK, { at: [x, TOP + 0.012, 0] });
+  b.box(0.05, 0.16, 0.04, DARK, { at: [x, TOP + 0.1, -0.01] }, 0.012);
+  const cy = TOP + 0.17 + h / 2;
+  b.box(w + 0.06, h + 0.06, 0.05, INK, { at: [x, cy, 0] }, 0.02);
+  b.screen(w, h, glow, { at: [x, cy, 0.027] });
+  return b;
+}
+
+function keyboardStation(): StationModel {
+  const color = PALETTE.station.keyboard;
+  const base = counter(new ModelBuilder(), color);
+  // A wide keyboard with colored keycaps, a mouse and a mug, in front of the screen.
+  base.box(0.56, 0.035, 0.2, 0x3a3f4a, { at: [-0.04, TOP + 0.018, 0.08] }, 0.012);
+  const caps = [0xfdfdf6, 0xffc04a, 0x5cc8f0, 0xfdfdf6];
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 8; c++) {
+      const cap = caps[(r * 3 + c) % caps.length] ?? 0xfdfdf6;
+      base.box(
+        0.05,
+        0.02,
+        0.045,
+        r === 2 && c > 1 && c < 6 ? 0xfdfdf6 : cap,
+        {
+          at: [-0.04 - 0.21 + c * 0.06, TOP + 0.045, 0.02 + r * 0.06],
+        },
+        0,
+      );
+    }
+  }
+  base.sphere(0.045, 0x3a3f4a, { at: [0.33, TOP + 0.02, 0.1] }, [0.8, 0.45, 1.2]);
+  base.cylinder(0.06, 0.055, 0.13, 0xffffff, { at: [0.36, TOP + 0.065, -0.25] });
+  base.torus(0.04, 0.013, 0xffffff, { at: [0.42, TOP + 0.07, -0.25], rot: [0, 0, Math.PI / 2] });
+  base.cylinder(0.05, 0.05, 0.004, 0x5a3a22, { at: [0.36, TOP + 0.128, -0.25] });
+
+  const hero = monitor(new ModelBuilder(), 0.58, 0.36, 0x4ee08a);
+  // Lines of "code", brighter, and a cursor.
+  const lines = [0.32, 0.42, 0.2, 0.36, 0.26];
+  lines.forEach((w, i) => {
+    hero.screen(w, 0.03, i % 2 ? 0xdcfff0 : 0xffe48a, {
+      at: [-0.26 + w / 2 + (i % 3) * 0.04, TOP + 0.47 - i * 0.06, 0.029],
+    });
+  });
+  return { base: base.build(), hero: hero.build(), heroAt: [-0.04, -0.3] };
+}
+
+function testBench(): StationModel {
+  const color = PALETTE.station.testBench;
+  const base = counter(new ModelBuilder(), color);
+  // A rack of test tubes with green liquid, front left.
+  base.box(0.34, 0.05, 0.1, 0x8c5f3d, { at: [-0.2, TOP + 0.025, 0.2] }, 0.01);
+  for (let i = 0; i < 4; i++) {
+    const x = -0.32 + i * 0.08;
+    base.cylinder(0.025, 0.025, 0.18, 0xe8f6ff, { at: [x, TOP + 0.1, 0.2] }, 10);
+    base.cylinder(
+      0.022,
+      0.022,
+      0.1 - (i % 2) * 0.03,
+      i === 2 ? 0xff5f57 : 0x5cf08a,
+      {
+        at: [x, TOP + 0.06, 0.2],
+      },
+      10,
     );
   }
-  b.torus(0.265, 0.025, tint(color, 0.25), { at: [0, TOP - 0.06, 0], rot: [Math.PI / 2, 0, 0] });
+  // The hero: a pass/fail light tower, red over green, and a small screen.
+  const hero = new ModelBuilder();
+  hero.cylinder(0.12, 0.14, 0.03, DARK, { at: [0, TOP + 0.015, 0] });
+  hero.cylinder(0.03, 0.03, 0.42, STEEL, { at: [0, TOP + 0.21, 0] }, 10);
+  hero.box(0.22, 0.36, 0.14, INK, { at: [0, TOP + 0.5, 0] }, 0.04);
+  hero.led(0.075, 0xff5f57, { at: [0, TOP + 0.6, 0.06] });
+  hero.led(0.075, 0x4ef07a, { at: [0, TOP + 0.41, 0.06] });
+  return { base: base.build(), hero: hero.build(), heroAt: [0.22, -0.26] };
+}
+
+function reviewStation(): StationModel {
+  const color = PALETTE.station.review;
+  const base = counter(new ModelBuilder(), color);
+  // A pile of printouts with red marks and a fat red pen.
+  for (let i = 0; i < 4; i++) {
+    base.box(
+      0.3,
+      0.014,
+      0.36,
+      PAPER,
+      {
+        at: [-0.24, TOP + 0.007 + i * 0.015, -0.2],
+        rot: [0, i % 2 ? 0.08 : -0.05, 0],
+      },
+      0,
+    );
+  }
+  base.box(0.16, 0.006, 0.02, 0xe0402f, { at: [-0.22, TOP + 0.068, -0.18] }, 0);
+  base.box(0.1, 0.006, 0.02, 0xe0402f, { at: [-0.26, TOP + 0.068, -0.12] }, 0);
+  base.capsule(0.025, 0.24, 0xe0402f, {
+    at: [0.25, TOP + 0.03, 0.22],
+    rot: [0, 0, Math.PI / 2 - 0.3],
+  });
+  // The hero: a big magnifying glass standing up on a foot.
+  const hero = new ModelBuilder();
+  hero.cylinder(0.11, 0.13, 0.03, 0x3a2a1a, { at: [0, TOP + 0.015, 0] });
+  hero.box(0.045, 0.24, 0.045, 0x3a2a1a, { at: [0, TOP + 0.13, 0] }, 0.015);
+  hero.torus(0.17, 0.035, 0xc89a3a, { at: [0, TOP + 0.42, 0] });
+  hero.pane(0.3, 0.3, 0.01, 0xcfefff, { at: [0, TOP + 0.42, 0] });
+  hero.screen(0.06, 0.12, 0xffffff, { at: [-0.06, TOP + 0.46, 0.01], rot: [0, 0, 0.5] });
+  return { base: base.build(), hero: hero.build(), heroAt: [0.18, -0.26] };
+}
+
+/** The pipeline's build server stands here on the top (station space); `WorldFx` puts its alarm there. */
+export const PIPELINE_SERVER_AT: [number, number] = [0, -0.3];
+
+function pipelineStation(): StationModel {
+  const color = PALETTE.station.pipeline;
+  const base = counter(new ModelBuilder(), color);
+  // A conveyor across the top, with rollers peeking out at the ends and hazard stripes.
+  base.box(0.98, 0.035, 0.5, DARK, { at: [0, TOP + 0.018, 0.12] }, 0.01);
+  for (const x of [-0.47, 0.47]) {
+    base.cylinder(0.04, 0.04, 0.52, STEEL, {
+      at: [x, TOP + 0.018, 0.12],
+      rot: [Math.PI / 2, 0, 0],
+    });
+  }
+  for (let i = 0; i < 6; i++) {
+    base.box(0.03, 0.006, 0.46, 0x4a505c, { at: [-0.4 + i * 0.16, TOP + 0.038, 0.12] }, 0);
+  }
+  // The hero: a chunky build server with blinking lights.
+  const hero = new ModelBuilder();
+  hero.box(0.62, 0.42, 0.24, 0x3a3f4a, { at: [0, TOP + 0.21, 0] }, 0.03);
+  for (let i = 0; i < 3; i++) {
+    const y = TOP + 0.09 + i * 0.12;
+    hero.box(0.54, 0.08, 0.01, INK, { at: [0, y, 0.122] }, 0);
+    hero.led(0.022, i === 1 ? 0xffc04a : 0x4ef07a, { at: [0.2, y, 0.13] });
+    hero.led(0.022, 0x4ef07a, { at: [0.14, y, 0.13] });
+  }
+  return { base: base.build(), hero: hero.build(), heroAt: PIPELINE_SERVER_AT };
+}
+
+/** A tray in the middle of the top for queued tickets: a dark floor, so any folder stands out. */
+function trayStation(color: number): ModelBuilder {
+  const b = counter(new ModelBuilder(), color);
+  const wall = tint(color, -0.25);
+  b.box(0.6, 0.012, 0.48, DARK, { at: [0, TOP + 0.006, 0.02] }, 0);
+  b.box(0.66, 0.06, 0.04, wall, { at: [0, TOP + 0.03, 0.27] }, 0.012);
+  b.box(0.66, 0.06, 0.04, wall, { at: [0, TOP + 0.03, -0.23] }, 0.012);
+  b.box(0.04, 0.06, 0.5, wall, { at: [-0.32, TOP + 0.03, 0.02] }, 0.012);
+  b.box(0.04, 0.06, 0.5, wall, { at: [0.32, TOP + 0.03, 0.02] }, 0.012);
+  return b;
+}
+
+function inboxStation(): StationModel {
+  const base = trayStation(PALETTE.station.inbox);
+  // The hero: a mailbox on a post with its red flag up.
+  const hero = new ModelBuilder();
+  const blue = tint(PALETTE.station.inbox, -0.2);
+  hero.box(0.05, 0.16, 0.05, DARK, { at: [0, TOP + 0.08, 0] }, 0.015);
+  hero.box(0.22, 0.16, 0.3, blue, { at: [0, TOP + 0.24, 0] }, 0.04);
+  hero.cylinder(0.11, 0.11, 0.3, blue, { at: [0, TOP + 0.32, 0], rot: [Math.PI / 2, 0, 0] }, 20);
+  hero.box(0.16, 0.02, 0.01, INK, { at: [0, TOP + 0.33, 0.152] }, 0);
+  hero.box(0.02, 0.18, 0.02, 0xe0402f, { at: [0.13, TOP + 0.36, -0.06] }, 0);
+  hero.box(0.02, 0.07, 0.1, 0xe0402f, { at: [0.13, TOP + 0.42, -0.02] }, 0);
+  // A letter sticking out.
+  hero.box(0.14, 0.1, 0.01, PAPER, { at: [0, TOP + 0.45, 0.06], rot: [-0.3, 0, 0] }, 0);
+  return { base: base.build(), hero: hero.build(), heroAt: [0.36, -0.3] };
+}
+
+function bugQueueStation(): StationModel {
+  const base = trayStation(PALETTE.station.bugQueue);
+  // The hero: a big friendly ladybug-like bug, front toward the camera.
+  const hero = new ModelBuilder();
+  const bug = 0x2b2f38;
+  hero.sphere(0.15, bug, { at: [0, TOP + 0.12, -0.03] }, [1, 0.62, 1.2]);
+  hero.sphere(0.135, 0xe0402f, { at: [0, TOP + 0.17, -0.04] }, [1.05, 0.5, 1.15]);
+  for (const [x, z] of [
+    [-0.06, -0.08],
+    [0.06, -0.02],
+    [-0.03, 0.05],
+  ] as const) {
+    hero.sphere(0.03, bug, { at: [x, TOP + 0.235, z] }, [1, 0.4, 1]);
+  }
+  hero.sphere(0.075, bug, { at: [0, TOP + 0.15, 0.17] });
+  for (const s of [-1, 1]) {
+    hero.sphere(0.025, 0xffffff, { at: [s * 0.035, TOP + 0.17, 0.235] });
+    hero.sphere(0.012, INK, { at: [s * 0.035, TOP + 0.17, 0.257] });
+    hero.cylinder(
+      0.008,
+      0.008,
+      0.16,
+      bug,
+      { at: [s * 0.04, TOP + 0.26, 0.2], rot: [0.5, 0, s * 0.35] },
+      6,
+    );
+    hero.sphere(0.02, bug, { at: [s * 0.07, TOP + 0.33, 0.24] });
+    for (let i = 0; i < 3; i++) {
+      hero.cylinder(
+        0.012,
+        0.012,
+        0.14,
+        bug,
+        {
+          at: [s * 0.15, TOP + 0.06, -0.1 + i * 0.09],
+          rot: [0, 0, s * 1.1],
+        },
+        6,
+      );
+    }
+  }
+  return { base: base.build(), hero: hero.build(), heroAt: [0.3, -0.28] };
+}
+
+function shipStation(): StationModel {
+  const color = PALETTE.station.ship;
+  const base = counter(new ModelBuilder(), color);
+  // A chute in the top, edged in yellow and black hazard stripes.
+  base.box(0.6, 0.014, 0.5, INK, { at: [0, TOP + 0.003, 0.08] }, 0);
+  for (let i = 0; i < 8; i++) {
+    const c = i % 2 ? INK : 0xffd166;
+    base.box(0.085, 0.03, 0.05, c, { at: [-0.3 + i * 0.085 + 0.04, TOP + 0.015, 0.355] }, 0);
+    base.box(0.085, 0.03, 0.05, c, { at: [-0.3 + i * 0.085 + 0.04, TOP + 0.015, -0.195] }, 0);
+  }
+  // A big red mushroom button, front right.
+  base.cylinder(0.09, 0.1, 0.05, 0xd8d2c6, { at: [0.38, TOP + 0.025, 0.36] });
+  base.sphere(0.085, 0xe0402f, { at: [0.38, TOP + 0.07, 0.36] }, [1, 0.55, 1]);
+  // The hero: a parcel with tape, ready to go.
+  const hero = new ModelBuilder();
+  hero.box(0.36, 0.28, 0.3, 0xc8955a, { at: [0, TOP + 0.14, 0] }, 0.02);
+  hero.box(0.37, 0.02, 0.06, 0xe8d4a8, { at: [0, TOP + 0.281, 0] }, 0);
+  hero.box(0.06, 0.29, 0.305, 0xe8d4a8, { at: [0, TOP + 0.14, 0] }, 0);
+  hero.box(0.1, 0.07, 0.005, 0xffffff, { at: [-0.1, TOP + 0.16, 0.152] }, 0);
+  return { base: base.build(), hero: hero.build(), heroAt: [-0.32, -0.3] };
+}
+
+function plainCounter(): StationModel {
+  return {
+    base: counter(new ModelBuilder(), PALETTE.counterFront, PALETTE.counterTop).build(),
+    hero: null,
+    heroAt: [0, 0],
+  };
+}
+
+function bin(): StationModel {
+  const b = new ModelBuilder();
+  // A recycling bin, wide enough to read from across the room, lid half open.
+  const color = 0x3f9a5c;
+  const h = TOP - 0.04;
+  b.cylinder(0.34, 0.28, h, color, { at: [0, h / 2, 0] }, 24);
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    b.box(
+      0.04,
+      h - 0.1,
+      0.04,
+      tint(color, -0.3),
+      {
+        at: [Math.cos(a) * 0.315, h / 2, Math.sin(a) * 0.315],
+      },
+      0,
+    );
+  }
+  b.torus(0.33, 0.03, tint(color, 0.25), { at: [0, h, 0], rot: [Math.PI / 2, 0, 0] });
+  b.cylinder(
+    0.33,
+    0.33,
+    0.04,
+    tint(color, 0.15),
+    { at: [0, h + 0.14, -0.22], rot: [-1.1, 0, 0] },
+    24,
+  );
   // Crumpled paper sticking out.
-  b.sphere(0.07, PAPER, { at: [-0.06, TOP - 0.04, 0.03] }, [1, 0.85, 1]);
-  b.sphere(0.06, 0xf6c4bd, { at: [0.08, TOP - 0.05, -0.05] }, [1, 0.8, 1]);
-  return b.build();
+  b.sphere(0.09, PAPER, { at: [-0.08, h, 0.06] }, [1, 0.85, 1]);
+  b.sphere(0.08, 0xf6c4bd, { at: [0.1, h - 0.01, -0.02] }, [1, 0.8, 1]);
+  b.sphere(0.07, 0xe8c77a, { at: [0.02, h + 0.02, 0.14] }, [1, 0.8, 1]);
+  return { base: b.build(), hero: null, heroAt: [0, 0] };
 }
 
 /** Every station and the counter, by tile. */
-export const STATION_MODELS: Readonly<Record<StationTile, () => Model>> = {
+export const STATION_MODELS: Readonly<Record<StationTile, () => StationModel>> = {
   counter: plainCounter,
   keyboard: keyboardStation,
   testBench,

@@ -38,8 +38,11 @@ export class ModelBuilder {
   /** A box `w` × `h` × `d` with rounded edges. */
   box(w: number, h: number, d: number, color: number, place: Place = {}, bevel = BEVEL): this {
     const r = Math.min(bevel, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001);
-    const geometry =
-      r > 0.002 ? new RoundedBoxGeometry(w, h, d, 2, r) : new THREE.BoxGeometry(w, h, d);
+    // Rounding costs ~150 triangles a box; on thin strips and tiny bevels it doesn't show.
+    const rounded = r >= 0.01 && Math.min(w, h, d) >= 0.08;
+    const geometry = rounded
+      ? new RoundedBoxGeometry(w, h, d, 2, r)
+      : new THREE.BoxGeometry(w, h, d);
     return this.add(geometry, color, place);
   }
 
@@ -153,11 +156,23 @@ export interface KitMaterials {
   glass: THREE.MeshStandardMaterial;
 }
 
+/**
+ * Screens and LEDs draw this much brighter than their color: over white, so
+ * they (and only they) bloom. Only with post-processing; without it the
+ * colors would clip, so the stage sets it per quality (`GLOW_BOOST_KEY`).
+ */
+export const GLOW_BOOST = 2.5;
+/** `userData` key on materials whose color the stage sets to the glow boost. */
+export const GLOW_BOOST_KEY = 'glowBoost';
+
 export function kitMaterials(): KitMaterials {
+  const glow = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
+  glow.userData[GLOW_BOOST_KEY] = GLOW_BOOST;
+  glow.color.setScalar(GLOW_BOOST);
   return {
     body: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0 }),
-    // Unlit and a little over 1, so screens and LEDs bloom on high quality.
-    glow: new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }),
+    // Unlit and brighter than white, so screens and LEDs bloom.
+    glow,
     glass: new THREE.MeshStandardMaterial({
       vertexColors: true,
       roughness: 0.1,

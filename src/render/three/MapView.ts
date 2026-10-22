@@ -4,11 +4,18 @@ import type { MapLook } from '../MapRenderer';
 import { tileHash, wallDeco, wallPiece } from '../mapShape';
 import { type Vec3, gridToWorld } from '../projection';
 import { type KitMaterials, type Model, kitMaterials } from './kit';
-import { SLAB_DEPTH, STATION_HEIGHT, facingYaw, stationFacing } from './layout';
+import { SLAB_DEPTH, STATION_HEIGHT, facingYaw, heroPlacement, stationFacing } from './layout';
 import { PALETTE, matte } from './look';
-import { STATION_MODELS, WALL_DECO_MODELS, floorModel, wallModel } from './models';
+import {
+  STATION_MODELS,
+  type StationModel,
+  type StationTile,
+  WALL_DECO_MODELS,
+  floorModel,
+  wallModel,
+} from './models';
 
-/** Letters on the station fronts, matching the order cards in the HUD. */
+/** Letters on the station tops, matching the order cards in the HUD. */
 const STATION_LETTERS: Partial<Record<Tile, string>> = {
   inbox: 'I',
   bugQueue: 'B',
@@ -20,8 +27,6 @@ const STATION_LETTERS: Partial<Record<Tile, string>> = {
 };
 /** Each floor tile's brightness wobbles by up to this much, so the floor doesn't look printed. */
 const FLOOR_WOBBLE = 0.06;
-/** Screens and LEDs draw this much brighter than their color: over white, so they (and only they) bloom. */
-export const GLOW_BOOST = 2.5;
 
 interface Placement {
   at: Vec3;
@@ -39,7 +44,6 @@ interface Placement {
 export function buildMap(map: LevelMap, look: MapLook): THREE.Group {
   const root = new THREE.Group();
   const materials = kitMaterials();
-  materials.glow.color.setScalar(GLOW_BOOST);
   const { width, height } = map;
 
   const slab = new THREE.Mesh(
@@ -51,6 +55,17 @@ export function buildMap(map: LevelMap, look: MapLook): THREE.Group {
   root.add(slab);
 
   const placements = new Map<string, { model: () => Model; at: Placement[] }>();
+  // Each station kind is built once; its base and hero are instanced separately.
+  const stations = new Map<StationTile, StationModel>();
+  const stationModel = (tile: StationTile): StationModel => {
+    let model = stations.get(tile);
+    if (!model) {
+      model = STATION_MODELS[tile]();
+      stations.set(tile, model);
+    }
+    return model;
+  };
+  const badges = new Map<string, THREE.MeshBasicMaterial>();
   const place = (key: string, model: () => Model, p: Placement) => {
     let entry = placements.get(key);
     if (!entry) {
@@ -64,14 +79,15 @@ export function buildMap(map: LevelMap, look: MapLook): THREE.Group {
     for (let x = 0; x < width; x++) {
       const tile = getTile(map, x, y);
       if (!tile) continue;
-      // Floor runs under blocks too, so no gaps show at their feet.
+      // Floor runs under stations too, so no gaps show at their feet; walls cover theirs.
       const wobble = 1 - FLOOR_WOBBLE + ((tileHash(x, y) % 100) / 100) * FLOOR_WOBBLE * 2;
       const checker = (x + y) % 2 === 0 ? 1 : 0.95;
-      place('floor', () => floorModel(look.floor), {
-        at: gridToWorld(x, y),
-        yaw: 0,
-        tint: new THREE.Color(1, 1, 1).multiplyScalar(wobble * checker).getHex(),
-      });
+      if (tile !== 'wall')
+        place('floor', () => floorModel(look.floor), {
+          at: gridToWorld(x, y),
+          yaw: 0,
+          tint: new THREE.Color(1, 1, 1).multiplyScalar(wobble * checker).getHex(),
+        });
       if (tile === 'floor') continue;
       if (tile === 'wall') {
         const piece = wallPiece(map, x, y);
@@ -79,18 +95,27 @@ export function buildMap(map: LevelMap, look: MapLook): THREE.Group {
           at: gridToWorld(x, y),
           yaw: 0,
         });
-        const deco = piece === 'wall' ? wallDeco(x, y, look.walls) : null;
+        // Only on walls with open floor in front: not behind a station or counter.
+        const open = getTile(map, x, y + 1) === 'floor';
+        const deco = piece === 'wall' && open ? wallDeco(x, y, look.walls) : null;
         const decoModel = deco ? WALL_DECO_MODELS[deco] : undefined;
         if (deco && decoModel) place(`deco:${deco}`, decoModel, { at: gridToWorld(x, y), yaw: 0 });
         continue;
       }
       const yaw = facingYaw(stationFacing(map, x, y));
-      place(`station:${tile}`, STATION_MODELS[tile], {
-        at: gridToWorld(x, y),
-        yaw,
-      });
+      const station = stationModel(tile);
+      place(`station:${tile}`, () => station.base, { at: gridToWorld(x, y), yaw });
+      if (station.hero) {
+        const hero = station.hero;
+        const h = heroPlacement(yaw, station.heroAt);
+        place(`hero:${tile}`, () => hero, { at: gridToWorld(x + h.dx, y + h.dz), yaw: h.yaw });
+      }
       const letter = STATION_LETTERS[tile];
-      if (letter) root.add(letterBadge(letter, gridToWorld(x, y), yaw));
+      if (letter) {
+        const b = heroPlacement(yaw, BADGE_AT);
+        const at = gridToWorld(x + b.dx, y + b.dz, STATION_HEIGHT + 0.004);
+        root.add(letterBadge(badges, letter, at));
+      }
     }
   }
 
@@ -133,8 +158,31 @@ function instances(
   return out;
 }
 
-/** A round badge with the station's letter on its front, like the HUD's order cards. */
-function letterBadge(text: string, at: Vec3, yaw: number): THREE.Mesh {
+/** Where the letter badge lies on a station's top: the front left corner, in the station's space. */
+const BADGE_AT: [number, number] = [-0.36, 0.36];
+const BADGE_SIZE = 0.22;
+const badgeGeometry = new THREE.PlaneGeometry(BADGE_SIZE, BADGE_SIZE).rotateX(-Math.PI / 2);
+
+/**
+ * A round badge with the station's letter lying on its top, upright for the
+ * camera, like the HUD's order cards. One material per letter, shared.
+ */
+function letterBadge(
+  materials: Map<string, THREE.MeshBasicMaterial>,
+  text: string,
+  at: Vec3,
+): THREE.Mesh {
+  let material = materials.get(text);
+  if (!material) {
+    material = new THREE.MeshBasicMaterial({ map: letterTexture(text), transparent: true });
+    materials.set(text, material);
+  }
+  const mesh = new THREE.Mesh(badgeGeometry, material);
+  put(mesh, at);
+  return mesh;
+}
+
+function letterTexture(text: string): THREE.Texture {
   const size = 64;
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -156,15 +204,7 @@ function letterBadge(text: string, at: Vec3, yaw: number): THREE.Mesh {
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.16, 0.16),
-    new THREE.MeshBasicMaterial({ map: texture, transparent: true }),
-  );
-  // On the front face, over the doors, turned with the station.
-  const r = 0.452;
-  put(mesh, { x: at.x + Math.sin(yaw) * r, y: STATION_HEIGHT - 0.2, z: at.z + Math.cos(yaw) * r });
-  mesh.rotation.y = yaw;
-  return mesh;
+  return texture;
 }
 
 function put(obj: THREE.Object3D, p: Vec3): void {

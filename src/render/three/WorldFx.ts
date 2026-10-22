@@ -4,13 +4,17 @@ import { type Pipeline, pipelineWarning } from '../../sim/pipeline';
 import type { GameState, Vec } from '../../sim/state';
 import { pipelinePulse } from '../effects';
 import { type Vec3, gridToWorld } from '../projection';
-import { blockHeight } from './layout';
+import { blockHeight, facingYaw, heroPlacement, stationFacing } from './layout';
+import { PIPELINE_SERVER_AT } from './models';
 
 const WARN_COLOR = 0xff3030;
 const BROKEN_COLOR = 0x111317;
 /** Dark, so it reads against light walls. */
 const SMOKE_COLOR = 0x3a3d44;
 const SPARK_COLOR = 0xffd166;
+const ALARM_COLOR = 0xff3020;
+/** Height of the build server's top over the block's top (see `models.ts`). */
+const SERVER_TOP = 0.42;
 const RUG_COLOR = 0x8e6bd8;
 const RUG_OPACITY = 0.35;
 const RUG_OPACITY_INVITED = 0.6;
@@ -26,6 +30,10 @@ interface PipelineFx {
   broken: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
   smoke: THREE.Mesh<THREE.SphereGeometry, THREE.MeshStandardMaterial>[];
   sparks: THREE.Mesh<THREE.BoxGeometry, THREE.MeshBasicMaterial>[];
+  /** A red alarm light on top of the build server, flashing while broken. */
+  alarm: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshBasicMaterial>;
+  /** Grid point of the build server on the block. */
+  server: { x: number; y: number };
 }
 
 interface Puff {
@@ -139,19 +147,24 @@ export class WorldFx {
     if (warning) fx.warn.material.opacity = 0.25 + 0.5 * pipelinePulse(pipeline.doneTicks, timeMs);
     fx.broken.visible = pipeline.broken;
     const t = timeMs / 1000;
+    fx.alarm.visible = pipeline.broken;
+    // Flashes twice a second, bright enough to bloom.
+    fx.alarm.material.color
+      .setHex(ALARM_COLOR)
+      .multiplyScalar(Math.sin(t * Math.PI * 4) > 0 ? 3 : 0.6);
     const top = blockHeight(this.map, pipeline.x, pipeline.y);
     fx.smoke.forEach((puff, i) => {
       puff.visible = pipeline.broken;
       if (!pipeline.broken) return;
       // Smoke puffs drift up and fade.
       const phase = (t * 0.8 + i / 3) % 1;
-      // From the back right corner, high enough to clear a ticket card on the block.
+      // Pouring out of the build server, drifting back, clear of a ticket card on the block.
       putAt(
         puff,
         gridToWorld(
-          pipeline.x + 0.25 + i * 0.05,
-          pipeline.y - 0.25 - phase * 0.3,
-          top + 0.9 + phase * 0.9,
+          fx.server.x + (i - 1) * 0.08,
+          fx.server.y - phase * 0.3,
+          top + SERVER_TOP + 0.15 + phase * 0.9,
         ),
       );
       puff.scale.setScalar(0.18 + phase * 0.22);
@@ -203,11 +216,25 @@ export class WorldFx {
       this.root.add(mesh);
       return mesh;
     });
+    const h = heroPlacement(
+      facingYaw(stationFacing(this.map, pipeline.x, pipeline.y)),
+      PIPELINE_SERVER_AT,
+    );
+    const server = { x: pipeline.x + h.dx, y: pipeline.y + h.dz };
+    const alarm = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.06, 0.07, 0.09, 16),
+      new THREE.MeshBasicMaterial({ color: ALARM_COLOR, toneMapped: false }),
+    );
+    putAt(alarm, gridToWorld(server.x, server.y, top + SERVER_TOP + 0.045));
+    alarm.visible = false;
+    this.root.add(alarm);
     return {
       warn: plate(WARN_COLOR, 0.5, 0.012),
       broken: plate(BROKEN_COLOR, 0.88, 0.011),
       smoke,
       sparks,
+      alarm,
+      server,
     };
   }
 }

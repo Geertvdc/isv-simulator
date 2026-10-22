@@ -10,6 +10,7 @@ import {
 } from 'postprocessing';
 import * as THREE from 'three';
 import { type CameraPose, cameraPosition } from '../projection';
+import { GLOW_BOOST_KEY } from './kit';
 import {
   type FrameWatch,
   type Quality,
@@ -158,6 +159,10 @@ export class Stage {
         for (const m of [obj.material as THREE.Material | THREE.Material[]].flat()) {
           // Tone mapping moves between the renderer and the post chain.
           m.needsUpdate = true;
+          const boost: unknown = m.userData[GLOW_BOOST_KEY];
+          if (typeof boost === 'number' && m instanceof THREE.MeshBasicMaterial) {
+            m.color.setScalar(this.quality === 'low' ? 1 : boost);
+          }
         }
       }
     });
@@ -257,6 +262,8 @@ export function disposeTree(root: THREE.Object3D): void {
   const materials = new Set<THREE.Material>();
   root.traverse((obj) => {
     if (obj instanceof THREE.Light) obj.dispose();
+    // Instance matrices and colors live in their own GPU buffers.
+    if (obj instanceof THREE.InstancedMesh) obj.dispose();
     if (obj instanceof THREE.Mesh || obj instanceof THREE.Sprite || obj instanceof THREE.Line) {
       (obj.geometry as THREE.BufferGeometry).dispose();
       const m = obj.material as THREE.Material | THREE.Material[];

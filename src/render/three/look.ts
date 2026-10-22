@@ -41,18 +41,19 @@ export const PALETTE = {
 /** Floor colors per theme: base and the alternate tile for a gentle checker. */
 export const FLOOR_COLORS: Readonly<Record<FloorTheme, readonly [number, number]>> = {
   concrete: [0xb8a487, 0xab977b],
-  carpet: [0x4f6a88, 0x4a6482],
+  // A warm teal: blue carpet sank into the backdrop.
+  carpet: [0x3f8a80, 0x3a8078],
   parquet: [0xb5824f, 0xab7947],
 };
 
-/** Wall colors per theme: face and top. */
+/** Wall colors per theme: face and top. Caps stay darker than stations, so the eye goes to the stations. */
 export const WALL_COLORS: Readonly<Record<WallTheme, { face: number; top: number }>> = {
-  plaster: { face: 0x8fa3b8, top: 0xd3dde6 },
-  wood: { face: 0xa36f45, top: 0xd9b88a },
-  glass: { face: 0xd6f0fa, top: 0xe6ecf0 },
+  plaster: { face: 0x8fa3b8, top: 0x5e6f82 },
+  wood: { face: 0x9a5a32, top: 0x6b4529 },
+  glass: { face: 0xd6f0fa, top: 0x7d8c9a },
 };
 
-/** Sun direction and strength: from the front left and high up, so shadows fall back and right. */
+/** Sun color and strength; it shines from behind and left (see `createLights`). */
 const SUN = { color: 0xffe9c7, intensity: 3.6 };
 const SKY = { sky: 0xc9dcff, ground: 0x6e5a48, intensity: 0.6 };
 /** A weak cool light from the camera side that lifts the shadow sides. */
@@ -61,7 +62,7 @@ const FILL = { color: 0xbfd4ff, intensity: 0.6 };
 const ENVIRONMENT_INTENSITY = 0.2;
 
 /** Lights for a level: sky, sun with soft shadows fitted to the map, and a fill. */
-export function createLights(map: LevelMap): THREE.Object3D[] {
+export function createLights(map: Pick<LevelMap, 'width' | 'height'>): THREE.Object3D[] {
   const { width, height } = map;
   const cx = (width - 1) / 2;
   const cy = (height - 1) / 2;
