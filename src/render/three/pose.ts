@@ -8,7 +8,7 @@
  * a head and two floating hands. Everything here moves those.
  */
 
-import { CARRY_HEIGHT, CARRY_REACH } from './layout';
+import { carryPoint } from './layout';
 
 export interface PoseInput {
   /** Speed over the floor, tiles per second. */
@@ -48,8 +48,9 @@ export interface Pose {
   rightHand: Vec3;
 }
 
-/** Walk steps per second at full speed. */
-const STEP_HZ = 3.2;
+/** Walk cycles per second: slow when ambling, faster at full speed (each cycle is two bounces). */
+const STEP_HZ_SLOW = 1.6;
+const STEP_HZ_FAST = 2.2;
 const BOB = 0.05;
 const LEAN_WALK = 0.14;
 const LEAN_DASH = 0.35;
@@ -57,18 +58,20 @@ const BREATHE_HZ = 0.5;
 const STUMBLE_MS = 350;
 /** Typing: how fast hands tap and how far. */
 const TYPE_HZ = 9;
-/** Where idle hands hang, either side of the belly. */
-const HAND_REST = { x: 0.3, y: 0.38, z: 0.08 };
+/** Where idle hands hang, either side of the belly, clear of the hoodie. */
+const HAND_REST = { x: 0.4, y: 0.38, z: 0.05 };
+/** Half the gap between the hands holding a ticket: on its short sides. */
+const CARRY_HALF_GAP = 0.22;
 
 /** The pose for `input` at `timeMs`. */
 export function playerPose(input: PoseInput, timeMs: number): Pose {
   const t = timeMs / 1000 + input.phase;
   const walk = Math.min(1, input.speed / Math.max(0.01, input.fullSpeed));
-  const stepPhase = t * Math.PI * 2 * STEP_HZ;
+  const stepPhase = t * Math.PI * 2 * (STEP_HZ_SLOW + (STEP_HZ_FAST - STEP_HZ_SLOW) * walk);
 
   let bob = walk > 0.05 ? Math.abs(Math.sin(stepPhase)) * BOB * walk : 0;
   let lean = LEAN_WALK * walk;
-  let roll = walk > 0.05 ? Math.sin(stepPhase) * 0.06 * walk : 0;
+  let roll = walk > 0.05 ? Math.sin(stepPhase) * 0.09 * walk : 0;
   const breathe = Math.sin(t * Math.PI * 2 * BREATHE_HZ) * 0.015 * (1 - walk);
   let squash = { x: 1 - breathe / 2, y: 1 + breathe };
   let nod = 0;
@@ -78,11 +81,14 @@ export function playerPose(input: PoseInput, timeMs: number): Pose {
   let leftHand: Vec3 = { x: -HAND_REST.x, y: HAND_REST.y, z: HAND_REST.z + swing };
   let rightHand: Vec3 = { x: HAND_REST.x, y: HAND_REST.y, z: HAND_REST.z - swing };
 
+  const windUp = Math.min(1, input.windUp);
   if (input.carrying) {
-    // Holding the ticket out front by its sides, bouncing with the walk.
-    const y = CARRY_HEIGHT + 0.03 + bob * 0.5;
-    leftHand = { x: -0.2, y, z: CARRY_REACH };
-    rightHand = { x: 0.2, y, z: CARRY_REACH };
+    // Holding the ticket by its sides where `carryPoint` puts it: out front, or over
+    // the shoulder in a throw wind-up.
+    const hold = carryPoint(windUp);
+    const y = hold.height + 0.03;
+    leftHand = { x: -CARRY_HALF_GAP, y, z: hold.reach };
+    rightHand = { x: CARRY_HALF_GAP, y, z: hold.reach };
   }
 
   if (input.working) {
@@ -94,12 +100,9 @@ export function playerPose(input: PoseInput, timeMs: number): Pose {
     lean = Math.max(lean, 0.1);
   }
 
-  if (input.windUp > 0) {
-    // Leaning back with the ticket over the shoulder.
-    const w = Math.min(1, input.windUp);
-    lean = -0.3 * w;
-    leftHand = mix(leftHand, { x: -0.15, y: 0.95, z: -0.15 }, w);
-    rightHand = mix(rightHand, { x: 0.15, y: 0.95, z: -0.15 }, w);
+  if (windUp > 0) {
+    // Leaning back, the ticket swung over the shoulder (the hands are on it).
+    lean = -0.3 * windUp;
   }
 
   if (input.dashing) {
@@ -108,8 +111,8 @@ export function playerPose(input: PoseInput, timeMs: number): Pose {
     bob = 0;
     if (!input.carrying) {
       // Arms flung back.
-      leftHand = { x: -0.32, y: 0.45, z: -0.25 };
-      rightHand = { x: 0.32, y: 0.45, z: -0.25 };
+      leftHand = { x: -0.34, y: 0.55, z: -0.35 };
+      rightHand = { x: 0.34, y: 0.55, z: -0.35 };
     }
   }
 
@@ -121,10 +124,6 @@ export function playerPose(input: PoseInput, timeMs: number): Pose {
   }
 
   return { bob, lean, roll, squash, nod, leftHand, rightHand };
-}
-
-function mix(a: Vec3, b: Vec3, k: number): Vec3 {
-  return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, z: a.z + (b.z - a.z) * k };
 }
 
 /** Turns `from` toward `to` (radians) by at most `maxStep`, the short way round. */

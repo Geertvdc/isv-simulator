@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CARRY_HEIGHT } from './layout';
+import { CARRY_HEIGHT, CARD_SIZE, carryPoint } from './layout';
 import { type PoseInput, playerPose, turnToward } from './pose';
 
 const still: PoseInput = {
@@ -55,10 +55,25 @@ describe('playerPose', () => {
     expect(p.lean).toBeGreaterThan(0.2);
   });
 
-  it('leans back with hands up while winding up a throw', () => {
+  it('leans back with the ticket over the shoulder while winding up a throw', () => {
     const p = playerPose({ ...still, carrying: true, windUp: 1 }, 0);
     expect(p.lean).toBeLessThan(0);
     expect(p.leftHand.y).toBeGreaterThan(0.9);
+    expect(p.leftHand.z).toBeLessThan(0);
+  });
+
+  it('holds the ticket where it is drawn: on its sides, at its height and reach', () => {
+    for (const windUp of [0, 0.5, 1]) {
+      const hold = carryPoint(windUp);
+      const p = playerPose({ ...still, carrying: true, windUp }, 0);
+      expect(p.leftHand.z).toBeCloseTo(hold.reach);
+      expect(p.rightHand.z).toBeCloseTo(hold.reach);
+      expect(p.leftHand.y - hold.height).toBeGreaterThan(0);
+      expect(p.leftHand.y - hold.height).toBeLessThan(0.1);
+      // Just outside the card's short sides.
+      expect(p.rightHand.x).toBeGreaterThan(CARD_SIZE.width / 2 - 0.05);
+      expect(p.rightHand.x).toBeLessThan(CARD_SIZE.width / 2 + 0.1);
+    }
   });
 
   it('wobbles after a shove and settles', () => {
