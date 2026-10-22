@@ -45,6 +45,8 @@ export const PIPELINE_BROKE_TEXT = 'Build server down!';
 
 /** Pops up over the pipeline once it's repaired. */
 export const PIPELINE_FIXED_TEXT = 'Fixed!';
+/** Over a ticket that fell into a gap or off the edge: all its work is gone. */
+export const TICKET_LOST_TEXT = 'git reset --hard';
 
 /** Pops up over a player who got shoved by a dash; one is picked per shove. */
 export const SHOVE_TEXTS: readonly string[] = ['Oof!', 'Hey!', 'Rude!', 'Watch it!', 'Not cool'];
@@ -88,6 +90,8 @@ export const MEETING_MISSED_TEXT = 'Missed the meeting';
 /** Level names, by level id. */
 export const LEVEL_NAMES: Readonly<Record<string, string>> = {
   garage: 'The Garage',
+  // Lab levels: outside the campaign, for scenes and tests.
+  'lab-shapes': 'Lab: shapes',
   'open-plan': 'Open Plan Office',
   // Id from before the Scale-Up chapter; kept so saves still count.
   'scale-up': 'Down the Hall',

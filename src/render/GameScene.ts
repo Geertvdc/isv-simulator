@@ -102,7 +102,7 @@ import {
 } from '../sim/balance';
 import { type LevelMap, type Tile, getTile } from '../sim/level';
 import { type Bot, botInput, createBot } from '../sim/bot';
-import { CHAPTERS, DEMO_LEVEL_IDS, LEVELS } from '../sim/levels';
+import { CHAPTERS, DEMO_LEVEL_IDS, LEVELS, levelById } from '../sim/levels';
 import type { GameEvent } from '../sim/orders';
 import { type Scene, sceneDone, sceneInputs, sceneState } from '../sim/scenes';
 import { type GameState, createGame } from '../sim/state';
@@ -360,6 +360,8 @@ const LEVEL_LOOKS: Readonly<Record<string, MapLook>> = {
   'back-to-back': { walls: 'glass', floor: 'carpet' },
   synergy: { walls: 'plaster', floor: 'concrete' },
   'the-reorg': { walls: 'glass', floor: 'carpet' },
+  // Lab levels have no chapter: they borrow a world.
+  'lab-shapes': { walls: 'glass', floor: 'carpet', setting: 'scale-up' },
 };
 
 /** The level's look, with `?walls=` and `?floor=` overriding it to preview others. */
@@ -370,7 +372,8 @@ function mapLook(levelId: string): MapLook {
     walls: WALL_THEMES.find((t) => t === params.get('walls')) ?? look.walls,
     floor: FLOOR_THEMES.find((t) => t === params.get('floor')) ?? look.floor,
     // `?setting=<chapter id>` previews another chapter's surroundings.
-    setting: params.get('setting') ?? chapterIdOf(LEVEL_IDS.indexOf(levelId)) ?? undefined,
+    setting:
+      params.get('setting') ?? look.setting ?? chapterIdOf(LEVEL_IDS.indexOf(levelId)) ?? undefined,
   };
 }
 
@@ -473,7 +476,9 @@ export class GameScene extends Phaser.Scene {
 
   create(data: SceneData = {}): void {
     this.mapLevelIndex = data.levelIndex ?? this.mapLevelIndex;
-    const level = LEVELS[this.mapLevelIndex];
+    // A scene may be on a lab level, outside the campaign.
+    const sceneLevel = this.options.scene ? levelById(this.options.scene.levelId) : undefined;
+    const level = sceneLevel ?? LEVELS[this.mapLevelIndex];
     if (!level) throw new Error(`No level ${this.mapLevelIndex}`);
     this.map = level.map;
     // Restarts reuse this object; the old sprites went with the old scene.

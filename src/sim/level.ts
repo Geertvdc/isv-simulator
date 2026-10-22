@@ -17,7 +17,16 @@ export type Tile =
   | 'review'
   | 'pipeline'
   | 'ship'
-  | 'bin';
+  | 'bin'
+  /** Outside the office: nothing there. Lets a map have any outline. */
+  | 'void'
+  /** A drop inside the office (an atrium): tickets fly over it, nobody walks it. */
+  | 'gap'
+  /** A belt that carries a ticket along its direction (`LevelMap.conveyors`). */
+  | 'conveyor';
+
+/** Tiles drawn as a block standing on the floor: everything but floor and the drops. */
+export type BlockTile = Exclude<Tile, 'floor' | 'void' | 'gap'>;
 
 export interface GridPoint {
   x: number;
@@ -34,6 +43,15 @@ export interface LevelMap {
   managerSpawns: GridPoint[];
   /** Meeting room tiles (`m`): floor that invited players must stand on. */
   meetingTiles: GridPoint[];
+  /** Every conveyor tile and the grid direction it carries tickets, row by row. */
+  conveyors: Conveyor[];
+}
+
+export interface Conveyor {
+  x: number;
+  y: number;
+  /** Unit grid direction: where a ticket on it goes next. */
+  dir: GridPoint;
 }
 
 /** Every level has a spawn for each of up to 4 players. */
@@ -51,6 +69,16 @@ const CHAR_TO_TILE: Readonly<Record<string, Tile>> = {
   P: 'pipeline',
   S: 'ship',
   X: 'bin',
+  ' ': 'void',
+  '~': 'gap',
+};
+
+/** Conveyor chars and the way they carry (screen-relative: `v` runs toward the camera). */
+const CONVEYOR_DIRS: Readonly<Record<string, GridPoint>> = {
+  '>': { x: 1, y: 0 },
+  '<': { x: -1, y: 0 },
+  v: { x: 0, y: 1 },
+  '^': { x: 0, y: -1 },
 };
 
 /** Floor tiles with something extra on them. */
@@ -82,6 +110,7 @@ export function parseLevelMap(text: string): LevelMap {
     managerSpawns: [],
     meetingTiles: [],
   };
+  const conveyors: Conveyor[] = [];
   lines.forEach((line, y) => {
     if (line.length !== width) {
       throw new Error(`Map line ${y + 1} has length ${line.length}, expected ${width}`);
@@ -102,6 +131,12 @@ export function parseLevelMap(text: string): LevelMap {
         tiles.push('floor');
         continue;
       }
+      const dir = CONVEYOR_DIRS[char];
+      if (dir) {
+        conveyors.push({ x, y, dir });
+        tiles.push('conveyor');
+        continue;
+      }
       const tile = CHAR_TO_TILE[char];
       if (tile === undefined) throw new Error(`Unknown map char '${char}' ${where}`);
       tiles.push(tile);
@@ -115,7 +150,7 @@ export function parseLevelMap(text: string): LevelMap {
     result.push(spawn);
   }
 
-  return { width, height: lines.length, tiles, spawns: result, ...marked };
+  return { width, height: lines.length, tiles, spawns: result, ...marked, conveyors };
 }
 
 /** Returns the tile at (x, y), or `null` when out of bounds or not on the grid. */
@@ -130,7 +165,22 @@ export function isSolid(tile: Tile | null): boolean {
   return tile !== 'floor';
 }
 
-/** Counters and stations: the tiles players will put things on and work at. */
+/** Counters, stations and conveyors: the tiles players will put things on and work at. */
 export function isWorkSurface(tile: Tile | null): boolean {
-  return tile !== null && tile !== 'floor' && tile !== 'wall';
+  return tile !== null && tile !== 'floor' && tile !== 'wall' && !isDrop(tile);
+}
+
+/** Whether `tile` stands on the floor as a block (walls, counters, stations, belts). */
+export function isBlock(tile: Tile | null): tile is BlockTile {
+  return tile !== null && tile !== 'floor' && !isDrop(tile);
+}
+
+/** Tiles a ticket falls into when it comes down there: the void outside and gaps. */
+export function isDrop(tile: Tile | null): boolean {
+  return tile === 'void' || tile === 'gap';
+}
+
+/** The conveyor on tile (x, y), if there is one. */
+export function conveyorAt(map: LevelMap, x: number, y: number): Conveyor | undefined {
+  return map.conveyors.find((c) => c.x === x && c.y === y);
 }

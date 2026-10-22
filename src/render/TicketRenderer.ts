@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { stationWorkStep } from '../sim/interact';
 import { THROW_RANGE } from '../sim/balance';
-import { type Tile, getTile } from '../sim/level';
+import { type BlockTile, getTile } from '../sim/level';
 import type { GameState } from '../sim/state';
 import {
   QUEUE_TILE,
@@ -33,7 +33,7 @@ const ICON_SPACING = 11;
 const ICON_RADIUS = 4.5;
 const ICON_TODO_COLOR = 0xc9c4b5;
 /** Each step's icon takes the color of the station that does it. */
-const STEP_STATION: Readonly<Record<StepKind, Exclude<Tile, 'floor'>>> = {
+const STEP_STATION: Readonly<Record<StepKind, BlockTile>> = {
   code: 'keyboard',
   review: 'review',
   test: 'testBench',

@@ -1,5 +1,12 @@
 import Phaser from 'phaser';
-import { type LevelMap, type Tile, getTile } from '../sim/level';
+import {
+  type BlockTile,
+  type LevelMap,
+  type Tile,
+  conveyorAt,
+  getTile,
+  isBlock,
+} from '../sim/level';
 import { WALL_DECOS, type WallPiece, isFrontWall, wallDeco, wallPiece } from './mapShape';
 import {
   type Point,
@@ -25,7 +32,7 @@ export const STATION_HEIGHT = TILE_SIZE * 0.4;
 /** Walls on the camera side of the room are cut down so they never hide what's behind. */
 export const FRONT_WALL_HEIGHT = TILE_SIZE * 0.2;
 
-export const BLOCK_STYLES: Readonly<Record<Exclude<Tile, 'floor'>, BlockStyle>> = {
+export const BLOCK_STYLES: Readonly<Record<BlockTile, BlockStyle>> = {
   wall: { color: 0x9aa3b5, height: WALL_HEIGHT },
   counter: { color: 0x8a8f99, height: STATION_HEIGHT },
   inbox: { color: 0x4fa3e0, height: STATION_HEIGHT, label: 'I' },
@@ -36,6 +43,7 @@ export const BLOCK_STYLES: Readonly<Record<Exclude<Tile, 'floor'>, BlockStyle>> 
   pipeline: { color: 0xe07c4f, height: STATION_HEIGHT, label: 'P' },
   ship: { color: 0x4fe0b0, height: STATION_HEIGHT, label: 'S' },
   bin: { color: 0x5a5a5a, height: STATION_HEIGHT, label: 'X' },
+  conveyor: { color: 0x4a505c, height: STATION_HEIGHT },
 };
 
 /** Wall looks a level can pick; each has the three pieces in `WALL_PIECES`. */
@@ -104,7 +112,7 @@ export function preloadMapSprites(scene: Phaser.Scene): void {
 }
 
 /** Placeholder color of a block, so other renderers can match it. */
-export function tileColor(tile: Exclude<Tile, 'floor'>): number {
+export function tileColor(tile: BlockTile): number {
   return BLOCK_STYLES[tile].color;
 }
 
@@ -117,6 +125,9 @@ const SIDE_SHADE: Readonly<Record<Side, number>> = {
 };
 
 const FLOOR_COLOR = 0x3a4a5c;
+const GAP_COLOR = 0x0e1015;
+const RAILING_COLOR = 0xb8c4d0;
+const BELT_ARROW_COLOR = 0xffd166;
 const GRID_LINE_COLOR = 0x000000;
 const GRID_LINE_ALPHA = 0.3;
 const EDGE_COLOR = 0x2a2f38;
@@ -164,14 +175,14 @@ export class MapRenderer {
   /** Top face of the block on tile (x, y), or `null` for floor and off-map tiles. */
   blockTop(x: number, y: number): Point[] | null {
     const tile = getTile(this.map, x, y);
-    if (tile === null || tile === 'floor') return null;
+    if (!isBlock(tile)) return null;
     return blockFaces(x, y, this.blockHeight(x, y, tile)).top;
   }
 
   /** Center of the top face of the block on tile (x, y), or `null` for floor and off-map tiles. */
   blockTopCenter(x: number, y: number): Point | null {
     const tile = getTile(this.map, x, y);
-    if (tile === null || tile === 'floor') return null;
+    if (!isBlock(tile)) return null;
     const c = tileToScreen(x, y);
     return { x: c.x, y: c.y - this.blockHeight(x, y, tile) };
   }
@@ -189,23 +200,54 @@ export class MapRenderer {
     const sprite = spriteKey(`floors/${this.look.floor}`);
     if (this.scene.textures.exists(sprite)) {
       // Floor runs under blocks too, so their front faces never show a gap.
-      this.forEachTile((x, y) => {
+      this.forEachTile((x, y, tile) => {
+        if (!isBlock(tile) && tile !== 'floor') return;
         const c = tileToScreen(x, y);
         this.scene.add.image(c.x, c.y, sprite).setDepth(FLOOR_DEPTH);
       });
+      this.drawGaps();
       return;
     }
     const g = this.scene.add.graphics().setDepth(FLOOR_DEPTH);
     // Floor runs under blocks too, so their front faces never show a gap.
     this.forEachTile((x, y, tile) => {
-      drawFloorTile(g, x, y, tile === 'floor');
+      if (isBlock(tile) || tile === 'floor') drawFloorTile(g, x, y, tile === 'floor');
+    });
+    this.drawGaps();
+  }
+
+  /** Gaps: a dark drop with a railing along its edges. The void outside isn't drawn at all. */
+  private drawGaps(): void {
+    const g = this.scene.add.graphics().setDepth(FLOOR_DEPTH);
+    this.forEachTile((x, y, tile) => {
+      if (tile !== 'gap') return;
+      g.fillStyle(GAP_COLOR);
+      g.fillPoints(vectors(tileCorners(x, y)), true);
+      const [bl, br, fr, fl] = tileCorners(x, y);
+      g.lineStyle(3, RAILING_COLOR);
+      // A railing on each edge that borders something other than another gap.
+      const edges: [number, number, Point, Point][] = [
+        [0, -1, bl, br],
+        [1, 0, br, fr],
+        [0, 1, fr, fl],
+        [-1, 0, fl, bl],
+      ];
+      for (const [dx, dy, a, b] of edges) {
+        if (getTile(this.map, x + dx, y + dy) === 'gap') continue;
+        g.lineBetween(a.x, a.y, b.x, b.y);
+      }
     });
   }
 
   private drawBlocks(): void {
     this.forEachTile((x, y, tile) => {
-      if (tile === 'floor') return;
+      if (!isBlock(tile)) return;
       const height = this.blockHeight(x, y, tile);
+      if (tile === 'conveyor') {
+        drawBlock(this.scene, x, y, tile, height);
+        this.drawBeltArrow(x, y, height);
+        return;
+      }
       if (tile !== 'wall') {
         drawBlock(this.scene, x, y, tile, height, `tiles/${tile}`);
         return;
@@ -214,6 +256,22 @@ export class MapRenderer {
       drawBlock(this.scene, x, y, tile, height, `walls/${this.look.walls}/${piece}`);
       if (piece === 'wall') this.drawWallDeco(x, y);
     });
+  }
+
+  /** A chevron on top of a belt, pointing the way it carries. */
+  private drawBeltArrow(x: number, y: number, height: number): void {
+    const belt = conveyorAt(this.map, x, y);
+    if (!belt) return;
+    const at = (fwd: number, side: number): Phaser.Math.Vector2 => {
+      const p = tileToScreen(
+        x + belt.dir.x * fwd - belt.dir.y * side,
+        y + belt.dir.y * fwd + belt.dir.x * side,
+      );
+      return new Phaser.Math.Vector2(p.x, p.y - height);
+    };
+    const g = this.scene.add.graphics().setDepth(tileDepth(x, y) + LABEL_DEPTH_OFFSET);
+    g.lineStyle(4, BELT_ARROW_COLOR);
+    g.strokePoints([at(-0.05, -0.25), at(0.25, 0), at(-0.05, 0.25)], false);
   }
 
   /** Maybe hangs a decoration on the front face of the wall on tile (x, y). */
@@ -228,7 +286,7 @@ export class MapRenderer {
       .setDepth(tileDepth(x, y) + LABEL_DEPTH_OFFSET);
   }
 
-  private blockHeight(x: number, y: number, tile: Exclude<Tile, 'floor'>): number {
+  private blockHeight(x: number, y: number, tile: BlockTile): number {
     return isFrontWall(this.map, x, y) ? FRONT_WALL_HEIGHT : BLOCK_STYLES[tile].height;
   }
 
@@ -237,7 +295,7 @@ export class MapRenderer {
     this.forEachTile((x, y, tile) => {
       const c = tileToScreen(x, y);
       const spawn = this.map.spawns.findIndex((s) => s.x === x && s.y === y);
-      const lift = tile === 'floor' ? 0 : this.blockHeight(x, y, tile);
+      const lift = isBlock(tile) ? this.blockHeight(x, y, tile) : 0;
       const label = this.scene.add
         .text(c.x, c.y - lift, spawn >= 0 ? `P${spawn + 1}` : `${x},${y}`, {
           fontFamily: 'monospace',
@@ -278,7 +336,7 @@ export function drawBlock(
   scene: Phaser.Scene,
   x: number,
   y: number,
-  tile: Exclude<Tile, 'floor'>,
+  tile: BlockTile,
   height: number,
   spritePath?: string,
 ): void {

@@ -1,6 +1,6 @@
 import type Phaser from 'phaser';
 import { PIPELINE_FAIL_TICKS, PIPELINE_WARN_TICKS } from '../sim/balance';
-import type { Tile } from '../sim/level';
+import type { BlockTile } from '../sim/level';
 import { GARAGE } from '../sim/levels';
 import type { Pipeline } from '../sim/pipeline';
 import type { Vec } from '../sim/state';
@@ -47,8 +47,6 @@ export const TILE_FRAME: AssetFrame = { width: 80, height: 112, anchor: { x: 40,
 export const PLAYER_FRAME: AssetFrame = { width: 64, height: 68, anchor: { x: 32, y: 54 } };
 export const TICKET_FRAME: AssetFrame = { width: 64, height: 44, anchor: { x: 32, y: 42 } };
 
-type BlockTile = Exclude<Tile, 'floor'>;
-
 const TILE_NOTES: Readonly<Record<BlockTile, string>> = {
   wall: 'Back and side walls of the room.',
   counter: 'Plain desk. Tickets can be put down and picked up here.',
@@ -60,6 +58,8 @@ const TILE_NOTES: Readonly<Record<BlockTile, string>> = {
   pipeline: 'CI/CD pipeline: builds a ticket on its own. Can break, see pipeline states.',
   ship: 'Ship to the customer: drop a finished ticket here. Sits in the front wall.',
   bin: 'Bin: throw a ticket away.',
+  conveyor:
+    'Conveyor belt (the message queue): carries a ticket along its arrow to the next counter or station.',
 };
 
 const FACINGS: readonly { name: string; facing: Vec }[] = [

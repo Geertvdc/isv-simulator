@@ -168,13 +168,39 @@ export class Surroundings {
     const cx = (width - 1) / 2;
     const cz = (height - 1) / 2;
 
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE).rotateX(-Math.PI / 2),
-      matte(s.ground, 0.95),
-    );
-    put(ground, gridToWorld(cx, cz, GROUND_Y));
-    ground.receiveShadow = true;
-    this.root.add(ground);
+    // The ground all round the level, and in its void tiles (outside spots within its outline).
+    // Never under the level itself: gaps drop deeper than the ground.
+    const groundMaterial = matte(s.ground, 0.95);
+    const strip = (x0: number, x1: number, z0: number, z1: number) => {
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(x1 - x0, z1 - z0).rotateX(-Math.PI / 2),
+        groundMaterial,
+      );
+      put(mesh, gridToWorld((x0 + x1) / 2, (z0 + z1) / 2, GROUND_Y));
+      mesh.receiveShadow = true;
+      this.root.add(mesh);
+    };
+    const far = GROUND_SIZE / 2;
+    const [l, r, b, f] = [-0.5, width - 0.5, -0.5, height - 0.5];
+    strip(cx - far, l, cz - far, cz + far);
+    strip(r, cx + far, cz - far, cz + far);
+    strip(l, r, cz - far, b);
+    strip(l, r, f, cz + far);
+    const voids = map.tiles.flatMap((t, i) => (t === 'void' ? [i] : []));
+    if (voids.length > 0) {
+      const tiles = new THREE.InstancedMesh(
+        new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
+        groundMaterial,
+        voids.length,
+      );
+      const m = new THREE.Matrix4();
+      voids.forEach((i, k) => {
+        const at = gridToWorld(i % width, Math.floor(i / width), GROUND_Y);
+        tiles.setMatrixAt(k, m.makeTranslation(at.x, at.y, at.z));
+      });
+      tiles.receiveShadow = true;
+      this.root.add(tiles);
+    }
     if (s.path !== null) {
       // A driveway or aisle down the left, under the far row.
       const path = new THREE.Mesh(

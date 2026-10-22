@@ -23,6 +23,7 @@ import {
 /** Tiles players can take a ticket from (queue tiles aside). */
 const PICK_UP_FROM: ReadonlySet<Tile> = new Set([
   'counter',
+  'conveyor',
   'keyboard',
   'testBench',
   'pipeline',
@@ -30,7 +31,13 @@ const PICK_UP_FROM: ReadonlySet<Tile> = new Set([
   'floor',
 ]);
 /** Tiles players can put any ticket on. */
-const PUT_DOWN_ON: ReadonlySet<Tile> = new Set(['counter', 'keyboard', 'testBench', 'review']);
+const PUT_DOWN_ON: ReadonlySet<Tile> = new Set([
+  'counter',
+  'conveyor',
+  'keyboard',
+  'testBench',
+  'review',
+]);
 
 /** The step each station advances. */
 const STATION_STEP: Partial<Record<Tile, StepKind>> = {

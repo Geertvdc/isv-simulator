@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import { type LevelMap, type Tile, getTile, isWorkSurface } from '../../sim/level';
+import { CONVEYOR_TICKS, TICKS_PER_SECOND } from '../../sim/balance';
+import { type LevelMap, type Tile, conveyorAt, getTile, isWorkSurface } from '../../sim/level';
 import type { MapLook } from '../MapRenderer';
 import { type WallPiece, tileHash, wallDeco, wallPiece } from '../mapShape';
 import { VIEW3D_PITCH, type Vec3, gridToWorld } from '../projection';
-import { type KitMaterials, type Model, kitMaterials } from './kit';
+import { type KitMaterials, type Model, ModelBuilder, kitMaterials } from './kit';
 import {
   SLAB_DEPTH,
   STATION_HEIGHT,
@@ -13,9 +14,10 @@ import {
   stationFacing,
 } from './layout';
 import { WALL_TOP_PROPS } from './setDressing';
-import { PALETTE, matte } from './look';
+import { PALETTE } from './look';
 import {
   STATION_MODELS,
+  conveyorModel,
   type StationModel,
   type StationTile,
   WALL_DECO_MODELS,
@@ -71,24 +73,30 @@ function wallClutter(
   return WALL_TOP_PROPS[Math.floor(h / CLUTTER_EVERY) % WALL_TOP_PROPS.length];
 }
 
+/** The level in 3D, and `update` for what moves on it (the belts). */
+export interface MapView {
+  root: THREE.Group;
+  update(timeMs: number): void;
+}
+
+/** Grid steps to the four neighbours, with the yaw that turns a model's front (+z) toward each. */
+const SIDES: readonly { dx: number; dy: number; yaw: number }[] = [
+  { dx: 0, dy: 1, yaw: 0 },
+  { dx: 1, dy: 0, yaw: Math.PI / 2 },
+  { dx: 0, dy: -1, yaw: Math.PI },
+  { dx: -1, dy: 0, yaw: -Math.PI / 2 },
+];
+
 /**
- * The level itself in 3D: the wooden slab, the floor and every block on it,
- * built from the office kit (`models.ts`). Static; each model kind is one
- * instanced mesh (plus one for its screens and one for its glass), so the
- * whole map is a few dozen draw calls.
+ * The level itself in 3D: the wooden slab (following the map's outline),
+ * the floor, gaps, belts and every block on it, built from the office kit
+ * (`models.ts`). Each model kind is one instanced mesh (plus one for its
+ * screens and one for its glass), so the whole map is a few dozen draw calls.
  */
-export function buildMap(map: LevelMap, look: MapLook): THREE.Group {
+export function buildMap(map: LevelMap, look: MapLook): MapView {
   const root = new THREE.Group();
   const materials = kitMaterials();
   const { width, height } = map;
-
-  const slab = new THREE.Mesh(
-    new THREE.BoxGeometry(width + 0.1, SLAB_DEPTH, height + 0.1),
-    matte(PALETTE.slab, 0.85),
-  );
-  put(slab, gridToWorld((width - 1) / 2, (height - 1) / 2, -SLAB_DEPTH / 2 - 0.013));
-  slab.receiveShadow = true;
-  root.add(slab);
 
   const placements = new Map<string, { model: () => Model; at: Placement[] }>();
   // Each station kind is built once; its base and hero are instanced separately.
@@ -115,7 +123,22 @@ export function buildMap(map: LevelMap, look: MapLook): THREE.Group {
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const tile = getTile(map, x, y);
-      if (!tile) continue;
+      if (!tile || tile === 'void') continue;
+      if (tile === 'gap') {
+        // A drop: a lower floor seen through it, shaft walls and a railing where it meets the office.
+        place('pit', pitFloorModel, { at: gridToWorld(x, y, -PIT_DEPTH), yaw: 0 });
+        for (const side of SIDES) {
+          const next = getTile(map, x + side.dx, y + side.dy);
+          if (next === 'gap') continue;
+          // Wall pieces face into the pit: turned from the neighbour toward this tile.
+          place('pitWall', pitWallModel, { at: gridToWorld(x, y), yaw: side.yaw + Math.PI });
+          if (next === 'floor')
+            place('railing', railingModel, { at: gridToWorld(x, y), yaw: side.yaw });
+        }
+        continue;
+      }
+      // The slab under every tile but drops: the level's outline, edges and all.
+      place('slab', slabModel, { at: gridToWorld(x, y), yaw: 0 });
       // Floor runs under stations too, so no gaps show at their feet; walls cover theirs.
       const wobble = 1 - FLOOR_WOBBLE + ((tileHash(x, y) % 100) / 100) * FLOOR_WOBBLE * 2;
       const checker = (x + y) % 2 === 0 ? 1 : 0.95;
@@ -149,6 +172,14 @@ export function buildMap(map: LevelMap, look: MapLook): THREE.Group {
         if (deco && decoModel) place(`deco:${deco}`, decoModel, { at: gridToWorld(x, y), yaw: 0 });
         continue;
       }
+      if (tile === 'conveyor') {
+        const belt = conveyorAt(map, x, y);
+        place('conveyor', conveyorModel, {
+          at: gridToWorld(x, y),
+          yaw: belt ? facingYaw(belt.dir) : 0,
+        });
+        continue;
+      }
       const yaw = facingYaw(stationFacing(map, x, y));
       const station = stationModel(tile);
       place(`station:${tile}`, () => station.base, { at: gridToWorld(x, y), yaw });
@@ -169,9 +200,103 @@ export function buildMap(map: LevelMap, look: MapLook): THREE.Group {
   }
 
   for (const [key, { model, at }] of placements) {
-    root.add(...instances(model(), at, materials, key !== 'floor'));
+    root.add(...instances(model(), at, materials, !NO_SHADOW.has(key)));
   }
-  return root;
+  const belts = beltTops(map);
+  if (belts) root.add(belts.mesh);
+  return {
+    root,
+    update(timeMs) {
+      // The stripes run along every belt toward its arrow.
+      if (belts) belts.texture.offset.y = (timeMs / 1000) * BELT_STRIPE_SPEED;
+    },
+  };
+}
+
+/** Flat pieces that never shadow anything. */
+const NO_SHADOW: ReadonlySet<string> = new Set(['floor', 'slab', 'pit', 'pitWall']);
+/** How deep a gap drops: well below the ground outside, which never covers the level. */
+const PIT_DEPTH = 1.6;
+/** Belt stripes per second, in texture repeats; one repeat is one tile. */
+const BELT_STRIPE_SPEED = 1 / (CONVEYOR_TICKS / TICKS_PER_SECOND);
+
+function slabModel(): Model {
+  return new ModelBuilder()
+    .box(1.002, SLAB_DEPTH, 1.002, PALETTE.slab, { at: [0, -SLAB_DEPTH / 2 - 0.013, 0] }, 0)
+    .build();
+}
+
+/** The floor below a gap: the office downstairs, darker. */
+function pitFloorModel(): Model {
+  const b = new ModelBuilder();
+  b.box(1, 0.02, 1, 0x2e3a48, { at: [0, -0.01, 0] }, 0);
+  b.box(0.42, 0.02, 0.42, 0x3c4a5a, { at: [0.18, 0.005, -0.15] }, 0);
+  return b.build();
+}
+
+/** One side of a gap's shaft, facing into it (+z), from the floor down. */
+function pitWallModel(): Model {
+  return new ModelBuilder()
+    .box(1, PIT_DEPTH, 0.04, 0x232a33, { at: [0, -PIT_DEPTH / 2, -0.48] }, 0)
+    .box(1, 0.06, 0.06, 0xb8c4d0, { at: [0, -0.03, -0.47] }, 0)
+    .build();
+}
+
+/** A glass railing along a gap's edge where it meets the floor, on the floor side (−z of the gap). */
+function railingModel(): Model {
+  const b = new ModelBuilder();
+  b.pane(1, 0.32, 0.03, 0xd6f0fa, { at: [0, 0.2, 0.47] });
+  b.box(1, 0.04, 0.06, 0xb8c4d0, { at: [0, 0.38, 0.47] }, 0);
+  for (const x of [-0.48, 0.48]) b.box(0.04, 0.38, 0.04, 0x8a96a3, { at: [x, 0.19, 0.47] }, 0);
+  return b.build();
+}
+
+/** The belts' running surfaces: one instanced plane with a shared scrolling stripe texture. */
+function beltTops(map: LevelMap): { mesh: THREE.InstancedMesh; texture: THREE.Texture } | null {
+  if (map.conveyors.length === 0) return null;
+  const texture = beltTexture();
+  const mesh = new THREE.InstancedMesh(
+    new THREE.PlaneGeometry(0.62, 1).rotateX(-Math.PI / 2),
+    new THREE.MeshStandardMaterial({ map: texture, roughness: 0.8 }),
+    map.conveyors.length,
+  );
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const up = new THREE.Vector3(0, 1, 0);
+  const one = new THREE.Vector3(1, 1, 1);
+  map.conveyors.forEach((c, i) => {
+    const at = gridToWorld(c.x, c.y, STATION_HEIGHT + 0.004);
+    q.setFromAxisAngle(up, facingYaw(c.dir));
+    mesh.setMatrixAt(i, m.compose(new THREE.Vector3(at.x, at.y, at.z), q, one));
+  });
+  mesh.receiveShadow = true;
+  return { mesh, texture };
+}
+
+/** Dark rubber with yellow chevrons pointing along +z (the belt's way), one per repeat. */
+function beltTexture(): THREE.Texture {
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.fillStyle = '#2b2f38';
+    ctx.fillRect(0, 0, size, size);
+    ctx.strokeStyle = '#ffd166';
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    // Canvas y runs down; texture v runs up, and the plane's +v points along −z, so draw the chevron pointing down.
+    ctx.moveTo(size * 0.18, size * 0.3);
+    ctx.lineTo(size * 0.5, size * 0.62);
+    ctx.lineTo(size * 0.82, size * 0.3);
+    ctx.stroke();
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  return texture;
 }
 
 /** The model's meshes, one instance per placement. */
