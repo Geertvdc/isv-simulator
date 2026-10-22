@@ -20,6 +20,7 @@ import {
 import type { RoundFrame, RoundRenderer } from '../RoundRenderer';
 import { OVERLAY_SCALE, Overlays, POPUP_HEIGHT, type ScreenPoint, overlayScale } from './Overlays';
 import { People } from './People';
+import { Surroundings } from './surroundings';
 import { WorldFx } from './WorldFx';
 import { blockHeight, levelBox, pickTile, placeTicket } from './layout';
 import { createLights, dressScene } from './look';
@@ -58,6 +59,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
   private readonly overlays: Overlays;
   private readonly fx: WorldFx;
   private readonly people: People;
+  private readonly surroundings: Surroundings;
   private readonly carrierYaw = (id: PlayerId): number | undefined => this.people.yawOf(id);
   /** The last round frame, placed again every render with the camera as it is then. */
   private frame: RoundFrame | null = null;
@@ -91,6 +93,8 @@ export class ThreeRoundRenderer implements RoundRenderer {
     this.overlays = new Overlays(scene, map);
     this.fx = new WorldFx(this.world, map);
     this.people = new People(this.world, this.materials);
+    this.surroundings = new Surroundings(map, look.setting, this.materials);
+    this.world.add(this.surroundings.root);
 
     this.pose = this.fit();
     scene.scale.on(Phaser.Scale.Events.RESIZE, this.onResize);
@@ -99,6 +103,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
   destroy(): void {
     this.scene.scale.off(Phaser.Scale.Events.RESIZE, this.onResize);
     this.people.destroy();
+    this.surroundings.destroy();
     for (const geometry of Object.values(this.shared)) geometry.dispose();
     for (const geometry of this.ticketGeometries.values()) geometry.dispose();
     const { body, glow, glass } = this.materials;
@@ -173,6 +178,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
     const frame = this.frame;
     if (frame) this.overlays.sync(frame.view, frame.hints, frame.hintsVisible, timeMs, project);
     this.overlays.place(project, timeMs);
+    this.surroundings.update(timeMs, this.stage.currentQuality !== 'low');
     this.stage.render(this.world, deltaMs);
   }
 

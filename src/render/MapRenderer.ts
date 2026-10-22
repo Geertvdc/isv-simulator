@@ -50,6 +50,8 @@ export type FloorTheme = (typeof FLOOR_THEMES)[number];
 export interface MapLook {
   walls: WallTheme;
   floor: FloorTheme;
+  /** The chapter whose world surrounds the level (3D only); none for a bare slab. */
+  setting?: string;
 }
 
 export const DEFAULT_LOOK: MapLook = { walls: 'plaster', floor: 'concrete' };

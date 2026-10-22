@@ -4,7 +4,15 @@ import type { MapLook } from '../MapRenderer';
 import { tileHash, wallDeco, wallPiece } from '../mapShape';
 import { VIEW3D_PITCH, type Vec3, gridToWorld } from '../projection';
 import { type KitMaterials, type Model, kitMaterials } from './kit';
-import { SLAB_DEPTH, STATION_HEIGHT, facingYaw, heroPlacement, stationFacing } from './layout';
+import {
+  SLAB_DEPTH,
+  STATION_HEIGHT,
+  WALL_HEIGHT,
+  facingYaw,
+  heroPlacement,
+  stationFacing,
+} from './layout';
+import { WALL_TOP_PROPS } from './setDressing';
 import { PALETTE, matte } from './look';
 import {
   STATION_MODELS,
@@ -99,6 +107,16 @@ export function buildMap(map: LevelMap, look: MapLook): THREE.Group {
         // Only on walls with open floor in front: not behind a station or counter.
         const open = getTile(map, x, y + 1) === 'floor';
         const deco = piece === 'wall' && open ? wallDeco(x, y, look.walls) : null;
+        // Clutter on top of full walls: plants, books, a mug, a laptop (not on glass).
+        const full = piece !== 'wall-front' && look.walls !== 'glass';
+        const clutter = full ? WALL_TOP_PROPS[(tileHash(x, y) >> 3) % 9] : undefined;
+        if (clutter) {
+          const turn = ((tileHash(y, x) % 8) / 8) * Math.PI * 2;
+          place(`clutter:${WALL_TOP_PROPS.indexOf(clutter)}`, clutter, {
+            at: gridToWorld(x, y, WALL_HEIGHT),
+            yaw: turn,
+          });
+        }
         const decoModel = deco ? WALL_DECO_MODELS[deco] : undefined;
         if (deco && decoModel) place(`deco:${deco}`, decoModel, { at: gridToWorld(x, y), yaw: 0 });
         continue;

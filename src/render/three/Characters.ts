@@ -64,12 +64,49 @@ export function applyPose(c: Character, pose: Pose): void {
   c.rightHand.position.set(pose.rightHand.x, pose.rightHand.y + pose.bob, pose.rightHand.z);
 }
 
-/** A developer for player `id`. */
+/** A developer for player `id`: a hoodie in their color and their hat. */
 export function createDeveloper(id: PlayerId, materials: KitMaterials): Character {
-  const color = playerColor(id);
   const i = (id - 1) % SKIN.length;
-  const skin = SKIN[i] ?? PALETTE.skin;
-  const hair = HAIR[i] ?? HAIR[0];
+  return createPerson(
+    {
+      color: playerColor(id),
+      skin: SKIN[i] ?? PALETTE.skin,
+      hair: HAIR[i] ?? HAIR[0],
+      hat: playerShape(id),
+    },
+    materials,
+  );
+}
+
+/** Muted hoodie colors for people in the background, so they never look like players. */
+const EXTRA_COLORS = [0x7d8a96, 0x9a8c7a, 0x6f8a7a, 0x8c7a8f, 0xa39274, 0x6c7a91] as const;
+
+/**
+ * Someone in the background (`seed` picks their look): no hat, a muted
+ * hoodie, so the players stay the only ones that stand out.
+ */
+export function createExtra(seed: number, materials: KitMaterials): Character {
+  const n = Math.abs(Math.floor(seed));
+  return createPerson(
+    {
+      color: EXTRA_COLORS[n % EXTRA_COLORS.length] ?? EXTRA_COLORS[0],
+      skin: SKIN[(n >> 2) % SKIN.length] ?? PALETTE.skin,
+      hair: HAIR[(n >> 4) % HAIR.length] ?? HAIR[0],
+      hat: null,
+    },
+    materials,
+  );
+}
+
+interface PersonLook {
+  color: number;
+  skin: number;
+  hair: number;
+  hat: PlayerShape | null;
+}
+
+function createPerson(look: PersonLook, materials: KitMaterials): Character {
+  const { color, skin, hair } = look;
 
   // The body: tapered jeans at the bottom, a round hoodie with a pocket and strings.
   const torso = new ModelBuilder()
@@ -100,7 +137,7 @@ export function createDeveloper(id: PlayerId, materials: KitMaterials): Characte
     .sphere(0.035, 0xf0908a, { at: [0.15, r * 0.78, r * 0.75] }, [1, 0.6, 0.5])
     .sphere(0.05, tint(skin, -0.1), { at: [-r, r * 0.85, 0] }, [0.5, 1, 0.8])
     .sphere(0.05, tint(skin, -0.1), { at: [r, r * 0.85, 0] }, [0.5, 1, 0.8]);
-  hat(head, playerShape(id), color);
+  if (look.hat) hat(head, look.hat, color);
   const headGeometry = head.build().body;
 
   const handGeometry = glove(GLOVE);

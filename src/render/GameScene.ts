@@ -369,6 +369,8 @@ function mapLook(levelId: string): MapLook {
   return {
     walls: WALL_THEMES.find((t) => t === params.get('walls')) ?? look.walls,
     floor: FLOOR_THEMES.find((t) => t === params.get('floor')) ?? look.floor,
+    // `?setting=<chapter id>` previews another chapter's surroundings.
+    setting: params.get('setting') ?? chapterIdOf(LEVEL_IDS.indexOf(levelId)) ?? undefined,
   };
 }
 
