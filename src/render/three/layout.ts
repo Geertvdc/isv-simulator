@@ -4,9 +4,9 @@
  * tested and shared by the 3D views.
  */
 
-import { PLAYER_RADIUS, THROW_RANGE } from '../../sim/balance';
+import { PLAYER_RADIUS, THROW_HOLD_TICKS, THROW_RANGE } from '../../sim/balance';
 import { type LevelMap, type Tile, getTile } from '../../sim/level';
-import type { GameState } from '../../sim/state';
+import type { GameState, PlayerId } from '../../sim/state';
 import { QUEUE_TILE, type QueueKind, type Ticket, queuedTickets } from '../../sim/tickets';
 import { isFrontWall } from '../mapShape';
 import { type Box3, type Vec3, gridToWorld } from '../projection';
@@ -18,8 +18,8 @@ export const WALL_HEIGHT = 1.15;
 export const FRONT_WALL_HEIGHT = 0.2;
 /** Counters and stations: about hip height on a developer. */
 export const STATION_HEIGHT = 0.55;
-/** A developer's height without the hat (the head top, at `CHARACTER_SCALE`). */
-export const BODY_HEIGHT = 1.0;
+/** The top of the tallest hat: overlays over a head start above it (matches `Characters`). */
+export const HAT_TOP = 1.78;
 /** How far the level's slab reaches below the floor (the diorama's front face). */
 export const SLAB_DEPTH = 0.45;
 
@@ -29,6 +29,9 @@ export const CARD_SIZE = { width: 0.42, depth: 0.32, thickness: 0.05 };
 export const QUEUE_STACK_MAX = 4;
 /** Height of the carried ticket's bottom above the floor: held out in front at chest height. */
 export const CARRY_HEIGHT = 0.62;
+/** A full throw wind-up lifts the carried ticket this much and pulls it this far back, over the shoulder. */
+const WIND_UP_LIFT = 0.33;
+const WIND_UP_BACK = 0.6;
 /** How far in front of the carrier's center the carried ticket floats. */
 export const CARRY_REACH = PLAYER_RADIUS + 0.1;
 /** Extra height at the top of a throw's arc. */
@@ -121,7 +124,11 @@ export interface TicketPlacement {
 }
 
 /** Where ticket `ticket` is drawn now, or `null` when it can't be (its carrier or queue is gone). */
-export function placeTicket(view: RoundView, ticket: Ticket): TicketPlacement | null {
+export function placeTicket(
+  view: RoundView,
+  ticket: Ticket,
+  carrierYaw?: (id: PlayerId) => number | undefined,
+): TicketPlacement | null {
   const { state } = view;
   const loc = ticket.location;
   switch (loc.kind) {
@@ -162,19 +169,33 @@ export function placeTicket(view: RoundView, ticket: Ticket): TicketPlacement | 
       const pos = view.renderPos(loc.playerId);
       const player = state.players.find((p) => p.id === loc.playerId);
       if (!pos || !player) return null;
-      const { facing } = player;
+      // Held where the hands are: turned like the carrier is drawn, pulled back in a wind-up.
+      const yaw = carrierYaw?.(player.id) ?? facingYaw(player.facing);
+      const hold = carryPoint(Math.min(1, player.throwCharge / THROW_HOLD_TICKS));
       return {
         pos: gridToWorld(
-          pos.x + facing.x * CARRY_REACH,
-          pos.y + facing.y * CARRY_REACH,
-          CARRY_HEIGHT,
+          pos.x + Math.sin(yaw) * hold.reach,
+          pos.y + Math.cos(yaw) * hold.reach,
+          hold.height,
         ),
-        yaw: facingYaw(facing),
+        yaw,
         visible: true,
         carried: true,
       };
     }
   }
+}
+
+/**
+ * Where a carried ticket is held, in the carrier's space: `height` of its
+ * bottom and `reach` in front. A throw wind-up (0 to 1) swings it back over
+ * the shoulder. The carrier's hands hold it there (`pose.ts`).
+ */
+export function carryPoint(windUp: number): { height: number; reach: number } {
+  return {
+    height: CARRY_HEIGHT + WIND_UP_LIFT * windUp,
+    reach: CARRY_REACH - WIND_UP_BACK * windUp,
+  };
 }
 
 /**

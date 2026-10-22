@@ -14,7 +14,7 @@ import { drawBadge } from '../PipelineRenderer';
 import { TILE_SIZE, type Vec3, gridToWorld } from '../projection';
 import type { RoundView } from '../roundView';
 import { drawProgressBar, drawTicketCard } from '../TicketRenderer';
-import { BODY_HEIGHT, blockHeight, placeTicket, queueAnchor } from './layout';
+import { HAT_TOP, blockHeight, placeTicket, queueAnchor } from './layout';
 
 /** Where a world point lands on the canvas and how big things drawn there are. */
 export interface ScreenPoint {
@@ -33,13 +33,13 @@ const OVERLAY_SCALE = 1.5;
 /** Ticket cards float this far over the ticket. */
 const CARD_LIFT = 0.28;
 /** Over a carrier's head, the card; the calendar invite goes over that. */
-const HEAD_CARD_HEIGHT = BODY_HEIGHT + 0.4;
+const HEAD_CARD_HEIGHT = HAT_TOP + 0.05;
 /** The invite is drawn around its middle, so it sits higher to clear the head and hat. */
-const HEAD_INVITE_HEIGHT = BODY_HEIGHT + 0.85;
+const HEAD_INVITE_HEIGHT = HAT_TOP + 0.4;
 /** Over a carrier, the invite goes over the card and its title: this many overlay pixels up. */
 const INVITE_OVER_CARD = 78;
 /** Popups start over the head and its card. */
-export const POPUP_HEIGHT = BODY_HEIGHT + 1.1;
+export const POPUP_HEIGHT = HAT_TOP + 0.6;
 const HINT_LIFT = 0.15;
 const HINT_BOB = 0.08;
 const HINT_BOB_MS = 700;

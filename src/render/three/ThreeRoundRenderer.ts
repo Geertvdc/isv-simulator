@@ -54,6 +54,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
   private readonly overlays: Overlays;
   private readonly fx: WorldFx;
   private readonly people: People;
+  private readonly carrierYaw = (id: PlayerId): number | undefined => this.people.yawOf(id);
   /** The last round frame, placed again every render with the camera as it is then. */
   private frame: RoundFrame | null = null;
   private readonly shared = {
@@ -110,12 +111,11 @@ export class ThreeRoundRenderer implements RoundRenderer {
     const { state } = view;
     this.frame = frame;
 
-    this.people.sync(view, events, timeMs);
-    const seenPlayers = new Set(state.players.filter((p) => view.renderPos(p.id)).map((p) => p.id));
+    const seenPlayers = this.people.sync(view, events, timeMs);
 
     const seenTickets = new Set<number>();
     for (const ticket of state.tickets) {
-      const placed = placeTicket(view, ticket);
+      const placed = placeTicket(view, ticket, this.carrierYaw);
       if (!placed) continue;
       seenTickets.add(ticket.id);
       let mesh = this.tickets.get(ticket.id);
@@ -253,7 +253,11 @@ export class ThreeRoundRenderer implements RoundRenderer {
     return geometry;
   }
 
-  private dropMissing<K>(objects: Map<K, THREE.Object3D>, seen: Set<K>, dispose = true): void {
+  private dropMissing<K>(
+    objects: Map<K, THREE.Object3D>,
+    seen: ReadonlySet<K>,
+    dispose = true,
+  ): void {
     for (const [key, obj] of objects) {
       if (seen.has(key)) continue;
       this.world.remove(obj);

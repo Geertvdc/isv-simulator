@@ -10,9 +10,20 @@
 - Overlay heights follow the new head height; the invite floats over the hat.
 - `/models.html` shows each player in a pose (idle, carrying, working, dashing) and the manager.
 
+## 14e review fixes
+
+- Hands outside the body (gloves at ±0.40, radius 0.09); the carried ticket and the hands share one hold point (`layout.carryPoint`), so through a throw wind-up both swing over the shoulder, and the ticket turns with the drawn (smoothed) facing, not the sim's snapping one. Turning is faster (20 rad/s) and new people start facing the right way.
+- A rounder silhouette: head (0.25) as wide as the body, a slimmer hoodie, tapered jeans, the head on the shoulders and tilted forward so the face shows; bigger eyes with highlights, hair kept above the face.
+- Hats 1.35× bigger; the party hat is in the player's color with a white band, the other hats white with a band or tassel in the player's color.
+- Overlays over heads start above the tallest hat (`layout.HAT_TOP`, tested against the model).
+- The manager is bigger (1.35×), square-shouldered in a blue-grey suit with a white collar that shows from behind, glasses, a clipboard and a coffee.
+- A calmer walk (1.6 to 2.2 cycles a second with speed), a bigger waddle; dashing keeps the head round and flings the hands back where they show.
+- "Working" is render-only memory (`noteWork`): the step in front moved on the same ticket while standing still. Deliberately no sim change for it (gameplay is out of scope); two players at one station both look busy.
+
 ## Tests
 
-- `three/pose.test.ts`: idle is still, walking bounces and leans more when faster, carrying holds the ticket at carry height out front, working taps in turn and nods, dashing squashes, a wind-up leans back, a shove wobbles and settles; turning goes the short way and stops on target
+- `three/People.test.ts`: `noteWork` (shows and holds, ignores switching tickets and walking past), the layout's hat top matches the model's
+- `three/pose.test.ts`: the hands hold the ticket where it's drawn, at every wind-up; idle is still, walking bounces and leans more when faster, carrying holds the ticket at carry height out front, working taps in turn and nods, dashing squashes, a wind-up leans back, a shove wobbles and settles; turning goes the short way and stops on target
 
 ## Done when
 
