@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CONVEYOR_TICKS, THROW_HOLD_TICKS, THROW_RANGE } from './balance';
+import { beltWaits } from './conveyor';
 import { getTile, parseLevelMap } from './level';
 import { LEVELS, levelWithMap } from './levels';
 import { type GameState, type PlayerId, type Vec, createGame, getPlayer } from './state';
@@ -306,5 +307,73 @@ describe('conveyor maps', () => {
     const second = on(state, 1, 1);
     tick(state, []);
     expect(second.location).toEqual({ kind: 'tile', x: 1, y: 1 });
+  });
+});
+
+describe('beltWaits (for drawing tickets gliding)', () => {
+  function game(rows: string[]): GameState {
+    const map = [
+      '#'.repeat(rows[0]?.length ?? 0),
+      ...rows,
+      '#1234'.padEnd(rows[0]?.length ?? 0, '#'),
+    ];
+    const state = createGame(levelWithMap(parseLevelMap(map.join('\n'))), 1, [1]);
+    state.nextOrderTick = Number.MAX_SAFE_INTEGER;
+    return state;
+  }
+  function on(state: GameState, x: number, y: number, done = 0): Ticket {
+    const t = newTicket(state, done);
+    t.location = { kind: 'tile', x, y };
+    return t;
+  }
+
+  it('does not wait in a full line that moves as one, but waits behind a taken counter', () => {
+    const state = game(['#>>>C#']);
+    on(state, 1, 1);
+    on(state, 2, 1);
+    expect(beltWaits(state, 1, 1)).toBe(false);
+    on(state, 3, 1);
+    on(state, 4, 1);
+    expect(beltWaits(state, 3, 1)).toBe(true);
+    expect(beltWaits(state, 1, 1)).toBe(true);
+  });
+
+  it('never waits round a full loop', () => {
+    const state = game(['#>v##', '#^<##']);
+    for (const [x, y] of [
+      [1, 1],
+      [2, 1],
+      [2, 2],
+      [1, 2],
+    ] as const) {
+      on(state, x, y);
+    }
+    expect(beltWaits(state, 1, 1)).toBe(false);
+  });
+
+  it('waits in front of a pipeline that would refuse the ticket', () => {
+    const state = game(['#>P###']);
+    on(state, 1, 1, 0);
+    expect(beltWaits(state, 1, 1)).toBe(true);
+  });
+
+  it('lets a side belt feed a loop with a free tile without overlapping', () => {
+    const state = game(['#>>v##', '#^<<<#']);
+    const loop = [
+      [1, 1],
+      [2, 1],
+      [3, 1],
+      [3, 2],
+      [2, 2],
+    ] as const;
+    for (const [x, y] of loop) on(state, x, y);
+    on(state, 4, 2);
+    for (let i = 0; i < CONVEYOR_TICKS * 12; i++) {
+      tick(state, []);
+      const tiles = state.tickets.map((t) =>
+        t.location.kind === 'tile' ? `${t.location.x},${t.location.y}` : '',
+      );
+      expect(new Set(tiles).size).toBe(tiles.length);
+    }
   });
 });

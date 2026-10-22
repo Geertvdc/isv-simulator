@@ -117,3 +117,25 @@ export function beltProgress(state: GameState, x: number, y: number): number {
   const belt = state.belts.find((b) => b.x === x && b.y === y);
   return belt ? Math.min(1, belt.ticks / CONVEYOR_TICKS) : 0;
 }
+
+/**
+ * Whether the ticket on belt (x, y) will have to wait at the end of its tile:
+ * the next tile won't take it, or it's a belt whose ticket waits too. A full
+ * line that moves as one, or a full loop, doesn't wait. For drawing.
+ */
+export function beltWaits(state: GameState, x: number, y: number): boolean {
+  const seen = new Set<string>();
+  for (let at = { x, y }; ;) {
+    const ticket = ticketOnTile(state, at.x, at.y);
+    const conveyor = conveyorAt(state.level, at.x, at.y);
+    if (!ticket || !conveyor) return false;
+    const next = { x: at.x + conveyor.dir.x, y: at.y + conveyor.dir.y };
+    if (!conveyorAt(state.level, next.x, next.y)) return !canPutDown(state, ticket, next.x, next.y);
+    // Round a loop: nothing ahead holds it up.
+    const key = `${next.x},${next.y}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    if (!ticketOnTile(state, next.x, next.y)) return false;
+    at = next;
+  }
+}

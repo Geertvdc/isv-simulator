@@ -5,16 +5,10 @@
  */
 
 import { PLAYER_RADIUS, THROW_HOLD_TICKS, THROW_RANGE } from '../../sim/balance';
-import { beltProgress } from '../../sim/conveyor';
+import { beltProgress, beltWaits } from '../../sim/conveyor';
 import { type LevelMap, type Tile, conveyorAt, getTile, isBlock } from '../../sim/level';
 import type { GameState, PlayerId } from '../../sim/state';
-import {
-  QUEUE_TILE,
-  type QueueKind,
-  type Ticket,
-  queuedTickets,
-  ticketOnTile,
-} from '../../sim/tickets';
+import { QUEUE_TILE, type QueueKind, type Ticket, queuedTickets } from '../../sim/tickets';
 import { isFrontWall } from '../mapShape';
 import { type Box3, type Vec3, gridToWorld } from '../projection';
 import type { RoundView } from '../roundView';
@@ -166,9 +160,7 @@ export function placeTicket(
       // On a belt it glides from this tile's middle toward the next one's, stopping
       // short at the edge when the next tile is taken.
       const belt = conveyorAt(state.level, loc.x, loc.y);
-      const blocked =
-        belt !== undefined &&
-        ticketOnTile(state, loc.x + belt.dir.x, loc.y + belt.dir.y) !== undefined;
+      const blocked = belt !== undefined && beltWaits(state, loc.x, loc.y);
       const ride = belt ? Math.min(beltProgress(state, loc.x, loc.y), blocked ? BELT_WAIT : 1) : 0;
       const x = loc.x + (belt ? belt.dir.x * ride * BELT_GLIDE : 0);
       const y = loc.y + (belt ? belt.dir.y * ride * BELT_GLIDE : 0);
