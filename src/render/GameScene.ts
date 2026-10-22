@@ -100,39 +100,26 @@ import {
   SCREEN_FADE_MS,
   SFX_VOLUME_MAX,
 } from '../sim/balance';
-import { type LevelMap, type Tile, getTile, isWorkSurface } from '../sim/level';
+import { type LevelMap, type Tile, getTile } from '../sim/level';
 import { type Bot, botInput, createBot } from '../sim/bot';
 import { CHAPTERS, DEMO_LEVEL_IDS, LEVELS } from '../sim/levels';
 import type { GameEvent } from '../sim/orders';
 import { type Scene, sceneDone, sceneInputs, sceneState } from '../sim/scenes';
-import { type GameState, type PlayerId, createGame, targetTile } from '../sim/state';
-import { CameraController } from './CameraController';
-import type { WorldRect } from './cameraFit';
-import { EffectsRenderer } from './EffectsRenderer';
-import { HintRenderer } from './HintRenderer';
+import { type GameState, createGame } from '../sim/state';
 import { GameLoop } from './GameLoop';
 import {
-  MAP_OVERHANG,
-  MapRenderer,
-  OVERLAY_DEPTH,
   DEFAULT_LOOK,
   FLOOR_THEMES,
   type MapLook,
   WALL_THEMES,
   preloadMapSprites,
-  vectors,
 } from './MapRenderer';
-import { playerColor } from './playerColors';
-import { ManagerRenderer } from './ManagerRenderer';
-import { MeetingRenderer } from './MeetingRenderer';
-import { PipelineRenderer } from './PipelineRenderer';
-import { PlayerRenderer } from './PlayerRenderer';
 import { MusicPlayer } from './MusicPlayer';
 import { musicCue } from './music';
+import { createPhaserRoundRenderer } from './PhaserRoundRenderer';
+import type { RoundRenderer, RoundRendererFactory } from './RoundRenderer';
 import { SoundPlayer } from './SoundPlayer';
-import { screenToTile, tileCorners, tileDepth } from './projection';
 import { type RoundView, frameView, predictedView } from './roundView';
-import { TicketRenderer } from './TicketRenderer';
 
 export interface TileHover {
   x: number;
@@ -320,6 +307,8 @@ export interface GameSceneOptions {
   /** `?demo`: a kiosk for a booth. Starts in the demo, and every menu goes back to it when left alone. */
   kiosk: boolean;
   online: OnlineOptions | null;
+  /** Draws the level and rounds: the 2D Phaser renderers unless given (`?render=3d`). */
+  roundRenderer?: RoundRendererFactory;
 }
 
 /**
@@ -337,9 +326,6 @@ interface SceneData {
   startRound?: boolean;
 }
 
-const HOVER_COLOR = 0xffffff;
-/** Over the target block's top, under its label. */
-const TARGET_DEPTH_OFFSET = 0.005;
 const LEVEL_IDS: readonly string[] = LEVELS.map((l) => l.id);
 const DEMO_LEVELS: readonly number[] = DEMO_LEVEL_IDS.map((id) => LEVEL_IDS.indexOf(id)).filter(
   (i) => i >= 0,
@@ -386,16 +372,9 @@ function mapLook(levelId: string): MapLook {
   };
 }
 
-interface TargetHighlight {
-  g: Phaser.GameObjects.Graphics;
-  tile: { x: number; y: number } | null;
-}
-
 export class GameScene extends Phaser.Scene {
   private map!: LevelMap;
-  private cameraController!: CameraController;
-  private mapRenderer!: MapRenderer;
-  private hoverOutline!: Phaser.GameObjects.Graphics;
+  private roundRenderer!: RoundRenderer;
   /**
    * Kept for the whole game, across scene restarts: new devices would see
    * buttons still held from the menu press that restarted the scene as new
@@ -412,17 +391,9 @@ export class GameScene extends Phaser.Scene {
   private loop: GameLoop | null = null;
   /** The bots playing the round, in the demo. */
   private bots: Bot[] = [];
-  private playerRenderer!: PlayerRenderer;
-  private managerRenderer!: ManagerRenderer;
-  private meetingRenderer!: MeetingRenderer;
-  private ticketRenderer!: TicketRenderer;
-  private pipelineRenderer!: PipelineRenderer;
-  private effects!: EffectsRenderer;
-  private hintRenderer!: HintRenderer;
   /** First-level hints still showing in this round. */
   private hints: HintId[] = [];
   private sounds!: SoundPlayer;
-  private readonly targets = new Map<PlayerId, TargetHighlight>();
   private hovered: TileHover | null = null;
   private debugVisible = false;
   private seed = FIRST_SEED;
@@ -504,10 +475,9 @@ export class GameScene extends Phaser.Scene {
     if (!level) throw new Error(`No level ${this.mapLevelIndex}`);
     this.map = level.map;
     // Restarts reuse this object; the old sprites went with the old scene.
-    this.targets.clear();
     this.hovered = null;
-    this.mapRenderer = new MapRenderer(this, this.map, mapLook(level.id));
-    this.hoverOutline = this.add.graphics().setDepth(OVERLAY_DEPTH).setVisible(false);
+    const createRenderer = this.options.roundRenderer ?? createPhaserRoundRenderer;
+    this.roundRenderer = createRenderer(this, this.map, mapLook(level.id));
     this.devices ??= new InputDevices(window);
     if (!this.music) {
       this.music = new MusicPlayer(this.game);
@@ -542,15 +512,7 @@ export class GameScene extends Phaser.Scene {
     this.game.events.on(ONLINE_RENAME_EVENT, (displayName: string) => {
       this.connection?.send({ type: 'rename', displayName });
     });
-    this.playerRenderer = new PlayerRenderer(this);
-    this.managerRenderer = new ManagerRenderer(this);
-    this.meetingRenderer = new MeetingRenderer(this, this.map);
-    this.ticketRenderer = new TicketRenderer(this, this.mapRenderer);
-    this.pipelineRenderer = new PipelineRenderer(this, this.mapRenderer);
-    this.effects = new EffectsRenderer(this);
-    this.hintRenderer = new HintRenderer(this, this.map, this.mapRenderer);
     this.sounds = new SoundPlayer(this);
-    this.cameraController = new CameraController(this, this.mapBounds());
     this.cameras.main.fadeIn(SCREEN_FADE_MS);
     this.applySettings();
 
@@ -577,8 +539,7 @@ export class GameScene extends Phaser.Scene {
     for (const code of [K.BACKTICK, K.F3]) {
       this.input.keyboard?.addKey(code).on('down', () => {
         this.debugVisible = !this.debugVisible;
-        this.mapRenderer.setDebugVisible(this.debugVisible);
-        this.cameraController.setDebug(this.debugVisible);
+        this.roundRenderer.setDebug(this.debugVisible);
       });
     }
   }
@@ -637,6 +598,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.updateMusic(delta, this.flow, this.loop?.state ?? null);
     this.updateHover();
+    this.roundRenderer.render(time, delta);
   }
 
   /**
@@ -652,16 +614,15 @@ export class GameScene extends Phaser.Scene {
   ): void {
     const { state } = view;
     this.game.events.emit(GAME_FRAME_EVENT, { state, events: [...events] } satisfies GameFrame);
-    this.playerRenderer.sync(view);
-    this.managerRenderer.sync(view, time);
-    this.meetingRenderer.sync(view, time);
-    this.ticketRenderer.sync(view);
-    this.pipelineRenderer.sync(state, time);
-    this.effects.play(state, events);
-    this.sounds.play(state, events, time);
-    for (const player of state.players) this.updateTarget(view, player.id);
     const screen = flow.screen;
-    this.hintRenderer.sync(this.hints, screen === 'countdown' || screen === 'playing', time);
+    this.roundRenderer.syncRound({
+      view,
+      events,
+      hints: this.hints,
+      hintsVisible: screen === 'countdown' || screen === 'playing',
+      timeMs: time,
+    });
+    this.sounds.play(state, events, time);
   }
 
   /** This frame's presses for the menus: none while a dialog is open (back closes it). */
@@ -1261,7 +1222,7 @@ export class GameScene extends Phaser.Scene {
     this.game.sound.mute = muted;
     this.sounds.volume = sfxVolume / SFX_VOLUME_MAX;
     if (this.music) this.music.volume = musicVolume / SFX_VOLUME_MAX;
-    this.effects.shakeEnabled = screenShake;
+    this.roundRenderer.setShake(screenShake);
   }
 
   /** A fresh round of the loaded level with everyone in the lobby, or bots in the demo. */
@@ -1312,60 +1273,13 @@ export class GameScene extends Phaser.Scene {
     done();
   }
 
-  /** Outlines the counter or station a player faces, in their color; nothing for floor and walls. */
-  private updateTarget(view: RoundView, id: PlayerId): void {
-    let highlight = this.targets.get(id);
-    if (!highlight) {
-      highlight = { g: this.add.graphics().setVisible(false), tile: null };
-      this.targets.set(id, highlight);
-    }
-    const target = targetTile(view.state, id);
-    const next = isWorkSurface(getTile(this.map, target.x, target.y)) ? target : null;
-    const prev = highlight.tile;
-    if (prev?.x === next?.x && prev?.y === next?.y) return;
-    highlight.tile = next;
-
-    const g = highlight.g;
-    g.clear();
-    const top = next && this.mapRenderer.blockTop(next.x, next.y);
-    g.setVisible(top !== null);
-    if (!next || !top) return;
-    const color = playerColor(id);
-    // Later players draw slightly higher so two players targeting one block both show.
-    g.setDepth(tileDepth(next.x, next.y) + TARGET_DEPTH_OFFSET * (1 + id / 10));
-    g.fillStyle(color, 0.3);
-    g.fillPoints(vectors(top), true);
-    g.lineStyle(3, color);
-    g.strokePoints(vectors(top), true);
-  }
-
-  /** World-space box spanned by the map's floor and what stands on it. */
-  private mapBounds(): WorldRect {
-    const { width, height } = this.map;
-    const corners = [
-      tileCorners(0, 0),
-      tileCorners(width - 1, 0),
-      tileCorners(0, height - 1),
-      tileCorners(width - 1, height - 1),
-    ].flat();
-    const xs = corners.map((c) => c.x);
-    const ys = corners.map((c) => c.y);
-    return {
-      left: Math.min(...xs),
-      right: Math.max(...xs),
-      top: Math.min(...ys) - MAP_OVERHANG,
-      bottom: Math.max(...ys),
-    };
-  }
-
   /** Runs every frame so hover stays right while panning/zooming with a still mouse. */
   private updateHover(): void {
     const pointer = this.input.activePointer;
     const overCanvas = pointer.active && this.input.isOver;
     let next: TileHover | null = null;
     if (this.debugVisible && overCanvas) {
-      const world = this.cameraController.screenToWorld(pointer.x, pointer.y);
-      const pos = screenToTile(world.x, world.y);
+      const pos = this.roundRenderer.tileAt(pointer.x, pointer.y);
       const tile = getTile(this.map, pos.x, pos.y);
       if (tile) next = { ...pos, tile };
     }
@@ -1374,12 +1288,7 @@ export class GameScene extends Phaser.Scene {
     if (prev?.x === next?.x && prev?.y === next?.y) return;
     this.hovered = next;
 
-    this.hoverOutline.clear();
-    this.hoverOutline.setVisible(next !== null);
-    if (next) {
-      this.hoverOutline.lineStyle(2, HOVER_COLOR);
-      this.hoverOutline.strokePoints(vectors(tileCorners(next.x, next.y)), true);
-    }
+    this.roundRenderer.setHover(next);
     this.game.events.emit(TILE_HOVER_EVENT, next);
   }
 }

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { type LevelMap, type Tile, getTile } from '../sim/level';
+import { type WallPiece, isFrontWall, wallPiece } from './mapShape';
 import {
   type Point,
   type Side,
@@ -53,11 +54,7 @@ export interface MapLook {
 
 export const DEFAULT_LOOK: MapLook = { walls: 'plaster', floor: 'concrete' };
 
-/**
- * `wall` shows its front face, `wall-front` is cut down on the camera side,
- * `wall-inner` has a wall in front so only its top shows.
- */
-const WALL_PIECES = ['wall', 'wall-front', 'wall-inner'] as const;
+const WALL_PIECES: readonly WallPiece[] = ['wall', 'wall-front', 'wall-inner'];
 
 /** Things hung on walls that show their front face, per theme. */
 const WALL_DECOS: Readonly<Record<WallTheme, readonly string[]>> = {
@@ -224,19 +221,10 @@ export class MapRenderer {
         drawBlock(this.scene, x, y, tile, height, `tiles/${tile}`);
         return;
       }
-      const piece = this.wallPiece(x, y, height);
+      const piece = wallPiece(this.map, x, y);
       drawBlock(this.scene, x, y, tile, height, `walls/${this.look.walls}/${piece}`);
       if (piece === 'wall') this.drawWallDeco(x, y);
     });
-  }
-
-  /**
-   * A full wall with another wall in front never shows its front face; where
-   * that wall is cut down (the front corners), the top runs on down instead.
-   */
-  private wallPiece(x: number, y: number, height: number): (typeof WALL_PIECES)[number] {
-    if (height < WALL_HEIGHT) return 'wall-front';
-    return getTile(this.map, x, y + 1) === 'wall' ? 'wall-inner' : 'wall';
   }
 
   /** Maybe hangs a decoration on the front face of the wall on tile (x, y). */
@@ -254,10 +242,7 @@ export class MapRenderer {
   }
 
   private blockHeight(x: number, y: number, tile: Exclude<Tile, 'floor'>): number {
-    const behind = getTile(this.map, x, y - 1);
-    const onFrontEdge = y === this.map.height - 1;
-    const isFrontWall = tile === 'wall' && (onFrontEdge || (behind !== null && behind !== 'wall'));
-    return isFrontWall ? FRONT_WALL_HEIGHT : BLOCK_STYLES[tile].height;
+    return isFrontWall(this.map, x, y) ? FRONT_WALL_HEIGHT : BLOCK_STYLES[tile].height;
   }
 
   /** Grid coordinates on every tile, and the player number on spawn tiles. */
