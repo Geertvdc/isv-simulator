@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { type LevelMap, type Tile, getTile } from '../../sim/level';
+import { type LevelMap, type Tile, getTile, isWorkSurface } from '../../sim/level';
 import type { MapLook } from '../MapRenderer';
-import { tileHash, wallDeco, wallPiece } from '../mapShape';
+import { type WallPiece, tileHash, wallDeco, wallPiece } from '../mapShape';
 import { VIEW3D_PITCH, type Vec3, gridToWorld } from '../projection';
 import { type KitMaterials, type Model, kitMaterials } from './kit';
 import {
@@ -41,6 +41,34 @@ interface Placement {
   yaw: number;
   /** Instance tint; white keeps the model's colors. */
   tint?: number;
+}
+
+/** One wall in this many gets clutter on top. */
+const CLUTTER_EVERY = 6;
+
+/**
+ * What stands on top of the wall on tile (x, y), if anything: plants, books
+ * or a plant and a mug, on some full-height walls. Never next to a counter or
+ * station (it'd look like something to pick up), never on a wall with floor
+ * behind it (it'd hide someone standing there), never on glass.
+ */
+function wallClutter(
+  map: LevelMap,
+  x: number,
+  y: number,
+  piece: WallPiece,
+  look: MapLook,
+): (() => Model) | undefined {
+  if (piece === 'wall-front' || look.walls === 'glass') return undefined;
+  const h = tileHash(x, y);
+  if (h % CLUTTER_EVERY !== 0) return undefined;
+  if (getTile(map, x, y - 1) === 'floor') return undefined;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (isWorkSurface(getTile(map, x + dx, y + dy))) return undefined;
+    }
+  }
+  return WALL_TOP_PROPS[Math.floor(h / CLUTTER_EVERY) % WALL_TOP_PROPS.length];
 }
 
 /**
@@ -107,11 +135,11 @@ export function buildMap(map: LevelMap, look: MapLook): THREE.Group {
         // Only on walls with open floor in front: not behind a station or counter.
         const open = getTile(map, x, y + 1) === 'floor';
         const deco = piece === 'wall' && open ? wallDeco(x, y, look.walls) : null;
-        // Clutter on top of full walls: plants, books, a mug, a laptop (not on glass).
-        const full = piece !== 'wall-front' && look.walls !== 'glass';
-        const clutter = full ? WALL_TOP_PROPS[(tileHash(x, y) >> 3) % 9] : undefined;
+        const clutter = wallClutter(map, x, y, piece, look);
         if (clutter) {
-          const turn = ((tileHash(y, x) % 8) / 8) * Math.PI * 2;
+          // Square to the wall, give or take a little.
+          const h = tileHash(y, x);
+          const turn = ((h % 4) * Math.PI) / 2 + (((h >> 2) % 3) - 1) * 0.15;
           place(`clutter:${WALL_TOP_PROPS.indexOf(clutter)}`, clutter, {
             at: gridToWorld(x, y, WALL_HEIGHT),
             yaw: turn,

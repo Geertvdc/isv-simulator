@@ -20,6 +20,37 @@ describe('placeSetPieces', () => {
     });
   }
 
+  for (const setting of Object.keys(SETTINGS)) {
+    it(`never stands two ${setting} props in each other`, () => {
+      const placed = placeSetPieces(setting, 14, 10);
+      const rect = (p: (typeof placed)[number]) => {
+        const turned = Math.abs(Math.sin(p.yaw)) > 0.5;
+        const [sx, sz] = p.piece.size;
+        // Slightly inset: props may touch, and loose ones turn a little.
+        const hx = (turned ? sz : sx) / 2 - 0.15;
+        const hz = (turned ? sx : sz) / 2 - 0.15;
+        return { x0: p.at.x - hx, x1: p.at.x + hx, z0: p.at.z - hz, z1: p.at.z + hz };
+      };
+      for (let i = 0; i < placed.length; i++) {
+        for (let j = i + 1; j < placed.length; j++) {
+          const a = placed[i];
+          const b = placed[j];
+          if (!a || !b) continue;
+          const ra = rect(a);
+          const rb = rect(b);
+          const overlap = ra.x0 < rb.x1 && rb.x0 < ra.x1 && ra.z0 < rb.z1 && rb.z0 < ra.z1;
+          expect(overlap, `${i} and ${j} overlap`).toBe(false);
+        }
+      }
+    });
+  }
+
+  it('shows each rare prop once', () => {
+    const rare = SETTINGS.garage?.rare ?? [];
+    const placed = placeSetPieces('garage', 14, 10);
+    for (const piece of rare) expect(placed.filter((p) => p.piece === piece)).toHaveLength(1);
+  });
+
   it('places the same props in the same places every time', () => {
     expect(placeSetPieces('garage', 14, 10)).toEqual(placeSetPieces('garage', 14, 10));
   });
