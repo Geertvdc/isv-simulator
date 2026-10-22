@@ -93,7 +93,7 @@ export class MeetingRenderer {
 }
 
 /** A little calendar page in the player's color, with a ring that runs down with the time left. */
-function drawInvite(g: Phaser.GameObjects.Graphics, state: GameState, invite: Invite): void {
+export function drawInvite(g: Phaser.GameObjects.Graphics, state: GameState, invite: Invite): void {
   g.clear();
   const color = playerColor(invite.playerId);
   const total = Math.max(1, invite.expiresTick - invite.createdTick);

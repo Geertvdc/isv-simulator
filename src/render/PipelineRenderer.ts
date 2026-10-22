@@ -1,16 +1,13 @@
 import Phaser from 'phaser';
-import { PIPELINE_FAIL_TICKS, PIPELINE_WARN_TICKS } from '../sim/balance';
 import { type Pipeline, pipelineWarning } from '../sim/pipeline';
 import type { GameState } from '../sim/state';
+import { pipelinePulse } from './effects';
 import { type MapRenderer, OVERLAY_DEPTH, vectors } from './MapRenderer';
 import { type Point, tileDepth } from './projection';
 import { drawProgressBar } from './TicketRenderer';
 
 /** Placeholder looks until the art pass. */
 const WARN_COLOR = 0xff3030;
-/** Warning pulses per second; faster in the last half of the warning. */
-const WARN_PULSE_HZ = 2;
-const WARN_PULSE_HZ_LAST = 5;
 const BROKEN_COLOR = 0x1a1d24;
 const BROKEN_ALPHA = 0.65;
 const SPARK_COLOR = 0xffd166;
@@ -77,9 +74,7 @@ export function drawPipelineState(
   t: number,
 ): void {
   if (pipelineWarning(pipeline)) {
-    const lastHalf = pipeline.doneTicks >= PIPELINE_FAIL_TICKS - PIPELINE_WARN_TICKS / 2;
-    const hz = lastHalf ? WARN_PULSE_HZ_LAST : WARN_PULSE_HZ;
-    const pulse = 0.5 + 0.5 * Math.sin(t * Math.PI * 2 * hz);
+    const pulse = pipelinePulse(pipeline.doneTicks, t * 1000);
     g.fillStyle(WARN_COLOR, 0.25 + 0.5 * pulse);
     g.fillPoints(vectors(top), true);
     drawBadge(overlay, center.x + BADGE_OFFSET.x, center.y + BADGE_OFFSET.y, 0.4 + 0.6 * pulse);
@@ -113,7 +108,12 @@ export function drawPipelineState(
 }
 
 /** A red "!" in a circle centered on (x, y). */
-function drawBadge(g: Phaser.GameObjects.Graphics, x: number, y: number, alpha: number): void {
+export function drawBadge(
+  g: Phaser.GameObjects.Graphics,
+  x: number,
+  y: number,
+  alpha: number,
+): void {
   g.fillStyle(WARN_COLOR, alpha);
   g.fillCircle(x, y, BADGE_RADIUS);
   g.lineStyle(2, 0xffffff, alpha);

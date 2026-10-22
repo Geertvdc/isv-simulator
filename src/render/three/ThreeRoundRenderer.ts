@@ -9,15 +9,21 @@ import {
 import { type LevelMap, type Tile, getTile, isWorkSurface } from '../../sim/level';
 import { type PlayerId, targetTile } from '../../sim/state';
 import type { TicketKind } from '../../sim/tickets';
+import { effectsFor } from '../effects';
 import { playerColor } from '../playerColors';
 import {
   type CameraPose,
   type Point,
+  type Vec3,
   fitCamera3d,
+  focalLength,
   gridToWorld,
+  projectPoint,
   screenToGround,
 } from '../projection';
 import type { RoundFrame, RoundRenderer } from '../RoundRenderer';
+import { Overlays, type ScreenPoint, overlayScale } from './Overlays';
+import { WorldFx } from './WorldFx';
 import {
   BODY_HEIGHT,
   CARD_SIZE,
@@ -25,6 +31,7 @@ import {
   blockHeight,
   facingYaw,
   levelBox,
+  pickTile,
   placeTicket,
 } from './layout';
 import { type Stage, disposeTree, getStage } from './stage';
@@ -32,7 +39,7 @@ import { type Stage, disposeTree, getStage } from './stage';
 /** Greybox colors until the look pass (14c). */
 const FLOOR_COLOR = 0x5b6b7e;
 const FLOOR_ALT_COLOR = 0x55647a;
-const SLAB_COLOR = 0x2e3440;
+const SLAB_COLOR = 0x6b5a4a;
 const BLOCK_COLORS: Readonly<Record<Exclude<Tile, 'floor'>, number>> = {
   wall: 0x9aa3b5,
   counter: 0x8a8f99,
@@ -78,6 +85,10 @@ export class ThreeRoundRenderer implements RoundRenderer {
   private readonly tickets = new Map<number, THREE.Mesh>();
   private readonly targets = new Map<PlayerId, THREE.Mesh>();
   private readonly hover: THREE.LineLoop;
+  private readonly overlays: Overlays;
+  private readonly fx: WorldFx;
+  /** The last round frame, placed again every render with the camera as it is then. */
+  private frame: RoundFrame | null = null;
   private readonly shared = {
     body: new THREE.CapsuleGeometry(PLAYER_RADIUS * 0.8, BODY_HEIGHT - PLAYER_RADIUS * 1.6, 6, 16),
     nose: new THREE.SphereGeometry(0.08, 12, 8),
@@ -106,18 +117,25 @@ export class ThreeRoundRenderer implements RoundRenderer {
     );
     this.hover.visible = false;
     this.world.add(this.hover);
+    this.overlays = new Overlays(scene, map);
+    this.fx = new WorldFx(this.world, map);
 
     this.pose = this.fit();
     scene.scale.on(Phaser.Scale.Events.RESIZE, this.onResize);
-    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      scene.scale.off(Phaser.Scale.Events.RESIZE, this.onResize);
-      for (const geometry of Object.values(this.shared)) geometry.dispose();
-      disposeTree(this.world);
-    });
   }
 
-  syncRound({ view }: RoundFrame): void {
+  destroy(): void {
+    this.scene.scale.off(Phaser.Scale.Events.RESIZE, this.onResize);
+    for (const geometry of Object.values(this.shared)) geometry.dispose();
+    disposeTree(this.world);
+    this.world.clear();
+    this.frame = null;
+  }
+
+  syncRound(frame: RoundFrame): void {
+    const { view, events, timeMs } = frame;
     const { state } = view;
+    this.frame = frame;
 
     const seenPlayers = new Set<PlayerId>();
     for (const player of state.players) {
@@ -129,7 +147,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
         g = this.createPlayer(player.id);
         this.players.set(player.id, g);
       }
-      g.position.set(pos.x, 0, pos.y);
+      putAt(g, gridToWorld(pos.x, pos.y));
       g.rotation.y = facingYaw(player.facing);
     }
     this.dropMissing(this.players, seenPlayers);
@@ -144,7 +162,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
         g = this.createManager();
         this.managers.set(manager.id, g);
       }
-      g.position.set(pos.x, 0, pos.y);
+      putAt(g, gridToWorld(pos.x, pos.y));
       g.rotation.y = facingYaw(manager.facing);
     }
     this.dropMissing(this.managers, seenManagers);
@@ -165,39 +183,76 @@ export class ThreeRoundRenderer implements RoundRenderer {
         this.tickets.set(ticket.id, mesh);
       }
       mesh.visible = placed.visible;
-      mesh.position.set(placed.pos.x, placed.pos.y + CARD_SIZE.thickness / 2, placed.pos.z);
+      putAt(mesh, { ...placed.pos, y: placed.pos.y + CARD_SIZE.thickness / 2 });
       mesh.rotation.y = placed.yaw;
     }
     this.dropMissing(this.tickets, seenTickets);
 
     for (const player of state.players) this.updateTarget(player.id, targetTile(state, player.id));
+    this.dropMissing(this.targets, seenPlayers);
+    this.fx.sync(state, timeMs);
+
+    for (const effect of effectsFor(state, events)) {
+      switch (effect.kind) {
+        case 'shake':
+          this.fx.startShake(effect.ms, effect.intensity, timeMs);
+          break;
+        case 'puff':
+          this.fx.puff(effect.at, effect.facing, timeMs);
+          break;
+        case 'popup':
+          this.overlays.popup(
+            gridToWorld(effect.at.x, effect.at.y, BODY_HEIGHT),
+            effect.text,
+            effect.color,
+            this.project(this.pose),
+          );
+          break;
+      }
+    }
   }
 
-  render(): void {
+  render(timeMs: number): void {
     const { width, height } = this.scene.scale;
     this.stage.resize(width, height);
-    this.stage.setPose(this.pose);
+    const shake = this.fx.update(timeMs, height);
+    const pose = {
+      ...this.pose,
+      principal: { x: this.pose.principal.x + shake.x, y: this.pose.principal.y + shake.y },
+    };
+    this.stage.setPose(pose);
+    const project = this.project(pose);
+    const frame = this.frame;
+    if (frame) this.overlays.sync(frame.view, frame.hints, frame.hintsVisible, timeMs, project);
+    this.overlays.place(project);
     this.stage.render(this.world);
   }
 
-  setShake(): void {
-    // Screen shake comes with the effects (14b).
+  setShake(enabled: boolean): void {
+    this.fx.shakeEnabled = enabled;
   }
 
-  setDebug(): void {
-    // Tile labels come with the overlays (14b).
+  setDebug(enabled: boolean): void {
+    this.overlays.setDebug(enabled);
   }
 
   tileAt(sx: number, sy: number): Point {
-    const g = screenToGround(this.pose, sx, sy);
-    if (!g) return { x: -1, y: -1 };
-    return { x: Math.round(g.x) + 0, y: Math.round(g.y) + 0 };
+    return pickTile(this.map, (h) => screenToGround(this.pose, sx, sy, h)) ?? { x: -1, y: -1 };
   }
 
   setHover(tile: Point | null): void {
     this.hover.visible = tile !== null;
     if (!tile) return;
-    this.hover.position.set(tile.x, blockHeight(this.map, tile.x, tile.y) + 0.01, tile.y);
+    putAt(this.hover, gridToWorld(tile.x, tile.y, blockHeight(this.map, tile.x, tile.y) + 0.01));
+  }
+
+  /** Canvas point, overlay scale and draw order of world points seen from `pose`. */
+  private project(pose: CameraPose): (p: Vec3) => ScreenPoint {
+    const f = focalLength(pose);
+    return (p) => {
+      const s = projectPoint(pose, p);
+      return { x: s.x, y: s.y, scale: overlayScale(f / s.depth), depth: 1000 - s.depth };
+    };
   }
 
   private readonly onResize = (): void => {
@@ -226,8 +281,8 @@ export class ThreeRoundRenderer implements RoundRenderer {
     const cx = (width - 1) / 2;
     const cz = (height - 1) / 2;
     // From the front left and high up, so shadows fall back and to the right.
-    sun.position.set(cx - width * 0.35, 14, cz + height * 0.6);
-    sun.target.position.set(cx, 0, cz);
+    putAt(sun, gridToWorld(cx - width * 0.35, cz + height * 0.6, 14));
+    putAt(sun.target, gridToWorld(cx, cz));
     sun.castShadow = true;
     const reach = Math.max(width, height) * 0.75;
     const cam = sun.shadow.camera;
@@ -249,45 +304,58 @@ export class ThreeRoundRenderer implements RoundRenderer {
       new THREE.BoxGeometry(width, SLAB_DEPTH, height),
       new THREE.MeshStandardMaterial({ color: SLAB_COLOR, roughness: 0.9 }),
     );
-    slab.position.set((width - 1) / 2, -SLAB_DEPTH / 2 - 0.001, (height - 1) / 2);
+    putAt(slab, gridToWorld((width - 1) / 2, (height - 1) / 2, -SLAB_DEPTH / 2 - 0.001));
     this.world.add(slab);
 
-    const floorGeometry = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
-    const floorMaterials = [FLOOR_COLOR, FLOOR_ALT_COLOR].map(
-      (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.95 }),
-    );
-    const blockMaterials = new Map<Exclude<Tile, 'floor'>, THREE.MeshStandardMaterial>();
-    const blockGeometries = new Map<number, THREE.BoxGeometry>();
+    // One instanced mesh for the floor and one per block kind and height: a few draw calls in all.
+    const floorTiles: { x: number; y: number }[] = [];
+    const blocks = new Map<string, { tile: Exclude<Tile, 'floor'>; h: number; at: Vec3[] }>();
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const tile = getTile(this.map, x, y);
         if (!tile) continue;
-        const floor = new THREE.Mesh(floorGeometry, floorMaterials[(x + y) % 2]);
-        floor.position.set(x, 0, y);
-        floor.receiveShadow = true;
-        this.world.add(floor);
+        floorTiles.push({ x, y });
         if (tile === 'floor') continue;
-
         const h = blockHeight(this.map, x, y);
-        let geometry = blockGeometries.get(h);
-        if (!geometry) {
-          geometry = new THREE.BoxGeometry(1, h, 1);
-          blockGeometries.set(h, geometry);
+        const key = `${tile}:${h}`;
+        let group = blocks.get(key);
+        if (!group) {
+          group = { tile, h, at: [] };
+          blocks.set(key, group);
         }
-        let material = blockMaterials.get(tile);
-        if (!material) {
-          material = new THREE.MeshStandardMaterial({ color: BLOCK_COLORS[tile], roughness: 0.8 });
-          blockMaterials.set(tile, material);
-        }
-        const block = new THREE.Mesh(geometry, material);
-        block.position.set(x, h / 2, y);
-        block.castShadow = true;
-        block.receiveShadow = true;
-        this.world.add(block);
-
+        group.at.push(gridToWorld(x, y, h / 2));
         const label = BLOCK_LABELS[tile];
         if (label) this.world.add(labelPlane(label, gridToWorld(x, y, h + 0.005)));
       }
+    }
+
+    const floor = new THREE.InstancedMesh(
+      new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95 }),
+      floorTiles.length,
+    );
+    const m = new THREE.Matrix4();
+    const color = new THREE.Color();
+    floorTiles.forEach((t, i) => {
+      const p = gridToWorld(t.x, t.y);
+      floor.setMatrixAt(i, m.makeTranslation(p.x, p.y, p.z));
+      floor.setColorAt(i, color.set((t.x + t.y) % 2 ? FLOOR_ALT_COLOR : FLOOR_COLOR));
+    });
+    floor.receiveShadow = true;
+    this.world.add(floor);
+
+    for (const { tile, h, at } of blocks.values()) {
+      const mesh = new THREE.InstancedMesh(
+        new THREE.BoxGeometry(1, h, 1),
+        new THREE.MeshStandardMaterial({ color: BLOCK_COLORS[tile], roughness: 0.8 }),
+        at.length,
+      );
+      at.forEach((p, i) => {
+        mesh.setMatrixAt(i, m.makeTranslation(p.x, p.y, p.z));
+      });
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this.world.add(mesh);
     }
   }
 
@@ -342,11 +410,8 @@ export class ThreeRoundRenderer implements RoundRenderer {
     mesh.visible = onSurface;
     if (!onSurface) return;
     // Later players sit slightly higher so two players targeting one block both show.
-    mesh.position.set(
-      target.x,
-      blockHeight(this.map, target.x, target.y) + 0.01 + id * 0.002,
-      target.y,
-    );
+    const top = blockHeight(this.map, target.x, target.y);
+    putAt(mesh, gridToWorld(target.x, target.y, top + 0.01 + id * 0.002));
   }
 
   private dropMissing<K>(objects: Map<K, THREE.Object3D>, seen: Set<K>): void {
@@ -361,6 +426,11 @@ export class ThreeRoundRenderer implements RoundRenderer {
       objects.delete(key);
     }
   }
+}
+
+/** Puts `obj` at world point `p` (from `gridToWorld`, so grid ↔ world stays in projection.ts). */
+function putAt(obj: THREE.Object3D, p: Vec3): void {
+  obj.position.set(p.x, p.y, p.z);
 }
 
 /** A letter lying on a block top, for the greybox. */

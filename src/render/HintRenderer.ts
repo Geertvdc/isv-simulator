@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
 import type { HintId } from '../flow/hints';
 import { HINT_TEXTS } from '../sim/content';
-import { type LevelMap, type Tile, getTile } from '../sim/level';
+import type { LevelMap, Tile } from '../sim/level';
 import { type MapRenderer, OVERLAY_DEPTH } from './MapRenderer';
+import { firstGroup } from './mapShape';
 
 /** The tile each first-level hint points at. */
-const HINT_TILES: Readonly<Record<HintId, Tile>> = {
+export const HINT_TILES: Readonly<Record<HintId, Tile>> = {
   inbox: 'inbox',
   keyboard: 'keyboard',
   ship: 'ship',
@@ -59,51 +60,21 @@ export class HintRenderer {
   private create(id: HintId): HintSprite | null {
     const at = this.anchor(HINT_TILES[id]);
     if (!at) return null;
-    // Labels by the side walls hang inwards, so they stay on screen.
-    const side = at.tileX / Math.max(1, this.map.width - 1);
-    const originX = side < 0.25 ? 0.15 : side > 0.75 ? 0.85 : 0.5;
-    const arrow = this.scene.add.graphics();
-    arrow.fillStyle(COLOR);
-    arrow.lineStyle(3, 0x1a1d24);
-    const tri = [
-      new Phaser.Math.Vector2(0, 0),
-      new Phaser.Math.Vector2(-ARROW_SIZE, -ARROW_SIZE * 1.3),
-      new Phaser.Math.Vector2(ARROW_SIZE, -ARROW_SIZE * 1.3),
-    ];
-    arrow.strokePoints(tri, true);
-    arrow.fillPoints(tri, true);
-    const label = this.scene.add
-      .text(0, -ARROW_SIZE * 1.3 - 4, HINT_TEXTS[id], {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '18px',
-        fontStyle: 'bold',
-        color: '#1a1d24',
-        backgroundColor: '#ffd166',
-        padding: { x: 8, y: 4 },
-      })
-      .setOrigin(originX, 1);
-    const baseY = at.y - ARROW_LIFT;
-    const container = this.scene.add
-      .container(at.x, baseY, [arrow, label])
+    const container = createHintMarker(
+      this.scene,
+      HINT_TEXTS[id],
+      hintLabelOrigin(at.tileX, this.map),
+    )
+      .setPosition(at.x, at.y - ARROW_LIFT)
       .setDepth(OVERLAY_DEPTH + 1);
-    return { container, baseY };
+    return { container, baseY: at.y - ARROW_LIFT };
   }
 
   /** The middle of the top of the first group of `tile` blocks on the map. */
   private anchor(tile: Tile): { x: number; y: number; tileX: number } | null {
-    const first = this.findFirst(tile);
+    const group = firstGroup(this.map, tile);
+    const first = group[0];
     if (!first) return null;
-    const group = [first];
-    for (const [dx, dy] of [
-      [1, 0],
-      [0, 1],
-      [-1, 0],
-      [0, -1],
-    ] as const) {
-      if (getTile(this.map, first.x + dx, first.y + dy) === tile) {
-        group.push({ x: first.x + dx, y: first.y + dy });
-      }
-    }
     const tops = group.flatMap((p) => this.mapRenderer.blockTopCenter(p.x, p.y) ?? []);
     if (tops.length === 0) return null;
     return {
@@ -112,13 +83,39 @@ export class HintRenderer {
       y: Math.min(...tops.map((p) => p.y)),
     };
   }
+}
 
-  private findFirst(tile: Tile): { x: number; y: number } | null {
-    for (let y = 0; y < this.map.height; y++) {
-      for (let x = 0; x < this.map.width; x++) {
-        if (getTile(this.map, x, y) === tile) return { x, y };
-      }
-    }
-    return null;
-  }
+/** Labels by the side walls hang inwards, so they stay on screen. */
+export function hintLabelOrigin(tileX: number, map: LevelMap): number {
+  const side = tileX / Math.max(1, map.width - 1);
+  return side < 0.25 ? 0.15 : side > 0.75 ? 0.85 : 0.5;
+}
+
+/** An arrow pointing down at (0, 0) with `text` on a label over it. */
+export function createHintMarker(
+  scene: Phaser.Scene,
+  text: string,
+  originX: number,
+): Phaser.GameObjects.Container {
+  const arrow = scene.add.graphics();
+  arrow.fillStyle(COLOR);
+  arrow.lineStyle(3, 0x1a1d24);
+  const tri = [
+    new Phaser.Math.Vector2(0, 0),
+    new Phaser.Math.Vector2(-ARROW_SIZE, -ARROW_SIZE * 1.3),
+    new Phaser.Math.Vector2(ARROW_SIZE, -ARROW_SIZE * 1.3),
+  ];
+  arrow.strokePoints(tri, true);
+  arrow.fillPoints(tri, true);
+  const label = scene.add
+    .text(0, -ARROW_SIZE * 1.3 - 4, text, {
+      fontFamily: 'system-ui, sans-serif',
+      fontSize: '18px',
+      fontStyle: 'bold',
+      color: '#1a1d24',
+      backgroundColor: '#ffd166',
+      padding: { x: 8, y: 4 },
+    })
+    .setOrigin(originX, 1);
+  return scene.add.container(0, 0, [arrow, label]);
 }

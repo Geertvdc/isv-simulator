@@ -30,7 +30,10 @@ export class Stage {
     canvas.style.position = 'absolute';
     canvas.style.inset = '0';
     canvas.style.pointerEvents = 'none';
-    // Under Phaser's canvas, which draws overlays, fades and takes the pointer.
+    // Under Phaser's canvas, which draws overlays, fades and takes the pointer. A
+    // positioned canvas would paint over Phaser's static one whatever the DOM
+    // order; `#game` is fixed, so z-index -1 stays inside it.
+    canvas.style.zIndex = '-1';
     parent.prepend(canvas);
   }
 
@@ -44,32 +47,39 @@ export class Stage {
     canvas.style.height = `${height}px`;
   }
 
-  /** Points the camera along `pose`, its principal point shifted off the canvas center like the pose says. */
-  setPose(pose: CameraPose, shake: { x: number; y: number } = { x: 0, y: 0 }): void {
-    const { width, height } = pose.viewport;
-    const cam = this.camera;
-    const p = cameraPosition(pose);
-    cam.position.set(p.x, p.y, p.z);
-    cam.up.set(0, 1, 0);
-    cam.lookAt(pose.target.x, pose.target.y, pose.target.z);
-    cam.fov = (pose.fov * 180) / Math.PI;
-    cam.aspect = width / height;
-    cam.near = 0.5;
-    cam.far = pose.distance * 4 + 50;
-    cam.setViewOffset(
-      width,
-      height,
-      width / 2 - pose.principal.x - shake.x,
-      height / 2 - pose.principal.y - shake.y,
-      width,
-      height,
-    );
-    cam.updateProjectionMatrix();
+  setPose(pose: CameraPose): void {
+    applyPose(this.camera, pose);
   }
 
   render(scene: THREE.Scene): void {
     this.renderer.render(scene, this.camera);
   }
+}
+
+/**
+ * Points `cam` along `pose`, its principal point shifted off the canvas
+ * center like the pose says, so it draws exactly what `projectPoint` computes.
+ */
+export function applyPose(cam: THREE.PerspectiveCamera, pose: CameraPose): void {
+  const { width, height } = pose.viewport;
+  const p = cameraPosition(pose);
+  cam.position.set(p.x, p.y, p.z);
+  cam.up.set(0, 1, 0);
+  cam.lookAt(pose.target.x, pose.target.y, pose.target.z);
+  cam.fov = (pose.fov * 180) / Math.PI;
+  cam.aspect = width / height;
+  cam.near = 0.5;
+  cam.far = pose.distance * 4 + 50;
+  cam.setViewOffset(
+    width,
+    height,
+    width / 2 - pose.principal.x,
+    height / 2 - pose.principal.y,
+    width,
+    height,
+  );
+  cam.updateProjectionMatrix();
+  cam.updateMatrixWorld();
 }
 
 let stage: Stage | null = null;
@@ -80,10 +90,11 @@ export function getStage(parent: HTMLElement): Stage {
   return stage;
 }
 
-/** Frees every geometry, material and texture under `root`. */
+/** Frees every geometry, material, texture and shadow map under `root`. */
 export function disposeTree(root: THREE.Object3D): void {
   const materials = new Set<THREE.Material>();
   root.traverse((obj) => {
+    if (obj instanceof THREE.Light) obj.dispose();
     if (obj instanceof THREE.Mesh || obj instanceof THREE.Sprite || obj instanceof THREE.Line) {
       (obj.geometry as THREE.BufferGeometry).dispose();
       const m = obj.material as THREE.Material | THREE.Material[];

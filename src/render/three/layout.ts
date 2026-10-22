@@ -42,12 +42,37 @@ export function blockHeight(map: LevelMap, x: number, y: number): number {
   return STATION_HEIGHT;
 }
 
-/** The world box the camera keeps in view: the floor and everything standing on it. */
+/** Room over the walls for hats and thrown tickets at the back of the room. */
+const BOX_HEADROOM = 0.25;
+
+/** The world box the camera keeps in view: the slab, the floor and everything standing on it. */
 export function levelBox(map: LevelMap): Box3 {
   return {
-    min: { x: -0.5, y: 0, z: -0.5 },
-    max: { x: map.width - 0.5, y: WALL_HEIGHT, z: map.height - 0.5 },
+    min: { x: -0.5, y: -SLAB_DEPTH, z: -0.5 },
+    max: { x: map.width - 0.5, y: WALL_HEIGHT + BOX_HEADROOM, z: map.height - 0.5 },
   };
+}
+
+/** Block heights from the tallest down, for picking. */
+const PICK_HEIGHTS = [WALL_HEIGHT, STATION_HEIGHT, FRONT_WALL_HEIGHT];
+
+/**
+ * The tile whose top a view ray hits first. `ground(h)` is where the ray
+ * crosses height `h` (or `null`); the ray meets higher tops before lower
+ * ones, so the first height whose tile is that tall wins, else the floor.
+ */
+export function pickTile(
+  map: LevelMap,
+  ground: (height: number) => { x: number; y: number } | null,
+): { x: number; y: number } | null {
+  for (const h of PICK_HEIGHTS) {
+    const g = ground(h);
+    if (!g) continue;
+    const tile = { x: Math.round(g.x) + 0, y: Math.round(g.y) + 0 };
+    if (blockHeight(map, tile.x, tile.y) === h) return tile;
+  }
+  const g = ground(0);
+  return g && { x: Math.round(g.x) + 0, y: Math.round(g.y) + 0 };
 }
 
 /** Every tile of kind `tile` on the map. */
@@ -61,8 +86,23 @@ export function tilesOf(map: LevelMap, tile: Tile): { x: number; y: number }[] {
   return out;
 }
 
+const anchors = new WeakMap<LevelMap, Partial<Record<QueueKind, Vec3 | null>>>();
+
 /** Bottom center of a queue's stack: the middle of the top of its queue tiles. */
 export function queueAnchor(map: LevelMap, queue: QueueKind): Vec3 | null {
+  let cached = anchors.get(map);
+  if (!cached) {
+    cached = {};
+    anchors.set(map, cached);
+  }
+  const known = cached[queue];
+  if (known !== undefined) return known;
+  const anchor = findQueueAnchor(map, queue);
+  cached[queue] = anchor;
+  return anchor;
+}
+
+function findQueueAnchor(map: LevelMap, queue: QueueKind): Vec3 | null {
   const tiles = tilesOf(map, QUEUE_TILE[queue]);
   if (tiles.length === 0) return null;
   const x = tiles.reduce((sum, t) => sum + t.x, 0) / tiles.length;
