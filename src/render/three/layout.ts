@@ -193,3 +193,20 @@ export function queueCounts(state: GameState): Record<QueueKind, number> {
     bug: queuedTickets(state, 'bug').length,
   };
 }
+
+/**
+ * Which way a station on tile (x, y) faces: toward the floor a player
+ * works it from. Prefers facing the camera, then the sides, then away.
+ * A grid direction; turn models with `facingYaw`.
+ */
+export function stationFacing(map: LevelMap, x: number, y: number): { x: number; y: number } {
+  for (const [dx, dy] of [
+    [0, 1],
+    [1, 0],
+    [-1, 0],
+    [0, -1],
+  ] as const) {
+    if (getTile(map, x + dx, y + dy) === 'floor') return { x: dx, y: dy };
+  }
+  return { x: 0, y: 1 };
+}

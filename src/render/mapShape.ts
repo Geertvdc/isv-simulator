@@ -4,6 +4,7 @@
  */
 
 import { type GridPoint, type LevelMap, type Tile, getTile } from '../sim/level';
+import type { WallTheme } from './MapRenderer';
 
 /**
  * A wall on the camera side of a room: on the map's front edge, or with
@@ -44,4 +45,26 @@ export function firstGroup(map: LevelMap, tile: Tile): GridPoint[] {
     }
   }
   return [];
+}
+
+/** Things hung on walls that show their front face, per theme. */
+export const WALL_DECOS: Readonly<Record<WallTheme, readonly string[]>> = {
+  plaster: ['poster', 'whiteboard', 'clock', 'kanban', 'dashboard', 'plants'],
+  wood: ['poster', 'whiteboard', 'clock', 'kanban', 'dashboard', 'plants'],
+  glass: ['whiteboard', 'clock', 'dashboard'],
+};
+/** One in this many front-facing walls gets a decoration. */
+const WALL_DECO_EVERY = 3;
+
+/** Small deterministic hash of a tile, so decorations stay put between runs. */
+export function tileHash(x: number, y: number): number {
+  return (Math.imul(x, 73856093) ^ Math.imul(y, 19349663)) >>> 0;
+}
+
+/** The decoration hung on the front of the wall on tile (x, y) with this theme, if any. Only asked of `wall` pieces. */
+export function wallDeco(x: number, y: number, theme: WallTheme): string | null {
+  const decos = WALL_DECOS[theme];
+  const hash = tileHash(x, y);
+  if (hash % WALL_DECO_EVERY !== 0 || decos.length === 0) return null;
+  return decos[Math.floor(hash / WALL_DECO_EVERY) % decos.length] ?? null;
 }

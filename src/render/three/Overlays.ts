@@ -38,7 +38,7 @@ const HEAD_INVITE_HEIGHT = BODY_HEIGHT + 0.6;
 /** Over a carrier, the invite goes over the card and its title: this many overlay pixels up. */
 const INVITE_OVER_CARD = 78;
 /** Popups start over the head and its card. */
-export const POPUP_HEIGHT = BODY_HEIGHT + 0.5;
+export const POPUP_HEIGHT = BODY_HEIGHT + 1.1;
 const HINT_LIFT = 0.15;
 const HINT_BOB = 0.08;
 const HINT_BOB_MS = 700;
@@ -195,7 +195,7 @@ export class Overlays {
       const p = project(at);
       place(card.g, p);
       card.title.setVisible(placed.carried);
-      if (placed.carried) place(card.title, { ...p, y: p.y - 26 * p.scale });
+      if (placed.carried) place(card.title, { ...p, y: p.y - 26 * p.scale * OVERLAY_SCALE });
     }
     for (const [id, card] of this.cards) {
       if (seen.has(id)) continue;

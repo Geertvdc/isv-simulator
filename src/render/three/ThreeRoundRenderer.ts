@@ -1,13 +1,9 @@
 import Phaser from 'phaser';
 import * as THREE from 'three';
-import {
-  CAMERA_FIT_PADDING,
-  CAMERA_HUD_BOTTOM,
-  CAMERA_HUD_TOP,
-  PLAYER_RADIUS,
-} from '../../sim/balance';
+import { CAMERA_FIT_PADDING, CAMERA_HUD_BOTTOM, PLAYER_RADIUS } from '../../sim/balance';
 import { type LevelMap, getTile, isWorkSurface } from '../../sim/level';
 import { type PlayerId, targetTile } from '../../sim/state';
+import type { TicketKind } from '../../sim/tickets';
 import { effectsFor } from '../effects';
 import type { MapLook } from '../MapRenderer';
 import { playerColor } from '../playerColors';
@@ -24,20 +20,20 @@ import {
 import type { RoundFrame, RoundRenderer } from '../RoundRenderer';
 import { Overlays, POPUP_HEIGHT, type ScreenPoint, overlayScale } from './Overlays';
 import { WorldFx } from './WorldFx';
-import {
-  BODY_HEIGHT,
-  CARD_SIZE,
-  blockHeight,
-  facingYaw,
-  levelBox,
-  pickTile,
-  placeTicket,
-} from './layout';
+import { BODY_HEIGHT, blockHeight, facingYaw, levelBox, pickTile, placeTicket } from './layout';
 import { createLights, dressScene, matte, PALETTE } from './look';
+import { kitMaterials } from './kit';
 import { buildMap } from './MapView';
+import { ticketModel } from './models';
 import { type Stage, disposeTree, getStage } from './stage';
 
 const HOVER_COLOR = 0xffffff;
+/**
+ * The top band the 3D camera keeps free, as a share of the height. Less than
+ * 2D's `CAMERA_HUD_TOP`: the order cards only cover the left of that band,
+ * and the back wall may reach under it.
+ */
+const HUD_TOP_3D = 0.1;
 /** The ring on the floor around each player, in their color. */
 const RING = { inner: PLAYER_RADIUS * 0.95, outer: PLAYER_RADIUS * 1.25, lift: 0.006 };
 
@@ -54,6 +50,8 @@ export class ThreeRoundRenderer implements RoundRenderer {
   private readonly players = new Map<PlayerId, THREE.Group>();
   private readonly managers = new Map<number, THREE.Group>();
   private readonly tickets = new Map<number, THREE.Mesh>();
+  private readonly ticketGeometries = new Map<TicketKind, THREE.BufferGeometry>();
+  private readonly materials = kitMaterials();
   private readonly targets = new Map<PlayerId, THREE.Group>();
   private readonly hover: THREE.LineLoop;
   private readonly overlays: Overlays;
@@ -63,7 +61,6 @@ export class ThreeRoundRenderer implements RoundRenderer {
   private readonly shared = {
     body: new THREE.CapsuleGeometry(PLAYER_RADIUS * 0.8, BODY_HEIGHT - PLAYER_RADIUS * 1.6, 6, 16),
     nose: new THREE.SphereGeometry(0.08, 12, 8),
-    card: new THREE.BoxGeometry(CARD_SIZE.width, CARD_SIZE.thickness, CARD_SIZE.depth),
     target: new THREE.PlaneGeometry(0.96, 0.96).rotateX(-Math.PI / 2),
     targetFrame: squareFrame(0.5, 0.42),
     targetRim: squareFrame(0.42, 0.39),
@@ -101,7 +98,11 @@ export class ThreeRoundRenderer implements RoundRenderer {
   destroy(): void {
     this.scene.scale.off(Phaser.Scale.Events.RESIZE, this.onResize);
     for (const geometry of Object.values(this.shared)) geometry.dispose();
+    for (const geometry of this.ticketGeometries.values()) geometry.dispose();
+    const { body, glow, glass } = this.materials;
+    for (const material of [body, glow, glass]) material.dispose();
     this.stage.forget(this.world);
+    if (this.world.background instanceof THREE.Texture) this.world.background.dispose();
     disposeTree(this.world);
     this.world.clear();
     this.frame = null;
@@ -149,16 +150,17 @@ export class ThreeRoundRenderer implements RoundRenderer {
       seenTickets.add(ticket.id);
       let mesh = this.tickets.get(ticket.id);
       if (!mesh) {
-        mesh = new THREE.Mesh(this.shared.card, matte(PALETTE.ticket[ticket.kind], 0.8));
+        mesh = new THREE.Mesh(this.ticketGeometry(ticket.kind), this.materials.body);
         mesh.castShadow = true;
         this.world.add(mesh);
         this.tickets.set(ticket.id, mesh);
       }
       mesh.visible = placed.visible;
-      putAt(mesh, { ...placed.pos, y: placed.pos.y + CARD_SIZE.thickness / 2 });
+      putAt(mesh, placed.pos);
       mesh.rotation.y = placed.yaw;
     }
-    this.dropMissing(this.tickets, seenTickets);
+    // Tickets share their geometry and material: nothing to free.
+    this.dropMissing(this.tickets, seenTickets, false);
 
     for (const id of seenPlayers) this.updateTarget(id, targetTile(state, id));
     this.dropMissing(this.targets, seenPlayers);
@@ -197,7 +199,6 @@ export class ThreeRoundRenderer implements RoundRenderer {
     const frame = this.frame;
     if (frame) this.overlays.sync(frame.view, frame.hints, frame.hintsVisible, timeMs, project);
     this.overlays.place(project, timeMs);
-    this.stage.watchFrame(deltaMs, this.world);
     this.stage.render(this.world, deltaMs);
   }
 
@@ -239,7 +240,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
       levelBox(this.map),
       { width, height },
       {
-        top: CAMERA_FIT_PADDING + height * CAMERA_HUD_TOP,
+        top: CAMERA_FIT_PADDING + height * HUD_TOP_3D,
         right: CAMERA_FIT_PADDING,
         bottom: CAMERA_FIT_PADDING + height * CAMERA_HUD_BOTTOM,
         left: CAMERA_FIT_PADDING,
@@ -302,15 +303,26 @@ export class ThreeRoundRenderer implements RoundRenderer {
     putAt(mesh, gridToWorld(target.x, target.y, top + 0.01 + id * 0.002));
   }
 
-  private dropMissing<K>(objects: Map<K, THREE.Object3D>, seen: Set<K>): void {
+  /** One folder geometry per ticket kind, made on first use. */
+  private ticketGeometry(kind: TicketKind): THREE.BufferGeometry {
+    let geometry = this.ticketGeometries.get(kind);
+    if (!geometry) {
+      geometry = ticketModel(kind).body;
+      this.ticketGeometries.set(kind, geometry);
+    }
+    return geometry;
+  }
+
+  private dropMissing<K>(objects: Map<K, THREE.Object3D>, seen: Set<K>, dispose = true): void {
     for (const [key, obj] of objects) {
       if (seen.has(key)) continue;
       this.world.remove(obj);
-      obj.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          for (const mat of [child.material as THREE.Material].flat()) mat.dispose();
-        }
-      });
+      if (dispose)
+        obj.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            for (const mat of [child.material as THREE.Material].flat()) mat.dispose();
+          }
+        });
       objects.delete(key);
     }
   }

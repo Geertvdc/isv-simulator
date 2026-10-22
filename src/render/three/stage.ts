@@ -15,6 +15,9 @@ import {
   type Quality,
   createFrameWatch,
   initialQuality,
+  pixelRatioFor,
+  rewarm,
+  stepDown,
   watchFrame,
 } from './quality';
 
@@ -24,15 +27,21 @@ const EXPOSURE = 0.95;
 
 /** Ambient occlusion: soft dark in corners, under counters and around feet, in world units. */
 const AO = { radius: 0.8, falloff: 0.5, intensity: 3.5 };
-/** Only screens, LEDs and warning lights are bright enough to bloom. */
-const BLOOM = { threshold: 0.85, smoothing: 0.2, intensity: 0.45 };
+/**
+ * Bloom only catches what is brighter than white: screens and LEDs, drawn
+ * unlit at 2–3× their color (see `GLOW_BOOST`). Lit white surfaces stay under it.
+ */
+const BLOOM = { threshold: 1.05, smoothing: 0.1, intensity: 0.5 };
+/** Sun shadow map size per quality. */
+const SHADOW_MAP = { high: 2048, medium: 2048, low: 1024 } as const;
 
 /**
  * The one WebGL canvas for the whole game, under Phaser's (transparent)
  * canvas. Kept across scene restarts: browsers allow only a few WebGL
  * contexts, so levels swap their `THREE.Scene` and keep this. On `high`
- * quality it draws through a post-processing chain (ambient occlusion,
- * bloom, SMAA, tone mapping); on `low` straight to the canvas.
+ * and `medium` quality it draws through a post-processing chain (ambient
+ * occlusion, bloom, tone mapping, then SMAA); on `low` straight to the
+ * canvas with MSAA.
  */
 export class Stage {
   readonly renderer: THREE.WebGLRenderer;
@@ -41,15 +50,19 @@ export class Stage {
   private quality: Quality;
   private readonly frames: FrameWatch;
   private composer: { scene: THREE.Scene; composer: EffectComposer } | null = null;
+  /** The level last drawn, to set it up for the quality when a new one comes. */
+  private scene: THREE.Scene | null = null;
+  private lastFrameMs: number | null = null;
 
   constructor(parent: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({
-      // SMAA does the edges on high; MSAA on low, where it's the only anti-aliasing.
+      // MSAA for low, where nothing else smooths edges.
       antialias: true,
       powerPreference: 'high-performance',
       stencil: false,
     });
     this.renderer.setClearColor(BACKGROUND);
+    this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMappingExposure = EXPOSURE;
@@ -72,24 +85,20 @@ export class Stage {
     return this.quality;
   }
 
-  /** Switches quality; materials recompile for the shadow change. */
-  setQuality(quality: Quality, scene: THREE.Scene | null): void {
+  /** Switches quality for the canvas and the level on it. */
+  setQuality(quality: Quality): void {
     if (quality === this.quality) return;
     this.quality = quality;
     this.applyQuality();
-    scene?.traverse((obj) => {
-      if (!(obj instanceof THREE.Mesh)) return;
-      for (const m of [obj.material as THREE.Material | THREE.Material[]].flat()) {
-        m.needsUpdate = true;
-      }
-    });
+    if (this.scene) this.prepare(this.scene);
+    rewarm(this.frames);
   }
 
   /** Matches the canvas to the game size in CSS pixels. */
   resize(width: number, height: number): void {
     if (width === this.size.width && height === this.size.height) return;
     this.size = { width, height };
-    this.renderer.setSize(width, height, false);
+    this.applyPixelRatio();
     this.composer?.composer.setSize(width, height, false);
     const canvas = this.renderer.domElement;
     canvas.style.width = `${width}px`;
@@ -101,6 +110,13 @@ export class Stage {
   }
 
   render(scene: THREE.Scene, deltaMs: number): void {
+    if (scene !== this.scene) {
+      this.scene = scene;
+      this.prepare(scene);
+      // A new level compiles new shaders: judge its frames after a warm-up of its own.
+      rewarm(this.frames);
+    }
+    this.watch();
     if (this.quality === 'low') {
       this.renderer.render(scene, this.camera);
       return;
@@ -109,26 +125,58 @@ export class Stage {
     this.composer?.composer.render(deltaMs / 1000);
   }
 
-  /** Counts a frame; drops to low quality for good when frames stay slow. */
-  watchFrame(deltaMs: number, scene: THREE.Scene): void {
-    if (watchFrame(this.frames, deltaMs)) this.setQuality('low', scene);
-  }
-
   /** Drops the post-processing chain of a level that is gone. */
   forget(scene: THREE.Scene): void {
+    if (this.scene === scene) this.scene = null;
     if (this.composer?.scene !== scene) return;
     this.composer.composer.dispose();
     this.composer = null;
   }
 
+  /** Times frames with the wall clock (Phaser's delta is smoothed and capped) and steps quality down when they stay slow. */
+  private watch(): void {
+    const now = performance.now();
+    const last = this.lastFrameMs;
+    this.lastFrameMs = now;
+    if (last === null || !watchFrame(this.frames, now - last)) return;
+    const next = stepDown(this.quality);
+    if (next) this.setQuality(next);
+  }
+
+  /** Sets a level's lights and materials up for the current quality. */
+  private prepare(scene: THREE.Scene): void {
+    const size = SHADOW_MAP[this.quality];
+    scene.traverse((obj) => {
+      if (obj instanceof THREE.DirectionalLight && obj.castShadow) {
+        if (obj.shadow.mapSize.x !== size) {
+          obj.shadow.mapSize.set(size, size);
+          obj.shadow.map?.dispose();
+          obj.shadow.map = null;
+        }
+      }
+      if (obj instanceof THREE.Mesh) {
+        for (const m of [obj.material as THREE.Material | THREE.Material[]].flat()) {
+          // Tone mapping moves between the renderer and the post chain.
+          m.needsUpdate = true;
+        }
+      }
+    });
+  }
+
+  private applyPixelRatio(): void {
+    const { width, height } = this.size;
+    this.renderer.setPixelRatio(
+      pixelRatioFor(this.quality, window.devicePixelRatio, width, height),
+    );
+    if (width > 0) this.renderer.setSize(width, height, false);
+  }
+
   private applyQuality(): void {
-    const high = this.quality === 'high';
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, high ? 2 : 1));
-    if (this.size.width > 0) this.renderer.setSize(this.size.width, this.size.height, false);
-    this.renderer.shadowMap.enabled = high;
-    // On high, tone mapping is the last effect in the chain.
-    this.renderer.toneMapping = high ? THREE.NoToneMapping : THREE.NeutralToneMapping;
-    if (!high && this.composer) {
+    const post = this.quality !== 'low';
+    this.applyPixelRatio();
+    // With post-processing, tone mapping is an effect in the chain.
+    this.renderer.toneMapping = post ? THREE.NoToneMapping : THREE.NeutralToneMapping;
+    if (this.composer) {
       this.composer.composer.dispose();
       this.composer = null;
     }
@@ -148,6 +196,7 @@ export class Stage {
     ao.configuration.intensity = AO.intensity;
     ao.configuration.halfRes = true;
     ao.configuration.gammaCorrection = false;
+    ao.configuration.transparencyAware = true;
     ao.setQualityMode('Low');
     composer.addPass(ao);
     composer.addPass(
@@ -159,10 +208,11 @@ export class Stage {
           intensity: BLOOM.intensity,
           mipmapBlur: true,
         }),
-        new SMAAEffect(),
         new ToneMappingEffect({ mode: ToneMappingMode.NEUTRAL }),
       ),
     );
+    // SMAA finds edges in the final, tone-mapped picture.
+    composer.addPass(new EffectPass(this.camera, new SMAAEffect()));
     composer.setSize(width, height, false);
     this.composer = { scene, composer };
   }
