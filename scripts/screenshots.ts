@@ -9,9 +9,7 @@
  * shots with `--only`), then
  *   npm run screenshots -- [--base=http://localhost:5173] [--server=http://localhost:2567] [--only=pipeline] [--skip=online]
  * `--only` takes shots whose name contains the text, `--skip` leaves them
- * out. `--render=3d` takes
- * them with the 3D look (phase 14), `--out=<dir>` writes them somewhere
- * other than `docs/game/images/`. `--server` is the game
+ * out. `--out=<dir>` writes them somewhere other than `docs/game/images/`. `--server` is the game
  * server the page talks to; a second room member joins it from here for the
  * online lobby shot. Set CHROME to the Chrome binary if it isn't in the usual
  * place.
@@ -31,16 +29,10 @@ const BASE = arg('base') ?? 'http://localhost:5173';
 const SERVER = arg('server') ?? 'http://localhost:2567';
 const ONLY = arg('only');
 const SKIP = arg('skip');
-const RENDER = arg('render');
 const OUT = arg('out') ?? join(import.meta.dirname, '..', 'docs', 'game', 'images');
 const WIDTH = Number(arg('width') ?? 1440);
 const HEIGHT = Number(arg('height') ?? 810);
 
-/** `path` with `?render=` added when taking 3D shots. */
-function withRender(path: string): string {
-  if (!RENDER) return path;
-  return `${path}${path.includes('?') ? '&' : '?'}render=${RENDER}`;
-}
 const PORT = 9333;
 
 const CHROME_PATHS = [
@@ -98,7 +90,7 @@ class Page {
 
   /** Loads a page; `settle` waits for boot, asset loading and the first frames. */
   async open(path: string, settle = 2500): Promise<void> {
-    await this.send('Page.navigate', { url: BASE + withRender(path) });
+    await this.send('Page.navigate', { url: BASE + path });
     await sleep(settle);
   }
 
@@ -154,7 +146,7 @@ async function launch(): Promise<{ chrome: ChildProcess; page: Page; profile: st
       '--hide-scrollbars',
       '--mute-audio',
       '--autoplay-policy=no-user-gesture-required',
-      // WebGL in headless Chrome without a GPU, for the 3D look.
+      // WebGL in headless Chrome without a GPU.
       '--enable-unsafe-swiftshader',
       'about:blank',
     ],

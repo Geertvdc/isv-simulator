@@ -14,7 +14,7 @@ Everything you interact with stands on a solid tile. You use it from the tile ne
 | Pipeline     | `P`             | Orange build machine          | The **pipeline** step. Builds on its own in 4 s, nobody needed. Collect the build in time or it breaks.         |
 | Ship hatch   | `S`             | Green crate with a parcel     | Put a finished ticket here to ship it and complete its order.                                                   |
 | Bin          | `X`             | Grey trash can                | Throws the carried ticket away for good. Its order stays open.                                                  |
-| Counter      | `C`             | Plain grey block              | Somewhere to put a ticket down and pick it up later. Counter walls split some offices in two.                   |
+| Counter      | `C`             | Plain wooden counter top      | Somewhere to put a ticket down and pick it up later. Counter walls split some offices in two.                   |
 | Whiteboard   | `W`             | White board on a stand        | The **design** step some features start with (Big Tech). Hold work, about 2.5 s. Designed features code faster. |
 | Merge        | `G`             | Raspberry desk                | git merge: put a coded front end and a coded back end here and they become one full-stack ticket.               |
 | Conveyor     | `>` `<` `^` `v` | Black belt with yellow arrows | Carries a ticket one tile every half second toward the arrow, onto the counter or station it points at.         |

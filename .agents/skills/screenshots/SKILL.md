@@ -1,18 +1,13 @@
 ---
 name: screenshots
-description: Retake the docs screenshots (every level, mechanic and screen) in 2D, 3D or both, check them and commit them. Use when the user asks to "make new screenshots", "retake the pictures", "update the docs images", or to render the levels again after visual changes.
+description: Retake the docs screenshots (every level, mechanic and screen), check them and commit them. Use when the user asks to "make new screenshots", "retake the pictures", "update the docs images", or to render the levels again after visual changes.
 ---
 
 # Retake the docs screenshots
 
-`scripts/screenshots.ts` (`npm run screenshots`) drives headless Chrome over a running dev server and writes `.webp` files:
-
-- 2D: `docs/game/images/{levels,mechanics,screens}/` (the default `--out`)
-- 3D: `docs/game/images-3d/...` with `--render=3d --out=docs/game/images-3d`
+`scripts/screenshots.ts` (`npm run screenshots`) drives headless Chrome over a running dev server and writes `.webp` files to `docs/game/images/{levels,mechanics,screens}/`.
 
 Shots are scenes from `src/sim/scenes.ts` (built game states, not playthroughs) plus menu screens. A new level gets a `levels/<id>` shot automatically; a new mechanic needs a scene in `scenes.ts` first.
-
-Ask which look the user wants if they didn't say: 2D, 3D or both.
 
 ## 1. Servers
 
@@ -24,24 +19,24 @@ The online lobby shot needs the game server on 2567, the rest only the dev serve
 
 ## 2. Take the shots
 
-One run per look, with the online lobby in its own run (it leaves the page in a room). Each run takes a few minutes; send the output to a log and only grep it.
+Two runs, with the online lobby in its own (it leaves the page in a room). Each run takes a few minutes; send the output to a log and only grep it.
 
 ```bash
-npm run screenshots -- --render=3d --out=docs/game/images-3d --skip=online-lobby > /tmp/shots3d.log 2>&1
-npm run screenshots -- --render=3d --out=docs/game/images-3d --only=online-lobby >> /tmp/shots3d.log 2>&1
+npm run screenshots -- --skip=online-lobby > /tmp/shots.log 2>&1
+npm run screenshots -- --only=online-lobby >> /tmp/shots.log 2>&1
 ```
 
-For 2D, the same without `--render=3d --out=...`. `--only=<text>` retakes just the shots whose name contains it (`levels/monorepo`, `mechanics/`, `screens/level-select`).
+`--only=<text>` retakes just the shots whose name contains it (`levels/monorepo`, `mechanics/`, `screens/level-select`).
 
 Then: count the shots (`grep -c '\.png' <log>`, one line per shot) and check for `failed`. "no room: is the game server running" means the server isn't on 2567.
 
 ## 3. Check them
 
-Look at a few before committing: convert with `sips -s format png -Z 900 <file>.webp --out <scratch>/<name>.png` and read the PNGs. At least one old level, one new or changed level, the level select and the online lobby. Look for: the wrong map, a blank canvas, cut-off UI, missing surroundings in 3D.
+Look at a few before committing: convert with `sips -s format png -Z 900 <file>.webp --out <scratch>/<name>.png` and read the PNGs. At least one old level, one new or changed level, the level select and the online lobby. Look for: the wrong map, a blank canvas, cut-off UI, missing surroundings.
 
 ## 4. Docs and commit
 
-- New levels or mechanics: add them to `docs/game/levels.md` / `mechanics.md` (2D images) and to the tables in `docs/game/3d.md` (3D images).
-- Commit only the images (and doc changes): `git add docs/game && git commit -m "Retake the <2D/3D> screenshots"`. Unchanged scenes may still produce byte-different files; that's fine.
+- New levels or mechanics: add them to `docs/game/levels.md` / `mechanics.md`.
+- Commit only the images (and doc changes): `git add docs/game && git commit -m "Retake the screenshots"`. Unchanged scenes may still produce byte-different files; that's fine.
 - Push if the branch has a PR.
 - Stop the servers when done (`preview_stop`).
