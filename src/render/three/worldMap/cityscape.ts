@@ -31,6 +31,8 @@ const DASH = { width: 0.05, length: 0.22, every: 0.5 };
 
 export interface Cityscape {
   root: THREE.Group;
+  /** Each chapter's pieces, by chapter index: hidden while its chapter is under clouds. */
+  chapters: THREE.Group[];
   update(timeMs: number, deltaMs: number): void;
 }
 
@@ -52,8 +54,11 @@ export function buildCityscape(map: WorldMap, plan: CityPlan, materials: KitMate
   });
   const blinkMaterials = [materials.glow.clone(), materials.glow.clone()] as const;
   const regions = new Map<number, Layers>();
-  const blinks: THREE.BufferGeometry[][] = [[], []];
-  const cranes: { at: THREE.Vector3 }[] = [];
+  const blinks = new Map<number, [THREE.BufferGeometry[], THREE.BufferGeometry[]]>();
+  const cranes: { at: THREE.Vector3; chapter: number }[] = [];
+  const groups = map.regions.map(() => new THREE.Group());
+  root.add(...groups);
+  const groupOf = (chapter: number): THREE.Group => groups[chapter] ?? root;
   const m = new THREE.Matrix4();
 
   plan.pieces.forEach((piece, i) => {
@@ -68,6 +73,8 @@ export function buildCityscape(map: WorldMap, plan: CityPlan, materials: KitMate
     m.makeRotationY(piece.yaw).setPosition(at.x, at.y, at.z);
     const layers = regions.get(piece.chapter) ?? { body: [], glow: [], shiny: [] };
     regions.set(piece.chapter, layers);
+    const lights = blinks.get(piece.chapter) ?? [[], []];
+    blinks.set(piece.chapter, lights);
     const body = builders.body.build();
     const shiny = builders.shiny.build();
     const blink = builders.blink.build();
@@ -75,7 +82,7 @@ export function buildCityscape(map: WorldMap, plan: CityPlan, materials: KitMate
       [layers.body, body.body],
       [layers.glow, body.glow],
       [layers.shiny, shiny.body],
-      [blinks[i % 2], blink.glow],
+      [lights[i % 2], blink.glow],
     ] as const) {
       if (!g || !('position' in g.attributes)) continue;
       g.applyMatrix4(m);
@@ -87,12 +94,12 @@ export function buildCityscape(map: WorldMap, plan: CityPlan, materials: KitMate
         piece.y + CRANE.mastZ(piece),
         GROUND + CRANE.mastHeight(piece),
       );
-      cranes.push({ at: new THREE.Vector3(top.x, top.y, top.z) });
+      cranes.push({ at: new THREE.Vector3(top.x, top.y, top.z), chapter: piece.chapter });
     }
   });
   streetDashes(map, regions);
 
-  for (const layers of regions.values()) {
+  for (const [chapter, layers] of regions) {
     const add = (
       list: THREE.BufferGeometry[],
       material: THREE.Material,
@@ -102,26 +109,31 @@ export function buildCityscape(map: WorldMap, plan: CityPlan, materials: KitMate
       const mesh = new THREE.Mesh(merge(list), material);
       mesh.castShadow = shadows;
       mesh.receiveShadow = shadows;
-      root.add(mesh);
+      groupOf(chapter).add(mesh);
     };
     add(layers.body, materials.body, true);
     add(layers.shiny, shinyMaterial, true);
     add(layers.glow, materials.glow, false);
   }
-  blinks.forEach((list, k) => {
-    const mesh = new THREE.Mesh(
-      list.length ? merge(list) : new THREE.BufferGeometry(),
-      blinkMaterials[k],
-    );
-    root.add(mesh);
-    return mesh;
-  });
+  for (const [chapter, lights] of blinks) {
+    lights.forEach((list, k) => {
+      if (list.length > 0) groupOf(chapter).add(new THREE.Mesh(merge(list), blinkMaterials[k]));
+    });
+  }
 
-  const trees = buildTrees(plan.pieces, materials);
-  root.add(...trees.map((t) => t.mesh));
+  // Trees per chapter and kind, so a chapter's trees hide with it.
+  const trees = map.regions.flatMap((region) =>
+    buildTrees(
+      plan.pieces.filter((p) => p.chapter === region.chapter),
+      materials,
+    ).map((tree) => {
+      groupOf(region.chapter).add(tree.mesh);
+      return tree;
+    }),
+  );
 
   // The cranes' turning tops.
-  const jibs = cranes.map(({ at }, k) => {
+  const jibs = cranes.map(({ at, chapter }, k) => {
     const parts = craneJib();
     const built = parts.body.build();
     const group = new THREE.Group();
@@ -131,7 +143,7 @@ export function buildCityscape(map: WorldMap, plan: CityPlan, materials: KitMate
     const light = parts.blink.build().glow;
     if (light) group.add(new THREE.Mesh(light, blinkMaterials[k % 2]));
     group.position.copy(at);
-    root.add(group);
+    groupOf(chapter).add(group);
     return group;
   });
 
@@ -159,13 +171,14 @@ export function buildCityscape(map: WorldMap, plan: CityPlan, materials: KitMate
 
   return {
     root,
+    chapters: groups,
     update(timeMs: number): void {
       for (const tree of trees) tree.sway(timeMs);
       carOffsets.forEach((offset, k) => {
         const spot = loop.at(offset + (timeMs / 1000) * CARS.speed);
-        const p = gridToWorld(spot.x, spot.y, GROUND);
+        // Map x and y are world x and z (see `gridToWorld`): no new vector per car per frame.
         carQuaternion.setFromAxisAngle(up, spot.yaw);
-        cars.setMatrixAt(k, m.compose(carPosition.set(p.x, p.y, p.z), carQuaternion, one));
+        cars.setMatrixAt(k, m.compose(carPosition.set(spot.x, GROUND, spot.y), carQuaternion, one));
       });
       cars.instanceMatrix.needsUpdate = true;
       jibs.forEach((jib, k) => {
@@ -208,8 +221,9 @@ function buildTrees(
   pieces: readonly CityPiece[],
   materials: KitMaterials,
 ): { mesh: THREE.InstancedMesh; sway: (timeMs: number) => void }[] {
-  return TREES.map((kind) => {
+  return TREES.flatMap((kind) => {
     const list = pieces.filter((p) => p.kind === kind);
+    if (list.length === 0) return [];
     const geometry = treeModel(kind).build().body;
     const mesh = new THREE.InstancedMesh(geometry, materials.body, Math.max(1, list.length));
     mesh.count = list.length;
@@ -243,6 +257,6 @@ function buildTrees(
     };
     sway(0);
     mesh.computeBoundingSphere();
-    return { mesh, sway };
+    return [{ mesh, sway }];
   });
 }
