@@ -783,11 +783,29 @@ body {
   --chapter-color: #2fb8b0;
 }
 
-/* Top left: the chapter, a dark blue tab with its color down the side. */
-.map-chapter {
+/* The top corners: the chapter banner over the card on the left, the star
+   total on the right (the card moves under it near the island's left end). */
+.map-column {
   position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.map-column-left {
   top: 1.25rem;
   left: 0;
+  align-items: flex-start;
+}
+
+.map-column-right {
+  top: 3.75rem;
+  right: 0;
+  align-items: flex-end;
+}
+
+/* Top left: the chapter, a dark blue tab with its color down the side. */
+.map-chapter {
   min-width: 15rem;
   padding: 0.625rem 1.5rem 0.75rem 1.25rem;
   border-left: 0.5rem solid var(--chapter-color);
@@ -821,9 +839,6 @@ body {
 
 /* Top right, under the sound button: the star total, like a badge. */
 .map-stars {
-  position: absolute;
-  top: 3.75rem;
-  right: 0;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -848,15 +863,13 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Upper middle: the selected level's card, light blue paper like Overcooked's. */
+/* The selected level's card, light blue paper like Overcooked's, in a top corner. */
 .map-card {
-  position: absolute;
-  top: 5.5rem;
-  left: 50%;
-  width: 22rem;
+  width: 21rem;
+  margin: 0 1rem;
   padding: 0.875rem 1.25rem 1rem;
   box-sizing: border-box;
-  transform: translateX(-50%) rotate(-1deg);
+  transform: rotate(-1deg);
   border: 3px solid #ffffff;
   border-top: 0.5rem solid var(--chapter-color);
   border-radius: 0.375rem;
