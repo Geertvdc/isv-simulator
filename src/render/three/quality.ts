@@ -4,10 +4,13 @@
  * - `medium`: the same at 1× pixel ratio
  * - `low`: no post-processing, small shadow map, 1× pixel ratio
  *
- * The game starts on high (or `?quality=`) and steps down one level each
- * time frames stay slow; it never steps back up, so it can't flicker
- * between levels. No three.js here, so it can be tested.
+ * The Graphics setting picks one, or `auto`: start on high and step down
+ * one level each time frames stay slow, never back up, so it can't flicker
+ * between levels. `?quality=` overrides the setting. No three.js here, so
+ * it can be tested.
  */
+
+import type { Graphics } from '../../flow/save';
 
 export const QUALITIES = ['high', 'medium', 'low'] as const;
 export type Quality = (typeof QUALITIES)[number];
@@ -61,9 +64,12 @@ export function stepDown(q: Quality): Quality | null {
   return QUALITIES[QUALITIES.indexOf(q) + 1] ?? null;
 }
 
-/** The quality `?quality=` asks for, and whether to watch frames (only when it isn't forced). */
-export function initialQuality(param: string | null): { quality: Quality; watch: boolean } {
-  const asked = QUALITIES.find((q) => q === param);
+/** The quality to start at: `?quality=` wins over the Graphics setting; only `auto` watches frames. */
+export function startQuality(
+  setting: Graphics,
+  param: string | null,
+): { quality: Quality; watch: boolean } {
+  const asked = QUALITIES.find((q) => q === param) ?? QUALITIES.find((q) => q === setting);
   if (asked) return { quality: asked, watch: false };
   return { quality: 'high', watch: true };
 }

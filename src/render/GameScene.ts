@@ -1197,13 +1197,14 @@ export class GameScene extends Phaser.Scene {
     this.emitFlow(this.time.now);
   }
 
-  /** Sound and music volume, mute and screen shake from the save, applied right away. */
+  /** Sound and music volume, mute, screen shake and graphics from the save, applied right away. */
   private applySettings(): void {
-    const { sfxVolume, musicVolume, screenShake, muted } = this.options.save.settings;
+    const { sfxVolume, musicVolume, screenShake, graphics, muted } = this.options.save.settings;
     this.game.sound.mute = muted;
     this.sounds.volume = sfxVolume / SFX_VOLUME_MAX;
     if (this.music) this.music.volume = musicVolume / SFX_VOLUME_MAX;
     this.roundRenderer.setShake(screenShake);
+    this.roundRenderer.setGraphics(graphics);
   }
 
   /** A fresh round of the loaded level with everyone in the lobby, or bots in the demo. */

@@ -415,6 +415,21 @@ describe('settings', () => {
     expect(update.effects.map((e) => e.type)).toContain('saveChanged');
   });
 
+  it('steps Graphics through auto, high, medium and low, wrapping round', () => {
+    const c = ctx();
+    const flow = fromPause(c);
+    flow.menuIndex = menuItems(flow).indexOf('graphics');
+    expect(c.save.settings.graphics).toBe('auto');
+    updateFlow(flow, right(), c);
+    expect(c.save.settings.graphics).toBe('high');
+    updateFlow(flow, left(), c);
+    const update = updateFlow(flow, left(), c);
+    expect(c.save.settings.graphics).toBe('low');
+    expect(update.effects.map((e) => e.type)).toContain('saveChanged');
+    updateFlow(flow, confirm(), c);
+    expect(c.save.settings.graphics).toBe('auto');
+  });
+
   it('returns to the pause menu with the cursor on Settings', () => {
     const flow = fromPause();
     updateFlow(flow, menu(), ctx());

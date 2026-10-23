@@ -28,6 +28,7 @@ import {
 import type { LevelResult } from '../sim/orders';
 import {
   type ChapterInfo,
+  GRAPHICS_LEVELS,
   type SaveData,
   chapterIndexOf,
   isChapterOpen,
@@ -74,6 +75,7 @@ export type MenuItem =
   | 'volume'
   | 'music'
   | 'shake'
+  | 'graphics'
   | 'profile'
   | ProfileAction
   | 'back';
@@ -276,7 +278,7 @@ export function menuItems(flow: Flow): MenuItem[] {
     case 'results':
       return flow.results?.canGoNext ? ['next', 'retry', 'levelSelect'] : ['retry', 'levelSelect'];
     case 'settings':
-      return ['volume', 'music', 'shake', 'profile', 'back'];
+      return ['volume', 'music', 'shake', 'graphics', 'profile', 'back'];
     case 'profile':
       return ['copyId', 'changeName', 'changeId', 'back'];
     case 'credits':
@@ -486,6 +488,10 @@ function navigate(flow: Flow, press: DevicePress, ctx: FlowContext, update: Flow
     toggleShake(ctx, update);
     return true;
   }
+  if (item === 'graphics') {
+    stepGraphics(ctx, update, Math.sign(x));
+    return true;
+  }
   return false;
 }
 
@@ -512,6 +518,16 @@ export function chapterCursor(ctx: FlowContext, index: number, x: number, y: num
 
 function toggleShake(ctx: FlowContext, update: FlowUpdate): void {
   ctx.save.settings.screenShake = !ctx.save.settings.screenShake;
+  update.effects.push({ type: 'settingsChanged' }, { type: 'saveChanged' });
+  update.changed = true;
+}
+
+/** Moves the Graphics setting `step` along its list, wrapping round. */
+function stepGraphics(ctx: FlowContext, update: FlowUpdate, step: number): void {
+  const settings = ctx.save.settings;
+  const n = GRAPHICS_LEVELS.length;
+  const index = GRAPHICS_LEVELS.indexOf(settings.graphics);
+  settings.graphics = GRAPHICS_LEVELS[(index + step + n) % n] ?? 'auto';
   update.effects.push({ type: 'settingsChanged' }, { type: 'saveChanged' });
   update.changed = true;
 }
@@ -632,6 +648,9 @@ function confirm(flow: Flow, ctx: FlowContext, update: FlowUpdate): void {
       return;
     case 'shake':
       toggleShake(ctx, update);
+      return;
+    case 'graphics':
+      stepGraphics(ctx, update, 1);
       return;
     case 'profile':
       goTo(flow, 'profile');

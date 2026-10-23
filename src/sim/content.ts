@@ -98,6 +98,14 @@ export const MEETING_TITLES: readonly string[] = [
   'Kick-off kick-off',
 ];
 
+/** The Graphics setting's values in the Settings menu. */
+export const GRAPHICS_TEXTS = {
+  auto: 'Auto',
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+} as const;
+
 /** Instead of the game, in a browser that can't draw it. */
 export const NO_WEBGL_TEXT =
   'This game needs WebGL 2 to draw the office. Try an up-to-date Chrome, Edge, Firefox or Safari, or turn on hardware acceleration.';
@@ -214,6 +222,7 @@ export const MENU_LABELS = {
   volume: 'Sound volume',
   music: 'Music volume',
   shake: 'Screen shake',
+  graphics: 'Graphics',
   profile: 'Online profile',
   copyId: 'Copy ID',
   changeName: 'Change name',

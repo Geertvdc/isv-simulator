@@ -9,13 +9,14 @@ import {
   ToneMappingMode,
 } from 'postprocessing';
 import * as THREE from 'three';
+import type { Graphics } from '../../flow/save';
 import { type CameraPose, cameraPosition } from '../projection';
 import { GLOW_BOOST_KEY } from './kit';
 import {
   type FrameWatch,
   type Quality,
   createFrameWatch,
-  initialQuality,
+  startQuality,
   pixelRatioFor,
   rewarm,
   stepDown,
@@ -36,6 +37,11 @@ const BLOOM = { threshold: 1.05, smoothing: 0.1, intensity: 0.5 };
 /** Sun shadow map size per quality. */
 const SHADOW_MAP = { high: 2048, medium: 2048, low: 1024 } as const;
 
+/** `?quality=`, which overrides the Graphics setting. */
+function qualityParam(): string | null {
+  return new URLSearchParams(window.location.search).get('quality');
+}
+
 /**
  * The one WebGL canvas for the whole game, under Phaser's (transparent)
  * canvas. Kept across scene restarts: browsers allow only a few WebGL
@@ -49,7 +55,9 @@ export class Stage {
   readonly camera = new THREE.PerspectiveCamera();
   private size = { width: 0, height: 0 };
   private quality: Quality;
-  private readonly frames: FrameWatch;
+  private frames: FrameWatch;
+  /** The Graphics setting last applied; `null` until `setGraphics` runs. */
+  private graphics: Graphics | null = null;
   private composer: { scene: THREE.Scene; composer: EffectComposer } | null = null;
   /** The level last drawn, to set it up for the quality when a new one comes. */
   private scene: THREE.Scene | null = null;
@@ -76,7 +84,7 @@ export class Stage {
     // order; `#game` is fixed, so z-index -1 stays inside it.
     canvas.style.zIndex = '-1';
     parent.prepend(canvas);
-    const start = initialQuality(new URLSearchParams(window.location.search).get('quality'));
+    const start = startQuality('auto', qualityParam());
     this.quality = start.quality;
     this.frames = createFrameWatch(start.watch);
     this.applyQuality();
@@ -84,6 +92,15 @@ export class Stage {
 
   get currentQuality(): Quality {
     return this.quality;
+  }
+
+  /** Applies the Graphics setting: a fixed quality, or `auto` from high down. */
+  setGraphics(graphics: Graphics): void {
+    if (graphics === this.graphics) return;
+    this.graphics = graphics;
+    const start = startQuality(graphics, qualityParam());
+    this.frames = createFrameWatch(start.watch);
+    this.setQuality(start.quality);
   }
 
   /** Switches quality for the canvas and the level on it. */

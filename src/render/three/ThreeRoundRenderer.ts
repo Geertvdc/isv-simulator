@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import * as THREE from 'three';
+import type { Graphics } from '../../flow/save';
 import { CAMERA_FIT_PADDING, CAMERA_HUD_BOTTOM } from '../../sim/balance';
 import { type LevelMap, getTile, isWorkSurface } from '../../sim/level';
 import { type PlayerId, targetTile } from '../../sim/state';
@@ -186,6 +187,10 @@ export class ThreeRoundRenderer implements RoundRenderer {
 
   setShake(enabled: boolean): void {
     this.fx.shakeEnabled = enabled;
+  }
+
+  setGraphics(graphics: Graphics): void {
+    this.stage.setGraphics(graphics);
   }
 
   setDebug(enabled: boolean): void {

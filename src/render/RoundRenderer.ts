@@ -1,5 +1,6 @@
 import type Phaser from 'phaser';
 import type { HintId } from '../flow/hints';
+import type { Graphics } from '../flow/save';
 import type { LevelMap } from '../sim/level';
 import type { GameEvent } from '../sim/orders';
 import type { MapLook } from './mapLook';
@@ -29,6 +30,8 @@ export interface RoundRenderer {
   /** Runs every frame, in a round or not, after `syncRound`. */
   render(timeMs: number, deltaMs: number): void;
   setShake(enabled: boolean): void;
+  /** The Graphics setting from Settings. */
+  setGraphics(graphics: Graphics): void;
   /** Debug mode: tile labels, free camera where the renderer has one. */
   setDebug(enabled: boolean): void;
   /** The tile under canvas point (sx, sy) on the floor, which may lie outside the map. */
