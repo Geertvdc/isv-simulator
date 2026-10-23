@@ -52,16 +52,28 @@ const ROAD = {
 export const ROAD_SURFACE = ROAD.y + 0.01;
 
 /** Level flags: a plate, a pole with a gold ball and a cloth in the chapter's color. */
-const FLAG = {
+export const FLAG = {
   plate: 0.3,
   pole: 1.45,
   cloth: { width: 0.62, height: 0.4, depth: 0.04 },
 };
 
+export interface DioramaFlag {
+  /** Waved every frame; its material is its own, so it can turn grey. */
+  cloth: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
+  /** The level number on the ground. */
+  label: THREE.Mesh;
+  foot: Vec3;
+  chapter: number;
+  /** The cloth's color while the level is open. */
+  color: number;
+}
+
 export interface Diorama {
   root: THREE.Group;
-  /** Each node's flag: its cloth (waved every frame) and where its foot stands. */
-  flags: { cloth: THREE.Mesh; foot: Vec3 }[];
+  flags: DioramaFlag[];
+  /** Each chapter's flag stands (plate, pole, ball), merged: hidden with its chapter. */
+  stands: THREE.Mesh[];
 }
 
 /** Builds the diorama for `map`; `chapterIds` names each region's chapter (for its colors), `ground` paves its tiles. */
@@ -74,27 +86,33 @@ export function buildDiorama(
   const root = new THREE.Group();
   root.add(...terrain(map, chapterIds, ground), sea(), shallows(map), road(map, materials));
   const flags: Diorama['flags'] = [];
-  // Every flag's stand in one mesh; the cloths wave one by one.
-  const stands = new ModelBuilder();
+  // Each chapter's flag stands in one mesh; the cloths wave one by one.
+  const builders = map.regions.map(() => new ModelBuilder());
   markerSpots(map).forEach((marker, i) => {
     const foot = gridToWorld(marker.foot.x, marker.foot.y, ROAD.y);
-    const chapterId = chapterIds[map.nodeChapters[i] ?? -1] ?? '';
-    flagStand(stands, foot);
-    const cloth = flagCloth(chapterId);
+    const chapter = map.nodeChapters[i] ?? 0;
+    const chapterId = chapterIds[chapter] ?? '';
+    const builder = builders[chapter];
+    if (builder) flagStand(builder, foot);
+    const color = MAP_PALETTE.flag[chapterId] ?? MAP_PALETTE.flagFallback;
+    const cloth = flagCloth(color);
     cloth.position.x += foot.x;
     cloth.position.y += foot.y;
     cloth.position.z += foot.z;
     root.add(cloth);
-    flags.push({ cloth, foot });
     const label = labelMesh(levelNumber(map, i));
     const at = gridToWorld(marker.label.x, marker.label.y, ROAD.y - 0.02);
     label.position.set(at.x, at.y, at.z);
     root.add(label);
+    flags.push({ cloth, label, foot, chapter, color });
   });
-  const standMesh = new THREE.Mesh(stands.build().body, materials.body);
-  standMesh.castShadow = true;
-  root.add(standMesh);
-  return { root, flags };
+  const stands = builders.map((builder) => {
+    const mesh = new THREE.Mesh(builder.build().body, materials.body);
+    mesh.castShadow = true;
+    root.add(mesh);
+    return mesh;
+  });
+  return { root, flags, stands };
 }
 
 /** "2-3": the chapter and the level's place in it, both from 1. */
@@ -158,7 +176,8 @@ function terrain(
     }
   }
 
-  const capGeometry = new RoundedBoxGeometry(CAP.size, CAP.height, CAP.size, 2, CAP.bevel);
+  // One segment per bevel: about 100 triangles a tile instead of 300, and it looks the same from up here.
+  const capGeometry = new RoundedBoxGeometry(CAP.size, CAP.height, CAP.size, 1, CAP.bevel);
   capGeometry.translate(0, -CAP.height / 2, 0);
   const caps = new THREE.InstancedMesh(capGeometry, matte(0xffffff, 0.9), tiles.length);
   const earthGeometry = new THREE.BoxGeometry(1, EARTH_DEPTH, 1);
@@ -332,16 +351,13 @@ function flagStand(b: ModelBuilder, foot: Vec3): void {
     .sphere(0.08, MAP_PALETTE.finial, { at: [x, y + FLAG.pole + 0.05, z] });
 }
 
-/** A flag's cloth in its chapter's color, hinged at the pole of a flag standing at the origin. */
-function flagCloth(chapterId: string): THREE.Mesh {
+/** A flag's cloth in `color`, hinged at the pole of a flag standing at the origin. */
+function flagCloth(color: number): DioramaFlag['cloth'] {
   const { width, height, depth } = FLAG.cloth;
   const clothGeometry = new THREE.BoxGeometry(width, height, depth);
   // Hinged at the pole.
   clothGeometry.translate(width / 2, 0, 0);
-  const cloth = new THREE.Mesh(
-    clothGeometry,
-    matte(MAP_PALETTE.flag[chapterId] ?? MAP_PALETTE.flagFallback, 0.8),
-  );
+  const cloth = new THREE.Mesh(clothGeometry, matte(color, 0.8));
   cloth.position.set(0.03, FLAG.pole - height / 2 - 0.04, 0);
   cloth.castShadow = true;
   return cloth;
