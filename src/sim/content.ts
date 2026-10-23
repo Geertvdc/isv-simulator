@@ -193,7 +193,7 @@ export const LEVEL_UNLOCKED_TEXT = 'Level unlocked!';
 export const SOUND_TOGGLE_TITLE = { mute: 'Sound off (M)', unmute: 'Sound on (M)' } as const;
 
 /** The big name on the title screen. */
-export const GAME_TITLE = 'ISV Simulator';
+export const GAME_TITLE = 'OverEngineered';
 export const GAME_TAGLINE = 'Ship it before the customer notices.';
 /** On the title screen until someone presses a button. */
 export const PRESS_ANY_BUTTON_TEXT = 'Press any button';
