@@ -16,6 +16,13 @@ const END_MARGIN = 8;
 const FOLLOW_Y = 0.15;
 /** The camera looks this far in front of the middle row, so the near flags' numbers show. */
 const LOOK_AHEAD = 0.6;
+/**
+ * A selected flag this far left of the screen's middle (only near the
+ * island's left end, where the camera stops following) puts the level card
+ * in the top right instead of the top left, so the card never covers it.
+ */
+const CARD_FLIP = 2;
+
 /** The glide's time constant: after this long, about two thirds of the way there. */
 const GLIDE_MS = 220;
 
@@ -34,4 +41,16 @@ export function cameraTarget(map: Pick<WorldMap, 'width' | 'height'>, node: MapP
 export function glide(from: MapPoint, to: MapPoint, deltaMs: number): MapPoint {
   const k = 1 - Math.exp(-Math.max(0, deltaMs) / GLIDE_MS);
   return { x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k };
+}
+
+/**
+ * Which top corner the level card goes in with `node` selected: the left,
+ * under the chapter banner, unless the camera holds off the island's left
+ * end and the flag (and the van on it) sits on the left of the screen.
+ */
+export function cardSide(
+  map: Pick<WorldMap, 'width' | 'height'>,
+  node: MapPoint,
+): 'left' | 'right' {
+  return node.x - cameraTarget(map, node).x < -CARD_FLIP ? 'right' : 'left';
 }

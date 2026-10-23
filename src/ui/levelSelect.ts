@@ -1,5 +1,7 @@
 import { isOnlineHost } from '../flow/online';
 import { chapterIndexOf, isChapterOpen, isUnlocked, totalStars } from '../flow/save';
+import { nodeIndexOf, worldMapFor } from '../flow/worldMap';
+import { cardSide } from '../render/three/worldMap/mapCamera';
 import type { FlowView } from '../render/GameScene';
 import { MAX_STARS, STARS_TO_UNLOCK } from '../sim/balance';
 import {
@@ -21,9 +23,12 @@ export interface LevelSelectView {
 
 /**
  * What floats over the world map on the level select (the map itself is
- * 3D, see `src/render/three/worldMap/`): the selected level's card, the
- * chapter's name in the top left, the star total in the top right and the
- * button hint at the bottom.
+ * 3D, see `src/render/three/worldMap/`): the chapter's name in the top
+ * left, the star total in the top right, the selected level's card under
+ * one of them and the button hint at the bottom. The card sits under the
+ * chapter banner, clear of the selected flag and the van in the middle of
+ * the screen; near the island's left end, where they sit on the left, it
+ * moves under the star total.
  */
 export function mountLevelSelect(root: HTMLElement): LevelSelectView {
   const panel = el('div', 'screen level-select');
@@ -50,7 +55,11 @@ export function mountLevelSelect(root: HTMLElement): LevelSelectView {
   card.append(number, name, blurb, stars, status);
 
   const hint = el('div', 'screen-hint map-hint', LEVEL_SELECT_HINT);
-  panel.append(banner, total, card, hint);
+  const left = el('div', 'map-column map-column-left');
+  const right = el('div', 'map-column map-column-right');
+  left.append(banner, card);
+  right.append(total);
+  panel.append(left, right, hint);
   root.append(panel);
 
   return {
@@ -82,6 +91,10 @@ export function mountLevelSelect(root: HTMLElement): LevelSelectView {
         ? ''
         : `🔒 ${chapterGateHint(chapters[c]?.starGate ?? 0, have)}`;
 
+      const map = worldMapFor(chapters);
+      const node = map.nodes[nodeIndexOf(map, id)];
+      const column = node && cardSide(map, node) === 'right' ? right : left;
+      if (card.parentElement !== column) column.append(card);
       card.dataset.chapter = chapter?.id ?? '';
       card.classList.toggle('locked', !open);
       number.textContent = levelLabel(c + 1, place);

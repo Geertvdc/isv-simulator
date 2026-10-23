@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cameraTarget, glide } from './mapCamera';
+import { cameraTarget, cardSide, glide } from './mapCamera';
 
 const MAP = { width: 48, height: 12 };
 
@@ -33,5 +33,15 @@ describe('glide', () => {
     const far = glide(from, to, 10_000);
     expect(far.x).toBeCloseTo(10);
     expect(glide(from, to, 0)).toEqual(from);
+  });
+});
+
+describe('cardSide', () => {
+  it('puts the card top left, or top right near the left end where the flag sits left', () => {
+    expect(cardSide(MAP, { x: 20, y: 6 })).toBe('left');
+    expect(cardSide(MAP, { x: 46.5, y: 8 })).toBe('left');
+    expect(cardSide(MAP, { x: 7, y: 4 })).toBe('left');
+    expect(cardSide(MAP, { x: 4.5, y: 4 })).toBe('right');
+    expect(cardSide(MAP, { x: 1.5, y: 8 })).toBe('right');
   });
 });
