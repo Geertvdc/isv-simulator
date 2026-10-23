@@ -12,7 +12,9 @@ import { type Stage, disposeTree, getStage } from '../stage';
 import { type Diorama, ROAD_SURFACE, buildDiorama } from './diorama';
 import { planCity } from './cityPlan';
 import { type Cityscape, buildCityscape } from './cityscape';
+import { type LockState, lockStateOf, newlyOpened, sameLocks, vanStop } from './locks';
 import { cameraTarget, glide } from './mapCamera';
+import { MapLocks } from './mapLocks';
 import {
   type Drive,
   type RoadPath,
@@ -22,6 +24,14 @@ import {
   tangentAt,
 } from './roadPath';
 import { type Van, buildVan } from './van';
+
+/**
+ * What was open when the map last showed: kept across scene restarts (a
+ * renderer is made per scene start), so the map can tell what opened while
+ * a level was on. `null` until the map first shows after a page load, which
+ * just shows how things stand.
+ */
+let seenLocks: LockState | null = null;
 
 /** A high three-quarter view, like Overcooked's map: tilted well down, a little wider than the rounds. */
 const CAMERA = {
@@ -36,8 +46,6 @@ const CAMERA = {
 };
 /** The ring round the selected flag's foot. */
 const RING = { radius: 0.5, tube: 0.06, pulse: 0.08, pulseMs: 900 };
-/** The flags flutter a little. */
-const FLUTTER = { angle: 0.18, ms: 1400 };
 /**
  * The van's drive, in tiles a second (and a second squared): a hop to the
  * next flag takes about a second, and a jump of more than two hops hurries
@@ -77,6 +85,10 @@ export class WorldMapRenderer implements MenuRenderer {
   private readonly ring: THREE.Mesh;
   private readonly road: RoadPath;
   private readonly van: Van;
+  private readonly locks: MapLocks;
+  /** What the locks show now, and the stars per node, so they only rebuild on a change. */
+  private shownLocks: LockState | null = null;
+  private shownStars = '';
   private selected = 0;
   /** The van on the road; `null` parks it at the selected flag on the next frame (no drive). */
   private drive: Drive | null = null;
@@ -108,7 +120,16 @@ export class WorldMapRenderer implements MenuRenderer {
     );
     this.road = buildRoadPath(this.map);
     this.van = buildVan(this.materials);
+    this.locks = new MapLocks(
+      this.map,
+      this.road,
+      this.diorama,
+      this.city,
+      CHAPTERS.map((c) => c.starGate),
+      this.materials,
+    );
     this.world.add(
+      this.locks.root,
       ...createLights(this.map),
       this.diorama.root,
       this.city.root,
@@ -123,25 +144,48 @@ export class WorldMapRenderer implements MenuRenderer {
     if (node >= 0) this.selected = node;
     // While a level shows instead of the map, the van just waits at the selected flag.
     if (!showsMap(view.screen)) this.drive = null;
+    this.syncLocks(view);
+  }
+
+  /**
+   * The locks as of the last time the map showed; when it shows again, what
+   * opened in the meantime (or since the last frame) animates open.
+   */
+  private syncLocks(view: MenuView): void {
+    const now = lockStateOf(this.map, view);
+    const onMap = showsMap(view.screen);
+    const opened = onMap ? newlyOpened(seenLocks, now) : { chapters: [], levels: [] };
+    if (onMap) seenLocks = now;
+    const display = onMap ? now : (seenLocks ?? now);
+    const stars = this.map.levelIds.map(
+      (id) => view.levels[view.levelIds.indexOf(id)]?.stars ?? null,
+    );
+    const starKey = stars.join(',');
+    const moving = opened.chapters.length > 0 || opened.levels.length > 0;
+    if (!moving && sameLocks(this.shownLocks, display) && starKey === this.shownStars) return;
+    this.locks.show(display, stars, opened);
+    this.shownLocks = display;
+    this.shownStars = starKey;
   }
 
   render(timeMs: number, deltaMs: number): void {
     const { width, height } = this.scene.scale;
     this.stage.resize(width, height);
-    const van = this.driveVan(deltaMs);
-    const target = cameraTarget(this.map, van);
+    const { at: van, blocked } = this.driveVan(deltaMs);
+    // Waiting at a closed gate, the van stays put and the camera goes to look at the level.
+    const selectedNode = this.map.nodes[this.selected] ?? van;
+    const target = cameraTarget(this.map, blocked ? selectedNode : van);
     this.look = this.look ? glide(this.look, target, deltaMs) : target;
     this.stage.setPose(this.pose(this.look, width, height));
 
     const flag = this.diorama.flags[this.selected];
+    this.ring.visible = !!flag && !this.locks.isLocked(flag.chapter);
     if (flag) {
       const pulse = 1 + Math.sin((timeMs / RING.pulseMs) * Math.PI * 2) * RING.pulse;
       this.ring.position.set(flag.foot.x, flag.foot.y + 0.1, flag.foot.z);
       this.ring.scale.setScalar(pulse);
     }
-    this.diorama.flags.forEach((f, i) => {
-      f.cloth.rotation.y = Math.sin((timeMs / FLUTTER.ms) * Math.PI * 2 + i * 1.7) * FLUTTER.angle;
-    });
+    this.locks.update(timeMs, deltaMs);
     this.city.update(timeMs, deltaMs);
     this.stage.render(this.world, deltaMs);
   }
@@ -159,9 +203,19 @@ export class WorldMapRenderer implements MenuRenderer {
     this.world.clear();
   }
 
-  /** Moves the van along the road toward the selected flag; returns where it is now. */
-  private driveVan(deltaMs: number): MapPoint {
-    const target = this.road.nodeDistances[this.selected] ?? 0;
+  /**
+   * Moves the van along the road toward the selected flag, or as far as the
+   * first closed gate on the way; returns where it is now, and whether a
+   * gate holds it up.
+   */
+  private driveVan(deltaMs: number): { at: MapPoint; blocked: boolean } {
+    const flagAt = this.road.nodeDistances[this.selected] ?? 0;
+    const target = vanStop(
+      flagAt,
+      this.locks.gateStops,
+      this.locks.gateChapters,
+      this.locks.chapterOpen,
+    );
     const before = this.drive;
     const parked = before === null;
     const drive = before
@@ -194,7 +248,7 @@ export class WorldMapRenderer implements MenuRenderer {
     const want = Math.min(Math.max(-accel * perAccel, -max), max);
     this.tilt += (want - this.tilt) * ease(dt, ms);
     body.rotation.x = this.tilt;
-    return at;
+    return { at, blocked: target < flagAt };
   }
 
   private pose(look: MapPoint, width: number, height: number): CameraPose {
