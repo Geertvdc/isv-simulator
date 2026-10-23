@@ -30,11 +30,11 @@ import {
   type ChapterInfo,
   GRAPHICS_LEVELS,
   type SaveData,
-  chapterIndexOf,
   isChapterOpen,
   isUnlocked,
   recordResult,
 } from './save';
+import { mapCursor } from './worldMap';
 
 export type Screen =
   | 'title'
@@ -461,7 +461,7 @@ function navigate(flow: Flow, press: DevicePress, ctx: FlowContext, update: Flow
   const { x, y } = press.nav;
   if (x === 0 && y === 0) return false;
   if (flow.screen === 'levelSelect') {
-    const index = chapterCursor(ctx, flow.levelIndex, x, y);
+    const index = mapCursor(ctx, flow.levelIndex, x, y);
     if (index === flow.levelIndex) return false;
     flow.levelIndex = index;
     return true;
@@ -493,27 +493,6 @@ function navigate(flow: Flow, press: DevicePress, ctx: FlowContext, update: Flow
     return true;
   }
   return false;
-}
-
-/**
- * The level select cursor moved from level `index`: left/right to the same
- * row of the chapter next door (or its last level when it's shorter),
- * up/down within the chapter. Returns the new level index.
- */
-export function chapterCursor(ctx: FlowContext, index: number, x: number, y: number): number {
-  const { chapters, levelIds } = ctx;
-  const id = levelIds[index];
-  const chapter = id === undefined ? -1 : chapterIndexOf(chapters, id);
-  const current = chapters[chapter];
-  if (!current) return clamp(index + (x !== 0 ? x : y), 0, levelIds.length - 1);
-  const row = current.levelIds.indexOf(id ?? '');
-  const target =
-    x !== 0 ? chapters[clamp(chapter + Math.sign(x), 0, chapters.length - 1)] : current;
-  if (!target) return index;
-  const nextRow = x !== 0 ? row : row + Math.sign(y);
-  const nextId = target.levelIds[clamp(nextRow, 0, target.levelIds.length - 1)];
-  const next = nextId === undefined ? -1 : levelIds.indexOf(nextId);
-  return next < 0 ? index : next;
 }
 
 function toggleShake(ctx: FlowContext, update: FlowUpdate): void {
