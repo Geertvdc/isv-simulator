@@ -20,6 +20,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { helloFor, joinRoomByCode } from '../src/net/client';
+import { CHAPTERS } from '../src/sim/levels';
 import { SCENES } from '../src/sim/scenes';
 
 const args = process.argv.slice(2);
@@ -209,10 +210,13 @@ async function toLevelSelect(page: Page, query = '?unlockAll'): Promise<void> {
   await page.key('KeyE'); // player 1 starts
 }
 
-/** Moves the level select to chapter `chapter` (0-based), level `row`, and opens its intro card. */
+/**
+ * Drives the level select to chapter `chapter` (0-based), level `row`, and
+ * opens its intro card. Right walks the map's road one level at a time.
+ */
 async function openIntro(page: Page, chapter: number, row: number): Promise<void> {
-  for (let i = 0; i < chapter; i++) await page.key('ArrowRight');
-  for (let i = 0; i < row; i++) await page.key('ArrowDown');
+  const before = CHAPTERS.slice(0, chapter).reduce((n, c) => n + c.levels.length, 0);
+  for (let i = 0; i < before + row; i++) await page.key('ArrowRight');
   await page.key('Enter');
   await sleep(500);
 }
@@ -316,8 +320,9 @@ const SHOTS: Record<string, Shot> = {
   async 'screens/level-select'(page) {
     // A fresh save: later chapters still locked.
     await toLevelSelect(page, '');
-    await page.key('ArrowDown');
-    await sleep(400);
+    // Drive to the second level: the map camera glides after the cursor.
+    await page.key('ArrowRight');
+    await sleep(900);
     await page.shot('screens/level-select');
   },
 

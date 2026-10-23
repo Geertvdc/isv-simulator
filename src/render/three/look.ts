@@ -49,6 +49,47 @@ export const PALETTE = {
   screenGlow: 0x7cf0c8,
 } as const;
 
+/**
+ * The world map's colors (phase 19): grass that turns greyer and more paved
+ * from the garage town to the Big Tech city, dirt under it, the sea around
+ * the island, the road and the level flags.
+ */
+export const MAP_PALETTE = {
+  /** Top of the land tiles, per chapter id. */
+  ground: {
+    garage: 0xa9cf55,
+    startup: 0x5cbd6e,
+    'scale-up': 0x93b98a,
+    enterprise: 0xaab3a2,
+    'big-tech': 0xbec6cb,
+  } as Readonly<Record<string, number>>,
+  groundFallback: 0x8fc46a,
+  /** The shore tiles round the island. */
+  sand: 0xe6d29a,
+  /** Under the grass: the cliff sides. */
+  earth: 0x8a5d3b,
+  sea: 0x3f8fae,
+  /** The lighter band of shallow water along the coast. */
+  shallows: 0x6fb8c8,
+  road: 0x474c56,
+  roadEdge: 0xdcd6c6,
+  roadDash: 0xfafaf2,
+  /** Flag accents, per chapter id: the same as the chapter colors in the CSS. */
+  flag: {
+    garage: 0xd98b3a,
+    startup: 0x4fbf74,
+    'scale-up': 0x4f8fe0,
+    enterprise: 0xa46ad8,
+    'big-tech': 0x2fb8b0,
+  } as Readonly<Record<string, number>>,
+  flagFallback: 0xe0e0e0,
+  pole: 0xf1efe8,
+  plate: 0xe3dccb,
+  finial: 0xffc83d,
+  /** The ring round the selected flag. */
+  selected: 0xffd166,
+} as const;
+
 /** Floor colors per theme: base and the alternate tile for a gentle checker. */
 export const FLOOR_COLORS: Readonly<Record<FloorTheme, readonly [number, number]>> = {
   concrete: [0xb8a487, 0xab977b],

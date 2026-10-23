@@ -409,160 +409,6 @@ body {
   }
 }
 
-.chapters {
-  display: grid;
-  /* Five chapters side by side. */
-  grid-template-columns: repeat(5, minmax(0, 13.5rem));
-  gap: 1rem;
-}
-
-.chapter {
-  display: flex;
-  flex-direction: column;
-  gap: 0.625rem;
-  padding: 0.625rem;
-  border-radius: 0.875rem;
-  border: 2px solid var(--panel-border);
-  border-top: 0.375rem solid var(--chapter-color, var(--panel-border));
-  background: var(--panel);
-  box-shadow: 0 0.375rem 1rem rgba(0, 0, 0, 0.35);
-}
-
-.chapter[data-chapter='garage'] {
-  --chapter-color: #d98b3a;
-}
-
-.chapter[data-chapter='startup'] {
-  --chapter-color: #4fbf74;
-}
-
-.chapter[data-chapter='scale-up'] {
-  --chapter-color: #4f8fe0;
-}
-
-.chapter[data-chapter='enterprise'] {
-  --chapter-color: #a46ad8;
-}
-
-.chapter[data-chapter='big-tech'] {
-  --chapter-color: #2fb8b0;
-}
-
-.chapter.selected {
-  border-color: var(--chapter-color);
-  border-top-color: var(--chapter-color);
-}
-
-.chapter-name {
-  font-size: 1.625rem;
-  font-weight: 800;
-  text-align: center;
-  color: var(--chapter-color, #e6e6e6);
-}
-
-.chapter-blurb {
-  font-size: 0.9375rem;
-  text-align: center;
-  color: var(--text-muted);
-  min-height: 1.3em;
-}
-
-.chapter-gate {
-  font-size: 0.9375rem;
-  text-align: center;
-  color: #ffd166;
-}
-
-.chapter-gate[hidden] {
-  display: none;
-}
-
-.chapter.locked .chapter-name,
-.chapter.locked .chapter-blurb {
-  color: var(--text-faint);
-}
-
-.level-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.625rem 0.875rem;
-  border: 3px solid var(--panel-border);
-  border-radius: 0.75rem;
-  background: var(--panel-raised);
-  text-align: center;
-  transition:
-    transform 0.12s,
-    background 0.12s;
-}
-
-.level-card.selected {
-  border-color: var(--gold);
-  background: var(--gold-panel);
-  transform: scale(1.04);
-  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.45);
-}
-
-.level-card-number {
-  font-size: 0.875rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
-}
-
-.level-card-name {
-  font-size: 1.25rem;
-  font-weight: 700;
-}
-
-.level-card-blurb {
-  font-size: 0.8125rem;
-  min-height: 2.6em;
-  color: var(--text-muted);
-}
-
-.level-card-stars {
-  font-size: 1rem;
-  color: var(--text-muted);
-}
-
-.level-card-stars.played {
-  font-size: 1.5rem;
-  letter-spacing: 0.1em;
-  color: var(--gold);
-}
-
-/* Locked: a flat, darker card with grey text, still readable. */
-.level-card.locked {
-  background: var(--menu-bg);
-  border-style: dashed;
-  color: var(--text-faint);
-}
-
-.level-card.locked .level-card-number,
-.level-card.locked .level-card-blurb,
-.level-card.locked .level-card-stars {
-  color: var(--text-faint);
-}
-
-.level-card.locked.selected {
-  border-color: var(--text-faint);
-  background: var(--panel);
-}
-
-.level-card-score {
-  min-height: 1.3em;
-  font-size: 1rem;
-  color: var(--text-muted);
-}
-
-.level-select-total {
-  margin-top: -1rem;
-  font-size: 1.625rem;
-  font-weight: 700;
-  color: #ffd166;
-}
-
 .hud-pause-hint {
   position: absolute;
   bottom: 0.875rem;
@@ -904,54 +750,188 @@ body {
   }
 }
 
+/* Level select: the 3D world map shows through; only the card, the chapter
+   banner, the star total and the hint float over it. */
 .screen.level-select {
-  gap: 0.75rem;
-  padding: 0.75rem 1.5rem;
+  display: block;
+  padding: 0;
+  background: none;
+  --chapter-color: #e6e6e6;
 }
 
-.level-select .screen-title {
-  font-size: 2.25rem;
-}
-
-.level-select .level-select-total {
-  margin-top: -0.5rem;
-  font-size: 1.375rem;
-}
-
-.level-select .level-card-score:empty {
+.screen.level-select[hidden] {
   display: none;
 }
 
-/* Tight cards, so all sixteen fit: the UI scales with the screen height, so
-   every screen from 720p up has the room a 720p screen has. */
-.level-select .level-card {
-  gap: 0;
-  padding: 0.3125rem 0.625rem;
+.level-select [data-chapter='garage'] {
+  --chapter-color: #d98b3a;
 }
 
-.level-select .level-card-number {
-  font-size: 0.75rem;
+.level-select [data-chapter='startup'] {
+  --chapter-color: #4fbf74;
 }
 
-.level-select .chapter-gate {
-  font-size: 0.8125rem;
+.level-select [data-chapter='scale-up'] {
+  --chapter-color: #4f8fe0;
 }
 
-.level-select .level-card-name {
-  font-size: 1.125rem;
+.level-select [data-chapter='enterprise'] {
+  --chapter-color: #a46ad8;
 }
 
-.level-select .level-card-blurb {
-  font-size: 0.75rem;
+.level-select [data-chapter='big-tech'] {
+  --chapter-color: #2fb8b0;
 }
 
-.level-select .level-card-stars.played {
-  font-size: 1.25rem;
+/* Top left: the chapter, a dark blue tab with its color down the side. */
+.map-chapter {
+  position: absolute;
+  top: 1.25rem;
+  left: 0;
+  min-width: 15rem;
+  padding: 0.625rem 1.5rem 0.75rem 1.25rem;
+  border-left: 0.5rem solid var(--chapter-color);
+  border-radius: 0 0.875rem 0.875rem 0;
+  background: #2a5a86;
+  box-shadow: 0 0.375rem 1rem rgba(0, 0, 0, 0.35);
 }
 
-.level-select .chapter {
+.map-chapter-name {
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: #ffffff;
+}
+
+.map-chapter-blurb {
+  font-size: 1rem;
+  color: #d4e4f4;
+}
+
+.map-chapter-gate {
+  margin-top: 0.25rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #ffd166;
+}
+
+.map-chapter-gate[hidden] {
+  display: none;
+}
+
+/* Top right, under the sound button: the star total, like a badge. */
+.map-stars {
+  position: absolute;
+  top: 3.75rem;
+  right: 0;
+  display: flex;
+  align-items: center;
   gap: 0.5rem;
-  padding: 0.375rem;
+  padding: 0.25rem 1.5rem 0.25rem 1rem;
+  border-radius: 0.875rem 0 0 0.875rem;
+  background: #2a5a86;
+  box-shadow: 0 0.375rem 1rem rgba(0, 0, 0, 0.35);
+}
+
+.map-stars-icon {
+  font-size: 2.75rem;
+  line-height: 1;
+  color: #ffd166;
+  text-shadow: 0 0.1875rem 0 #b07a00;
+}
+
+.map-stars-count {
+  font-size: 2.5rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Upper middle: the selected level's card, light blue paper like Overcooked's. */
+.map-card {
+  position: absolute;
+  top: 5.5rem;
+  left: 50%;
+  width: 22rem;
+  padding: 0.875rem 1.25rem 1rem;
+  box-sizing: border-box;
+  transform: translateX(-50%) rotate(-1deg);
+  border: 3px solid #ffffff;
+  border-top: 0.5rem solid var(--chapter-color);
+  border-radius: 0.375rem;
+  background: #cfe2f3;
+  box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.4);
+  color: #1f3d5c;
+  text-align: center;
+}
+
+.map-card-number {
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #4d6a88;
+}
+
+.map-card-name {
+  font-size: 1.875rem;
+  font-weight: 900;
+  line-height: 1.15;
+  color: #1f3d5c;
+}
+
+.map-card-blurb {
+  margin-top: 0.25rem;
+  font-size: 0.9375rem;
+  line-height: 1.3;
+  color: #34506e;
+}
+
+.map-card-stars {
+  margin-top: 0.375rem;
+  font-size: 2.25rem;
+  line-height: 1.1;
+  letter-spacing: 0.1em;
+}
+
+.map-card-star {
+  color: #a9bdd1;
+}
+
+.map-card-star.earned {
+  color: #ffc83d;
+  text-shadow: 0 0.125rem 0 #b07a00;
+}
+
+.map-card-status {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #34506e;
+}
+
+.map-card.locked {
+  background: #c3ccd6;
+}
+
+.map-card.locked .map-card-name,
+.map-card.locked .map-card-blurb {
+  color: #5d6b7a;
+}
+
+/* Bottom: which buttons do what, on a dark strip so it reads over the map. */
+.map-hint {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 2rem);
+  padding: 0.375rem 1.25rem;
+  border-radius: 999px;
+  background: rgba(20, 22, 28, 0.78);
+  color: #e6e6e6;
+  text-align: center;
+  white-space: nowrap;
 }
 
 /* Level intro card: before the clock starts. */

@@ -14,7 +14,6 @@ import {
   type MenuItem,
   COUNTDOWN_MS,
   cancelJoinCode,
-  chapterCursor,
   editJoinCode,
   finishDemoRound,
   joinFailed,
@@ -195,7 +194,8 @@ describe('level select', () => {
     updateFlow(flow, left(), ctx());
     expect(flow.levelIndex).toBe(0);
     updateFlow(flow, right('kb-left'), ctx());
-    updateFlow(flow, down(), ctx());
+    updateFlow(flow, right(), ctx());
+    expect(flow.levelIndex).toBe(2);
     updateFlow(flow, right(), ctx());
     expect(flow.levelIndex).toBe(2);
   });
@@ -485,31 +485,12 @@ describe('chapter view', () => {
   const chapterCtx = (extra: Partial<FlowContext> = {}): FlowContext =>
     ctx({ levelIds: CHAPTER_IDS, chapters: CHAPTERS, ...extra });
 
-  it('moves up and down within a chapter, and stops at its ends', () => {
-    const c = chapterCtx();
-    expect(chapterCursor(c, 0, 0, 1)).toBe(1);
-    expect(chapterCursor(c, 1, 0, 1)).toBe(2);
-    expect(chapterCursor(c, 2, 0, 1)).toBe(2);
-    expect(chapterCursor(c, 0, 0, -1)).toBe(0);
-    expect(chapterCursor(c, 4, 0, -1)).toBe(3);
-  });
-
-  it('moves left and right to the same row of the next chapter, or its last level', () => {
-    const c = chapterCtx();
-    expect(chapterCursor(c, 1, 1, 0)).toBe(4);
-    expect(chapterCursor(c, 4, -1, 0)).toBe(1);
-    expect(chapterCursor(c, 5, 1, 0)).toBe(7);
-    expect(chapterCursor(c, 7, 1, 0)).toBe(7);
-    expect(chapterCursor(c, 0, -1, 0)).toBe(0);
-  });
-
   it('drives the level select cursor, locked chapters included', () => {
     const c = chapterCtx();
     const flow = atLevelSelect(c);
-    updateFlow(flow, down(), c);
-    updateFlow(flow, right(), c);
+    for (let i = 0; i < 4; i++) updateFlow(flow, right(), c);
     expect(flow.levelIndex).toBe(4);
-    updateFlow(flow, right(), c);
+    for (let i = 0; i < 5; i++) updateFlow(flow, right(), c);
     expect(flow.levelIndex).toBe(7);
     expect(updateFlow(flow, confirm(), c).effects).toEqual([]);
   });
