@@ -107,13 +107,8 @@ import type { GameEvent } from '../sim/orders';
 import { type Scene, sceneDone, sceneInputs, sceneState } from '../sim/scenes';
 import { type GameState, createGame } from '../sim/state';
 import { GameLoop } from './GameLoop';
-import {
-  DEFAULT_LOOK,
-  FLOOR_THEMES,
-  type MapLook,
-  WALL_THEMES,
-  preloadMapSprites,
-} from './MapRenderer';
+import { preloadMapSprites } from './MapRenderer';
+import { DEFAULT_LOOK, FLOOR_THEMES, LEVEL_LOOKS, type MapLook, WALL_THEMES } from './mapLook';
 import { MusicPlayer } from './MusicPlayer';
 import { musicCue } from './music';
 import { createPhaserRoundRenderer } from './PhaserRoundRenderer';
@@ -343,33 +338,6 @@ function chapterIdOf(index: number): string | null {
 
 /** The first round's seed; every restart moves on to the next one. */
 const FIRST_SEED = 1;
-/** Map look per level id; levels not listed get `DEFAULT_LOOK`. */
-const LEVEL_LOOKS: Readonly<Record<string, MapLook>> = {
-  garage: { walls: 'plaster', floor: 'concrete' },
-  'open-plan': { walls: 'glass', floor: 'carpet' },
-  'scale-up': { walls: 'wood', floor: 'parquet' },
-  // Startup: a loft, warm wood.
-  'seed-round': { walls: 'wood', floor: 'concrete' },
-  'demo-day': { walls: 'plaster', floor: 'parquet' },
-  'on-call': { walls: 'wood', floor: 'carpet' },
-  // Scale-Up: glass walls go in.
-  'middle-management': { walls: 'glass', floor: 'concrete' },
-  hypergrowth: { walls: 'glass', floor: 'parquet' },
-  'hot-desking': { walls: 'plaster', floor: 'carpet' },
-  // Enterprise: carpet and glass as far as the eye can see.
-  'back-to-back': { walls: 'glass', floor: 'carpet' },
-  synergy: { walls: 'plaster', floor: 'concrete' },
-  'the-reorg': { walls: 'glass', floor: 'carpet' },
-  // Big Tech: a bright campus, wood and glass.
-  'the-atrium': { walls: 'glass', floor: 'parquet' },
-  'design-sprint': { walls: 'wood', floor: 'concrete' },
-  monorepo: { walls: 'glass', floor: 'concrete' },
-  hackathon: { walls: 'plaster', floor: 'parquet' },
-  // Lab levels have no chapter: they borrow a world.
-  'lab-shapes': { walls: 'glass', floor: 'carpet', setting: 'scale-up' },
-  'lab-dev': { walls: 'wood', floor: 'parquet', setting: 'startup' },
-};
-
 /** The level's look, with `?walls=` and `?floor=` overriding it to preview others. */
 function mapLook(levelId: string): MapLook {
   const params = new URLSearchParams(window.location.search);

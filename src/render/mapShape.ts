@@ -4,7 +4,7 @@
  */
 
 import { type GridPoint, type LevelMap, type Tile, getTile } from '../sim/level';
-import type { WallTheme } from './MapRenderer';
+import type { WallTheme } from './mapLook';
 
 /**
  * A wall on the camera side of a room: on the map's front edge, or with

@@ -1,12 +1,10 @@
 import Phaser from 'phaser';
 import { MEETING_ROOM_TEXT } from '../sim/content';
 import type { LevelMap } from '../sim/level';
-import type { Invite } from '../sim/meetings';
-import type { GameState } from '../sim/state';
 import type { RoundView } from './roundView';
+import { drawInvite } from './billboards';
 import { vectors } from './MapRenderer';
 import { BODY_HEIGHT, PLAYER_DEPTH_OFFSET } from './PlayerRenderer';
-import { playerColor } from './playerColors';
 import { tileCorners, tileDepth, tileToScreen } from './projection';
 
 /** Placeholder meeting room: a rug over the floor, brighter while someone is invited. */
@@ -18,9 +16,7 @@ const RUG_PULSE_MS = 300;
 const RUG_DEPTH = -0.5;
 
 /** Calendar icon over an invited player's head. */
-const ICON_SIZE = 22;
 const ICON_LIFT = BODY_HEIGHT + 40;
-const RING_RADIUS = 17;
 
 /**
  * Meeting rooms and calendar invites in the world: the room's rug and label,
@@ -90,32 +86,4 @@ export class MeetingRenderer {
       g.fillPoints(vectors(tileCorners(t.x, t.y)), true);
     }
   }
-}
-
-/** A little calendar page in the player's color, with a ring that runs down with the time left. */
-export function drawInvite(g: Phaser.GameObjects.Graphics, state: GameState, invite: Invite): void {
-  g.clear();
-  const color = playerColor(invite.playerId);
-  const total = Math.max(1, invite.expiresTick - invite.createdTick);
-  const left = Math.max(0, invite.expiresTick - state.tick) / total;
-  const done = invite.attendedTicks / Math.max(1, invite.attendTicks);
-
-  g.fillStyle(0x000000, 0.55);
-  g.fillCircle(0, 0, RING_RADIUS + 3);
-  g.lineStyle(4, left < 0.3 ? 0xff5a4f : color);
-  g.beginPath();
-  g.arc(0, 0, RING_RADIUS, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * left, false);
-  g.strokePath();
-
-  const half = ICON_SIZE / 2;
-  g.fillStyle(0xffffff);
-  g.fillRect(-half, -half, ICON_SIZE, ICON_SIZE);
-  g.fillStyle(0xd2322d);
-  g.fillRect(-half, -half, ICON_SIZE, ICON_SIZE * 0.3);
-  // Time sat so far fills the page from the bottom.
-  g.fillStyle(0x7cf07c);
-  const filled = (ICON_SIZE * 0.7 - 2) * done;
-  g.fillRect(-half + 2, half - 1 - filled, ICON_SIZE - 4, filled);
-  g.lineStyle(2, 0x1a1d24);
-  g.strokeRect(-half, -half, ICON_SIZE, ICON_SIZE);
 }

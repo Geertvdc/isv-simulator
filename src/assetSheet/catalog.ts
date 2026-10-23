@@ -16,7 +16,7 @@ import { drawPipelineState } from '../render/PipelineRenderer';
 import { PLAYER_COLORS, playerShape } from '../render/playerColors';
 import { PLAYER_DEPTH_OFFSET, drawPlayer } from '../render/PlayerRenderer';
 import { TILE_SIZE, VIEW_PITCH, blockFaces, tileDepth, tileToScreen } from '../render/projection';
-import { drawProgressBar, drawTicketCard } from '../render/TicketRenderer';
+import { drawProgressBar, drawTicketCard } from '../render/billboards';
 
 /**
  * Every placeholder the game draws, each on its own frame so it can be handed

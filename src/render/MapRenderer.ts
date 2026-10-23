@@ -18,6 +18,7 @@ import {
   tileDepth,
   tileToScreen,
 } from './projection';
+import { DEFAULT_LOOK, FLOOR_THEMES, type MapLook, WALL_THEMES } from './mapLook';
 
 /** Placeholder looks until the art pass. Floor tiles draw flat, the rest as blocks. */
 interface BlockStyle {
@@ -47,24 +48,6 @@ export const BLOCK_STYLES: Readonly<Record<BlockTile, BlockStyle>> = {
   whiteboard: { color: 0xdfe6ee, height: STATION_HEIGHT, label: 'W' },
   merge: { color: 0xe8459a, height: STATION_HEIGHT, label: 'G' },
 };
-
-/** Wall looks a level can pick; each has the three pieces in `WALL_PIECES`. */
-export const WALL_THEMES = ['plaster', 'wood', 'glass'] as const;
-export type WallTheme = (typeof WALL_THEMES)[number];
-
-/** Floor looks a level can pick, from `public/assets/floors/<theme>.png` (one 64x32 tile). */
-export const FLOOR_THEMES = ['concrete', 'carpet', 'parquet'] as const;
-export type FloorTheme = (typeof FLOOR_THEMES)[number];
-
-/** How a level's map looks. */
-export interface MapLook {
-  walls: WallTheme;
-  floor: FloorTheme;
-  /** The chapter whose world surrounds the level (3D only); none for a bare slab. */
-  setting?: string;
-}
-
-export const DEFAULT_LOOK: MapLook = { walls: 'plaster', floor: 'concrete' };
 
 const WALL_PIECES: readonly WallPiece[] = ['wall', 'wall-front', 'wall-inner'];
 
@@ -111,11 +94,6 @@ export function preloadMapSprites(scene: Phaser.Scene): void {
       scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
     });
   }
-}
-
-/** Placeholder color of a block, so other renderers can match it. */
-export function tileColor(tile: BlockTile): number {
-  return BLOCK_STYLES[tile].color;
 }
 
 /** How much darker each side face is than the top. */

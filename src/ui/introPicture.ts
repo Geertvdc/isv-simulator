@@ -3,7 +3,7 @@
  * shapes in the game's colors (placeholders until the art pass).
  */
 
-import { tileColor } from '../render/MapRenderer';
+import { tileColor } from '../render/mapLook';
 import { playerCssColor } from '../render/playerColors';
 import type { IntroPicture } from '../sim/content';
 

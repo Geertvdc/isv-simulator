@@ -19,7 +19,7 @@ import {
 } from '../render/three/models';
 import { VIEW3D_PITCH } from '../render/projection';
 import { STATION_HEIGHT } from '../render/three/layout';
-import { FLOOR_THEMES, WALL_THEMES } from '../render/MapRenderer';
+import { FLOOR_THEMES, WALL_THEMES } from '../render/mapLook';
 
 const SPACING = 2.2;
 const COLUMNS = 7;

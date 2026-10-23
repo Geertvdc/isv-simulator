@@ -5,7 +5,7 @@ import { type LevelMap, getTile, isWorkSurface } from '../../sim/level';
 import { type PlayerId, targetTile } from '../../sim/state';
 import type { TicketKind } from '../../sim/tickets';
 import { effectsFor } from '../effects';
-import type { MapLook } from '../MapRenderer';
+import type { MapLook } from '../mapLook';
 import { playerColor } from '../playerColors';
 import {
   type CameraPose,

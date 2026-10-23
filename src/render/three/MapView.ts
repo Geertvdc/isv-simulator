@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CONVEYOR_TICKS, TICKS_PER_SECOND } from '../../sim/balance';
 import { type LevelMap, type Tile, conveyorAt, getTile, isWorkSurface } from '../../sim/level';
-import type { MapLook } from '../MapRenderer';
+import type { MapLook } from '../mapLook';
 import { type WallPiece, tileHash, wallDeco, wallPiece } from '../mapShape';
 import { VIEW3D_PITCH, type Vec3, gridToWorld } from '../projection';
 import { type KitMaterials, type Model, ModelBuilder, kitMaterials } from './kit';

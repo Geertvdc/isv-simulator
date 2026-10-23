@@ -3,21 +3,13 @@ import type { HintId } from '../flow/hints';
 import { HINT_TEXTS } from '../sim/content';
 import type { LevelMap, Tile } from '../sim/level';
 import { type MapRenderer, OVERLAY_DEPTH } from './MapRenderer';
+import { HINT_TILES, createHintMarker, hintLabelOrigin } from './billboards';
 import { firstGroup } from './mapShape';
-
-/** The tile each first-level hint points at. */
-export const HINT_TILES: Readonly<Record<HintId, Tile>> = {
-  inbox: 'inbox',
-  keyboard: 'keyboard',
-  ship: 'ship',
-};
 
 /** How far over the block top the arrow tip floats, and how far it bobs. */
 const ARROW_LIFT = 10;
 const BOB_PX = 6;
 const BOB_MS = 700;
-const ARROW_SIZE = 12;
-const COLOR = 0xffd166;
 
 interface HintSprite {
   container: Phaser.GameObjects.Container;
@@ -83,39 +75,4 @@ export class HintRenderer {
       y: Math.min(...tops.map((p) => p.y)),
     };
   }
-}
-
-/** Labels by the side walls hang inwards, so they stay on screen. */
-export function hintLabelOrigin(tileX: number, map: LevelMap): number {
-  const side = tileX / Math.max(1, map.width - 1);
-  return side < 0.25 ? 0.15 : side > 0.75 ? 0.85 : 0.5;
-}
-
-/** An arrow pointing down at (0, 0) with `text` on a label over it. */
-export function createHintMarker(
-  scene: Phaser.Scene,
-  text: string,
-  originX: number,
-): Phaser.GameObjects.Container {
-  const arrow = scene.add.graphics();
-  arrow.fillStyle(COLOR);
-  arrow.lineStyle(3, 0x1a1d24);
-  const tri = [
-    new Phaser.Math.Vector2(0, 0),
-    new Phaser.Math.Vector2(-ARROW_SIZE, -ARROW_SIZE * 1.3),
-    new Phaser.Math.Vector2(ARROW_SIZE, -ARROW_SIZE * 1.3),
-  ];
-  arrow.strokePoints(tri, true);
-  arrow.fillPoints(tri, true);
-  const label = scene.add
-    .text(0, -ARROW_SIZE * 1.3 - 4, text, {
-      fontFamily: 'system-ui, sans-serif',
-      fontSize: '18px',
-      fontStyle: 'bold',
-      color: '#1a1d24',
-      backgroundColor: '#ffd166',
-      padding: { x: 8, y: 4 },
-    })
-    .setOrigin(originX, 1);
-  return scene.add.container(0, 0, [arrow, label]);
 }
