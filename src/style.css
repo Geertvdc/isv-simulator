@@ -40,7 +40,7 @@ body {
   inset: 0;
   pointer-events: none;
   color: #e6e6e6;
-  /* Menu palette: solid colors, no see-through panels, so text stays readable. */
+  /* Menu palette: solid panels on a scrim over the 3D map, so text stays readable. */
   --menu-bg: #161a26;
   --menu-grid: #1d2232;
   --panel: #222839;
@@ -50,6 +50,17 @@ body {
   --text-faint: #767e95;
   --gold: #ffd166;
   --gold-panel: #3d3622;
+  /* Overcooked's light blue paper: the cards over the 3D map. */
+  --paper: #cfe2f3;
+  --paper-edge: #ffffff;
+  --paper-ink: #1f3d5c;
+  --paper-text: #34506e;
+  --paper-muted: #4d6a88;
+  --paper-faint: #8ea6be;
+  --paper-accent: #f0a020;
+  --banner: #2a5a86;
+  --ink-outline: #14243d;
+  --scrim: rgba(10, 16, 30, 0.55);
 }
 
 .hud-version {
@@ -78,7 +89,12 @@ body {
 .lobby-title {
   margin: 0;
   font-size: 2.5rem;
+  font-weight: 900;
   letter-spacing: 0.02em;
+  color: #ffffff;
+  -webkit-text-stroke: 0.12em var(--ink-outline);
+  paint-order: stroke fill;
+  text-shadow: 0 0.09em 0 var(--ink-outline);
 }
 
 .lobby-slots {
@@ -87,28 +103,36 @@ body {
   gap: 1rem;
 }
 
+/* A paper card per seat: dashed and pale while empty, the player's color on top once joined. */
 .lobby-slot {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   padding: 1.25rem 1rem;
-  border: 3px dashed var(--panel-border);
-  border-radius: 0.75rem;
-  background: var(--panel);
-  color: var(--text-faint);
+  border: 3px dashed var(--paper-faint);
+  border-radius: 0.375rem;
+  background: rgba(207, 226, 243, 0.82);
+  color: var(--paper-muted);
   text-align: center;
 }
 
 .lobby-slot.joined {
-  border: 3px solid var(--player-color);
-  background: color-mix(in srgb, var(--player-color) 22%, var(--panel));
-  color: #e6e6e6;
+  border: 3px solid var(--paper-edge);
+  border-top: 0.625rem solid var(--player-color);
+  background: var(--paper);
+  box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.45);
+  color: var(--paper-text);
+  transform: rotate(-1deg);
 }
 
 .lobby-slot-name {
   font-size: 1.375rem;
-  font-weight: 700;
-  color: var(--player-color);
+  font-weight: 900;
+  color: var(--paper-muted);
+}
+
+.lobby-slot.joined .lobby-slot-name {
+  color: var(--paper-ink);
 }
 
 .lobby-slot-device {
@@ -118,7 +142,10 @@ body {
 
 .lobby-hint {
   min-height: 1.4em;
-  font-size: 1.25rem;
+  font-size: 1.375rem;
+  font-weight: 800;
+  color: var(--gold);
+  text-shadow: 0 0.1em 0 var(--ink-outline);
 }
 
 /* In-game HUD: order bar on top, score and clock in the bottom corners. */
@@ -540,17 +567,25 @@ body {
   gap: 1.75rem;
   padding: 1.5rem;
   box-sizing: border-box;
-  /* Solid, with a faint blueprint grid and a lighter middle: the game behind
-     doesn't show through, so the text stays easy to read. */
-  background-color: var(--menu-bg);
-  background-image:
-    radial-gradient(ellipse at 50% 35%, rgba(70, 82, 120, 0.35), transparent 70%),
-    linear-gradient(var(--menu-grid) 2px, transparent 2px),
-    linear-gradient(90deg, var(--menu-grid) 2px, transparent 2px);
-  background-size:
-    100% 100%,
-    2.5rem 2.5rem,
-    2.5rem 2.5rem;
+  /* A dim, slightly blurred scrim over the 3D world map (or the round, for
+     pause and results): the world shows, the cards on it read clearly. */
+  background: radial-gradient(
+    ellipse at 50% 45%,
+    rgba(10, 16, 30, 0.35),
+    rgba(10, 16, 30, 0.72) 85%
+  );
+  backdrop-filter: blur(3px);
+}
+
+/* Over a round: darker, so the cards read over the busy office. */
+.pause-screen,
+.results-screen {
+  background: radial-gradient(
+    ellipse at 50% 45%,
+    rgba(10, 16, 30, 0.6),
+    rgba(10, 16, 30, 0.85) 85%
+  );
+  backdrop-filter: blur(4px);
 }
 
 .screen[hidden] {
@@ -568,36 +603,136 @@ body {
   }
 }
 
+/* Chunky white headings with a dark outline, like the logo's little sibling. */
 .screen-title {
   margin: 0;
-  font-size: 3rem;
-  letter-spacing: 0.02em;
-}
-
-.screen-hint {
-  font-size: 1.125rem;
-  color: var(--text-muted);
-}
-
-.title-name {
-  margin: 0;
-  font-size: 6.5rem;
+  font-size: 3.25rem;
   font-weight: 900;
   letter-spacing: 0.02em;
-  color: #ffd166;
-  text-shadow: 0 0.375rem 0 #8a5a00;
+  color: #ffffff;
+  -webkit-text-stroke: 0.12em var(--ink-outline);
+  paint-order: stroke fill;
+  text-shadow: 0 0.09em 0 var(--ink-outline);
+}
+
+/* Which buttons do what: a dark pill, so it reads over the map. */
+.screen-hint {
+  padding: 0.375rem 1.25rem;
+  border-radius: 999px;
+  background: rgba(20, 22, 28, 0.78);
+  font-size: 1.125rem;
+  color: #e6e6e6;
+}
+
+/* The title: the logo up top over the drifting map, the menu card below it. */
+.screen.title-screen {
+  justify-content: flex-start;
+  gap: 1.5rem;
+  padding-top: 7vh;
+  /* Lighter than the other menus: the world map is the show here. Dim only
+     at the top (behind the logo) and the bottom (behind the hint). */
+  background: linear-gradient(
+    rgba(10, 16, 30, 0.45),
+    rgba(10, 16, 30, 0) 38%,
+    rgba(10, 16, 30, 0) 70%,
+    rgba(10, 16, 30, 0.5)
+  );
+  backdrop-filter: none;
+}
+
+.title-screen .screen-hint {
+  margin-top: auto;
+}
+
+.title-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  transform: rotate(-2.5deg);
+}
+
+/* Before anyone presses: the logo bigger, in the middle of the screen. */
+.title-screen:not(.awake) .title-head {
+  margin-top: 14vh;
+}
+
+.title-screen:not(.awake) .logo {
+  font-size: min(7.5rem, 9vw);
+}
+
+/* The logo: two chunky words on an arch, a thick navy outline and a stacked
+   drop shadow, so it reads over anything the map shows. */
+.logo {
+  margin: 0;
+  display: flex;
+  align-items: flex-end;
+  font-family: 'Arial Rounded MT Bold', 'Arial Black', 'Segoe UI Black', system-ui, sans-serif;
+  /* Held to the window's width too, so the long name fits a 4:3 screen. */
+  font-size: min(6rem, 8vw);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  -webkit-text-stroke: 0.16em var(--ink-outline);
+  paint-order: stroke fill;
+  text-shadow:
+    0 0.06em 0 var(--ink-outline),
+    0 0.12em 0 var(--ink-outline),
+    0 0.2em 0.25em rgba(0, 0, 0, 0.45);
+  animation: logo-in 0.6s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+.logo-word {
+  display: inline-flex;
+}
+
+.logo-letter {
+  display: inline-block;
+}
+
+.logo-word-0 {
+  color: #fff4d8;
+}
+
+.logo-word-1 {
+  color: #ffc23d;
+}
+
+@keyframes logo-in {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
 }
 
 .title-tagline {
-  margin-top: -0.75rem;
-  font-size: 1.625rem;
-  color: var(--text-muted);
+  padding: 0.25rem 1.125rem;
+  border-radius: 0.5rem;
+  background: var(--banner);
+  box-shadow: 0 0.25rem 0 var(--ink-outline);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #ffffff;
 }
 
 .title-press {
-  font-size: 2.125rem;
-  font-weight: 700;
-  animation: blink 1.2s ease-in-out infinite;
+  margin-top: 4vh;
+  padding: 0.5rem 2rem;
+  border: 3px solid var(--paper-edge);
+  border-radius: 999px;
+  background: var(--banner);
+  box-shadow: 0 0.3rem 0 var(--ink-outline);
+  font-size: 2rem;
+  font-weight: 900;
+  color: #ffffff;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    transform: scale(1.06);
+  }
 }
 
 .title-press[hidden] {
@@ -610,17 +745,20 @@ body {
   }
 }
 
+/* The menu: a card of light blue paper, like the level card on the map. */
 .menu {
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
+  gap: 0.375rem;
   min-width: 22.5rem;
   margin: 0;
-  padding: 1rem;
-  border: 2px solid var(--panel-border);
-  border-radius: 1rem;
-  background: var(--panel);
-  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.4);
+  padding: 0.875rem;
+  border: 3px solid var(--paper-edge);
+  border-top: 0.5rem solid var(--paper-accent);
+  border-radius: 0.375rem;
+  background: var(--paper);
+  box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.45);
+  transform: rotate(-1deg);
   list-style: none;
 }
 
@@ -631,35 +769,53 @@ body {
 }
 
 .menu.disabled .menu-item {
-  color: var(--text-faint);
+  color: var(--paper-faint);
 }
 
 .menu-item {
   display: flex;
   justify-content: space-between;
   gap: 2rem;
-  padding: 0.75rem 1.75rem;
-  border: 3px solid transparent;
-  border-radius: 0.75rem;
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--text-muted);
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.5rem;
+  font-size: 1.875rem;
+  font-weight: 800;
+  color: var(--paper-text);
 }
 
+/* The selected line: a dark blue band with white text, like the chapter banner. */
 .menu-item.selected {
-  border-color: var(--gold);
-  background: var(--gold-panel);
-  color: #fff;
+  background: var(--banner);
+  box-shadow: 0 0.2rem 0 var(--ink-outline);
+  color: #ffffff;
 }
 
 .menu-item.selected .menu-label::before {
   content: '▶ ';
-  color: #ffd166;
+  color: var(--gold);
+}
+
+.menu.disabled .menu-item.selected {
+  background: var(--paper-faint);
+  box-shadow: none;
 }
 
 .menu-value {
   font-variant-numeric: tabular-nums;
-  color: #ffd166;
+  color: var(--banner);
+}
+
+.menu-item.selected .menu-value {
+  color: var(--gold);
+}
+
+/* The title's menu: a little smaller, so the map shows round it. */
+.title-screen .menu {
+  min-width: 20rem;
+}
+
+.title-screen .menu-item {
+  font-size: 1.625rem;
 }
 
 .results-stars {
@@ -670,6 +826,7 @@ body {
 
 .results-star {
   color: #4a5060;
+  -webkit-text-stroke: 0.04em var(--ink-outline);
 }
 
 .results-star.earned {
@@ -694,7 +851,9 @@ body {
 
 .results-score {
   font-size: 2.25rem;
-  font-weight: 700;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 0 0.1em 0 var(--ink-outline);
 }
 
 .results-badge {
@@ -716,11 +875,19 @@ body {
 }
 
 .credits-list {
-  max-width: 56.25rem;
+  max-width: min(56.25rem, calc(100% - 4rem));
+  box-sizing: border-box;
   max-height: 55vh;
   overflow: hidden;
   flex-shrink: 1;
   min-height: 0;
+  padding: 0.5rem 2rem 1rem;
+  border: 3px solid var(--paper-edge);
+  border-top: 0.5rem solid var(--paper-accent);
+  border-radius: 0.375rem;
+  background: var(--paper);
+  box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.45);
+  color: var(--paper-ink);
   text-align: center;
   font-size: 1.125rem;
 }
@@ -732,12 +899,13 @@ body {
 .credits-heading {
   margin: 1.125rem 0 0.5rem;
   font-size: 1.625rem;
-  color: #ffd166;
+  font-weight: 900;
+  color: var(--banner);
 }
 
 .credits-row {
   font-size: 1rem;
-  color: var(--text-muted);
+  color: var(--paper-text);
 }
 
 .credits-roll.rolling {
@@ -756,6 +924,7 @@ body {
   display: block;
   padding: 0;
   background: none;
+  backdrop-filter: none;
   --chapter-color: #e6e6e6;
 }
 
@@ -1186,20 +1355,23 @@ body {
   align-items: baseline;
   max-width: calc(100% - 2rem);
   padding: 1.25rem 1.75rem;
-  border: 2px solid var(--panel-border);
-  border-radius: 1rem;
-  background: var(--panel);
+  border: 3px solid var(--paper-edge);
+  border-top: 0.5rem solid var(--paper-accent);
+  border-radius: 0.375rem;
+  background: var(--paper);
+  box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.45);
+  color: var(--paper-ink);
 }
 
 .profile-label {
   font-size: 1.125rem;
-  color: var(--text-muted);
+  color: var(--paper-muted);
 }
 
 .profile-id {
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   font-size: 1.375rem;
-  color: var(--gold);
+  color: var(--banner);
   overflow-wrap: anywhere;
   /* So it can be selected and copied by hand when the clipboard isn't allowed. */
   user-select: all;
@@ -1216,7 +1388,7 @@ body {
   min-height: 1.5rem;
   font-size: 1.125rem;
   font-weight: 700;
-  color: var(--gold);
+  color: #b06a00;
 }
 
 .profile-about,
@@ -1224,11 +1396,12 @@ body {
   max-width: 40rem;
   font-size: 1.125rem;
   text-align: center;
-  color: var(--text-muted);
+  color: #dfe6f2;
+  text-shadow: 0 0.08em 0.2em rgba(0, 0, 0, 0.8);
 }
 
 .profile-server[data-status='offline'] {
-  color: var(--text-faint);
+  color: #b8c0d2;
 }
 
 .profile-dialog {
@@ -1313,7 +1486,9 @@ body {
 /* Join online: four letter boxes with a text box laid over them for typing. */
 .join-code-prompt {
   font-size: 1.375rem;
-  color: var(--text-muted);
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 0.08em 0.2em rgba(0, 0, 0, 0.8);
 }
 
 .join-code-boxes {
@@ -1329,18 +1504,19 @@ body {
   justify-content: center;
   width: 4.5rem;
   height: 5.5rem;
-  border: 3px solid var(--panel-border);
-  border-radius: 0.75rem;
-  background: var(--panel);
+  border: 3px solid var(--paper-edge);
+  border-radius: 0.5rem;
+  background: var(--paper);
+  box-shadow: 0 0.375rem 0 var(--ink-outline);
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   font-size: 3rem;
   font-weight: 700;
-  color: var(--gold);
+  color: var(--paper-ink);
 }
 
 .join-code-box.cursor {
-  border-color: var(--gold);
-  background: var(--panel-raised);
+  border-color: var(--paper-accent);
+  background: #e4f0fa;
 }
 
 /* Invisible, over the boxes: it takes the typing (and pastes) and the clicks. */
@@ -1359,6 +1535,7 @@ body {
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--gold);
+  text-shadow: 0 0.08em 0.2em rgba(0, 0, 0, 0.8);
 }
 
 .join-code-status.error {
