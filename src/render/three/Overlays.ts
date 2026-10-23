@@ -9,7 +9,7 @@ import type { GameState } from '../../sim/state';
 import { type QueueKind, queuedTickets } from '../../sim/tickets';
 import { firstGroup } from '../mapShape';
 import { pipelinePulse } from '../effects';
-import { TILE_SIZE, type Vec3, gridToWorld } from '../projection';
+import { type Vec3, gridToWorld } from '../projection';
 import type { RoundView } from '../roundView';
 import {
   HINT_TILES,
@@ -28,7 +28,7 @@ import { HAT_TOP, blockHeight, placeTicket, queueAnchor } from './layout';
 export interface ScreenPoint {
   x: number;
   y: number;
-  /** Overlay scale: 1 is the size the 2D look draws them at zoom 1. */
+  /** Overlay scale: 1 is the size `../billboards` draws them at. */
   scale: number;
   /** Phaser depth: nearer the camera draws on top. */
   depth: number;
@@ -36,7 +36,7 @@ export interface ScreenPoint {
 
 export type Project = (p: Vec3) => ScreenPoint;
 
-/** Overlays over the 3D world are a bit bigger than in 2D: the camera is further out, and they must read from the couch. */
+/** Overlays are drawn a bit bigger than a 64 px tile would give: they must read from the couch. */
 export const OVERLAY_SCALE = 1.5;
 /** Ticket cards float this far over the ticket. */
 const CARD_LIFT = 0.28;
@@ -75,7 +75,7 @@ interface CardSprite {
  * Everything drawn flat over the 3D world, in Phaser on the canvas above
  * three.js: ticket checklists and progress bars, queue counts, pipeline
  * badges and repair bars, meeting invites, first-level hints, popups and
- * debug labels. Reuses the 2D drawing code, placed and scaled from the 3D
+ * debug labels. Draws with `../billboards`, placed and scaled from the 3D
  * camera every frame. Phaser's camera stays at zoom 1, so world = canvas pixels.
  */
 export class Overlays {
@@ -355,9 +355,12 @@ function place(
   obj.setDepth(depth ?? p.depth);
 }
 
-/** Overlay scale for `pixelsPerUnit` world-unit pixels: the 2D look has `TILE_SIZE` per tile at zoom 1. */
+/** Billboards (`../billboards`) are drawn in pixels for a tile this wide. */
+const BILLBOARD_TILE_PX = 64;
+
+/** Overlay scale for `pixelsPerUnit` world-unit pixels. */
 export function overlayScale(pixelsPerUnit: number): number {
-  return pixelsPerUnit / TILE_SIZE;
+  return pixelsPerUnit / BILLBOARD_TILE_PX;
 }
 
 /** Gap kept between hint labels that would overlap, in canvas pixels. */

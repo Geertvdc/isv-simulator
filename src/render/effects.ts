@@ -1,7 +1,7 @@
 /**
- * Which one-off visual reactions sim events get, shared by the 2D and 3D
- * looks: screen shake, floating point popups and dash puffs. Each look
- * decides how to draw them. Phaser-free, so it can be tested.
+ * Which one-off visual reactions sim events get: screen shake, floating
+ * point popups and dash puffs. The renderer decides how to draw them.
+ * Phaser-free, so it can be tested.
  */
 
 import {

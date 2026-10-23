@@ -107,11 +107,9 @@ import type { GameEvent } from '../sim/orders';
 import { type Scene, sceneDone, sceneInputs, sceneState } from '../sim/scenes';
 import { type GameState, createGame } from '../sim/state';
 import { GameLoop } from './GameLoop';
-import { preloadMapSprites } from './MapRenderer';
 import { DEFAULT_LOOK, FLOOR_THEMES, LEVEL_LOOKS, type MapLook, WALL_THEMES } from './mapLook';
 import { MusicPlayer } from './MusicPlayer';
 import { musicCue } from './music';
-import { createPhaserRoundRenderer } from './PhaserRoundRenderer';
 import type { RoundRenderer, RoundRendererFactory } from './RoundRenderer';
 import { SoundPlayer } from './SoundPlayer';
 import { type RoundView, frameView, predictedView } from './roundView';
@@ -302,8 +300,8 @@ export interface GameSceneOptions {
   /** `?demo`: a kiosk for a booth. Starts in the demo, and every menu goes back to it when left alone. */
   kiosk: boolean;
   online: OnlineOptions | null;
-  /** Draws the level and rounds: the 2D Phaser renderers unless given (`?render=3d`). */
-  roundRenderer?: RoundRendererFactory;
+  /** Draws the level and rounds: `createThreeRoundRenderer`, passed in by `main.ts`. */
+  roundRenderer: RoundRendererFactory;
 }
 
 /**
@@ -443,7 +441,6 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload(): void {
-    preloadMapSprites(this);
     SoundPlayer.preload(this);
     MusicPlayer.preload(this);
   }
@@ -457,8 +454,7 @@ export class GameScene extends Phaser.Scene {
     this.map = level.map;
     // Restarts reuse this object; the old sprites went with the old scene.
     this.hovered = null;
-    const createRenderer = this.options.roundRenderer ?? createPhaserRoundRenderer;
-    const roundRenderer = createRenderer(this, this.map, mapLook(level.id));
+    const roundRenderer = this.options.roundRenderer(this, this.map, mapLook(level.id));
     this.roundRenderer = roundRenderer;
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       roundRenderer.destroy();
