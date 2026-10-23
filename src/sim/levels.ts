@@ -285,20 +285,20 @@ function chapter(id: string, index: number, levels: readonly Level[]): Chapter {
 }
 
 // ---- Big Tech: atriums, belts, design, merges and pairing ----
-// Star thresholds set from bot runs like the old levels (the bots walk round
-// the long way, merge parts but don't pair on purpose or throw), a bit above
-// the old chapters: this is the last one.
+// Star thresholds from bot runs: the bots walk everywhere (no throws, belts or
+// pairing on purpose) and land on about 2 stars; 3 stars is ~1.1x their average,
+// so the finale chapter wants the new tricks.
 
 /** Two office halves across an atrium: throw across it, use the belts, or walk the long way round. */
 export const THE_ATRIUM: Level = level('the-atrium', theAtriumMap, {
   ...GARAGE_SETTINGS,
-  starThresholds: [60, 120, 180],
+  starThresholds: [80, 155, 230],
 });
 
 /** An L-shaped floor round a courtyard: whiteboards first, keyboards built for pairs. */
 export const DESIGN_SPRINT: Level = level('design-sprint', designSprintMap, {
   ...GARAGE_SETTINGS,
-  starThresholds: [65, 130, 195],
+  starThresholds: [90, 175, 260],
   designShare: 0.6,
   pairing: true,
 });
@@ -307,7 +307,7 @@ export const DESIGN_SPRINT: Level = level('design-sprint', designSprintMap, {
 export const MONOREPO: Level = level('monorepo', monorepoMap, {
   ...GARAGE_SETTINGS,
   orderSchedule: { ...GARAGE_SETTINGS.orderSchedule, intervalTicks: 24 * SECOND },
-  starThresholds: [65, 130, 190],
+  starThresholds: [90, 175, 265],
   fullstackShare: 0.6,
   pairing: true,
 });
@@ -315,7 +315,7 @@ export const MONOREPO: Level = level('monorepo', monorepoMap, {
 /** A belt carousel round a courtyard and everything new at once, with incidents. */
 export const HACKATHON: Level = level('hackathon', hackathonMap, {
   ...GARAGE_SETTINGS,
-  starThresholds: [60, 120, 180],
+  starThresholds: [90, 180, 270],
   designShare: 0.3,
   fullstackShare: 0.4,
   pairing: true,

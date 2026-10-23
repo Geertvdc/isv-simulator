@@ -396,7 +396,7 @@ _New: belts, design, merges._
 
 ![The Atrium](images/levels/the-atrium.webp)
 
-Two office halves across an atrium. Inbox, bug queue and keyboards on the left; test benches and pipelines on the right; ship on the left again. Throw across the gap, put tickets on the belt bridges (one each way), or walk round along the bottom.
+Two office halves across an atrium. Inbox, bug queue and keyboards on the left; test benches and pipelines on the right; ship on the left again. Throw across the gap onto the counters on the far edge, put tickets on the belt bridges (one each way), or walk round along the bottom.
 
 - **New here:** Gaps you throw across, conveyor belts, a long way round.
 - **Extras:** No reviews, no incidents
@@ -404,20 +404,20 @@ Two office halves across an atrium. Inbox, bug queue and keyboards on the left; 
 
 ```text
 #II##BB###TT####
-K..1..C~~C..2..P
-K.....C~~C.....P
+K..1...~~C..2..P
+K......~~C.....P
 #......~~......#
 #....>>>>>>C...#
 #......~~......#
 #...C<<<<<<....#
-X.4...C~~C...3.T
+X.4...C~~....3.T
 #..............#
 ###SS###########
 ```
 
 | Players      | 1          | 2           | 3           | 4           |
 | ------------ | ---------- | ----------- | ----------- | ----------- |
-| ★ / ★★ / ★★★ | 60/120/180 | 100/200/310 | 140/280/410 | 170/340/500 |
+| ★ / ★★ / ★★★ | 80/160/230 | 140/260/390 | 180/360/530 | 220/430/640 |
 
 ### 5-2 Design Sprint
 
@@ -446,15 +446,15 @@ X..............P
 
 | Players      | 1          | 2           | 3           | 4           |
 | ------------ | ---------- | ----------- | ----------- | ----------- |
-| ★ / ★★ / ★★★ | 70/130/200 | 110/220/330 | 150/300/450 | 180/360/550 |
+| ★ / ★★ / ★★★ | 90/180/260 | 150/300/440 | 210/400/600 | 250/490/730 |
 
 ### 5-3 Monorepo
 
-> Front end on one side, back end on the other. Merge in the middle.
+> Full-stack features: code the front end and the back end, then merge them.
 
 ![Monorepo](images/levels/monorepo.webp)
 
-Keyboards on both sides of an atrium, the merge station below it where the halves meet, and a belt across the top. Orders come a bit slower (every 24 s) but most are full-stack.
+Keyboards on both sides of an atrium (any keyboard codes either half), the merge station just below the gap, and a belt across the top. Orders come a bit slower (every 24 s) but most are full-stack.
 
 - **New here:** Full-stack orders: front end + back end, merged at G.
 - **Extras:** 60% full-stack, pairing, orders every 24 s
@@ -475,15 +475,15 @@ B..............#
 
 | Players      | 1          | 2           | 3           | 4           |
 | ------------ | ---------- | ----------- | ----------- | ----------- |
-| ★ / ★★ / ★★★ | 70/130/190 | 110/220/320 | 150/300/440 | 180/360/530 |
+| ★ / ★★ / ★★★ | 90/180/270 | 150/300/450 | 210/400/610 | 250/490/740 |
 
 ### 5-4 Hackathon
 
-> A carousel of tickets and every new idea at once.
+> A belt round the middle and every new idea at once.
 
 ![Hackathon](images/levels/hackathon.webp)
 
-A belt carousel runs round a void in the middle: put a ticket on and it comes round to the other side. Whiteboards, a merge station, design, full-stack orders, pairing and incidents.
+A long belt runs round a void in the middle and drops tickets on the counter at the bottom: put one on anywhere and it comes round. Whiteboards, a merge station, design, full-stack orders, pairing and incidents.
 
 - **New here:** Everything new at once, on a loop.
 - **Extras:** 30% design, 40% full-stack, pairing, incidents
@@ -496,7 +496,7 @@ A belt carousel runs round a void in the middle: put a ticket on and it comes ro
 #...^      v...T
 K...^      v...T
 K...^      v...#
-#...^<<<<<<<...#
+#...^<<<<v<<...#
 #.3...G..CC..4.#
 X..............#
 ###SS###TT##PP##
@@ -504,4 +504,4 @@ X..............#
 
 | Players      | 1          | 2           | 3           | 4           |
 | ------------ | ---------- | ----------- | ----------- | ----------- |
-| ★ / ★★ / ★★★ | 60/120/180 | 100/200/310 | 140/280/410 | 170/340/500 |
+| ★ / ★★ / ★★★ | 90/180/270 | 150/310/460 | 210/410/620 | 250/500/760 |

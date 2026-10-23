@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { PIPELINE_FAIL_TICKS, REPAIR_TICKS, TICKS_PER_SECOND } from './balance';
-import { botInput, createBot, findPath, runBots } from './bot';
-import { parseLevelMap } from './level';
+import { type Bot, botInput, createBot, findPath, runBots } from './bot';
+import { getTile, parseLevelMap } from './level';
 import { DOWN_THE_HALL, GARAGE, levelWithMap } from './levels';
+import type { Ticket } from './tickets';
 import { createOrder } from './orders';
-import { createGame } from './state';
+import { type GameState, type PlayerId, createGame } from './state';
 import { pipelineAt } from './pipeline';
 import { COL, addTicket, idle, newTestGame } from './testing';
 import { tick } from './tick';
@@ -118,5 +119,62 @@ describe('bot and a broken pipeline', () => {
     }
     expect(pipelineAt(state, COL.pipeline, 1)?.broken).toBe(false);
     expect(ticket.location).toEqual({ kind: 'tile', x: COL.pipeline, y: 1 });
+  });
+});
+
+describe('bots and full-stack features', () => {
+  /** Inbox, two keyboards, merge station, two counters, test bench, pipeline, ship. */
+  const MERGE_MAP = [
+    '###########',
+    '#IKKGCCTPS#',
+    '#.........#',
+    '#1234.....#',
+    '###########',
+  ].join('\n');
+
+  function mergeGame(): GameState {
+    const state = createGame(levelWithMap(parseLevelMap(MERGE_MAP)), 1, [1, 2]);
+    state.nextOrderTick = Number.MAX_SAFE_INTEGER;
+    return state;
+  }
+
+  function play(state: GameState, bots: Bot[], seconds: number): void {
+    for (let i = 0; i < seconds * TICKS_PER_SECOND; i++) {
+      tick(
+        state,
+        bots.map((b) => botInput(state, b, bots)),
+      );
+    }
+  }
+
+  it('code both halves, merge them and ship the full-stack order', () => {
+    const state = mergeGame();
+    createOrder(state, 'fullstack', 'Checkout');
+    const before = state.score;
+    play(state, [createBot(1), createBot(2)], 40);
+    expect(state.orders).toHaveLength(0);
+    expect(state.score).toBeGreaterThan(before);
+  });
+
+  it('park a half on a counter when the merge station holds the same half', () => {
+    const state = mergeGame();
+    const part = (playerId: PlayerId | null): Ticket => {
+      const t: Ticket = {
+        id: state.nextTicketId++,
+        kind: 'frontend',
+        title: 'Checkout',
+        steps: [{ kind: 'code', progress: 1 }],
+        location: playerId === null ? { kind: 'tile', x: 4, y: 1 } : { kind: 'player', playerId },
+      };
+      state.tickets.push(t);
+      return t;
+    };
+    part(null);
+    const held = part(1);
+    play(state, [createBot(1)], 5);
+    expect(held.location.kind).toBe('tile');
+    if (held.location.kind === 'tile') {
+      expect(getTile(state.level, held.location.x, held.location.y)).toBe('counter');
+    }
   });
 });

@@ -235,8 +235,16 @@ function levelScene(level: Level): Scene {
     setup(state) {
       const first = openOrder(state, 'feature', 'Make the logo bigger', { left: 0.6 });
       openOrder(state, 'feature', 'Add dark mode', { left: 0.9 });
-      if (settingsForPlayers(level, 4).reviewShare > 0) {
+      const settings = settingsForPlayers(level, 4);
+      if (settings.reviewShare > 0) {
         openOrder(state, 'feature', 'Add AI to it', { review: true, left: 0.95 });
+      }
+      // Big Tech's orders show what's new there.
+      if ((settings.designShare ?? 0) > 0) {
+        openOrder(state, 'feature', 'Rethink onboarding', { design: true, left: 0.95 });
+      }
+      if ((settings.fullstackShare ?? 0) > 0) {
+        openOrder(state, 'fullstack', 'Add a checkout', { left: 0.9 });
       }
       give(workOn(first, 1), 1);
     },

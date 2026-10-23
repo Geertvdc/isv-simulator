@@ -177,8 +177,8 @@ function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | nu
   if (own?.location.kind === 'tile') {
     const tile = { x: own.location.x, y: own.location.y };
     const kind = getTile(state.level, tile.x, tile.y);
-    // A coded part waits on the merge station for its other half.
-    if (kind === 'merge' && isPart(own)) {
+    // A coded part waits on the merge station for its other half, or parked on a counter.
+    if ((kind === 'merge' || kind === 'counter') && isPart(own)) {
       bot.ticketId = null;
       return chooseGoal(state, bot, bots);
     }
@@ -190,7 +190,7 @@ function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | nu
 
   const help = reviewHelpGoal(state, bot, bots);
   if (help) return help;
-  const merged = mergedGoal(state, bot, bots);
+  const merged = mergedGoal(state, bot, bots) ?? parkedPartGoal(state, bot, bots);
   if (merged) return merged;
   for (const queue of ['bug', 'feature'] as const satisfies readonly TicketKind[]) {
     if (queuedTickets(state, queue).length === 0) continue;
@@ -207,6 +207,24 @@ function mergedGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | nu
     return ticket && !isPart(ticket) && !bots.some((b) => b !== bot && b.ticketId === ticket.id);
   });
   const tile = nearest(state, bot.playerId, waiting);
+  if (!tile) return null;
+  bot.ticketId = ticketOnTile(state, tile.x, tile.y)?.id ?? null;
+  return { tile, action: 'interact' };
+}
+
+/** The nearest coded part parked on a counter that a merge station would take now. */
+function parkedPartGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | null {
+  const merges = tilesOf(state.level, 'merge');
+  const parked = tilesOf(state.level, 'counter').filter((t) => {
+    const ticket = ticketOnTile(state, t.x, t.y);
+    return (
+      ticket &&
+      isPart(ticket) &&
+      !bots.some((b) => b !== bot && b.ticketId === ticket.id) &&
+      merges.some((m) => canPutDown(state, ticket, m.x, m.y))
+    );
+  });
+  const tile = nearest(state, bot.playerId, parked);
   if (!tile) return null;
   bot.ticketId = ticketOnTile(state, tile.x, tile.y)?.id ?? null;
   return { tile, action: 'interact' };
@@ -240,7 +258,14 @@ function carryGoal(state: GameState, bot: Bot, bots: readonly Bot[], ticket: Tic
     const open = tilesOf(state.level, 'merge').filter((t) => canPutDown(state, ticket, t.x, t.y));
     const halves = open.filter((t) => ticketOnTile(state, t.x, t.y));
     const tile = nearest(state, bot.playerId, halves.length > 0 ? halves : open);
-    return tile ? { tile, action: 'interact' } : null;
+    if (tile) return { tile, action: 'interact' };
+    // The station is taken (by the same half, or a merged ticket): park it on a free counter.
+    const counter = nearest(
+      state,
+      bot.playerId,
+      tilesOf(state.level, 'counter').filter((t) => !ticketOnTile(state, t.x, t.y)),
+    );
+    return counter ? { tile: counter, action: 'interact' } : null;
   }
   if (!step) {
     // Without a bin, a ticket whose order expired still ships, for nothing.
