@@ -95,6 +95,13 @@ function unit(x: number, y: number, fallback: MapPoint = { x: 1, y: 0 }): MapPoi
 export interface DriveTuning {
   topSpeed: number;
   accel: number;
+  /**
+   * Further than this from its target (in tiles), the van hurries: top
+   * speed and acceleration grow with the distance, up to `maxHurry` times,
+   * so a jump over many levels doesn't take ages.
+   */
+  hurryGap: number;
+  maxHurry: number;
 }
 
 /** The van's place on the road and its speed (negative: driving back). */
@@ -122,13 +129,15 @@ export function stepDrive(
   tuning: DriveTuning,
 ): Drive {
   const dt = Math.max(0, deltaMs) / 1000;
-  const { topSpeed, accel } = tuning;
   let { distance, speed } = drive;
   // Small steps, so braking lands on the target even on a slow frame.
   const steps = Math.max(1, Math.ceil(dt / (1 / 120)));
   const h = dt / steps;
   for (let k = 0; k < steps; k++) {
     const gap = target - distance;
+    const hurry = Math.min(Math.max(Math.abs(gap) / tuning.hurryGap, 1), tuning.maxHurry);
+    const topSpeed = tuning.topSpeed * hurry;
+    const accel = tuning.accel * hurry;
     if (Math.abs(gap) < STOP_DISTANCE && Math.abs(speed) < STOP_SPEED) {
       return { distance: target, speed: 0 };
     }

@@ -7,7 +7,7 @@ const MAP = buildWorldMap(
   CHAPTERS.map((c) => ({ levelIds: c.levels.map((l) => l.id), starGate: c.starGate })),
 );
 const PATH = buildRoadPath(MAP);
-const TUNING = { topSpeed: 10, accel: 24 };
+const TUNING = { topSpeed: 10, accel: 24, hurryGap: 1000, maxHurry: 3 };
 
 /** Drives from `from` to `to` at 60 frames a second; every place along the way. */
 function drive(from: number, to: number, start: Drive = { distance: from, speed: 0 }): Drive[] {
@@ -104,6 +104,18 @@ describe('stepDrive', () => {
       const step = Math.abs((back[i]?.distance ?? 0) - (back[i - 1]?.distance ?? 0));
       expect(step).toBeLessThanOrEqual(TUNING.topSpeed / 60 + 1e-9);
     }
+  });
+
+  it('hurries over a long way, but not more than maxHurry times', () => {
+    const tuning = { ...TUNING, hurryGap: 10 };
+    let calm: Drive = { distance: 0, speed: 0 };
+    let rushed: Drive = { distance: 0, speed: 0 };
+    for (let i = 0; i < 120; i++) {
+      calm = stepDrive(calm, 60, 1000 / 60, TUNING);
+      rushed = stepDrive(rushed, 60, 1000 / 60, tuning);
+      expect(rushed.speed).toBeLessThanOrEqual(TUNING.topSpeed * tuning.maxHurry + 1e-9);
+    }
+    expect(rushed.distance).toBeGreaterThan(calm.distance * 1.5);
   });
 
   it('stays parked when already there', () => {
