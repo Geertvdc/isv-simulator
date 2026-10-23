@@ -26,6 +26,7 @@ import {
   type TicketStore,
 } from './render/GameScene';
 import { createThreeRoundRenderer } from './render/three/ThreeRoundRenderer';
+import { createWorldMapRenderer } from './render/three/worldMap/WorldMapRenderer';
 import { mountDemo } from './ui/demo';
 import { mountGameHud } from './ui/game';
 import { mountHud } from './ui/hud';
@@ -117,6 +118,7 @@ const scene = new GameScene({
   // `?demo`: a kiosk for a booth, bots play whenever nobody does.
   kiosk: !shownScene && params.has('demo'),
   roundRenderer: createThreeRoundRenderer,
+  menuRenderer: createWorldMapRenderer,
   // A scene is a picture: it never goes online.
   online: shownScene
     ? null
