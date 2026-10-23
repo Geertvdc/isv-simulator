@@ -295,7 +295,7 @@ export const LEVEL_INTRO_TIPS: Readonly<Record<string, { text: string; picture: 
   },
   'the-atrium': {
     picture: 'atrium',
-    text: 'Throw tickets across the atrium, or put them on a belt. Drop one in and its work is gone: git reset --hard.',
+    text: 'Throw tickets across the atrium, put them on a belt or walk round the bottom. Drop one in and its work is gone: git reset --hard.',
   },
   'design-sprint': {
     picture: 'design',

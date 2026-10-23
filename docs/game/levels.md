@@ -1,23 +1,24 @@
 # Levels
 
-12 levels in 4 chapters, one new mechanic per chapter. Every level is a 14 × 10 ASCII map in [`maps/`](../../maps) and lasts 3 minutes. Settings (order pace, reviews, incidents, meetings, star targets) live in `src/sim/levels.ts`, names and blurbs in `src/sim/content.ts`.
+16 levels in 5 chapters, one new mechanic per chapter (Big Tech brings a few). Every level is a 14 × 10 ASCII map (Big Tech's campus is 16 wide) in [`maps/`](../../maps) and lasts 3 minutes. Settings (order pace, reviews, incidents, meetings, star targets) live in `src/sim/levels.ts`, names and blurbs in `src/sim/content.ts`.
 
 ## Campaign
 
 A level opens when the level before it has at least 1 star. A chapter also needs enough stars in total over all levels.
 
-| Chapter    | What's new                 | Opens at | Levels                                                                                                     |
-| ---------- | -------------------------- | -------- | ---------------------------------------------------------------------------------------------------------- |
-| Garage     | Two founders and a dream.  | —        | [The Garage](#11-the-garage), [Open Plan Office](#12-open-plan-office), [Down the Hall](#13-down-the-hall) |
-| Startup    | New: production incidents  | 4 ★      | [Seed Round](#21-seed-round), [Demo Day](#22-demo-day), [On Call](#23-on-call)                             |
-| Scale-Up   | New: the wandering manager | 9 ★      | [Middle Management](#31-middle-management), [Hypergrowth](#32-hypergrowth), [Hot Desking](#33-hot-desking) |
-| Enterprise | New: meetings              | 13 ★     | [Back to Back](#41-back-to-back), [Synergy](#42-synergy), [The Reorg](#43-the-reorg)                       |
+| Chapter    | What's new                 | Opens at | Levels                                                                                                                 |
+| ---------- | -------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Garage     | Two founders and a dream.  | —        | [The Garage](#11-the-garage), [Open Plan Office](#12-open-plan-office), [Down the Hall](#13-down-the-hall)             |
+| Startup    | New: production incidents  | 4 ★      | [Seed Round](#21-seed-round), [Demo Day](#22-demo-day), [On Call](#23-on-call)                                         |
+| Scale-Up   | New: the wandering manager | 9 ★      | [Middle Management](#31-middle-management), [Hypergrowth](#32-hypergrowth), [Hot Desking](#33-hot-desking)             |
+| Enterprise | New: meetings              | 13 ★     | [Back to Back](#41-back-to-back), [Synergy](#42-synergy), [The Reorg](#43-the-reorg)                                   |
+| Big Tech   | New: belts, design, merges | 18 ★     | [The Atrium](#51-the-atrium), [Design Sprint](#52-design-sprint), [Monorepo](#53-monorepo), [Hackathon](#54-hackathon) |
 
 Unless a level says otherwise, feature orders come every 20 seconds (solo, a few seconds either way), at most 3 are open at once, features last 75 seconds and bugs 45. More players get orders faster and higher star targets: see [Tickets and events](mechanics.md#orders-and-tickets).
 
 ### Reading the maps
 
-`#` wall · `.` floor · `C` counter · `I` inbox · `B` bug queue · `K` keyboard · `R` review · `T` test bench · `P` pipeline · `S` ship · `X` bin · `1`–`4` player spawns · `M` manager start · `m` meeting room. See [Stations](stations.md).
+`#` wall · `.` floor · `C` counter · `I` inbox · `B` bug queue · `K` keyboard · `R` review · `T` test bench · `P` pipeline · `S` ship · `X` bin · `1`–`4` player spawns · `M` manager start · `m` meeting room · `W` whiteboard · `G` merge station · `>` `<` `^` `v` conveyor belt · `~` gap · blank: void (no floor). See [Mechanics](mechanics.md#gaps-and-odd-shapes-from-chapter-5-big-tech). See [Stations](stations.md).
 
 The screenshots show four players on their spawns with a few orders open.
 
@@ -384,3 +385,123 @@ C.......2....P
 | Players      | 1         | 2          | 3           | 4           |
 | ------------ | --------- | ---------- | ----------- | ----------- |
 | ★ / ★★ / ★★★ | 50/90/140 | 80/150/240 | 100/210/320 | 130/250/390 |
+
+## Chapter: Big Tech
+
+_New: belts, design, merges._
+
+### 5-1 The Atrium
+
+> An atrium in the middle. Throw it across, ride the belt or walk round.
+
+![The Atrium](images/levels/the-atrium.webp)
+
+Two office halves across an atrium. Inbox, bug queue and keyboards on the left; test benches and pipelines on the right; ship on the left again. Throw across the gap, put tickets on the belt bridges (one each way), or walk round along the bottom.
+
+- **New here:** Gaps you throw across, conveyor belts, a long way round.
+- **Extras:** No reviews, no incidents
+- **Map:** [`maps/level-13-the-atrium.txt`](../../maps/level-13-the-atrium.txt)
+
+```text
+#II##BB###TT####
+K..1..C~~C..2..P
+K.....C~~C.....P
+#......~~......#
+#....>>>>>>C...#
+#......~~......#
+#...C<<<<<<....#
+X.4...C~~C...3.T
+#..............#
+###SS###########
+```
+
+| Players      | 1          | 2           | 3           | 4           |
+| ------------ | ---------- | ----------- | ----------- | ----------- |
+| ★ / ★★ / ★★★ | 60/120/180 | 100/200/310 | 140/280/410 | 170/340/500 |
+
+### 5-2 Design Sprint
+
+> Whiteboards before keyboards. Pair up to code faster.
+
+![Design Sprint](images/levels/design-sprint.webp)
+
+An L-shaped office (the corner is void). Whiteboards along the top and the side, a keyboard island built for two, the test benches and pipelines far away at the end of the long arm.
+
+- **New here:** Design at the whiteboard, pair programming.
+- **Extras:** 60% of features start with design, pairing
+- **Map:** [`maps/level-14-design-sprint.txt`](../../maps/level-14-design-sprint.txt)
+
+```text
+##II##WW##
+#...1....#
+K........W
+K..CKKC..W
+#........#######
+B.2..........3.T
+#.....CCCC.....T
+X..............P
+#..4...........P
+####SS##########
+```
+
+| Players      | 1          | 2           | 3           | 4           |
+| ------------ | ---------- | ----------- | ----------- | ----------- |
+| ★ / ★★ / ★★★ | 70/130/200 | 110/220/330 | 150/300/450 | 180/360/550 |
+
+### 5-3 Monorepo
+
+> Front end on one side, back end on the other. Merge in the middle.
+
+![Monorepo](images/levels/monorepo.webp)
+
+Keyboards on both sides of an atrium, the merge station below it where the halves meet, and a belt across the top. Orders come a bit slower (every 24 s) but most are full-stack.
+
+- **New here:** Full-stack orders: front end + back end, merged at G.
+- **Extras:** 60% full-stack, pairing, orders every 24 s
+- **Map:** [`maps/level-15-monorepo.txt`](../../maps/level-15-monorepo.txt)
+
+```text
+##II###~~###KK##
+K..1...~~...2..K
+K......~~......K
+#..>>>>>>>>C...#
+#......~~......#
+#..C...~~...C..#
+#......G.......#
+X.4...........3T
+B..............#
+###SS####TT#PP##
+```
+
+| Players      | 1          | 2           | 3           | 4           |
+| ------------ | ---------- | ----------- | ----------- | ----------- |
+| ★ / ★★ / ★★★ | 70/130/190 | 110/220/320 | 150/300/440 | 180/360/530 |
+
+### 5-4 Hackathon
+
+> A carousel of tickets and every new idea at once.
+
+![Hackathon](images/levels/hackathon.webp)
+
+A belt carousel runs round a void in the middle: put a ticket on and it comes round to the other side. Whiteboards, a merge station, design, full-stack orders, pairing and incidents.
+
+- **New here:** Everything new at once, on a loop.
+- **Extras:** 30% design, 40% full-stack, pairing, incidents
+- **Map:** [`maps/level-16-hackathon.txt`](../../maps/level-16-hackathon.txt)
+
+```text
+#II##WW###BB#KK#
+#.1.........2..#
+#...>>>>>>>v...#
+#...^      v...T
+K...^      v...T
+K...^      v...#
+#...^<<<<<<<...#
+#.3...G..CC..4.#
+X..............#
+###SS###TT##PP##
+```
+
+| Players      | 1          | 2           | 3           | 4           |
+| ------------ | ---------- | ----------- | ----------- | ----------- |
+| ★ / ★★ / ★★★ | 60/120/180 | 100/200/310 | 140/280/410 | 170/340/500 |

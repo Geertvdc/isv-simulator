@@ -423,6 +423,89 @@ const lobbySign: SetPiece = {
   },
 };
 
+// ---- Big Tech: a campus with lawns ----
+
+const picnicTable: SetPiece = {
+  size: [2, 2],
+  model: () => {
+    const b = new ModelBuilder();
+    b.box(1.4, 0.06, 0.7, WOOD, { at: [0, 0.62, 0] }, 0.02);
+    for (const z of [-0.6, 0.6]) b.box(1.4, 0.05, 0.25, WOOD, { at: [0, 0.38, z] }, 0.02);
+    for (const x of [-0.55, 0.55]) {
+      b.box(0.06, 0.62, 0.06, DARK, { at: [x, 0.31, 0] }, 0);
+      b.box(0.06, 0.06, 1.4, DARK, { at: [x, 0.3, 0] }, 0);
+    }
+    // Lunch: laptops open, of course.
+    b.box(0.3, 0.02, 0.22, 0x8a929c, { at: [-0.3, 0.66, -0.12] }, 0);
+    b.screen(0.28, 0.18, 0x7ab8ff, { at: [-0.3, 0.76, -0.22], rot: [-0.3, 0, 0] });
+    b.cylinder(0.05, 0.04, 0.1, WHITE, { at: [0.35, 0.7, 0.1] });
+    return b.build();
+  },
+  seats: [
+    { at: [-0.4, 0.85], yaw: Math.PI, pose: 'chatting' },
+    { at: [0.4, -0.85], yaw: 0, pose: 'typing' },
+  ],
+};
+
+const bikeRack: SetPiece = {
+  size: [2, 1],
+  model: () => {
+    const b = new ModelBuilder();
+    b.box(1.8, 0.05, 0.08, STEEL, { at: [0, 0.35, 0.3] }, 0);
+    // Campus bikes in muted colors, nothing in a player's color.
+    [0x6a8a9c, 0x9c8a6a, 0x7a9c7a].forEach((frame, i) => {
+      const x = -0.6 + i * 0.6;
+      for (const z of [-0.28, 0.28]) {
+        b.torus(0.17, 0.022, INK, { at: [x, 0.19, z], rot: [0, Math.PI / 2, 0] });
+      }
+      b.box(0.03, 0.03, 0.56, frame, { at: [x, 0.3, 0], rot: [0.3, 0, 0] }, 0);
+      b.box(0.03, 0.24, 0.03, frame, { at: [x, 0.33, 0.1] }, 0);
+      b.box(0.3, 0.025, 0.025, STEEL, { at: [x, 0.46, -0.24] }, 0);
+    });
+    return b.build();
+  },
+};
+
+const foodTruck: SetPiece = {
+  size: [3, 2],
+  model: () => {
+    const b = new ModelBuilder();
+    b.box(2.4, 1.3, 1.1, 0xe8dcc4, { at: [0, 0.85, 0] }, 0.08);
+    b.box(2.42, 0.25, 1.12, 0xd0704a, { at: [0, 0.35, 0] }, 0.04);
+    b.box(0.7, 0.9, 1.0, 0xe8dcc4, { at: [1.45, 0.65, 0] }, 0.08);
+    b.screen(0.5, 0.35, 0x9fc4d8, { at: [1.81, 0.85, 0], rot: [0, Math.PI / 2, 0] });
+    // The serving hatch, lit, with its awning.
+    b.screen(1.2, 0.45, 0xffe2a8, { at: [-0.2, 1.05, 0.56] });
+    b.box(1.4, 0.04, 0.4, 0xd0704a, { at: [-0.2, 1.45, 0.72], rot: [0.35, 0, 0] }, 0);
+    b.box(1.2, 0.05, 0.2, 0x8a929c, { at: [-0.2, 0.8, 0.65] }, 0);
+    for (const [x, z] of [
+      [-0.8, -0.56],
+      [0.8, -0.56],
+      [-0.8, 0.56],
+      [0.8, 0.56],
+      [1.45, -0.5],
+      [1.45, 0.5],
+    ] as const) {
+      b.cylinder(0.2, 0.2, 0.14, INK, { at: [x, 0.2, z], rot: [Math.PI / 2, 0, 0] });
+    }
+    return b.build();
+  },
+  seats: [{ at: [-0.2, 1.3], yaw: Math.PI, pose: 'idle' }],
+};
+
+const fountain: SetPiece = {
+  size: [2, 2],
+  model: () => {
+    const b = new ModelBuilder();
+    b.cylinder(0.85, 0.9, 0.3, 0xb8b2a6, { at: [0, 0.15, 0] }, 24);
+    b.cylinder(0.75, 0.75, 0.04, 0x5aa8d8, { at: [0, 0.29, 0] }, 24);
+    b.cylinder(0.12, 0.16, 0.6, 0xb8b2a6, { at: [0, 0.5, 0] }, 12);
+    b.cylinder(0.35, 0.3, 0.08, 0xb8b2a6, { at: [0, 0.82, 0] }, 16);
+    b.sphere(0.12, 0x9fd4f0, { at: [0, 0.95, 0] }, [1, 1.6, 1]);
+    return b.build();
+  },
+};
+
 /**
  * What a chapter's world is made of, the ground it stands on (darker than
  * the office floor, so the eye stays inside), and what fills its rows.
@@ -473,6 +556,15 @@ export const SETTINGS: Readonly<Record<string, Setting>> = {
     far: [meetingPod, bigPlant],
     rare: [lobbySign],
     walkers: 2,
+  },
+  'big-tech': {
+    // Lawns round the campus, with a paved path.
+    ground: 0x41663a,
+    path: 0x5a5e66,
+    near: [picnicTable, bikeRack, bigPlant],
+    far: [tree, foodTruck, bushes],
+    rare: [fountain],
+    walkers: 3,
   },
 };
 

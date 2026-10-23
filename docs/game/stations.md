@@ -1,23 +1,26 @@
 # Stations
 
-Everything you interact with stands on a solid tile. You use it from the tile next to it, facing it: the block you face lights up in your color. Order cards and recipes name stations by letter: **K**eyboard, **R**eview, **T**est bench, **P**ipeline.
+Everything you interact with stands on a solid tile. You use it from the tile next to it, facing it: the block you face lights up in your color. Order cards and recipes name stations by letter: **W**hiteboard, **K**eyboard, merge (**G**), **R**eview, **T**est bench, **P**ipeline.
 
 ![The Garage: inbox and bug queue at the back, keyboards on the left, test benches and pipeline on the right, ship hatch at the front](images/levels/garage.webp)
 
-| Station      | Map char | Looks like                    | What it does                                                                                                  |
-| ------------ | -------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Inbox        | `I`      | Blue tray with envelopes      | New feature tickets wait here. Pick-up takes the oldest one. A "x3" over it says how many are waiting.        |
-| Bug queue    | `B`      | Red crate full of bugs        | Bug tickets and incident hotfixes wait here. Hotfixes always come out first.                                  |
-| Keyboard     | `K`      | Green desk with a computer    | The **code** step. Put the ticket down and hold work. About 2.5 s of work.                                    |
-| Review       | `R`      | Purple desk with a magnifier  | The **review** step. Needs **two players** holding work at the same time. About 3 s.                          |
-| Test bench   | `T`      | Yellow desk with ✓/✗ screens  | The **test** step. Hold work, about 2.5 s. Tests are optional, but skipping them makes bugs much more likely. |
-| Pipeline     | `P`      | Orange build machine          | The **pipeline** step. Builds on its own in 4 s, nobody needed. Collect the build in time or it breaks.       |
-| Ship hatch   | `S`      | Green crate with a parcel     | Put a finished ticket here to ship it and complete its order.                                                 |
-| Bin          | `X`      | Grey trash can                | Throws the carried ticket away for good. Its order stays open.                                                |
-| Counter      | `C`      | Plain grey block              | Somewhere to put a ticket down and pick it up later. Counter walls split some offices in two.                 |
-| Meeting room | `m`      | Purple carpet, "Meeting room" | Floor, not a station. Players with a calendar invite stand here. See [meetings](mechanics.md#meetings).       |
+| Station      | Map char        | Looks like                    | What it does                                                                                                    |
+| ------------ | --------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Inbox        | `I`             | Blue tray with envelopes      | New feature tickets wait here. Pick-up takes the oldest one. A "x3" over it says how many are waiting.          |
+| Bug queue    | `B`             | Red crate full of bugs        | Bug tickets and incident hotfixes wait here. Hotfixes always come out first.                                    |
+| Keyboard     | `K`             | Green desk with a computer    | The **code** step. Put the ticket down and hold work. About 2.5 s of work.                                      |
+| Review       | `R`             | Purple desk with a magnifier  | The **review** step. Needs **two players** holding work at the same time. About 3 s.                            |
+| Test bench   | `T`             | Yellow desk with ✓/✗ screens  | The **test** step. Hold work, about 2.5 s. Tests are optional, but skipping them makes bugs much more likely.   |
+| Pipeline     | `P`             | Orange build machine          | The **pipeline** step. Builds on its own in 4 s, nobody needed. Collect the build in time or it breaks.         |
+| Ship hatch   | `S`             | Green crate with a parcel     | Put a finished ticket here to ship it and complete its order.                                                   |
+| Bin          | `X`             | Grey trash can                | Throws the carried ticket away for good. Its order stays open.                                                  |
+| Counter      | `C`             | Plain grey block              | Somewhere to put a ticket down and pick it up later. Counter walls split some offices in two.                   |
+| Whiteboard   | `W`             | White board on a stand        | The **design** step some features start with (Big Tech). Hold work, about 2.5 s. Designed features code faster. |
+| Merge        | `G`             | Raspberry desk                | git merge: put a coded front end and a coded back end here and they become one full-stack ticket.               |
+| Conveyor     | `>` `<` `^` `v` | Black belt with yellow arrows | Carries a ticket one tile every half second toward the arrow, onto the counter or station it points at.         |
+| Meeting room | `m`             | Purple carpet, "Meeting room" | Floor, not a station. Players with a calendar invite stand here. See [meetings](mechanics.md#meetings).         |
 
-Other map chars: `#` wall, `.` floor, `1` to `4` player spawns, `M` where a manager starts.
+Other map chars: `#` wall, `.` floor, `~` gap (throw over it, don't drop in it), blank: void, `1` to `4` player spawns, `M` where a manager starts.
 
 ## Working a station
 
