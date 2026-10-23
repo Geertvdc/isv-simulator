@@ -21,7 +21,6 @@ import {
   type ShotRig,
   LOBBY,
   establishingFraming,
-  openEnd,
   shotFor,
   startRig,
   stepRig,
@@ -170,7 +169,9 @@ export class WorldMapRenderer implements MenuRenderer {
    */
   private syncLocks(view: MenuView): void {
     const now = lockStateOf(this.map, view);
-    const onMap = showsMap(view.screen);
+    // Behind the title the whole world shows open (the promise), so only the
+    // level select and the lobby count as having seen the locks.
+    const onMap = showsMap(view.screen) && shotFor(view.screen) !== 'establishing';
     const opened = onMap ? newlyOpened(seenLocks, now) : { chapters: [], levels: [] };
     if (onMap) seenLocks = now;
     const display = onMap ? now : (seenLocks ?? now);
@@ -196,6 +197,7 @@ export class WorldMapRenderer implements MenuRenderer {
     const target = cameraTarget(this.map, look);
     this.look = this.look ? glide(this.look, target, deltaMs) : target;
     const want = this.framing(this.shot, this.look, timeMs);
+    this.locks.setPromise(this.shot === 'establishing', this.rig === null);
     this.rig = this.rig ? stepRig(this.rig, this.shot, want, deltaMs) : startRig(this.shot, want);
     this.stage.setPose(this.pose(this.rig.shown, width, height));
 
@@ -277,7 +279,7 @@ export class WorldMapRenderer implements MenuRenderer {
   /** Where `shot` wants the camera now, with the level select's look at `look`. */
   private framing(shot: MapShot, look: MapPoint, timeMs: number): Framing {
     if (shot === 'establishing') {
-      return establishingFraming(openEnd(this.map.regions, this.locks.chapterOpen), timeMs);
+      return establishingFraming(this.map.width, timeMs);
     }
     const { distance, pitch, fov, principalY } = shot === 'lobby' ? LOBBY : CAMERA;
     return { look, distance, pitch, fov, principalY };
