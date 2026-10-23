@@ -46,12 +46,12 @@ Each step is built by one agent and then checked by a separate critic agent (typ
 
 ## Done when
 
-- [ ] The level select is a 3D map; arrows, WASD and the stick drive the van between levels, Enter plays
-- [ ] The map tells the startup-to-enterprise story from left to right
+- [x] The level select is a 3D map; arrows, WASD and the stick drive the van between levels, Enter plays
+- [x] The map tells the startup-to-enterprise story from left to right
 - [x] Locked chapters and levels read as locked, with what opens them
-- [ ] The title screen is 3D and says OverEngineered
-- [ ] Online: the host drives, guests see the van move
-- [ ] `npm run check` and `npm run build` pass; screenshots retaken
+- [x] The title screen is 3D and says OverEngineered
+- [ ] Online: the host drives, guests see the van move (not checked by hand yet: the server tests drive the level select along the road and the online lobby shot works, but nobody has watched a guest's screen while the host drives)
+- [x] `npm run check` and `npm run build` pass; screenshots retaken
 
 ## Out of scope
 
