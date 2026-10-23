@@ -111,17 +111,19 @@ export interface Puff {
   phase: number;
 }
 
-interface Layer {
-  step: number;
-  r: readonly [number, number];
-  z: readonly [number, number];
-}
-
-/** The cloud bank: puffs on a grid, a low layer that hides the ground and a puffy top. */
+/**
+ * The cloud bank: a flat base of puffs that hides the ground, and on it
+ * cloud masses, each a big puff with smaller ones clumped round its rim, so
+ * the bank has a real cloud silhouette instead of an even grid of balls.
+ */
 export const CLOUDS = {
-  low: { step: 1.45, r: [0.95, 1.5], z: [0.5, 0.9] } as Layer,
-  top: { step: 2.6, r: [1.3, 1.95], z: [1.3, 1.85] } as Layer,
-  squash: 0.58,
+  base: { step: 2.1, r: [1.1, 1.5], z: [0.3, 0.55], squash: 0.5 },
+  mass: {
+    step: { x: 3.3, y: 3.7 },
+    jitter: 0.7,
+    core: { r: [1.7, 2.3], z: [1.05, 1.45], squash: 0.62 },
+    rim: { count: [4, 6], r: [0.6, 1.1], z: [0.7, 1.1], out: [0.75, 1.15], squash: 0.7 },
+  },
   /** How far past the island's back and front edges the bank reaches. */
   overhang: 1,
   /** How far a puff drifts to and fro: they stay this far in from the region's sides. */
@@ -129,6 +131,8 @@ export const CLOUDS = {
   /** How far a bank reaches over its right edge, into the next (locked) chapter. */
   seam: 0.9,
 };
+
+type Range = readonly number[];
 
 /**
  * The puffs over `region` (whose land reaches `back` tiles behind the
@@ -141,39 +145,60 @@ export const CLOUDS = {
  */
 export function cloudPuffs(region: MapRegion, back: number): Puff[] {
   const random = seeded(region.chapter + 101);
+  const between = ([lo = 0, hi = lo]: Range): number => lo + random() * (hi - lo);
   const puffs: Puff[] = [];
   const top = -back - CLOUDS.overhang;
   const bottom = region.height + CLOUDS.overhang;
-  for (const layer of [CLOUDS.low, CLOUDS.top]) {
-    const [rMin, rMax] = layer.r;
-    const [zMin, zMax] = layer.z;
-    const columns = Math.max(
-      1,
-      Math.round((region.width + CLOUDS.seam - rMin * 2) / layer.step) + 1,
-    );
-    const rows = Math.max(1, Math.round((bottom - top) / layer.step) + 1);
+  const left = region.x + CLOUDS.drift;
+  const right = region.x + region.width + CLOUDS.seam - CLOUDS.drift;
+  const add = (x: number, y: number, z: number, r: number, squash: number): void => {
+    // Kept whole inside the bank's sides, however big.
+    const fit = Math.min(r, (right - left) / 2);
+    puffs.push({
+      x: Math.min(Math.max(x, left + fit), right - fit),
+      y,
+      z,
+      r: fit,
+      squash: squash * (0.9 + random() * 0.2),
+      phase: random() * Math.PI * 2,
+    });
+  };
+  // Lay a grid over the bank, `step` apart, centered on it.
+  const grid = (stepX: number, stepY: number, each: (x: number, y: number) => void): void => {
+    const columns = Math.max(1, Math.round((right - left) / stepX));
+    const rows = Math.max(1, Math.round((bottom - top) / stepY) + 1);
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < columns; col++) {
-        const r = rMin + random() * (rMax - rMin);
-        // Every other row shifts half a step, so the bank has no straight lanes.
-        const shift = row % 2 === 0 ? 0 : layer.step / 2;
-        const span = region.width + CLOUDS.seam - (r + CLOUDS.drift) * 2;
-        const x =
-          region.x +
-          CLOUDS.drift +
-          r +
-          Math.min(span, Math.max(0, col * layer.step + shift + (random() - 0.5) * 0.7));
-        const y = top + row * ((bottom - top) / Math.max(1, rows - 1)) + (random() - 0.5) * 0.8;
-        puffs.push({
-          x,
-          y,
-          z: zMin + random() * (zMax - zMin),
-          r,
-          squash: CLOUDS.squash * (0.85 + random() * 0.3),
-          phase: random() * Math.PI * 2,
-        });
+        const shift = row % 2 === 0 ? 0.25 : 0.75;
+        each(
+          left + ((col + shift) * (right - left)) / columns,
+          top + (row * (bottom - top)) / Math.max(1, rows - 1),
+        );
       }
     }
-  }
+  };
+  const { base, mass } = CLOUDS;
+  grid(base.step, base.step, (x, y) => {
+    add(x, y, between(base.z), between(base.r), base.squash);
+  });
+  grid(mass.step.x, mass.step.y, (gx, gy) => {
+    const x = gx + (random() - 0.5) * mass.jitter * 2;
+    const y = gy + (random() - 0.5) * mass.jitter * 2;
+    const core = between(mass.core.r);
+    add(x, y, between(mass.core.z), core, mass.core.squash);
+    const count = Math.round(between(mass.rim.count));
+    const start = random() * Math.PI * 2;
+    for (let k = 0; k < count; k++) {
+      const a = start + (k / count) * Math.PI * 2 + (random() - 0.5) * 0.6;
+      const out = core * between(mass.rim.out);
+      add(
+        x + Math.cos(a) * out,
+        y + Math.sin(a) * out * 0.8,
+        between(mass.rim.z),
+        between(mass.rim.r),
+        mass.rim.squash,
+      );
+    }
+  });
   return puffs;
 }

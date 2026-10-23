@@ -244,6 +244,11 @@ export function chapterGateHint(needed: number, have: number): string {
   return `Needs ${needed} ★ · you have ${have}`;
 }
 
+/** On the card of a level in a locked chapter (the chapter banner says how many you have). */
+export function chapterGateShort(needed: number): string {
+  return `Chapter needs ${needed} ★`;
+}
+
 /** The sign on a locked chapter's road barrier, on the world map: the stars it takes. */
 export function gateSign(needed: number): string {
   return `★ ${needed}`;
