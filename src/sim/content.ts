@@ -149,8 +149,8 @@ export const LEVEL_BLURBS: Readonly<Record<string, string>> = {
   'the-reorg': 'Everything, everywhere, all at once.',
   'the-atrium': 'An atrium in the middle. Throw it across, ride the belt or walk round.',
   'design-sprint': 'Whiteboards before keyboards. Pair up to code faster.',
-  monorepo: 'Front end on one side, back end on the other. Merge in the middle.',
-  hackathon: 'A carousel of tickets and every new idea at once.',
+  monorepo: 'Full-stack features: code the front end and the back end, then merge them.',
+  hackathon: 'A belt round the middle and every new idea at once.',
 };
 
 /** Chapter names, by chapter id. */
@@ -229,7 +229,7 @@ export function levelLabel(chapter: number, level: number): string {
 
 /** On a locked chapter: how many stars it takes, and how many you have. */
 export function chapterGateHint(needed: number, have: number): string {
-  return `Needs ${needed} ★ in total (you have ${have})`;
+  return `Needs ${needed} ★ · you have ${have}`;
 }
 
 /** Shown on the results when the round opened a new chapter. */
@@ -307,7 +307,7 @@ export const LEVEL_INTRO_TIPS: Readonly<Record<string, { text: string; picture: 
   },
   hackathon: {
     picture: 'carousel',
-    text: 'A belt runs round the middle: put a ticket on and it comes round to the other side.',
+    text: 'A long belt runs round the middle and drops tickets on the counter at the bottom: put one on anywhere and it comes round.',
   },
   'back-to-back': {
     picture: 'meeting',

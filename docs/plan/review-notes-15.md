@@ -48,8 +48,10 @@ Decisions made without the product owner, who asked for the work to go ahead on 
 - **The Atrium has a walkway** along the bottom (the plan had two halves with only throws and belts between them): with one player, nobody could get to the other half. Throwing and the belts are the fast way across; walking round is the slow way.
 - **The campus is 16 tiles wide** (the old levels are 14): room for an atrium and two working halves. It still fits the screen in 2D and 3D.
 - **Bots learned to merge** (carry a coded part to the merge station, fetch the merged ticket) so they can play every Big Tech level, and the demo plays them too. They still don't throw, pair on purpose or use belts: they walk.
-- **Star thresholds come from bot runs**, like the old levels, set a bit higher (bots earn 2 to 3 stars, as on the old levels). Humans throw and pair, bots don't, so these may want tuning after playtests.
+- **Star thresholds come from bot runs** (5 seeds, 1 to 4 bots): bots only walk (no throws, belts or pairing on purpose) and land on about 2 stars; 3 stars sits at about 1.1× their average, so the finale chapter asks for the new tricks. Old chapters let walking bots reach 3 stars; these may want tuning after playtests.
 - **The chapter gate is 18 stars** (Enterprise opens at 13).
 - **No music of its own:** Big Tech plays the Scale-Up track.
 - **Campus surroundings:** lawns and a paved path, picnic tables with people at lunch, bike racks, food trucks, trees, and once a level a fountain. Scooters and a slide from the plan are left for later.
 - **Level select:** five chapter columns, cards a little tighter so all sixteen fit at 720p.
+- **Review round 1:** The Atrium's counters on the thrower's side of the gap are floor now (they caught your own throws); only the far-side counters are landing pads. Hackathon's belt is no longer a closed loop: it ends on the counter at the bottom middle, so it delivers. Bots park a coded half on a counter when the merge station holds the same half, and pick it back up when it fits. Monorepo's blurb no longer promises front-end and back-end sides (any keyboard codes either half).
+- **Left after review round 1:** Design Sprint's void corner is only a shape (nothing crosses it); the level shots use the generic order scene, not a design or full-stack order; walkways on the gap levels stay generous.

@@ -4,12 +4,12 @@
 
 ## Levels
 
-| #   | Level             | Shape and layout gimmick                                                                                                                              | New mechanic             |
-| --- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| 5-1 | **The Atrium**    | Two office halves across an atrium gap. Inbox and keyboards on one side, test and pipeline on the other; throw across, or use the one conveyor bridge | Gaps, conveyors          |
-| 5-2 | **Design Sprint** | An L-shaped floor wrapped around a courtyard (void); whiteboards in the corner, keyboards made for pairing                                            | Design, pair programming |
-| 5-3 | **Monorepo**      | Front-end team on the left island, back-end team on the right, the merge station on a narrow peninsula between them that both can throw to            | Merge                    |
-| 5-4 | **Hackathon**     | A ring around a void courtyard with a conveyor loop; everything at once                                                                               | All of the above         |
+| #   | Level             | Shape and layout gimmick                                                                                                                           | New mechanic             |
+| --- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| 5-1 | **The Atrium**    | Two office halves across an atrium gap. Inbox and keyboards on one side, test and pipeline on the other; throw across, or use the conveyor bridges | Gaps, conveyors          |
+| 5-2 | **Design Sprint** | An L-shaped floor wrapped around a courtyard (void); whiteboards in the corner, keyboards made for pairing                                         | Design, pair programming |
+| 5-3 | **Monorepo**      | Front-end team on the left island, back-end team on the right, the merge station on a narrow peninsula between them that both can throw to         | Merge                    |
+| 5-4 | **Hackathon**     | A ring around a void courtyard with a conveyor loop; everything at once                                                                            | All of the above         |
 
 ## Scope
 

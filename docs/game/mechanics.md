@@ -110,7 +110,7 @@ Levels don't have to be a rectangle any more. Blank tiles in a map are **void**:
 
 ## Conveyor belts (from chapter 5, Big Tech)
 
-`>` `<` `^` `v` are belts: the message queue. Put a ticket on one and it moves one tile every half second along the arrows, onto the next belt and then onto the counter or station the belt points at. A belt waits when what's ahead is full. Belts that run in a closed loop (Hackathon) carry tickets round and round until someone picks one off.
+`>` `<` `^` `v` are belts: the message queue. Put a ticket on one and it moves one tile every half second along the arrows, onto the next belt and then onto the counter or station the belt points at. A belt waits when what's ahead is full. You can also pick a ticket off a belt as it passes.
 
 ![The conveyor bridge carries tickets across the atrium to the test side](images/mechanics/conveyor.webp)
 
@@ -122,7 +122,7 @@ Some feature orders start at the whiteboard (`W`): design → code → test → 
 
 ## Front end + back end: merging (from Monorepo)
 
-A **full-stack** order arrives as two tickets in the inbox: a front end and a back end (the order card shows two K chips, marked FE and BE). Code both, then put them on the **merge station** (`G`, git merge) one after the other: they become one full-stack ticket that still needs testing and the pipeline. Halves can't ship on their own. Full-stack orders pay 30 and last 1.5× as long. Throwing a coded half onto the station or letting a belt bring it works too.
+A **full-stack** order arrives as two tickets in the inbox: a front end and a back end (the order card shows two K chips, marked FE and BE). Code both, then put them on the **merge station** (`G`, git merge) one after the other: they become one full-stack ticket that still needs testing and the pipeline. Halves can't ship on their own. Full-stack orders pay 30 and last 1.5× as long. Throwing a coded half onto the station works too, and so would a belt that ends at it.
 
 ![The back end lands on the merge station next to its front end](images/mechanics/merge.webp)
 

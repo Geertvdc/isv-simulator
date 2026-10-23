@@ -166,7 +166,7 @@ export const REPAIR_TICKS = 3 * TICKS_PER_SECOND;
 export const STARS_TO_UNLOCK = 1;
 /**
  * Best stars over all levels needed to open each chapter (Garage, Startup,
- * Scale-Up, Enterprise), on top of the previous level's star. Reachable
+ * Scale-Up, Enterprise, Big Tech), on top of the previous level's star. Reachable
  * with 1 to 2 stars per level.
  */
 export const CHAPTER_STAR_GATES: readonly number[] = [0, 4, 9, 13, 18];
