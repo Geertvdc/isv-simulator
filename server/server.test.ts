@@ -323,7 +323,7 @@ describe('profiles over HTTP', () => {
     await a.waitFor('snapshot', (m) => m.flow.lobby.players.length === 1);
     a.send({ type: 'menu', presses: [press({ interact: true })] });
     await a.waitFor('snapshot', (m) => m.flow.screen === 'levelSelect');
-    a.send({ type: 'menu', presses: [press({ nav: { x: 0, y: 1 } })] });
+    a.send({ type: 'menu', presses: [press({ nav: { x: 1, y: 0 } })] });
     await a.waitFor('snapshot', (m) => m.flow.levelIndex === 1);
     a.send({ type: 'menu', presses: [press({ interact: true })] });
     const start = await a.waitFor('roundStart');

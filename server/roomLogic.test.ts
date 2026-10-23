@@ -352,7 +352,7 @@ describe('who drives the menus', () => {
   it('lets only the host pick a level, pause and choose on the results', () => {
     const room = lobbyRoom();
     menu(room, 'host', press('kb-left', { interact: true }));
-    menu(room, 'guest', press('kb-left', { nav: { x: 0, y: 1 } }));
+    menu(room, 'guest', press('kb-left', { nav: { x: 1, y: 0 } }));
     menu(room, 'guest', press('kb-left', { interact: true }));
     expect(room.flow).toMatchObject({ screen: 'levelSelect', levelIndex: 0 });
     menu(room, 'host', press('kb-left', { interact: true }));
@@ -532,7 +532,7 @@ describe('profiles', () => {
     menu(room, 'host', press('kb-left', { join: true }));
     menu(room, 'host', press('kb-left', { interact: true }));
     expect(room.flow.screen).toBe('levelSelect');
-    menu(room, 'host', press('kb-left', { nav: { x: 0, y: 1 } }));
+    menu(room, 'host', press('kb-left', { nav: { x: 1, y: 0 } }));
     expect(room.flow.levelIndex).toBe(1);
   }
 
@@ -763,9 +763,9 @@ describe('resilience', () => {
       dropMember(room, 'guest');
       expect(hostOf(room)?.sessionId).toBe('watcher');
       expect(playerIdsOf(room, 'watcher')).toEqual([]);
-      menu(room, 'watcher', press('kb-left', { nav: { x: 0, y: 1 } }));
+      menu(room, 'watcher', press('kb-left', { nav: { x: 1, y: 0 } }));
       expect(room.flow.levelIndex).toBe(1);
-      menu(room, 'watcher', press('kb-left', { nav: { x: 0, y: -1 } }));
+      menu(room, 'watcher', press('kb-left', { nav: { x: -1, y: 0 } }));
       play(room, 'watcher');
       menu(room, 'watcher', press('kb-left', { menu: true }));
       expect(room.flow.screen).toBe('paused');
@@ -938,7 +938,7 @@ describe('resilience', () => {
       const room = twoPlayers();
       steps(room, idleTicks - 100);
       handleMessage(room, 'host', { type: 'ping', id: 1, clientTimeMs: 0 });
-      menu(room, 'host', press('kb-left', { nav: { x: 0, y: 1 } }));
+      menu(room, 'host', press('kb-left', { nav: { x: 1, y: 0 } }));
       steps(room, 200);
       expect(room.closing).toBeNull();
     });
