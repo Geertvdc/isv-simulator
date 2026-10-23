@@ -17,8 +17,8 @@ import { MAP_PALETTE, matte } from '../look';
 /** Height of the grass tops, and how much they vary from tile to tile. */
 const GROUND_TOP = 0;
 const GROUND_JITTER = 0.05;
-/** The grass cap on each tile: a bit smaller than the tile, so the grid shows. */
-const CAP = { size: 0.95, height: 0.12, bevel: 0.035 };
+/** The grass cap on each tile: just smaller than the tile, so the seams barely show. */
+const CAP = { size: 0.985, height: 0.12, bevel: 0.035 };
 /** How deep the dirt under a tile reaches (under the sea). */
 const EARTH_DEPTH = 1.2;
 /** The shore ring: lower than the land; some tiles are left out so the coast is ragged. */
@@ -27,7 +27,9 @@ const SHORE_KEEP = 0.8;
 const SEA_LEVEL = -0.34;
 const SEA_SIZE = 400;
 /** How much a tile's grass color varies, lighter or darker. */
-const SHADE_JITTER = 0.06;
+const SHADE_JITTER = 0.07;
+/** Shallow water round the coast: a lighter band this many tiles wide. */
+const SHALLOWS = 1.6;
 
 /** The road: a light edge under the asphalt, the dashes on top, a round stop at each flag. */
 const ROAD = {
@@ -74,7 +76,7 @@ export function buildDiorama(
   materials: KitMaterials,
 ): Diorama {
   const root = new THREE.Group();
-  root.add(...terrain(map, chapterIds), sea(), road(map, materials));
+  root.add(...terrain(map, chapterIds), sea(), shallows(map), road(map, materials));
   const flags: Diorama['flags'] = [];
   map.nodes.forEach((node, i) => {
     const out = outside(map, i);
@@ -123,6 +125,8 @@ function terrain(map: WorldMap, chapterIds: readonly string[]): THREE.Object3D[]
     y: number;
     top: number;
     color: number;
+    /** Under the cap: dirt on the island's sides, a darker grass in the seams inside. */
+    seam: number;
   }
   const tiles: Tile[] = [];
   for (const region of map.regions) {
@@ -135,6 +139,7 @@ function terrain(map: WorldMap, chapterIds: readonly string[]): THREE.Object3D[]
           y,
           top: GROUND_TOP + hash01(x, y, 2) * GROUND_JITTER,
           color: shadeColor(base, shade),
+          seam: shadeColor(base, -0.35),
         });
       }
     }
@@ -145,7 +150,13 @@ function terrain(map: WorldMap, chapterIds: readonly string[]): THREE.Object3D[]
       const ring = x === -1 || y === -1 || x === map.width || y === map.height;
       if (!ring || hash01(x, y, 3) > SHORE_KEEP) continue;
       const shade = (hash01(x, y, 4) * 2 - 1) * SHADE_JITTER;
-      tiles.push({ x, y, top: SHORE_TOP, color: shadeColor(MAP_PALETTE.sand, shade) });
+      tiles.push({
+        x,
+        y,
+        top: SHORE_TOP,
+        color: shadeColor(MAP_PALETTE.sand, shade),
+        seam: MAP_PALETTE.earth,
+      });
     }
   }
 
@@ -154,11 +165,7 @@ function terrain(map: WorldMap, chapterIds: readonly string[]): THREE.Object3D[]
   const caps = new THREE.InstancedMesh(capGeometry, matte(0xffffff, 0.9), tiles.length);
   const earthGeometry = new THREE.BoxGeometry(1, EARTH_DEPTH, 1);
   earthGeometry.translate(0, -EARTH_DEPTH / 2, 0);
-  const earth = new THREE.InstancedMesh(
-    earthGeometry,
-    matte(MAP_PALETTE.earth, 0.95),
-    tiles.length,
-  );
+  const earth = new THREE.InstancedMesh(earthGeometry, matte(0xffffff, 0.95), tiles.length);
   const m = new THREE.Matrix4();
   const color = new THREE.Color();
   tiles.forEach((tile, i) => {
@@ -169,6 +176,8 @@ function terrain(map: WorldMap, chapterIds: readonly string[]): THREE.Object3D[]
     caps.setColorAt(i, color.setHex(tile.color));
     m.makeTranslation(p.x, p.y - CAP.height * 0.6, p.z);
     earth.setMatrixAt(i, m);
+    const edge = tile.x <= 0 || tile.y <= 0 || tile.x >= map.width - 1 || tile.y >= map.height - 1;
+    earth.setColorAt(i, color.setHex(edge ? MAP_PALETTE.earth : tile.seam));
   });
   caps.receiveShadow = true;
   earth.receiveShadow = true;
@@ -190,6 +199,20 @@ function sea(): THREE.Mesh {
     matte(MAP_PALETTE.sea, 0.55),
   );
   mesh.position.y = SEA_LEVEL;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+/** A lighter band of shallow water round the island, so the coast doesn't stand on a flat sea. */
+function shallows(map: WorldMap): THREE.Mesh {
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(map.width + SHALLOWS * 2, map.height + SHALLOWS * 2).rotateX(
+      -Math.PI / 2,
+    ),
+    matte(MAP_PALETTE.shallows, 0.5),
+  );
+  const center = gridToWorld(map.width / 2, map.height / 2, SEA_LEVEL + 0.01);
+  mesh.position.set(center.x, center.y, center.z);
   mesh.receiveShadow = true;
   return mesh;
 }
