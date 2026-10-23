@@ -285,20 +285,20 @@ function chapter(id: string, index: number, levels: readonly Level[]): Chapter {
 }
 
 // ---- Big Tech: atriums, belts, design, merges and pairing ----
-// Star thresholds here are estimates, not `npm run sim` runs (the bots don't
-// play the new mechanics yet): set from the nearest old level and the extra
-// throwing and walking. See docs/plan/review-notes-15.md.
+// Star thresholds set from bot runs like the old levels (the bots walk round
+// the long way, merge parts but don't pair on purpose or throw), a bit above
+// the old chapters: this is the last one.
 
-/** Two office halves across an atrium: throw across it, or use the belts. */
+/** Two office halves across an atrium: throw across it, use the belts, or walk the long way round. */
 export const THE_ATRIUM: Level = level('the-atrium', theAtriumMap, {
   ...GARAGE_SETTINGS,
-  starThresholds: [50, 100, 150],
+  starThresholds: [60, 120, 180],
 });
 
 /** An L-shaped floor round a courtyard: whiteboards first, keyboards built for pairs. */
 export const DESIGN_SPRINT: Level = level('design-sprint', designSprintMap, {
   ...GARAGE_SETTINGS,
-  starThresholds: [50, 100, 150],
+  starThresholds: [65, 130, 195],
   designShare: 0.6,
   pairing: true,
 });
@@ -307,7 +307,7 @@ export const DESIGN_SPRINT: Level = level('design-sprint', designSprintMap, {
 export const MONOREPO: Level = level('monorepo', monorepoMap, {
   ...GARAGE_SETTINGS,
   orderSchedule: { ...GARAGE_SETTINGS.orderSchedule, intervalTicks: 24 * SECOND },
-  starThresholds: [55, 110, 165],
+  starThresholds: [65, 130, 190],
   fullstackShare: 0.6,
   pairing: true,
 });
@@ -315,7 +315,7 @@ export const MONOREPO: Level = level('monorepo', monorepoMap, {
 /** A belt carousel round a courtyard and everything new at once, with incidents. */
 export const HACKATHON: Level = level('hackathon', hackathonMap, {
   ...GARAGE_SETTINGS,
-  starThresholds: [50, 100, 150],
+  starThresholds: [60, 120, 180],
   designShare: 0.3,
   fullstackShare: 0.4,
   pairing: true,
@@ -340,12 +340,16 @@ export const LEVELS: readonly Level[] = CHAPTERS.flatMap((c) => c.levels);
  */
 export const DEMO_LEVEL_IDS: readonly string[] = [
   'hypergrowth',
+  'monorepo',
   'seed-round',
   'the-reorg',
+  'the-atrium',
   'open-plan',
   'middle-management',
+  'hackathon',
   'on-call',
   'back-to-back',
+  'design-sprint',
   'scale-up',
   'hot-desking',
   'demo-day',

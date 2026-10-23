@@ -178,7 +178,9 @@ describe('throwing on the old levels', () => {
       { x: 0, y: 1 },
       { x: 0, y: -1 },
     ];
-    for (const level of LEVELS) {
+    // Levels with gaps or void lose throws that fall in, on purpose.
+    const solid = LEVELS.filter((l) => !l.map.tiles.some((t) => t === 'gap' || t === 'void'));
+    for (const level of solid) {
       const state = createGame(level, 1, [1]);
       state.nextOrderTick = Number.MAX_SAFE_INTEGER;
       state.nextIncidentTick = null;

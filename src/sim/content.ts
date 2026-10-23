@@ -147,10 +147,10 @@ export const LEVEL_BLURBS: Readonly<Record<string, string>> = {
   'back-to-back': 'Calendar invites! Go sit in the meeting room or lose points.',
   synergy: 'Meetings, a manager and incidents. Lots of synergy.',
   'the-reorg': 'Everything, everywhere, all at once.',
-  'the-atrium': 'A campus with an atrium in the middle. Throw it across, or let the belt take it.',
+  'the-atrium': 'An atrium in the middle. Throw it across, ride the belt or walk round.',
   'design-sprint': 'Whiteboards before keyboards. Pair up to code faster.',
   monorepo: 'Front end on one side, back end on the other. Merge in the middle.',
-  hackathon: 'A carousel of tickets, every new idea, and 3 minutes to ship it all.',
+  hackathon: 'A carousel of tickets and every new idea at once.',
 };
 
 /** Chapter names, by chapter id. */
@@ -168,7 +168,7 @@ export const CHAPTER_BLURBS: Readonly<Record<string, string>> = {
   startup: 'New: production incidents',
   'scale-up': 'New: the wandering manager',
   enterprise: 'New: meetings',
-  'big-tech': 'New: atriums, belts, design, merges and pairing',
+  'big-tech': 'New: belts, design, merges',
 };
 
 /** Shown on the results when the score beats the best so far. */
