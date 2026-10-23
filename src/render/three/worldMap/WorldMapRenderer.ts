@@ -44,6 +44,8 @@ const CAMERA = {
    */
   principal: { x: 0.5, y: 0.7 },
 };
+/** With the van held at a closed gate, the camera looks at most this far (map tiles) past it. */
+const BLOCKED_LOOK = 4.5;
 /** The ring round the selected flag's foot. */
 const RING = { radius: 0.5, tube: 0.06, pulse: 0.08, pulseMs: 900 };
 /**
@@ -172,9 +174,11 @@ export class WorldMapRenderer implements MenuRenderer {
     const { width, height } = this.scene.scale;
     this.stage.resize(width, height);
     const { at: van, blocked } = this.driveVan(deltaMs);
-    // Waiting at a closed gate, the van stays put and the camera goes to look at the level.
-    const selectedNode = this.map.nodes[this.selected] ?? van;
-    const target = cameraTarget(this.map, blocked ? selectedNode : van);
+    // Waiting at a closed gate, the van stays put and the camera leans toward the picked
+    // level, but no further than keeps the van, the barrier and the cloud edge in view.
+    const picked = this.map.nodes[this.selected] ?? van;
+    const look = blocked ? { x: Math.min(picked.x, van.x + BLOCKED_LOOK), y: picked.y } : van;
+    const target = cameraTarget(this.map, look);
     this.look = this.look ? glide(this.look, target, deltaMs) : target;
     this.stage.setPose(this.pose(this.look, width, height));
 

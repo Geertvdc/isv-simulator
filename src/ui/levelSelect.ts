@@ -10,6 +10,7 @@ import {
   LEVEL_SELECT_GUEST_HINT,
   LEVEL_SELECT_HINT,
   chapterGateHint,
+  chapterGateShort,
   levelLabel,
   unlockHint,
 } from '../sim/content';
@@ -106,7 +107,7 @@ export function mountLevelSelect(root: HTMLElement): LevelSelectView {
         status.textContent = `🔒 ${
           chapterOpen
             ? unlockHint(STARS_TO_UNLOCK, LEVELS[index - 1]?.name ?? '')
-            : chapterGateHint(chapters[c]?.starGate ?? 0, have)
+            : chapterGateShort(chapters[c]?.starGate ?? 0)
         }`;
       } else if (record) {
         status.textContent = `Best score: ${record.bestScore}`;

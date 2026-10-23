@@ -33,7 +33,7 @@ const POP = { ms: 700, delay: 150, afterClouds: 900 };
 const FLAG_MOTION = { droop: -1.25, flutter: 0.18, flutterMs: 1400 };
 /** The stars over a played flag: a little row above the pole, tipped to face the camera. */
 const STARS = { radius: 0.2, gap: 0.4, over: 0.5, shift: 0.2, tilt: -(56 * Math.PI) / 180 };
-const PADLOCK = { height: 0.72, ahead: 0.08, size: 1.8 };
+const PADLOCK = { height: 0.72, ahead: 0.08, size: 2.7 };
 const MAX_STARS_SHOWN = 3;
 
 export class MapLocks {
