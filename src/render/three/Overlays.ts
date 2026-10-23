@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import type { HintId } from '../../flow/hints';
+import { PAIR_RATE, WORK_RATE } from '../../sim/balance';
 import { stationWorkStep } from '../../sim/interact';
-import { HINT_TEXTS, MEETING_ROOM_TEXT, PAIRING_TEXT } from '../../sim/content';
+import { HINT_TEXTS, MEETING_ROOM_TEXT, pairingText } from '../../sim/content';
 import { type LevelMap, getTile } from '../../sim/level';
 import { pipelineWarning } from '../../sim/pipeline';
 import type { GameState } from '../../sim/state';
@@ -198,8 +199,10 @@ export class Overlays {
       // Over a carried card its title; over a keyboard two players code at, that they're pairing.
       const paired = isPaired(state, ticket);
       card.title
-        .setText(paired ? PAIRING_TEXT : ticket.title)
+        .setText(paired ? pairingText(PAIR_RATE / WORK_RATE) : ticket.title)
         .setColor(paired ? PAIRING_COLOR : '#ffffff')
+        // A dark backing so the pairing label reads over the station.
+        .setBackgroundColor(paired ? 'rgba(0, 0, 0, 0.65)' : '')
         .setVisible(placed.carried || paired);
       const lift = (bar === null ? 26 : 40) * p.scale * OVERLAY_SCALE;
       if (placed.carried || paired) place(card.title, { ...p, y: p.y - lift });

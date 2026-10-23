@@ -13,6 +13,8 @@ import {
   EXPIRED_PENALTY,
   INCIDENT_EXPIRED_PENALTY,
   INCIDENT_POINTS,
+  DESIGNED_ORDER_POINTS,
+  DESIGNED_TIME_FACTOR,
   FULLSTACK_ORDER_POINTS,
   FULLSTACK_TIME_FACTOR,
   ORDER_POINTS,
@@ -121,7 +123,9 @@ export function shipPoints(order: Order, tick: number): number {
   if (order.kind === 'fullstack') {
     return FULLSTACK_ORDER_POINTS + Math.round(ORDER_SPEED_BONUS_MAX * timeShare(order, tick));
   }
-  const base = order.kind === 'incident' ? INCIDENT_POINTS : ORDER_POINTS;
+  const designed = order.steps.includes('design');
+  const base =
+    order.kind === 'incident' ? INCIDENT_POINTS : designed ? DESIGNED_ORDER_POINTS : ORDER_POINTS;
   return base + Math.round(ORDER_SPEED_BONUS_MAX * timeShare(order, tick));
 }
 
@@ -140,11 +144,13 @@ export function expiredPenalty(kind: TicketKind): number {
 }
 
 /** Ticks an order of `kind` lasts on this level. */
-function timeLimit(state: GameState, kind: TicketKind): number {
+function timeLimit(state: GameState, kind: TicketKind, steps: readonly StepKind[]): number {
   const { orderSchedule, incidents } = state.settings;
   if (kind === 'bug') return orderSchedule.bugTimeLimitTicks;
   if (kind === 'incident') return incidents?.timeLimitTicks ?? orderSchedule.bugTimeLimitTicks;
   if (kind === 'fullstack') return Math.round(orderSchedule.timeLimitTicks * FULLSTACK_TIME_FACTOR);
+  if (steps.includes('design'))
+    return Math.round(orderSchedule.timeLimitTicks * DESIGNED_TIME_FACTOR);
   return orderSchedule.timeLimitTicks;
 }
 
@@ -177,7 +183,7 @@ export function createOrder(
   title: string,
   steps: readonly StepKind[] = TICKET_STEPS[kind],
 ): Order {
-  const limit = timeLimit(state, kind);
+  const limit = timeLimit(state, kind, steps);
   const order: Order = {
     id: state.nextOrderId++,
     kind,
@@ -330,5 +336,7 @@ export function updateLevelTimer(state: GameState): void {
     stars: starsFor(state.score, state.settings.starThresholds),
   };
   state.result = result;
+  // Nobody pairs once the level is over.
+  state.pairing = [];
   state.events.push({ type: 'levelEnded', result });
 }

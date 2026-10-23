@@ -196,6 +196,9 @@ export function work(state: GameState, playerId: PlayerId, tickWork: TickWork): 
     return true;
   }
   if (tile === 'keyboard' && state.settings.pairing) {
+    // Only a keyboard with something to code signs anyone up.
+    const ticket = ticketOnTile(state, x, y);
+    if (!ticket || !stationWorkStep(ticket, tile)) return false;
     // Pairing: everyone at the keyboard signs up. The first one codes right away (like
     // alone); `finishCoding` adds the pair's extra once a second one joined.
     const coders = tickWork.coders.get(key) ?? [];

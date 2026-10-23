@@ -104,6 +104,9 @@ export const ORDER_POINTS = 20;
 /** A full-stack feature is two tickets' work: it pays more and lasts longer. */
 export const FULLSTACK_ORDER_POINTS = 30;
 export const FULLSTACK_TIME_FACTOR = 1.5;
+/** A feature that starts at the whiteboard has an extra step: it pays a bit more and lasts longer. */
+export const DESIGNED_ORDER_POINTS = 25;
+export const DESIGNED_TIME_FACTOR = 1.3;
 /** Extra points for shipping with the whole timer left; scales down linearly to 0. */
 export const ORDER_SPEED_BONUS_MAX = 10;
 /** Points lost when an order runs out. */

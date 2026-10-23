@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { stationWorkStep } from '../sim/interact';
-import { THROW_RANGE } from '../sim/balance';
-import { PAIRING_TEXT } from '../sim/content';
+import { PAIR_RATE, THROW_RANGE, WORK_RATE } from '../sim/balance';
+import { pairingText } from '../sim/content';
 import { type BlockTile, getTile } from '../sim/level';
 import type { GameState } from '../sim/state';
 import {
@@ -117,8 +117,10 @@ export class TicketRenderer {
       // Over a carried card its title; over a keyboard two players code at, that they're pairing.
       const paired = isPaired(state, ticket);
       sprite.title
-        .setText(paired ? PAIRING_TEXT : ticket.title)
+        .setText(paired ? pairingText(PAIR_RATE / WORK_RATE) : ticket.title)
         .setColor(paired ? PAIRING_COLOR : '#ffffff')
+        // A dark backing so the pairing label reads over the station.
+        .setBackgroundColor(paired ? 'rgba(0, 0, 0, 0.65)' : '')
         .setPosition(
           placed.x,
           placed.y - CARD_HEIGHT - (bar === null ? 2 : BAR_HEIGHT + BAR_GAP + 4),
