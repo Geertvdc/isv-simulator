@@ -8,7 +8,7 @@
  */
 
 import type { Screen } from '../../../flow/flow';
-import type { MapPoint, MapRegion } from '../../../flow/worldMap';
+import type { MapPoint } from '../../../flow/worldMap';
 
 export type MapShot = 'establishing' | 'lobby' | 'follow';
 
@@ -32,24 +32,20 @@ const DEG = Math.PI / 180;
  * The establishing shot: lower and further out than the level select, so
  * the buildings stand up against the sky and the town reads as a skyline.
  * It looks at the back street (the island's back rows hold the skyline),
- * drifting along the island from the garage to the end of the open land.
+ * drifting along the island from the garage toward Big Tech. The locks
+ * don't show behind it: it is the promise of the whole journey.
  */
 export const ESTABLISHING = {
-  distance: 40,
+  distance: 36,
   pitch: 40 * DEG,
   fov: 30 * DEG,
-  principalY: 0.66,
+  principalY: 0.6,
   /** The map row it looks at: toward the back, where the tall buildings stand. */
   row: 4.5,
-  /**
-   * The drift's left end (or, with little land open, this far short of its
-   * end, so the cloud bank sits on the right), and how far short of the open
-   * land's right end it turns.
-   */
-  start: 14,
-  startInset: 4,
-  endInset: 10,
-  /** Always drifts at least this far, so even a fresh save's view breathes. */
+  /** The drift's left end, and how far short of the island's right end it turns. */
+  start: 16,
+  endInset: 14,
+  /** Always drifts at least this far, on a small island too. */
   minSpan: 4,
   /** One way along the island takes half of this. */
   periodMs: 90_000,
@@ -73,22 +69,13 @@ export function shotFor(screen: Screen | null): MapShot {
   return 'establishing';
 }
 
-/** Where the open land ends on the right: the right edge of the last open chapter. */
-export function openEnd(regions: readonly MapRegion[], chapterOpen: readonly boolean[]): number {
-  let end = regions[0] ? regions[0].x + regions[0].width : 0;
-  for (const r of regions) {
-    if (chapterOpen[r.chapter] !== false) end = Math.max(end, r.x + r.width);
-  }
-  return end;
-}
-
 /**
  * The establishing shot at `timeMs`: a slow ping-pong along the island,
- * easing at both ends, from the garage to `end` (where the open land stops).
+ * easing at both ends, from the garage toward `end` (the island's right end).
  */
 export function establishingFraming(end: number, timeMs: number): Framing {
-  const { start, startInset, endInset, minSpan, periodMs, row } = ESTABLISHING;
-  const left = Math.min(start, end - startInset);
+  const { start, endInset, minSpan, periodMs, row } = ESTABLISHING;
+  const left = start;
   const span = Math.max(minSpan, end - endInset - left);
   const phase = (timeMs / periodMs) * Math.PI * 2;
   const x = left + span * (0.5 - 0.5 * Math.cos(phase));
