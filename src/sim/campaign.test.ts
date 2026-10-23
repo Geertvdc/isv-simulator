@@ -16,10 +16,16 @@ function mechanics(level: Level): { incidents: boolean; manager: boolean; meetin
 }
 
 describe('chapters', () => {
-  it('are Garage, Startup, Scale-Up and Enterprise, three levels each, about 12 in all', () => {
-    expect(CHAPTERS.map((c) => c.id)).toEqual(['garage', 'startup', 'scale-up', 'enterprise']);
-    for (const chapter of CHAPTERS) expect(chapter.levels).toHaveLength(3);
-    expect(LEVELS).toHaveLength(12);
+  it('are Garage, Startup, Scale-Up, Enterprise (three levels each) and Big Tech (four)', () => {
+    expect(CHAPTERS.map((c) => c.id)).toEqual([
+      'garage',
+      'startup',
+      'scale-up',
+      'enterprise',
+      'big-tech',
+    ]);
+    expect(CHAPTERS.map((c) => c.levels.length)).toEqual([3, 3, 3, 3, 4]);
+    expect(LEVELS).toHaveLength(16);
     expect(LEVELS).toEqual(CHAPTERS.flatMap((c) => c.levels));
   });
 

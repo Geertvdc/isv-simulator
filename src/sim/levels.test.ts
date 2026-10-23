@@ -89,7 +89,8 @@ describe('levels', () => {
       for (const tile of ['inbox', 'bugQueue', 'keyboard', 'testBench', 'pipeline', 'ship']) {
         expect(level.map.tiles).toContain(tile);
       }
-      expect(level.map.width).toBe(14);
+      // Big Tech's campus is two tiles wider.
+      expect([14, 16]).toContain(level.map.width);
       expect(level.map.height).toBe(10);
     });
 

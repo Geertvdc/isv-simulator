@@ -93,6 +93,47 @@ const PICTURES: Readonly<Record<IntroPicture, () => string>> = {
       `<ellipse cx="190" cy="74" rx="26" ry="9" fill="#7e57c2" opacity="0.6"/>`,
       dev(190, 76, playerCssColor(4)),
     ].join(''),
+  // A ticket thrown across a gap in the floor.
+  atrium: () =>
+    [
+      `<rect x="0" y="66" width="88" height="24" fill="#c9b79c" stroke="${OUTLINE}" stroke-width="2"/>`,
+      `<rect x="152" y="66" width="88" height="24" fill="#c9b79c" stroke="${OUTLINE}" stroke-width="2"/>`,
+      `<rect x="88" y="66" width="64" height="24" fill="#20242c"/>`,
+      dev(50, 70, playerCssColor(1)),
+      dev(190, 70, playerCssColor(2)),
+      `<path d="M 62 40 Q 120 -6 178 40" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="6 5"/>`,
+      ticket(120, 18),
+    ].join(''),
+  // Whiteboard first, then the keyboard codes it faster.
+  design: () =>
+    [
+      block(40, 45, 'whiteboard', 'W'),
+      arrow(60, 96, 45),
+      block(120, 45, 'keyboard', 'K'),
+      `<text x="120" y="22" text-anchor="middle" font-size="12" font-weight="800" fill="currentColor">faster</text>`,
+      arrow(140, 176, 45),
+      ticket(200, 45),
+    ].join(''),
+  // A front end and a back end meet at the merge station.
+  merge: () =>
+    [
+      ticket(30, 45, '#7ab8f0'),
+      arrow(44, 100, 45),
+      block(120, 45, 'merge', 'G'),
+      arrow(196, 140, 45),
+      ticket(210, 45, '#6cbf7a'),
+      `<text x="30" y="76" text-anchor="middle" font-size="11" font-weight="800" fill="currentColor">FE</text>`,
+      `<text x="210" y="76" text-anchor="middle" font-size="11" font-weight="800" fill="currentColor">BE</text>`,
+    ].join(''),
+  // A belt carrying tickets round to a station.
+  carousel: () =>
+    [
+      `<rect x="20" y="36" width="160" height="18" rx="9" fill="${css(tileColor('conveyor'))}" stroke="${OUTLINE}" stroke-width="2"/>`,
+      `<path d="M 60 45 l 6 -5 v 10 Z M 100 45 l 6 -5 v 10 Z M 140 45 l 6 -5 v 10 Z" transform="rotate(180 103 45)" fill="${OUTLINE}" opacity="0.5"/>`,
+      ticket(50, 34),
+      ticket(120, 34),
+      block(210, 45, 'testBench', 'T'),
+    ].join(''),
 };
 
 /** The picture for an intro card, as an SVG element. */

@@ -26,11 +26,18 @@ describe('musicCue', () => {
     }
   });
 
-  it('plays a track of its own per chapter, from the intro card to the end of the round', () => {
+  it('plays a track per chapter, from the intro card to the end of the round', () => {
     const tracks = CHAPTERS.map((c) =>
       musicCue(flowAt('playing'), { ...noRound, chapterId: c.id }),
     );
-    expect(tracks.map((t) => t.track)).toEqual(['garage', 'startup', 'scale-up', 'enterprise']);
+    // Big Tech has no track of its own yet and borrows the Scale-Up one.
+    expect(tracks.map((t) => t.track)).toEqual([
+      'garage',
+      'startup',
+      'scale-up',
+      'enterprise',
+      'scale-up',
+    ]);
     for (const t of tracks) expect(MUSIC_TRACKS).toContain(t.track);
     for (const screen of ['intro', 'countdown'] as const) {
       expect(musicCue(flowAt(screen), { ...noRound, chapterId: 'enterprise' })).toEqual({
