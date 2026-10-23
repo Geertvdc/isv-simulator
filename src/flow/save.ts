@@ -32,12 +32,17 @@ export interface LevelRecord {
   plays: number;
 }
 
+/** The Graphics setting: `auto` starts high and steps down while frames stay slow. */
+export const GRAPHICS_LEVELS = ['auto', 'high', 'medium', 'low'] as const;
+export type Graphics = (typeof GRAPHICS_LEVELS)[number];
+
 export interface Settings {
   /** 0 (off) to `SFX_VOLUME_MAX`. */
   sfxVolume: number;
   /** 0 (off) to `SFX_VOLUME_MAX`, separate from the sound effects. */
   musicVolume: number;
   screenShake: boolean;
+  graphics: Graphics;
   /** All sound and music off, from the speaker button or M. */
   muted: boolean;
 }
@@ -56,6 +61,7 @@ export function defaultSettings(): Settings {
     sfxVolume: DEFAULT_SFX_VOLUME,
     musicVolume: DEFAULT_MUSIC_VOLUME,
     screenShake: true,
+    graphics: 'auto',
     muted: false,
   };
 }
@@ -143,6 +149,10 @@ export function parseSave(raw: unknown): SaveData {
     if (typeof raw.settings.screenShake === 'boolean') {
       save.settings.screenShake = raw.settings.screenShake;
     }
+    // Saves from before phase 14g have no Graphics line: they stay on auto.
+    const rawGraphics = raw.settings.graphics;
+    const graphics = GRAPHICS_LEVELS.find((g) => g === rawGraphics);
+    if (graphics) save.settings.graphics = graphics;
     if (typeof raw.settings.muted === 'boolean') save.settings.muted = raw.settings.muted;
   }
   if (typeof raw.tutorialDone === 'boolean') save.tutorialDone = raw.tutorialDone;

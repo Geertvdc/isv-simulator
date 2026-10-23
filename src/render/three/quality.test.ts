@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createFrameWatch,
-  initialQuality,
+  startQuality,
   pixelRatioFor,
   rewarm,
   stepDown,
@@ -50,12 +50,18 @@ describe('frame watch', () => {
   });
 
   it('does not watch when the quality was asked for', () => {
-    expect(initialQuality('low')).toEqual({ quality: 'low', watch: false });
-    expect(initialQuality('medium').watch).toBe(false);
-    expect(initialQuality(null)).toEqual({ quality: 'high', watch: true });
+    expect(startQuality('auto', 'low')).toEqual({ quality: 'low', watch: false });
+    expect(startQuality('auto', 'medium').watch).toBe(false);
+    expect(startQuality('auto', null)).toEqual({ quality: 'high', watch: true });
     const w = createFrameWatch(false);
     run(w, 120, 16);
     expect(run(w, 500, 100)).toBe(0);
+  });
+
+  it('takes the Graphics setting unless ?quality= overrides it', () => {
+    expect(startQuality('low', null)).toEqual({ quality: 'low', watch: false });
+    expect(startQuality('medium', 'high')).toEqual({ quality: 'high', watch: false });
+    expect(startQuality('auto', 'ultra')).toEqual({ quality: 'high', watch: true });
   });
 });
 

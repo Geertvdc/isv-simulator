@@ -16,6 +16,7 @@ import {
   CREDITS_TITLE,
   GAME_TAGLINE,
   GAME_TITLE,
+  GRAPHICS_TEXTS,
   LEVEL_NAMES,
   LEVEL_UNLOCKED_TEXT,
   MENU_HINT,
@@ -46,6 +47,7 @@ function menuLine(item: MenuItem, settings: Settings): MenuLine {
   if (item === 'volume') return { label, value: `◀ ${volumeText(settings.sfxVolume)} ▶` };
   if (item === 'music') return { label, value: `◀ ${volumeText(settings.musicVolume)} ▶` };
   if (item === 'shake') return { label, value: settings.screenShake ? 'On' : 'Off' };
+  if (item === 'graphics') return { label, value: `◀ ${GRAPHICS_TEXTS[settings.graphics]} ▶` };
   return { label };
 }
 
