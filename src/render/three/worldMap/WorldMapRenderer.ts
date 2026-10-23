@@ -10,6 +10,8 @@ import { kitMaterials } from '../kit';
 import { MAP_PALETTE, createLights, dressScene } from '../look';
 import { type Stage, disposeTree, getStage } from '../stage';
 import { type Diorama, ROAD_SURFACE, buildDiorama } from './diorama';
+import { planCity } from './cityPlan';
+import { type Cityscape, buildCityscape } from './cityscape';
 import { cameraTarget, glide } from './mapCamera';
 import {
   type Drive,
@@ -71,6 +73,7 @@ export class WorldMapRenderer implements MenuRenderer {
   private readonly materials = kitMaterials();
   private readonly map: WorldMap;
   private readonly diorama: Diorama;
+  private readonly city: Cityscape;
   private readonly ring: THREE.Mesh;
   private readonly road: RoadPath;
   private readonly van: Van;
@@ -91,18 +94,27 @@ export class WorldMapRenderer implements MenuRenderer {
     this.stage = getStage(parent);
     dressScene(this.world, this.stage.renderer);
     this.map = worldMapFor(CHAPTER_INFO);
+    const plan = planCity(this.map);
     this.diorama = buildDiorama(
       this.map,
       CHAPTERS.map((c) => c.id),
+      plan.ground,
       this.materials,
     );
+    this.city = buildCityscape(this.map, plan, this.materials);
     this.ring = new THREE.Mesh(
       new THREE.TorusGeometry(RING.radius, RING.tube, 8, 32).rotateX(-Math.PI / 2),
       new THREE.MeshBasicMaterial({ color: MAP_PALETTE.selected }),
     );
     this.road = buildRoadPath(this.map);
     this.van = buildVan(this.materials);
-    this.world.add(...createLights(this.map), this.diorama.root, this.ring, this.van.root);
+    this.world.add(
+      ...createLights(this.map),
+      this.diorama.root,
+      this.city.root,
+      this.ring,
+      this.van.root,
+    );
   }
 
   syncMenu(view: MenuView): void {
@@ -130,6 +142,7 @@ export class WorldMapRenderer implements MenuRenderer {
     this.diorama.flags.forEach((f, i) => {
       f.cloth.rotation.y = Math.sin((timeMs / FLUTTER.ms) * Math.PI * 2 + i * 1.7) * FLUTTER.angle;
     });
+    this.city.update(timeMs, deltaMs);
     this.stage.render(this.world, deltaMs);
   }
 

@@ -64,6 +64,16 @@ export const MAP_PALETTE = {
     'big-tech': 0xbec6cb,
   } as Readonly<Record<string, number>>,
   groundFallback: 0x8fc46a,
+  /** Big Tech's mown lawn, in stripes. */
+  lawn: 0x78c450,
+  lawnStripe: 0x6cb848,
+  /** Paved ground: sidewalks round buildings, the back street, city concrete, the plaza. */
+  paving: {
+    paving: 0xd6d0c2,
+    concrete: 0xb7bbbb,
+    asphalt: 0x5a5f69,
+    plaza: 0xe6d8bb,
+  },
   /** The shore tiles round the island. */
   sand: 0xe6d29a,
   /** Under the grass: the cliff sides. */
