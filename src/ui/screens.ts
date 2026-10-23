@@ -28,6 +28,7 @@ import {
 } from '../sim/content';
 import { parseCredits } from './credits';
 import { el } from './dom';
+import { createLogo } from './logo';
 import { type MenuLine, createMenu } from './menu';
 
 export interface ScreenView {
@@ -67,19 +68,16 @@ export function mountTitle(root: HTMLElement): ScreenView {
   const menu = createMenu();
   const press = el('div', 'title-press', PRESS_ANY_BUTTON_TEXT);
   const hint = el('div', 'screen-hint', MENU_HINT);
-  screen.append(
-    el('h1', 'title-name', GAME_TITLE),
-    el('div', 'title-tagline', GAME_TAGLINE),
-    press,
-    menu.root,
-    hint,
-  );
+  const head = el('div', 'title-head');
+  head.append(createLogo(GAME_TITLE), el('div', 'title-tagline', GAME_TAGLINE));
+  screen.append(head, press, menu.root, hint);
   return {
     render: (view) => {
       screen.hidden = view === null;
       if (!view) return;
       const awake = view.flow.awake;
       press.hidden = awake;
+      screen.classList.toggle('awake', awake);
       menu.root.hidden = !awake;
       hint.style.visibility = awake ? 'visible' : 'hidden';
       menu.render(menuLines(view), view.flow.menuIndex);
@@ -122,7 +120,9 @@ export function mountResults(root: HTMLElement): ScreenView {
   const chapter = el('div', 'results-badge');
   const menu = createMenu();
   const hint = el('div', 'screen-hint', MENU_HINT);
-  screen.append(title, stars, score, best, unlocked, chapter, menu.root, hint);
+  const card = el('div', 'results-card');
+  card.append(stars, score, best, unlocked, chapter);
+  screen.append(title, card, menu.root, hint);
   return {
     render: (view) => {
       const results = view?.flow.results;
@@ -166,12 +166,10 @@ export function mountCredits(root: HTMLElement): ScreenView {
     roll.append(el(line.kind === 'heading' ? 'h2' : 'p', `credits-${line.kind}`, line.text));
   }
   const menu = createMenu();
-  screen.append(
-    el('h1', 'screen-title', CREDITS_TITLE),
-    list,
-    menu.root,
-    el('div', 'screen-hint', MENU_HINT),
-  );
+  // Back sits in the card's foot.
+  const card = el('div', 'credits-card');
+  card.append(list, menu.root);
+  screen.append(el('h1', 'screen-title', CREDITS_TITLE), card, el('div', 'screen-hint', MENU_HINT));
   return {
     render: (view) => {
       const wasHidden = screen.hidden;

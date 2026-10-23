@@ -16,6 +16,16 @@ import { type LockState, lockStateOf, newlyOpened, sameLocks, vanStop } from './
 import { cameraTarget, glide } from './mapCamera';
 import { MapLocks } from './mapLocks';
 import {
+  type Framing,
+  type MapShot,
+  type ShotRig,
+  LOBBY,
+  establishingFraming,
+  shotFor,
+  startRig,
+  stepRig,
+} from './mapShots';
+import {
   type Drive,
   type RoadPath,
   buildRoadPath,
@@ -42,7 +52,7 @@ const CAMERA = {
    * Where the van (and, once parked, the selected flag) sits on screen, as
    * shares of the canvas: low enough that the far row of flags clears the level card.
    */
-  principal: { x: 0.5, y: 0.7 },
+  principalY: 0.7,
 };
 /** With the van held at a closed gate, the camera looks at most this far (map tiles) past it. */
 const BLOCKED_LOOK = 4.5;
@@ -101,6 +111,9 @@ export class WorldMapRenderer implements MenuRenderer {
   private bouncePhase = 0;
   /** Where the camera looks now (map units); `null` until the first frame, which starts there. */
   private look: MapPoint | null = null;
+  /** The shot the screen wants (title, lobby, level select), and the camera gliding between them. */
+  private shot: MapShot = 'establishing';
+  private rig: ShotRig | null = null;
 
   constructor(private readonly scene: Phaser.Scene) {
     const parent = scene.game.canvas.parentElement;
@@ -144,6 +157,7 @@ export class WorldMapRenderer implements MenuRenderer {
     const id = view.levelIds[view.levelIndex];
     const node = id === undefined ? -1 : nodeIndexOf(this.map, id);
     if (node >= 0) this.selected = node;
+    if (showsMap(view.screen)) this.shot = shotFor(view.screen);
     // While a level shows instead of the map, the van just waits at the selected flag.
     if (!showsMap(view.screen)) this.drive = null;
     this.syncLocks(view);
@@ -155,7 +169,9 @@ export class WorldMapRenderer implements MenuRenderer {
    */
   private syncLocks(view: MenuView): void {
     const now = lockStateOf(this.map, view);
-    const onMap = showsMap(view.screen);
+    // Behind the title the whole world shows open (the promise), so only the
+    // level select and the lobby count as having seen the locks.
+    const onMap = showsMap(view.screen) && shotFor(view.screen) !== 'establishing';
     const opened = onMap ? newlyOpened(seenLocks, now) : { chapters: [], levels: [] };
     if (onMap) seenLocks = now;
     const display = onMap ? now : (seenLocks ?? now);
@@ -180,10 +196,15 @@ export class WorldMapRenderer implements MenuRenderer {
     const look = blocked ? { x: Math.min(picked.x, van.x + BLOCKED_LOOK), y: picked.y } : van;
     const target = cameraTarget(this.map, look);
     this.look = this.look ? glide(this.look, target, deltaMs) : target;
-    this.stage.setPose(this.pose(this.look, width, height));
+    const want = this.framing(this.shot, this.look, timeMs);
+    this.locks.setPromise(this.shot === 'establishing', this.rig === null);
+    this.rig = this.rig ? stepRig(this.rig, this.shot, want, deltaMs) : startRig(this.shot, want);
+    this.stage.setPose(this.pose(this.rig.shown, width, height));
 
     const flag = this.diorama.flags[this.selected];
-    this.ring.visible = !!flag && !this.locks.isLocked(flag.chapter);
+    // The ring marks the pick on the level select only, once the camera is down there.
+    this.ring.visible =
+      !!flag && !this.locks.isLocked(flag.chapter) && this.shot === 'follow' && !this.rig.from;
     if (flag) {
       const pulse = 1 + Math.sin((timeMs / RING.pulseMs) * Math.PI * 2) * RING.pulse;
       this.ring.position.set(flag.foot.x, flag.foot.y + 0.1, flag.foot.z);
@@ -255,14 +276,24 @@ export class WorldMapRenderer implements MenuRenderer {
     return { at, blocked: target < flagAt };
   }
 
-  private pose(look: MapPoint, width: number, height: number): CameraPose {
+  /** Where `shot` wants the camera now, with the level select's look at `look`. */
+  private framing(shot: MapShot, look: MapPoint, timeMs: number): Framing {
+    if (shot === 'establishing') {
+      return establishingFraming(this.map.width, timeMs);
+    }
+    const { distance, pitch, fov, principalY } = shot === 'lobby' ? LOBBY : CAMERA;
+    return { look, distance, pitch, fov, principalY };
+  }
+
+  private pose(framing: Framing, width: number, height: number): CameraPose {
+    const { look, distance, pitch, fov, principalY } = framing;
     return {
       target: gridToWorld(look.x, look.y),
-      distance: CAMERA.distance,
-      pitch: CAMERA.pitch,
-      fov: CAMERA.fov,
+      distance,
+      pitch,
+      fov,
       viewport: { width, height },
-      principal: { x: width * CAMERA.principal.x, y: height * CAMERA.principal.y },
+      principal: { x: width / 2, y: height * principalY },
     };
   }
 }
