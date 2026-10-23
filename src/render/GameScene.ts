@@ -110,6 +110,8 @@ import { GameLoop } from './GameLoop';
 import { DEFAULT_LOOK, FLOOR_THEMES, LEVEL_LOOKS, type MapLook, WALL_THEMES } from './mapLook';
 import { MusicPlayer } from './MusicPlayer';
 import { musicCue } from './music';
+import type { MenuRenderer, MenuRendererFactory } from './MenuRenderer';
+import { drawsMap, menuViewOf } from './menuView';
 import type { RoundRenderer, RoundRendererFactory } from './RoundRenderer';
 import { SoundPlayer } from './SoundPlayer';
 import { type RoundView, frameView, predictedView } from './roundView';
@@ -302,6 +304,8 @@ export interface GameSceneOptions {
   online: OnlineOptions | null;
   /** Draws the level and rounds: `createThreeRoundRenderer`, passed in by `main.ts`. */
   roundRenderer: RoundRendererFactory;
+  /** Draws the world map behind the menus: `createWorldMapRenderer`, passed in by `main.ts`. */
+  menuRenderer: MenuRendererFactory;
 }
 
 /**
@@ -352,6 +356,7 @@ function mapLook(levelId: string): MapLook {
 export class GameScene extends Phaser.Scene {
   private map!: LevelMap;
   private roundRenderer!: RoundRenderer;
+  private menuRenderer!: MenuRenderer;
   /**
    * Kept for the whole game, across scene restarts: new devices would see
    * buttons still held from the menu press that restarted the scene as new
@@ -456,8 +461,11 @@ export class GameScene extends Phaser.Scene {
     this.hovered = null;
     const roundRenderer = this.options.roundRenderer(this, this.map, mapLook(level.id));
     this.roundRenderer = roundRenderer;
+    const menuRenderer = this.options.menuRenderer(this);
+    this.menuRenderer = menuRenderer;
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       roundRenderer.destroy();
+      menuRenderer.destroy();
     });
     this.devices ??= new InputDevices(window);
     if (!this.music) {
@@ -531,6 +539,7 @@ export class GameScene extends Phaser.Scene {
     if (this.flow.screen === 'online') {
       this.updateOnline(frame, time, delta);
       this.updateHover();
+      this.renderStage(time, delta);
       return;
     }
     const { players } = this.flow.lobby;
@@ -579,7 +588,17 @@ export class GameScene extends Phaser.Scene {
     }
     this.updateMusic(delta, this.flow, this.loop?.state ?? null);
     this.updateHover();
-    this.roundRenderer.render(time, delta);
+    this.renderStage(time, delta);
+  }
+
+  /** Draws the world map on the menus and the level around a round: one of the two per frame. */
+  private renderStage(time: number, delta: number): void {
+    const room = this.flow.screen === 'online' ? (this.online?.flow ?? null) : null;
+    if (drawsMap(this.flow, room, this.options.scene !== null)) {
+      this.menuRenderer.render(time, delta);
+    } else {
+      this.roundRenderer.render(time, delta);
+    }
   }
 
   /**
@@ -662,7 +681,7 @@ export class GameScene extends Phaser.Scene {
     const now = online ? onlineNowMs(online) : nowMs;
     this.shownResultsReady = resultsReady(flow, now);
     this.shownCountdown = countdownNumber(flow, now);
-    this.game.events.emit(FLOW_EVENT, {
+    const view: FlowView = {
       flow,
       save: online ? { ...this.options.save, levels: online.levels } : this.options.save,
       levelIds: LEVEL_IDS,
@@ -671,7 +690,9 @@ export class GameScene extends Phaser.Scene {
       resultsReady: this.shownResultsReady,
       countdown: this.shownCountdown,
       online,
-    } satisfies FlowView);
+    };
+    this.menuRenderer.syncMenu(menuViewOf(view));
+    this.game.events.emit(FLOW_EVENT, view);
   }
 
   private takeOnlineDirty(): boolean {
@@ -1205,6 +1226,7 @@ export class GameScene extends Phaser.Scene {
     if (this.music) this.music.volume = musicVolume / SFX_VOLUME_MAX;
     this.roundRenderer.setShake(screenShake);
     this.roundRenderer.setGraphics(graphics);
+    this.menuRenderer.setGraphics(graphics);
   }
 
   /** A fresh round of the loaded level with everyone in the lobby, or bots in the demo. */
