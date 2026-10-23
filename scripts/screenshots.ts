@@ -320,9 +320,9 @@ const SHOTS: Record<string, Shot> = {
   async 'screens/level-select'(page) {
     // A fresh save: later chapters still locked.
     await toLevelSelect(page, '');
-    // Drive to the second level: the map camera glides after the cursor.
+    // Drive to the second level: the van drives there and the map camera follows it.
     await page.key('ArrowRight');
-    await sleep(900);
+    await sleep(1500);
     await page.shot('screens/level-select');
   },
 

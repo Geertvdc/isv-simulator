@@ -1,8 +1,8 @@
 /**
  * Where the world map camera looks, as plain math (testable in Node): at the
- * selected flag, held off the island's ends so they don't show a sea of
- * water, and only partly following the road up and down so the view
- * doesn't bob. It glides there instead of jumping.
+ * van (on the selected flag once parked), held off the island's ends so
+ * they don't show a sea of water, and only partly following the road up
+ * and down so the view doesn't bob. It glides there instead of jumping.
  */
 
 import type { MapPoint, WorldMap } from '../../../flow/worldMap';
