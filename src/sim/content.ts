@@ -98,6 +98,10 @@ export const MEETING_TITLES: readonly string[] = [
   'Kick-off kick-off',
 ];
 
+/** Instead of the game, in a browser that can't draw it. */
+export const NO_WEBGL_TEXT =
+  'This game needs WebGL 2 to draw the office. Try an up-to-date Chrome, Edge, Firefox or Safari, or turn on hardware acceleration.';
+
 /** Over a meeting room. */
 export const MEETING_ROOM_TEXT = 'Meeting room';
 /** On a player's invite card in the HUD. */

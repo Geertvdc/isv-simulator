@@ -6,6 +6,7 @@ import { parseLag } from './net/lag';
 import { REJOIN_KEY } from './net/rejoin';
 import { createProfileApi, serverUrl, syncLevels } from './net/profileApi';
 import { SCREEN_FADE_MS } from './sim/balance';
+import { NO_WEBGL_TEXT } from './sim/content';
 import { sceneById } from './sim/scenes';
 import {
   DIALOG_CANCEL_EVENT,
@@ -24,6 +25,7 @@ import {
   TOGGLE_SOUND_EVENT,
   type TicketStore,
 } from './render/GameScene';
+import { createThreeRoundRenderer } from './render/three/ThreeRoundRenderer';
 import { mountDemo } from './ui/demo';
 import { mountGameHud } from './ui/game';
 import { mountHud } from './ui/hud';
@@ -42,6 +44,23 @@ function getElement(id: string): HTMLElement {
   const el = document.getElementById(id);
   if (!el) throw new Error(`Missing #${id} in index.html`);
   return el;
+}
+
+/** Whether this browser can draw the 3D office (three.js needs WebGL 2). */
+function hasWebGL2(): boolean {
+  try {
+    return document.createElement('canvas').getContext('webgl2') !== null;
+  } catch {
+    return false;
+  }
+}
+
+if (!hasWebGL2()) {
+  const message = document.createElement('p');
+  message.className = 'no-webgl';
+  message.textContent = NO_WEBGL_TEXT;
+  getElement('ui').append(message);
+  throw new Error('No WebGL 2');
 }
 
 /** This tab's rejoin ticket in `sessionStorage` (survives a reload, not a new tab); quiet where storage throws. */
@@ -87,12 +106,6 @@ let identity = loadIdentity(storage, () =>
     ? crypto.randomUUID()
     : uuidFromBytes(crypto.getRandomValues(new Uint8Array(16))),
 );
-// `?render=3d`: the 3D look (phase 14). three.js loads only then.
-const render3d = params.get('render') === '3d';
-const roundRenderer = render3d
-  ? (await import('./render/three/ThreeRoundRenderer')).createThreeRoundRenderer
-  : undefined;
-
 const gameServerUrl = serverUrl(import.meta.env.VITE_SERVER_URL, window.location);
 const profileApi = createProfileApi(gameServerUrl, (url, init) => fetch(url, init));
 const scene = new GameScene({
@@ -103,7 +116,7 @@ const scene = new GameScene({
   scene: shownScene,
   // `?demo`: a kiosk for a booth, bots play whenever nobody does.
   kiosk: !shownScene && params.has('demo'),
-  roundRenderer,
+  roundRenderer: createThreeRoundRenderer,
   // A scene is a picture: it never goes online.
   online: shownScene
     ? null
@@ -122,9 +135,8 @@ const scene = new GameScene({
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: getElement('game'),
-  backgroundColor: '#14161c',
-  // In 3D, three.js draws the level on its own canvas under this one.
-  transparent: render3d,
+  // three.js draws the level on its own canvas under this one.
+  transparent: true,
   scale: {
     mode: Phaser.Scale.RESIZE,
     width: window.innerWidth,
