@@ -44,6 +44,8 @@ const ROAD = {
   /** Space between road samples when resampling it smooth. */
   step: 0.12,
 };
+/** The road's top, where the van's wheels stand. */
+export const ROAD_SURFACE = ROAD.y + 0.01;
 
 /** Level flags: a plate, a pole with a gold ball and a cloth in the chapter's color. */
 const FLAG = {
