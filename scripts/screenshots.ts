@@ -7,8 +7,9 @@
  *
  * Usage: start `npm run dev:online` (or `npm run dev` and skip the online
  * shots with `--only`), then
- *   npm run screenshots -- [--base=http://localhost:5173] [--server=http://localhost:2567] [--only=pipeline]
- * `--only` takes shots whose name contains the text. `--render=3d` takes
+ *   npm run screenshots -- [--base=http://localhost:5173] [--server=http://localhost:2567] [--only=pipeline] [--skip=online]
+ * `--only` takes shots whose name contains the text, `--skip` leaves them
+ * out. `--render=3d` takes
  * them with the 3D look (phase 14), `--out=<dir>` writes them somewhere
  * other than `docs/game/images/`. `--server` is the game
  * server the page talks to; a second room member joins it from here for the
@@ -29,6 +30,7 @@ const arg = (name: string): string | undefined =>
 const BASE = arg('base') ?? 'http://localhost:5173';
 const SERVER = arg('server') ?? 'http://localhost:2567';
 const ONLY = arg('only');
+const SKIP = arg('skip');
 const RENDER = arg('render');
 const OUT = arg('out') ?? join(import.meta.dirname, '..', 'docs', 'game', 'images');
 const WIDTH = Number(arg('width') ?? 1440);
@@ -385,6 +387,7 @@ async function main(): Promise<void> {
   try {
     for (const [name, shot] of Object.entries(SHOTS)) {
       if (ONLY && !name.includes(ONLY)) continue;
+      if (SKIP && name.includes(SKIP)) continue;
       console.log(name);
       try {
         await shot(page);
