@@ -42,7 +42,8 @@ export interface CloudBank {
 
 /** A soft, low-poly cloud bank from `puffs` (map units). */
 export function buildCloudBank(puffs: readonly Puff[], drift: number): CloudBank {
-  const geometry = new THREE.IcosahedronGeometry(1, 1);
+  // Detail 2 with smooth normals: soft round puffs, not faceted boulders.
+  const geometry = new THREE.IcosahedronGeometry(1, 2);
   // Light on top, a cool shade underneath: reads as a cloud, not a snowball.
   const top = new THREE.Color(LOCK_COLORS.cloudTop);
   const bottom = new THREE.Color(LOCK_COLORS.cloudBottom);
