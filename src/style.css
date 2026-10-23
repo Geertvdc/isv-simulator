@@ -20,6 +20,19 @@ body {
   inset: 0;
 }
 
+/* Shown instead of the game where WebGL 2 is missing. */
+.no-webgl {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 28rem;
+  margin: 0;
+  text-align: center;
+  font-size: 1.25rem;
+  line-height: 1.5;
+}
+
 /* DOM overlay for HUD and panels. Clicks fall through to the canvas
    except on elements that opt back in with pointer-events: auto. */
 #ui {
