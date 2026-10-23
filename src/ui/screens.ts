@@ -120,7 +120,9 @@ export function mountResults(root: HTMLElement): ScreenView {
   const chapter = el('div', 'results-badge');
   const menu = createMenu();
   const hint = el('div', 'screen-hint', MENU_HINT);
-  screen.append(title, stars, score, best, unlocked, chapter, menu.root, hint);
+  const card = el('div', 'results-card');
+  card.append(stars, score, best, unlocked, chapter);
+  screen.append(title, card, menu.root, hint);
   return {
     render: (view) => {
       const results = view?.flow.results;
@@ -164,12 +166,10 @@ export function mountCredits(root: HTMLElement): ScreenView {
     roll.append(el(line.kind === 'heading' ? 'h2' : 'p', `credits-${line.kind}`, line.text));
   }
   const menu = createMenu();
-  screen.append(
-    el('h1', 'screen-title', CREDITS_TITLE),
-    list,
-    menu.root,
-    el('div', 'screen-hint', MENU_HINT),
-  );
+  // Back sits in the card's foot.
+  const card = el('div', 'credits-card');
+  card.append(list, menu.root);
+  screen.append(el('h1', 'screen-title', CREDITS_TITLE), card, el('div', 'screen-hint', MENU_HINT));
   return {
     render: (view) => {
       const wasHidden = screen.hidden;
