@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   DESIGNED_CODE_FACTOR,
+  DESIGNED_ORDER_POINTS,
+  DESIGNED_TIME_FACTOR,
   DESIGN_RATE,
+  ORDER_POINTS,
   PAIR_RATE,
   THROW_HOLD_TICKS,
   WORK_RATE,
@@ -9,7 +12,7 @@ import {
 import { canPutDown, interact } from './interact';
 import { parseLevelMap } from './level';
 import { type LevelSettings, levelWithMap } from './levels';
-import { createOrder, expireOrders, shipTicket } from './orders';
+import { createOrder, expireOrders, shipPoints, shipTicket } from './orders';
 import { type GameState, type PlayerId, type Vec, createGame, getPlayer } from './state';
 import { cmd } from './testing';
 import { tick } from './tick';
@@ -178,6 +181,19 @@ describe('design pays off', () => {
     workFor(state, 10, 1);
     expect(t.steps[1]?.progress).toBeCloseTo(WORK_RATE * DESIGNED_CODE_FACTOR * 10);
   });
+
+  it('pays more and gives more time for an order that starts at the whiteboard', () => {
+    const state = newGame();
+    const plain = createOrder(state, 'feature', 'Plain');
+    const designed = createOrder(state, 'feature', 'Designed', DESIGNED_FEATURE_STEPS);
+    const limit = state.settings.orderSchedule.timeLimitTicks;
+    expect(plain.expiresTick - plain.createdTick).toBe(limit);
+    expect(designed.expiresTick - designed.createdTick).toBe(
+      Math.round(limit * DESIGNED_TIME_FACTOR),
+    );
+    expect(shipPoints(plain, plain.expiresTick)).toBe(ORDER_POINTS);
+    expect(shipPoints(designed, designed.expiresTick)).toBe(DESIGNED_ORDER_POINTS);
+  });
 });
 
 describe('merging on the way', () => {
@@ -264,6 +280,26 @@ describe('pair programming', () => {
     expect(t.steps[0]?.progress).toBeCloseTo(PAIR_RATE * 10);
     expect(state.pairing).toEqual([{ x: 6, y: 4 }]);
     workFor(state, 1, 1);
+    expect(state.pairing).toEqual([]);
+  });
+
+  it('signs nobody up at a keyboard with nothing to code', () => {
+    const state = newGame({ pairing: true });
+    place(state, 1, { x: 6, y: 3 }, { x: 0, y: 1 });
+    place(state, 2, { x: 6, y: 5 }, { x: 0, y: -1 });
+    workFor(state, 1, 1, 2);
+    expect(state.pairing).toEqual([]);
+  });
+
+  it('stops pairing when the level ends', () => {
+    const state = newGame({ pairing: true });
+    const t = ticket(state, 'feature', 0);
+    t.location = { kind: 'tile', x: 6, y: 4 };
+    place(state, 1, { x: 6, y: 3 }, { x: 0, y: 1 });
+    place(state, 2, { x: 6, y: 5 }, { x: 0, y: -1 });
+    state.settings.durationTicks = state.tick + 1;
+    workFor(state, 1, 1, 2);
+    expect(state.result).not.toBeNull();
     expect(state.pairing).toEqual([]);
   });
 

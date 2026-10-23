@@ -52,7 +52,10 @@ export const TICKET_LOST_TEXT = 'git reset --hard';
 /** Over the queue a lost ticket went back to. */
 export const BACKLOG_TEXT = 'Back in the backlog';
 /** Over a ticket two players are coding together. */
-export const PAIRING_TEXT = 'Pairing ×1.9';
+/** Over a keyboard two players code at; `speedup` is the pair's rate over one coder's. */
+export function pairingText(speedup: number): string {
+  return `Pairing ×${Math.round(speedup * 10) / 10}`;
+}
 
 /** What each kind of order (and ticket) is called on its card. */
 export const ORDER_KIND_LABELS: Readonly<Record<TicketKind, string>> = {

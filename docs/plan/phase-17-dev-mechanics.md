@@ -60,7 +60,7 @@
 - `tickets.ts`: step kinds `design` and `merge`; ticket kinds `frontend`, `backend`, `fullstack` (`fullstack` steps are `code → merge → test → pipeline`, code and merge done when merged); `DESIGNED_FEATURE_STEPS`; `isPart`, `canMerge`, `mergeParts`. A lost merged ticket keeps its merge.
 - `level.ts`: tiles `whiteboard` (`W`) and `merge` (`G`).
 - `interact.ts`: the whiteboard works `design` by hand at `DESIGN_RATE`; `canPutDown` on a merge station takes a coded part, then its other half; `settleOn` (used by put-down, throw landings and conveyors) merges them; on levels with `pairing`, everyone coding at a keyboard signs up and `finishCoding` advances it at `PAIR_RATE` for two or more.
-- `orders.ts`: `fullstack` orders (35 points, 1.5× the time) open as both parts in the inbox; parts can't ship; `designShare` and `fullstackShare` roll only on levels that use them; an expired full-stack order takes its waiting parts with it.
+- `orders.ts`: `fullstack` orders (30 points, 1.5× the time); features that start with `design` pay 25 and get 1.3× the time open as both parts in the inbox; parts can't ship; `designShare` and `fullstackShare` roll only on levels that use them; an expired full-stack order takes its waiting parts with it.
 - `levels.ts`: optional `designShare`, `fullstackShare`, `pairing` settings; lab level `lab-dev`.
 - 2D: whiteboard and merge blocks (W, G); card colors for the new kinds. 3D: a whiteboard on legs with a user-flow sketch, a merge desk with a glowing git branch sign; sky-blue, green and purple folders. HUD: W and G letters, "Front end", "Back end", "Full-stack" labels. Popup "Merged!".
 - Scenes: `design`, `merge`, `pairing`.
@@ -74,3 +74,10 @@
 - **Balance:** full-stack orders pay 30 (from 35).
 - **Fixes:** an expired full-stack order takes a waiting merged ticket (lost and back) instead of two parts; conveyors and throw landings report the merged ticket's id.
 - **More tests:** a part thrown onto its other half, an uncoded part flying over G, a conveyor feeding G, full-stack expiry, designed coding, the pairing marker.
+
+## Review round 2 fixes
+
+- **Designed orders pay for their extra step:** 25 points (`DESIGNED_ORDER_POINTS`) and 1.3× the time (`DESIGNED_TIME_FACTOR`), so an order with a whiteboard step isn't just a slower plain feature.
+- **FE / BE tags** on the two code chips of a full-stack order card, so the parts read without telling blue from green.
+- **Pairing only counts at a keyboard with something to code**, and clears when the level ends. The label is built from `PAIR_RATE / WORK_RATE` (`pairingText`) and has a dark backing.
+- Doc fixes: full-stack points (30), the pairing label in the review notes.
