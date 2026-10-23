@@ -26,6 +26,18 @@
 
 ## Done when
 
-- [ ] Four new levels play from the level select, each feels different
-- [ ] Docs and screenshots updated
-- [ ] `npm run check` passes
+- [x] Four new levels play from the level select, each feels different
+- [x] Docs and screenshots updated
+- [x] `npm run check` passes
+
+## As built
+
+- Maps `maps/level-13-the-atrium.txt` to `level-16-hackathon.txt`, 16 × 10. The Atrium got a walkway along the bottom (solo play needs it); Monorepo's merge station sits below the atrium where both sides meet, with a belt across the top; Design Sprint is an L with the corner void.
+- Settings: Design Sprint 60% designed features and pairing; Monorepo 60% full-stack, pairing, orders every 24 s; Hackathon 30% design, 40% full-stack, pairing and calm incidents. Star thresholds from bot runs.
+- Chapter `big-tech` behind 18 stars, the Scale-Up music, level select in five columns.
+- Intro pictures: `atrium`, `design`, `merge`, `carousel`.
+- Bots carry coded parts to the merge station and fetch the merged ticket, so every level is checked by the bot star test (which also proves every station is reachable) and the demo plays them.
+- 3D: a `big-tech` campus setting (lawns, picnic tables, bike racks, food trucks, a fountain); each level has its own walls and floor.
+- Docs: `levels.md` (chapter 5), `mechanics.md` (gaps, belts, design, merge, pairing), `stations.md`, `3d.md`, screenshots in 2D and 3D.
+
+Assumptions are logged in [review-notes-15.md](review-notes-15.md#phase-18-big-tech).

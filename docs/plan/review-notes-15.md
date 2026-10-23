@@ -41,3 +41,15 @@ Decisions made without the product owner, who asked for the work to go ahead on 
 - **Design takes as long as coding** (`DESIGN_RATE`) but makes the coding after it 1.6× faster, so a designed feature costs about a second more than a plain one.
 - **Bots still don't know the new stations:** a bot holding a part would bin it. They only play the old levels (the demo), so this only matters once bots learn the new chapter.
 - **Parts look alike from afar** (sky-blue and green folders); an icon on each (`</>` and a database) is a follow-up.
+- **Designed orders** pay 25 and last 1.3× as long (review round 2), so the extra whiteboard step is paid for.
+
+## Phase 18: Big Tech
+
+- **The Atrium has a walkway** along the bottom (the plan had two halves with only throws and belts between them): with one player, nobody could get to the other half. Throwing and the belts are the fast way across; walking round is the slow way.
+- **The campus is 16 tiles wide** (the old levels are 14): room for an atrium and two working halves. It still fits the screen in 2D and 3D.
+- **Bots learned to merge** (carry a coded part to the merge station, fetch the merged ticket) so they can play every Big Tech level, and the demo plays them too. They still don't throw, pair on purpose or use belts: they walk.
+- **Star thresholds come from bot runs**, like the old levels, set a bit higher (bots earn 2 to 3 stars, as on the old levels). Humans throw and pair, bots don't, so these may want tuning after playtests.
+- **The chapter gate is 18 stars** (Enterprise opens at 13).
+- **No music of its own:** Big Tech plays the Scale-Up track.
+- **Campus surroundings:** lawns and a paved path, picnic tables with people at lunch, bike racks, food trucks, trees, and once a level a fountain. Scooters and a slide from the plan are left for later.
+- **Level select:** five chapter columns, cards a little tighter so all sixteen fit at 720p.

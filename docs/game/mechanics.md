@@ -102,11 +102,43 @@ A calendar invite pops up for one of the players (each has at most one open): "S
 | ----------------------------------------------------------------------- | -------------------------------------------------------------- |
 | ![A calendar invite for player 2](images/mechanics/meeting-invite.webp) | ![Sitting out the meeting](images/mechanics/meeting-room.webp) |
 
+## Gaps and odd shapes (from chapter 5, Big Tech)
+
+Levels don't have to be a rectangle any more. Blank tiles in a map are **void**: nothing there, not even floor. `~` is a **gap** (an atrium, a stairwell): you can't walk over it, but a thrown ticket flies right over it. A ticket that comes down in a gap or the void is gone: it goes back to its queue with all its work lost ("git reset --hard"), and the order keeps running.
+
+![The test benches are across the atrium: player 1 throws the coded ticket over the gap](images/mechanics/gap-throw.webp)
+
+## Conveyor belts (from chapter 5, Big Tech)
+
+`>` `<` `^` `v` are belts: the message queue. Put a ticket on one and it moves one tile every half second along the arrows, onto the next belt and then onto the counter or station the belt points at. A belt waits when what's ahead is full. Belts that run in a closed loop (Hackathon) carry tickets round and round until someone picks one off.
+
+![The conveyor bridge carries tickets across the atrium to the test side](images/mechanics/conveyor.webp)
+
+## Design at the whiteboard (from Design Sprint)
+
+Some feature orders start at the whiteboard (`W`): design → code → test → pipeline. Hold work at a whiteboard to design, like coding. A designed feature then codes 1.6× faster, and these orders pay 25 instead of 20 and last 1.3× as long.
+
+![Designing at the whiteboard](images/mechanics/design.webp)
+
+## Front end + back end: merging (from Monorepo)
+
+A **full-stack** order arrives as two tickets in the inbox: a front end and a back end (the order card shows two K chips, marked FE and BE). Code both, then put them on the **merge station** (`G`, git merge) one after the other: they become one full-stack ticket that still needs testing and the pipeline. Halves can't ship on their own. Full-stack orders pay 30 and last 1.5× as long. Throwing a coded half onto the station or letting a belt bring it works too.
+
+![The back end lands on the merge station next to its front end](images/mechanics/merge.webp)
+
+## Pair programming (from Design Sprint)
+
+On levels with pairing, two players working at one keyboard code 1.9× as fast as one ("Pairing ×1.9" shows over the ticket). Not twice as fast: splitting up is still sometimes better.
+
+![Two players pairing at one keyboard](images/mechanics/pairing.webp)
+
 ## Scoring at a glance
 
 | Event                           | Points                        |
 | ------------------------------- | ----------------------------- |
 | Feature shipped                 | +20, plus up to +10 for speed |
+| Designed feature shipped        | +25, plus up to +10 for speed |
+| Full-stack feature shipped      | +30, plus up to +10 for speed |
 | Hotfix shipped                  | +20, plus up to +10 for speed |
 | Bug fix shipped                 | 0                             |
 | Shipped after its order ran out | 0                             |

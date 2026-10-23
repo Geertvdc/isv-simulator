@@ -360,6 +360,11 @@ const LEVEL_LOOKS: Readonly<Record<string, MapLook>> = {
   'back-to-back': { walls: 'glass', floor: 'carpet' },
   synergy: { walls: 'plaster', floor: 'concrete' },
   'the-reorg': { walls: 'glass', floor: 'carpet' },
+  // Big Tech: a bright campus, wood and glass.
+  'the-atrium': { walls: 'glass', floor: 'parquet' },
+  'design-sprint': { walls: 'wood', floor: 'concrete' },
+  monorepo: { walls: 'glass', floor: 'concrete' },
+  hackathon: { walls: 'plaster', floor: 'parquet' },
   // Lab levels have no chapter: they borrow a world.
   'lab-shapes': { walls: 'glass', floor: 'carpet', setting: 'scale-up' },
   'lab-dev': { walls: 'wood', floor: 'parquet', setting: 'startup' },
