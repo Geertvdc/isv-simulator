@@ -849,6 +849,30 @@ function helipad(p: CityPiece, { body: b, glow }: Parts): void {
     const a = (i / 8) * Math.PI * 2;
     glow.led(0.03, 0x9fff8a, { at: [Math.cos(a) * (r - 0.06), 0.08, Math.sin(a) * (r - 0.06)] });
   }
+  // The founders' helicopter, parked across the H.
+  const yaw = 0.7;
+  const turn = (x: number, z: number): [number, number] => [
+    x * Math.cos(yaw) + z * Math.sin(yaw),
+    -x * Math.sin(yaw) + z * Math.cos(yaw),
+  ];
+  const put = (x: number, y: number, z: number): [number, number, number] => {
+    const [tx, tz] = turn(x, z);
+    return [tx, y, tz];
+  };
+  const rot: [number, number, number] = [0, yaw, 0];
+  for (const x of [-0.13, 0.13]) {
+    b.box(0.03, 0.03, 0.5, C.ink, { at: put(x, 0.09, 0), rot }, 0);
+    for (const z of [-0.12, 0.12]) b.box(0.02, 0.1, 0.02, C.ink, { at: put(x, 0.14, z), rot }, 0);
+  }
+  b.sphere(0.2, C.teal, { at: put(0, 0.3, 0.02), rot }, [0.9, 0.85, 1.25]);
+  b.sphere(0.13, C.paneDark, { at: put(0, 0.33, 0.13), rot }, [1.05, 0.8, 1]);
+  b.box(0.07, 0.07, 0.55, C.teal, { at: put(0, 0.34, -0.42), rot }, 0.02);
+  b.box(0.03, 0.18, 0.1, C.teal, { at: put(0, 0.44, -0.66), rot }, 0.01);
+  b.box(0.12, 0.012, 0.03, C.ink, { at: put(0.04, 0.44, -0.66), rot }, 0);
+  b.cylinder(0.025, 0.025, 0.1, C.ink, { at: put(0, 0.52, 0) }, 8);
+  for (const a of [0.3, 0.3 + Math.PI / 2]) {
+    b.box(1.1, 0.012, 0.06, C.ink, { at: put(0, 0.57, 0), rot: [0, yaw + a, 0] }, 0);
+  }
 }
 
 function hedge(p: CityPiece, { body: b }: Parts): void {
