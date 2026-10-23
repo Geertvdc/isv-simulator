@@ -8,7 +8,7 @@
 - Match the camera: sprites must be drawn or rendered at our front-facing 3/4 view (`VIEW_PITCH`, `VIEW_YAW` in `src/render/projection.ts`). If an art set has a different angle, adjust the projection constants rather than mixing angles
 - Office furniture and stations: desks with keyboards, a test bench with screens, a pipeline as a server rack or conveyor, inbox and ship as hatches in the wall
 - Characters: developers in a few player colors with idle, walk, carry (ticket held up) and work animations, in at least 4 directions
-- See `docs/assets.md` for sources
+- Superseded by the 3D look (phase 14); the sprite notes in `docs/assets.md` were deleted in phase 14g
 - `CREDITS.md` listing every pack and license
 
 ## Done when

@@ -18,7 +18,7 @@ The game started as a Theme Hospital-style management sim and pivoted to Overcoo
 | 11 Campaign (done, in review)                | About 12 levels in chapters (Garage to Enterprise), one new mechanic per chapter      |
 | 12 Music and onboarding (done, in review)    | Music, level intro cards, first-level hints, countdown and transitions                |
 | 13 Online multiplayer (in progress)          | Authoritative Colyseus server, lobbies with join codes, user ids, stacked 13a to 13f  |
-| 14 3D graphics (14a to 14e done, in review)  | three.js Overcooked-style office diorama behind `?render=3d`, stacked 14a to 14g      |
+| 14 3D graphics (done)                        | three.js Overcooked-style office diorama; 14g made it the only look and deleted 2D    |
 | 15 Atmosphere (in progress)                  | Themed surroundings and life around every level (3D)                                  |
 | 16 Level shapes (planned)                    | Any outline, gaps you throw across, conveyor belts                                    |
 | 17 Dev mechanics (planned)                   | Design at the whiteboard, front end + back end merge, pair programming                |

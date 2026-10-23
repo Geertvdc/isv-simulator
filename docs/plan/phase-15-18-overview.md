@@ -24,7 +24,7 @@ So they're built and tested as separate PRs (each small enough to review, each w
 ## What stays the same
 
 - The existing 12 levels keep their maps and balance (saves and star records stay valid). New ideas arrive as a fifth chapter.
-- Architecture rules: everything new in the sim is plain data, deterministic and tested; tunables in `balance.ts`, text in `content.ts`; 2D and 3D both draw every new tile.
+- Architecture rules: everything new in the sim is plain data, deterministic and tested; tunables in `balance.ts`, text in `content.ts`; every new tile gets a 3D model (2D was deleted in phase 14g).
 - Online play: the server runs the same sim; the protocol version goes up because maps can hold new tiles.
 
 Sources for the research: [Overcooked 2 (Wikipedia)](https://en.wikipedia.org/wiki/Overcooked_2), [Twinfinite review](https://twinfinite.net/2018/08/overcooked-2-review/), [Co-Optimus review](https://www.co-optimus.com/ampfeature/2181/overcooked-2-co-op-review.html), [Shacknews](https://shacknews.com/article/109081/shacknews-best-co-op-game-of-2018-overcooked-2).

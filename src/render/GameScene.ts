@@ -1255,7 +1255,7 @@ export class GameScene extends Phaser.Scene {
     done();
   }
 
-  /** Runs every frame so hover stays right while panning/zooming with a still mouse. */
+  /** Runs every frame so hover stays right while the view changes under a still mouse. */
   private updateHover(): void {
     const pointer = this.input.activePointer;
     const overCanvas = pointer.active && this.input.isOver;
