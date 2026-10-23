@@ -200,6 +200,9 @@ function sceneImage(id: string): string {
 
 // ---- Menus ----
 
+/** Long enough for the map camera's swoop between title, lobby and level select to land. */
+const SWOOP_SETTLE_MS = 1800;
+
 /** From a fresh load to the level select with two keyboard players. */
 async function toLevelSelect(page: Page, query = '?unlockAll'): Promise<void> {
   await page.open(`/${query}`);
@@ -208,6 +211,7 @@ async function toLevelSelect(page: Page, query = '?unlockAll'): Promise<void> {
   await page.key('Enter'); // join: left keyboard
   await page.key('Enter'); // join: right keyboard
   await page.key('KeyE'); // player 1 starts
+  await sleep(SWOOP_SETTLE_MS); // the camera swoops down from the lobby
 }
 
 /**
@@ -247,7 +251,7 @@ const SHOTS: Record<string, Shot> = {
     await page.key('Enter');
     await page.key('Enter');
     await page.key('Enter');
-    await sleep(400);
+    await sleep(SWOOP_SETTLE_MS);
     await page.shot('screens/lobby');
   },
 
