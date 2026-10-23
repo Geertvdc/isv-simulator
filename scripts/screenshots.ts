@@ -330,14 +330,59 @@ const SHOTS: Record<string, Shot> = {
     await page.shot('screens/level-select');
   },
 
+  async 'screens/map-campaign'(page) {
+    // Further into the campaign: a built save, not a playthrough. The Garage and
+    // the Startup played with mixed stars (12 in all), the Scale-Up open, the
+    // Enterprise still under its clouds (13 stars) and the van at Middle Management.
+    const best = (bestStars: number, bestScore: number) => ({ bestStars, bestScore, plays: 2 });
+    const save = {
+      version: 1,
+      levels: {
+        garage: best(3, 260),
+        'open-plan': best(2, 190),
+        'scale-up': best(3, 285),
+        'seed-round': best(2, 175),
+        'demo-day': best(1, 120),
+        'on-call': best(1, 110),
+      },
+      tutorialDone: true,
+    };
+    await page.open('/');
+    await page.eval(
+      `localStorage.setItem('isv-simulator.save', ${JSON.stringify(JSON.stringify(save))})`,
+    );
+    try {
+      await toLevelSelect(page, '');
+      for (let i = 0; i < 6; i++) await page.key('ArrowRight');
+      await sleep(2500);
+      await page.shot('screens/map-campaign');
+    } finally {
+      // The other shots start from a fresh save.
+      await page.eval(`localStorage.removeItem('isv-simulator.save')`);
+    }
+  },
+
   async 'screens/round-start'(page) {
     await toLevelSelect(page);
     await page.key('Enter');
     await sleep(500);
     await page.shot('screens/intro-garage');
     await page.key('Enter');
-    await sleep(350);
+    // Each number pops in and fades; catch one at full strength and hold it there for the picture.
+    for (let i = 0; i < 40; i++) {
+      const held = await page.eval<boolean>(`(() => {
+        const e = document.querySelector('.countdown.count');
+        if (!e || Number(getComputedStyle(e).opacity) < 0.95) return false;
+        e.style.animationPlayState = 'paused';
+        return true;
+      })()`);
+      if (held) break;
+      await sleep(20);
+    }
     await page.shot('screens/countdown');
+    await page.eval(
+      `document.querySelector('.countdown')?.style.removeProperty('animation-play-state')`,
+    );
     await sleep(2600);
     await page.shot('screens/first-level-hints');
     await page.key('Escape');
