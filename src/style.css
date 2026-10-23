@@ -1669,6 +1669,25 @@ body {
   text-align: center;
 }
 
+/* The status and name row sit straight on the scrim over the map: light text with a navy outline. */
+.online-status,
+.online-name .profile-label,
+.online-name-value,
+.online-name-error {
+  text-shadow:
+    0 0.08em 0 var(--ink-outline),
+    0 0 0.3em var(--ink-outline),
+    0 0 0.6em rgba(10, 16, 30, 0.8);
+}
+
+.online-status {
+  font-weight: 700;
+}
+
+.online-name .profile-label {
+  color: var(--paper);
+}
+
 .online-members {
   display: flex;
   flex-direction: column;
