@@ -233,7 +233,6 @@ export const MENU_LABELS = {
 export const PAUSED_TITLE = 'Paused';
 export const SETTINGS_TITLE = 'Settings';
 export const CREDITS_TITLE = 'Credits';
-export const LEVEL_SELECT_TITLE = 'Pick a level';
 
 /** On a level's card: its chapter and place in it, e.g. "Level 2-1". */
 export function levelLabel(chapter: number, level: number): string {
@@ -262,7 +261,7 @@ export function bugTitle(title: string): string {
 export const MENU_HINT = 'Enter, E or gamepad A: choose · Esc or gamepad B: back';
 /** Under the level select. */
 export const LEVEL_SELECT_HINT =
-  'Left/right: chapter · Up/down: level · Enter, E or gamepad A: play · Esc or gamepad B: change players';
+  'Arrows, WASD or stick: drive · Enter, E or gamepad A: play · Esc or gamepad B: change players';
 /** Under the level select for an online guest: the host picks. */
 export const LEVEL_SELECT_GUEST_HINT =
   'The host picks the level · Enter or gamepad A: join the next round if you have no player yet';
