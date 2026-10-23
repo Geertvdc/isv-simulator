@@ -48,6 +48,7 @@ const VAN_DRIVE = {
   accel: 24,
   hurryGap: 12,
   maxHurry: 3,
+  reverseSpeed: 0.5,
   turnMs: 70,
   bounce: { height: 0.025, ms: 230 },
   tilt: { perAccel: 0.004, max: 0.07, ms: 90 },
@@ -154,7 +155,8 @@ export class WorldMapRenderer implements MenuRenderer {
       ? stepDrive(before, target, deltaMs, VAN_DRIVE)
       : { distance: target, speed: 0 };
     this.drive = drive;
-    if (drive.speed !== 0) this.travel = Math.sign(drive.speed);
+    // Only a real drive back turns the van round, never a creep at the end of a stop.
+    if (Math.abs(drive.speed) > VAN_DRIVE.reverseSpeed) this.travel = Math.sign(drive.speed);
     const at = pointAt(this.road, drive.distance);
     const tangent = tangentAt(this.road, drive.distance);
     const yaw = Math.atan2(tangent.x * this.travel, tangent.y * this.travel);
