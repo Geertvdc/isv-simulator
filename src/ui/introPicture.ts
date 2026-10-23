@@ -125,14 +125,14 @@ const PICTURES: Readonly<Record<IntroPicture, () => string>> = {
       `<text x="30" y="76" text-anchor="middle" font-size="11" font-weight="800" fill="currentColor">FE</text>`,
       `<text x="210" y="76" text-anchor="middle" font-size="11" font-weight="800" fill="currentColor">BE</text>`,
     ].join(''),
-  // A belt carrying tickets round to a station.
+  // A belt carrying tickets round to the counter at its end.
   carousel: () =>
     [
       `<rect x="20" y="36" width="160" height="18" rx="9" fill="${css(tileColor('conveyor'))}" stroke="${OUTLINE}" stroke-width="2"/>`,
       `<path d="M 60 45 l 6 -5 v 10 Z M 100 45 l 6 -5 v 10 Z M 140 45 l 6 -5 v 10 Z" transform="rotate(180 103 45)" fill="${OUTLINE}" opacity="0.5"/>`,
       ticket(50, 34),
       ticket(120, 34),
-      block(210, 45, 'testBench', 'T'),
+      block(210, 45, 'counter', ''),
     ].join(''),
 };
 

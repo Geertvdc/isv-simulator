@@ -212,6 +212,11 @@ function mergedGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | nu
   return { tile, action: 'interact' };
 }
 
+/** Whether a belt hands tickets to `tile`: parking there would stop the belt. */
+function beltEndsAt(map: LevelMap, tile: GridPoint): boolean {
+  return map.conveyors.some((c) => c.x + c.dir.x === tile.x && c.y + c.dir.y === tile.y);
+}
+
 /** The nearest coded part parked on a counter that a merge station would take now. */
 function parkedPartGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | null {
   const merges = tilesOf(state.level, 'merge');
@@ -263,7 +268,9 @@ function carryGoal(state: GameState, bot: Bot, bots: readonly Bot[], ticket: Tic
     const counter = nearest(
       state,
       bot.playerId,
-      tilesOf(state.level, 'counter').filter((t) => !ticketOnTile(state, t.x, t.y)),
+      tilesOf(state.level, 'counter').filter(
+        (t) => !ticketOnTile(state, t.x, t.y) && !beltEndsAt(state.level, t),
+      ),
     );
     return counter ? { tile: counter, action: 'interact' } : null;
   }
