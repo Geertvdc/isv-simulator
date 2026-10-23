@@ -72,7 +72,7 @@ const ROAD_BEND = 0.9;
 /** Road waypoints per stretch between two control points. */
 const ROAD_SAMPLES = 6;
 /** Where the road starts and ends: this far in from the island's left and right shores. */
-const ROAD_SHORE = 0.4;
+const ROAD_SHORE = 1;
 /** How well a press has to point at a level to drive there (cosine of the angle). */
 const CURSOR_MIN_DOT = 0.3;
 

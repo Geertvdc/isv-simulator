@@ -57,11 +57,11 @@ export const PALETTE = {
 export const MAP_PALETTE = {
   /** Top of the land tiles, per chapter id. */
   ground: {
-    garage: 0x95c95c,
-    startup: 0x7fc266,
-    'scale-up': 0x8cbc74,
-    enterprise: 0xa2b38f,
-    'big-tech': 0xb2bdb2,
+    garage: 0xa9cf55,
+    startup: 0x5cbd6e,
+    'scale-up': 0x93b98a,
+    enterprise: 0xaab3a2,
+    'big-tech': 0xbec6cb,
   } as Readonly<Record<string, number>>,
   groundFallback: 0x8fc46a,
   /** The shore tiles round the island. */
@@ -69,6 +69,8 @@ export const MAP_PALETTE = {
   /** Under the grass: the cliff sides. */
   earth: 0x8a5d3b,
   sea: 0x3f8fae,
+  /** The lighter band of shallow water along the coast. */
+  shallows: 0x6fb8c8,
   road: 0x474c56,
   roadEdge: 0xdcd6c6,
   roadDash: 0xfafaf2,
