@@ -28,6 +28,7 @@ import {
 } from '../sim/content';
 import { parseCredits } from './credits';
 import { el } from './dom';
+import { createLogo } from './logo';
 import { type MenuLine, createMenu } from './menu';
 
 export interface ScreenView {
@@ -67,19 +68,16 @@ export function mountTitle(root: HTMLElement): ScreenView {
   const menu = createMenu();
   const press = el('div', 'title-press', PRESS_ANY_BUTTON_TEXT);
   const hint = el('div', 'screen-hint', MENU_HINT);
-  screen.append(
-    el('h1', 'title-name', GAME_TITLE),
-    el('div', 'title-tagline', GAME_TAGLINE),
-    press,
-    menu.root,
-    hint,
-  );
+  const head = el('div', 'title-head');
+  head.append(createLogo(GAME_TITLE), el('div', 'title-tagline', GAME_TAGLINE));
+  screen.append(head, press, menu.root, hint);
   return {
     render: (view) => {
       screen.hidden = view === null;
       if (!view) return;
       const awake = view.flow.awake;
       press.hidden = awake;
+      screen.classList.toggle('awake', awake);
       menu.root.hidden = !awake;
       hint.style.visibility = awake ? 'visible' : 'hidden';
       menu.render(menuLines(view), view.flow.menuIndex);
