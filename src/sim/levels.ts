@@ -312,7 +312,7 @@ export const MONOREPO: Level = level('monorepo', monorepoMap, {
   pairing: true,
 });
 
-/** A belt carousel round a courtyard and everything new at once, with incidents. */
+/** A long belt round a courtyard, ending on a counter, and everything new at once, with incidents. */
 export const HACKATHON: Level = level('hackathon', hackathonMap, {
   ...GARAGE_SETTINGS,
   starThresholds: [90, 180, 270],
