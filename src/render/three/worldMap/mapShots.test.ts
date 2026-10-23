@@ -5,14 +5,11 @@ import {
   type Framing,
   blendFraming,
   establishingFraming,
-  openEnd,
   shotFor,
   startRig,
   stepRig,
   swoopEase,
 } from './mapShots';
-
-const REGIONS = [0, 12, 24, 36].map((x, chapter) => ({ chapter, x, y: 0, width: 12, height: 12 }));
 
 const CLOSE: Framing = {
   look: { x: 20, y: 7 },
@@ -41,14 +38,6 @@ describe('shotFor', () => {
   });
 });
 
-describe('openEnd', () => {
-  it('is the right edge of the last open chapter', () => {
-    expect(openEnd(REGIONS, [true, false, false, false])).toBe(12);
-    expect(openEnd(REGIONS, [true, true, true, false])).toBe(36);
-    expect(openEnd(REGIONS, [true, true, true, true])).toBe(48);
-  });
-});
-
 describe('establishingFraming', () => {
   it('drifts from the garage toward the end of the open land and back', () => {
     const half = ESTABLISHING.periodMs / 2;
@@ -63,11 +52,10 @@ describe('establishingFraming', () => {
     expect(quarter).toBeLessThan(far);
   });
 
-  it('keeps a little sway over a small open land, with the clouds on the right', () => {
+  it('keeps a little sway on a small island', () => {
     const near = establishingFraming(12, 0).look.x;
     const far = establishingFraming(12, ESTABLISHING.periodMs / 2).look.x;
     expect(far - near).toBeCloseTo(ESTABLISHING.minSpan);
-    expect(near).toBeLessThan(12);
   });
 
   it('is higher and wider than the level select', () => {

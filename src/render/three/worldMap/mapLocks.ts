@@ -35,6 +35,8 @@ const FLAG_MOTION = { droop: -1.25, flutter: 0.18, flutterMs: 1400 };
 const STARS = { radius: 0.2, gap: 0.4, over: 0.5, shift: 0.2, tilt: -(56 * Math.PI) / 180 };
 const PADLOCK = { height: 0.72, ahead: 0.08, size: 2.7 };
 const MAX_STARS_SHOWN = 3;
+/** How long the locks take to fade in or out between the promise (title) and the level select. */
+const PROMISE_MS = 1600;
 
 export class MapLocks {
   readonly root = new THREE.Group();
@@ -51,6 +53,13 @@ export class MapLocks {
   private readonly unveil: (number | null)[];
   /** Per node: ms into its pop (negative while it waits), or null. */
   private readonly pop: (number | null)[];
+  /**
+   * The promise: 1 shows the whole world open (behind the title, whatever
+   * the save), 0 shows the locks as they are; in between, the clouds roll in
+   * or out, the barriers and padlocks come and go.
+   */
+  private promise = 0;
+  private promiseTarget = 0;
   private readonly grey = new THREE.Color(LOCK_COLORS.lockedCloth);
   private readonly paint = new THREE.Color();
   private readonly m = new THREE.Matrix4();
@@ -100,6 +109,19 @@ export class MapLocks {
     this.pop = diorama.flags.map(() => null);
   }
 
+  /**
+   * Shows the whole world open (`on`), or the locks as they are; glides
+   * there unless `instant`.
+   */
+  setPromise(on: boolean, instant = false): void {
+    this.promiseTarget = on ? 1 : 0;
+    if (instant && this.promise !== this.promiseTarget) {
+      this.promise = this.promiseTarget;
+      this.applyChapters();
+      this.placeBadges();
+    }
+  }
+
   /** Whether chapter `chapter` shows as locked (under its clouds). */
   isLocked(chapter: number): boolean {
     return this.shown?.chapters[chapter] === false;
@@ -130,6 +152,16 @@ export class MapLocks {
   update(timeMs: number, deltaMs: number): void {
     const dt = Math.max(0, deltaMs);
     const state = this.shown;
+    if (this.promise !== this.promiseTarget) {
+      const step = dt / PROMISE_MS;
+      this.promise =
+        this.promiseTarget > this.promise
+          ? Math.min(this.promiseTarget, this.promise + step)
+          : Math.max(this.promiseTarget, this.promise - step);
+      this.applyChapters();
+      this.placeBadges();
+    }
+    const promise = smooth(this.promise);
     // Clouds and gates.
     this.clouds.forEach((bank, c) => {
       if (!bank) return;
@@ -138,37 +170,45 @@ export class MapLocks {
       if (t !== null && t !== undefined) {
         const next = t + dt;
         this.unveil[c] = next >= UNVEIL.clouds + UNVEIL.sign ? null : next;
-        bank.update(timeMs, smooth(next / UNVEIL.clouds));
+        bank.update(timeMs, Math.max(smooth(next / UNVEIL.clouds), promise));
         const gate = this.gates.get(c);
         if (gate) {
-          gate.setRaised(backOut(clamp01((next - UNVEIL.liftFrom) / UNVEIL.lift)));
-          const sign = 1 - clamp01((next - UNVEIL.signFrom) / UNVEIL.sign);
+          const lift = backOut(clamp01((next - UNVEIL.liftFrom) / UNVEIL.lift));
+          gate.setRaised(Math.max(lift, promise));
+          const sign = (1 - clamp01((next - UNVEIL.signFrom) / UNVEIL.sign)) * (1 - promise);
           gate.sign.scale.setScalar(Math.max(0.001, sign));
           gate.sign.visible = sign > 0;
         }
       } else if (!open) {
-        bank.update(timeMs, 0);
+        bank.update(timeMs, promise);
+        const gate = this.gates.get(c);
+        if (gate) {
+          gate.setRaised(promise);
+          gate.sign.scale.setScalar(Math.max(0.001, 1 - promise));
+          gate.sign.visible = promise < 1;
+        }
       }
     });
     // Flags: open ones flutter, locked ones droop; a popping one swings up.
     this.diorama.flags.forEach((flag, i) => {
       const open = state?.levels[i] ?? true;
-      let openness = open ? 1 : 0;
+      let openness = open ? 1 : promise;
       let swell = 1;
       const t = this.pop[i];
-      if (t !== null && t !== undefined) {
+      const popping = t !== null && t !== undefined;
+      if (popping) {
         const next = t + dt;
         this.pop[i] = next >= POP.ms ? null : next;
         const share = clamp01(next / POP.ms);
-        openness = backOut(share);
-        swell = 1 + Math.sin(share * Math.PI) * 0.35;
-        this.setPadlock(i, share < 0.3 ? 1 - share / 0.3 : 0);
+        openness = Math.max(backOut(share), promise);
+        swell = 1 + Math.sin(share * Math.PI) * 0.35 * (1 - promise);
+        this.setPadlock(i, (share < 0.3 ? 1 - share / 0.3 : 0) * (1 - promise));
       }
       const wave = Math.sin((timeMs / FLAG_MOTION.flutterMs) * Math.PI * 2 + i * 1.7);
       flag.cloth.rotation.y = wave * FLAG_MOTION.flutter * Math.max(0, openness);
       flag.cloth.rotation.z = FLAG_MOTION.droop * (1 - openness);
       flag.cloth.scale.setScalar(swell);
-      if (t !== null && t !== undefined) {
+      if (popping || !open) {
         flag.cloth.material.color
           .copy(this.grey)
           .lerp(this.paint.setHex(flag.color), clamp01(openness));
@@ -180,15 +220,19 @@ export class MapLocks {
   private applyChapters(): void {
     const state = this.shown;
     if (!state) return;
+    const promised = this.promise > 0;
     this.map.regions.forEach((region) => {
       const c = region.chapter;
       const open = state.chapters[c] ?? true;
+      // Shown at all: open, or promised behind the title (its clouds rolling in or out over it).
+      const shown = open || promised;
       const unveiling = this.unveil[c] !== null && this.unveil[c] !== undefined;
       const bank = this.clouds[c];
       if (bank && open && !unveiling) bank.mesh.visible = false;
       if (bank && !open) {
         this.unveil[c] = null;
-        bank.update(0, 0);
+        bank.mesh.visible = this.promise < 1;
+        bank.update(0, smooth(this.promise));
       }
       const gate = this.gates.get(c);
       if (gate && !unveiling) {
@@ -197,14 +241,14 @@ export class MapLocks {
         gate.sign.scale.setScalar(1);
       }
       // A gate stands just before its chapter, on the land of the one before: under that one's clouds while it is locked.
-      if (gate) gate.root.visible = state.chapters[c - 1] ?? true;
+      if (gate) gate.root.visible = (state.chapters[c - 1] ?? true) || promised;
       const group = this.city.chapters[c];
-      if (group) group.visible = open;
+      if (group) group.visible = shown;
       const stand = this.diorama.stands[c];
-      if (stand) stand.visible = open;
+      if (stand) stand.visible = shown;
     });
     this.diorama.flags.forEach((flag, i) => {
-      const visible = state.chapters[flag.chapter] ?? true;
+      const visible = (state.chapters[flag.chapter] ?? true) || promised;
       flag.cloth.visible = visible;
       flag.label.visible = visible;
       if (this.pop[i] === null || this.pop[i] === undefined) {
@@ -222,7 +266,8 @@ export class MapLocks {
     this.diorama.flags.forEach((flag, i) => {
       const shown = state.chapters[flag.chapter] ?? true;
       const popping = this.pop[i] !== null && this.pop[i] !== undefined;
-      this.setPadlock(i, shown && (!state.levels[i] || popping) ? 1 : 0);
+      const padlock = 1 - smooth(this.promise);
+      this.setPadlock(i, shown && (!state.levels[i] || popping) ? padlock : 0);
       const stars = shown && state.levels[i] ? (this.starCounts[i] ?? null) : null;
       for (let k = 0; k < MAX_STARS_SHOWN; k++) {
         const at = new THREE.Vector3(
