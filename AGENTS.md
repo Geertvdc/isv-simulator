@@ -1,6 +1,6 @@
 # ISV Simulator
 
-Internal Zure game. An Overcooked-style couch co-op game about shipping software: 2 to 4 players on one screen each control a developer in a small office. Tickets arrive at the inbox; players carry them through stations (write code, test, pipeline) and ship them to the customer before the order timer runs out. Levels last about 3 minutes and end with a score and 1 to 3 stars. Chaos and shouting at each other is the point. 2D with a front-facing 3/4 view (like Overcooked), runs in the browser.
+Internal Zure game. An Overcooked-style couch co-op game about shipping software: 2 to 4 players on one screen each control a developer in a small office. Tickets arrive at the inbox; players carry them through stations (write code, test, pipeline) and ship them to the customer before the order timer runs out. Levels last about 3 minutes and end with a score and 1 to 3 stars. Chaos and shouting at each other is the point. A 3D office diorama (three.js) seen from a fixed camera at the front, like Overcooked, runs in the browser.
 
 ## Stack
 
@@ -45,14 +45,14 @@ docs/plan/   phase specs
 - Tests sit next to code: `foo.ts` + `foo.test.ts`.
 - Every sim feature gets tests. A phase is done only when `npm run check` (typecheck, lint, test) passes and the manual checks in the phase file work.
 - Small commits per step.
-- Placeholder graphics are procedural (Phaser Graphics) until the art pass. Every asset pack is listed in `CREDITS.md` with its license.
+- 3D models, characters and set pieces are built in code in `src/render/three/`; billboards over the world (ticket cards, progress bars, badges) are Phaser Graphics in `src/render/billboards.ts`. Every outside asset is listed in `CREDITS.md` with its license.
 
 ## Skills
 
 Reusable agent workflows live in `.agents/skills/<name>/SKILL.md` (the cross-agent location read by Codex, GitHub Copilot and OpenCode). `.claude/skills` is a symlink to it for Claude Code. Add new skills there, not in a tool-specific folder.
 
 - `ship`: open a PR, wait for CI, rebase-merge into main, pull main.
-- `screenshots`: retake the docs screenshots (2D, 3D or both), check them and commit them.
+- `screenshots`: retake the docs screenshots, check them and commit them.
 
 ## Working on phases
 

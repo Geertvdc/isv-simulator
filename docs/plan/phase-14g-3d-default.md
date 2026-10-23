@@ -48,14 +48,14 @@ Roughly 2,000 lines of render code, 27 sprite PNGs and one dev page go away.
 
 ## Done when
 
-- [ ] `npm run dev` opens the game in 3D with no query string; `?render=2d` and `?render=3d` both just open the game
-- [ ] No file in `src/` imports a deleted module, and `src/render/` has no 2D drawing code left outside `billboards.ts`
-- [ ] Every level, mechanic scene and screen still plays and reads the same as `?render=3d` did before this phase (screenshots match)
-- [ ] Hover tile in debug mode, screen shake, hints and the meeting invite still work
-- [ ] Settings has a Graphics line, and the choice is kept after a reload
-- [ ] A browser without WebGL shows the message instead of a blank page
-- [ ] `docs/game` shows only 3D pictures; `CREDITS.md` lists nothing that is no longer shipped
-- [ ] `npm run check` and `verify:online` pass
+- [x] `npm run dev` opens the game in 3D with no query string; `?render=2d` and `?render=3d` both just open the game
+- [x] No file in `src/` imports a deleted module, and `src/render/` has no 2D drawing code left outside `billboards.ts`
+- [x] Every level, mechanic scene and screen still plays and reads the same as `?render=3d` did before this phase (screenshots match)
+- [x] Hover tile in debug mode, screen shake, hints and the meeting invite still work
+- [x] Settings has a Graphics line, and the choice is kept after a reload
+- [x] A browser without WebGL shows the message instead of a blank page
+- [x] `docs/game` shows only 3D pictures; `CREDITS.md` lists nothing that is no longer shipped
+- [x] `npm run check` and `verify:online` pass
 
 ## Out of scope
 

@@ -252,7 +252,8 @@ const SHOTS: Record<string, Shot> = {
     await page.key('Enter'); // wake the title
     for (let i = 0; i < 3; i++) await page.key('ArrowDown');
     await page.key('Enter'); // Settings
-    for (let i = 0; i < 3; i++) await page.key('ArrowDown');
+    // Sound volume, Music volume, Screen shake, Graphics, Online profile.
+    for (let i = 0; i < 4; i++) await page.key('ArrowDown');
     await page.key('Enter'); // Online profile
     await sleep(400);
     await page.shot('screens/profile');

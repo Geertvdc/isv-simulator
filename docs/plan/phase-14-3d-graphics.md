@@ -89,7 +89,7 @@ Overcooked-style developers have no legs or rig to animate, which is why they're
 - [ ] Each player is easy to tell apart, and you can see at a glance who carries what and what a ticket still needs
 - [ ] 60 fps with 4 players on a laptop iGPU at 1080p on High, or it drops to Low by itself
 - [ ] Gameplay, HUD, online play and saves are unchanged (`npm run check` and `verify:online` pass)
-- [ ] `?render=2d` still works until 14g decides otherwise
+- [x] `?render=2d` still works until 14g decides otherwise (14g deleted 2D, see [phase 14g](phase-14g-3d-default.md))
 - [ ] `CREDITS.md` lists every outside model with its source and license
 
 ## Out of scope
