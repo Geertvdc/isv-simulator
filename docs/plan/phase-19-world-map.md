@@ -48,7 +48,7 @@ Each step is built by one agent and then checked by a separate critic agent (typ
 
 - [ ] The level select is a 3D map; arrows, WASD and the stick drive the van between levels, Enter plays
 - [ ] The map tells the startup-to-enterprise story from left to right
-- [ ] Locked chapters and levels read as locked, with what opens them
+- [x] Locked chapters and levels read as locked, with what opens them
 - [ ] The title screen is 3D and says OverEngineered
 - [ ] Online: the host drives, guests see the van move
 - [ ] `npm run check` and `npm run build` pass; screenshots retaken
