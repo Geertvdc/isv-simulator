@@ -23,6 +23,7 @@ The game started as a Theme Hospital-style management sim and pivoted to Overcoo
 | 16 Level shapes (planned)                    | Any outline, gaps you throw across, conveyor belts                                    |
 | 17 Dev mechanics (planned)                   | Design at the whiteboard, front end + back end merge, pair programming                |
 | 18 Big Tech chapter (planned)                | Four new levels built on 16 and 17; see [the overview](phase-15-18-overview.md)       |
+| 19 World map (in progress)                   | 3D Overcooked-style level select and title, startup to enterprise; stacked PRs        |
 
 ## How to feed a phase to Claude Code
 
