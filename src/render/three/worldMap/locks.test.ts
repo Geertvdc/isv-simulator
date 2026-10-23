@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createFlow } from '../../../flow/flow';
 import { createSave } from '../../../flow/save';
 import { buildWorldMap } from '../../../flow/worldMap';
-import { STARS_TO_UNLOCK } from '../../../sim/balance';
+import { CHAPTER_STAR_GATES, STARS_TO_UNLOCK } from '../../../sim/balance';
 import { menuViewOf } from '../../menuView';
 import { BACKLOT } from './cityPlan';
 import {
@@ -126,13 +126,21 @@ describe('vanStop', () => {
 });
 
 describe('cloudPuffs', () => {
-  it('covers its region without reaching into a neighbour', () => {
+  it('may spill into the next chapter: star gates grow, so it is locked whenever this one is', () => {
+    CHAPTER_STAR_GATES.forEach((gate, i) => {
+      expect(gate).toBeGreaterThanOrEqual(CHAPTER_STAR_GATES[i - 1] ?? 0);
+    });
+  });
+
+  it('covers its region without reaching into the chapter before', () => {
     for (const region of MAP.regions) {
       const puffs = cloudPuffs(region, BACKLOT);
       expect(puffs.length).toBeGreaterThan(10);
       for (const p of puffs) {
         expect(p.x - p.r - CLOUDS.drift).toBeGreaterThanOrEqual(region.x - 1e-9);
-        expect(p.x + p.r + CLOUDS.drift).toBeLessThanOrEqual(region.x + region.width + 1e-9);
+        expect(p.x + p.r + CLOUDS.drift).toBeLessThanOrEqual(
+          region.x + region.width + CLOUDS.seam + 1e-9,
+        );
         expect(p.z).toBeGreaterThan(0);
       }
       // From the back lot to the front shore.

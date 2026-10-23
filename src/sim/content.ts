@@ -244,6 +244,11 @@ export function chapterGateHint(needed: number, have: number): string {
   return `Needs ${needed} ★ · you have ${have}`;
 }
 
+/** The sign on a locked chapter's road barrier, on the world map: the stars it takes. */
+export function gateSign(needed: number): string {
+  return `★ ${needed}`;
+}
+
 /** Shown on the results when the round opened a new chapter. */
 export const CHAPTER_UNLOCKED_TEXT = 'Chapter unlocked!';
 

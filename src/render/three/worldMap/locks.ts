@@ -111,21 +111,33 @@ export interface Puff {
   phase: number;
 }
 
+interface Layer {
+  step: number;
+  r: readonly [number, number];
+  z: readonly [number, number];
+}
+
 /** The cloud bank: puffs on a grid, a low layer that hides the ground and a puffy top. */
 export const CLOUDS = {
-  low: { step: 1.35, r: [1.05, 1.35], z: [0.55, 0.95] },
-  top: { step: 2.3, r: [1.15, 1.6], z: [1.35, 1.8] },
-  squash: 0.62,
+  low: { step: 1.45, r: [0.95, 1.5], z: [0.5, 0.9] } as Layer,
+  top: { step: 2.6, r: [1.3, 1.95], z: [1.3, 1.85] } as Layer,
+  squash: 0.58,
   /** How far past the island's back and front edges the bank reaches. */
   overhang: 1,
   /** How far a puff drifts to and fro: they stay this far in from the region's sides. */
   drift: 0.15,
+  /** How far a bank reaches over its right edge, into the next (locked) chapter. */
+  seam: 0.9,
 };
 
 /**
  * The puffs over `region` (whose land reaches `back` tiles behind the
- * map's top row): never wider than the region, so they never hide a
- * neighbouring chapter's land. Deterministic per region.
+ * map's top row). They never reach left of the region, so the chapter
+ * before (open whenever this one shows its gate) stays in view, up to the
+ * gate. They do reach `CLOUDS.seam` into the next chapter, so two locked
+ * chapters' banks meet without a gap: star gates only grow from chapter to
+ * chapter, so the next one is locked whenever this one is. Deterministic
+ * per region.
  */
 export function cloudPuffs(region: MapRegion, back: number): Puff[] {
   const random = seeded(region.chapter + 101);
@@ -135,26 +147,29 @@ export function cloudPuffs(region: MapRegion, back: number): Puff[] {
   for (const layer of [CLOUDS.low, CLOUDS.top]) {
     const [rMin, rMax] = layer.r;
     const [zMin, zMax] = layer.z;
-    const columns = Math.max(1, Math.round((region.width - rMin * 2) / layer.step) + 1);
+    const columns = Math.max(
+      1,
+      Math.round((region.width + CLOUDS.seam - rMin * 2) / layer.step) + 1,
+    );
     const rows = Math.max(1, Math.round((bottom - top) / layer.step) + 1);
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < columns; col++) {
         const r = rMin + random() * (rMax - rMin);
         // Every other row shifts half a step, so the bank has no straight lanes.
         const shift = row % 2 === 0 ? 0 : layer.step / 2;
-        const span = region.width - (r + CLOUDS.drift) * 2;
+        const span = region.width + CLOUDS.seam - (r + CLOUDS.drift) * 2;
         const x =
           region.x +
           CLOUDS.drift +
           r +
-          Math.min(span, Math.max(0, col * layer.step + shift + (random() - 0.5) * 0.3));
-        const y = top + row * ((bottom - top) / Math.max(1, rows - 1)) + (random() - 0.5) * 0.4;
+          Math.min(span, Math.max(0, col * layer.step + shift + (random() - 0.5) * 0.7));
+        const y = top + row * ((bottom - top) / Math.max(1, rows - 1)) + (random() - 0.5) * 0.8;
         puffs.push({
           x,
           y,
           z: zMin + random() * (zMax - zMin),
           r,
-          squash: CLOUDS.squash,
+          squash: CLOUDS.squash * (0.85 + random() * 0.3),
           phase: random() * Math.PI * 2,
         });
       }
