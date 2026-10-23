@@ -1,6 +1,6 @@
 /**
- * Which way blocks on a level map are cut, shared by the 2D and 3D looks.
- * Phaser-free, so it can be tested.
+ * Which way blocks on a level map are cut: wall pieces, wall decorations,
+ * groups of stations. Phaser-free, so it can be tested.
  */
 
 import { type GridPoint, type LevelMap, type Tile, getTile } from '../sim/level';
@@ -48,7 +48,7 @@ export function firstGroup(map: LevelMap, tile: Tile): GridPoint[] {
 }
 
 /** Things hung on walls that show their front face, per theme. */
-export const WALL_DECOS: Readonly<Record<WallTheme, readonly string[]>> = {
+const WALL_DECOS: Readonly<Record<WallTheme, readonly string[]>> = {
   plaster: ['poster', 'whiteboard', 'clock', 'kanban', 'dashboard', 'plants'],
   wood: ['poster', 'whiteboard', 'clock', 'kanban', 'dashboard', 'plants'],
   glass: ['whiteboard', 'clock', 'dashboard'],

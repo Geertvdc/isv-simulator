@@ -20,9 +20,8 @@ export interface RoundFrame {
 
 /**
  * What `GameScene` asks of the thing that draws the level and the round on
- * it: the 2D Phaser renderers (`PhaserRoundRenderer`) or the 3D one
- * (`?render=3d`, `src/render/three/`). One is made per scene start, for one
- * level map, and destroyed when the scene shuts down.
+ * it (`src/render/three/`). One is made per scene start, for one level map,
+ * and destroyed when the scene shuts down.
  */
 export interface RoundRenderer {
   /** Draws the round from `frame`: players, tickets, stations, effects, hints, target highlights. */

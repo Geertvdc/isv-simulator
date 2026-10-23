@@ -15,7 +15,7 @@ import { playerColor } from './playerColors';
 
 /** Placeholder ticket cards until the art pass. */
 const CARD_MIN_WIDTH = 34;
-export const CARD_HEIGHT = 24;
+const CARD_HEIGHT = 24;
 const CARD_COLOR: Readonly<Record<TicketKind, number>> = {
   feature: 0xf4f1e8,
   bug: 0xf6c4bd,
@@ -46,8 +46,8 @@ const STEP_STATION: Readonly<Record<StepKind, BlockTile>> = {
 };
 
 const BAR_WIDTH = 44;
-export const BAR_HEIGHT = 7;
-export const BAR_GAP = 6;
+const BAR_HEIGHT = 7;
+const BAR_GAP = 6;
 const BAR_BACK_COLOR = 0x1a1d24;
 const BAR_FILL_COLOR = 0x7cf07c;
 

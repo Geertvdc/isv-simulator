@@ -39,8 +39,7 @@ interface Person {
 }
 
 /**
- * The developers and managers in the 3D world, keyed by id like the 2D
- * renderers: placed where the view says, turned smoothly, and posed from
+ * The developers and managers in the 3D world, keyed by id: placed where the view says, turned smoothly, and posed from
  * what they're doing (walking, carrying, working, dashing, winding up a
  * throw, stumbling after a shove).
  */

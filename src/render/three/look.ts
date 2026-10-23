@@ -19,7 +19,7 @@ export const PALETTE = {
   /** Counter tops (light laminate) over darker fronts. */
   counterTop: 0xf0e6d2,
   counterFront: 0x8a6448,
-  /** Every station keeps the color players learned in 2D. */
+  /** Every station keeps its signature color (`tileColor`), which the HUD recipes use too. */
   station: {
     inbox: 0x4fa3e0,
     bugQueue: 0xe05a5a,

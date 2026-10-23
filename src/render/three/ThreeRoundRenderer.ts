@@ -32,8 +32,8 @@ import { type Stage, disposeTree, getStage } from './stage';
 const HOVER_COLOR = 0xffffff;
 /**
  * The top band the 3D camera keeps free, as a share of the height. Less than
- * 2D's `CAMERA_HUD_TOP`: the order cards only cover the left of that band,
- * and the back wall may reach under it.
+ * the order cards' band: they only cover the left of it, and the back wall
+ * may reach under it.
  */
 const HUD_TOP_3D = 0.1;
 /** How far down the HUD's order cards reach, as a share of the height. */
@@ -42,10 +42,9 @@ const HUD_ORDERS_BAND = 0.135;
 const OVERLAY_TALL = 52;
 
 /**
- * The 3D look (`?render=3d`): the level and round drawn with three.js on the
- * stage canvas under Phaser's. Phaser keeps the scene, the loop, sound and
- * the fade; this syncs three.js objects keyed by entity id, like the 2D
- * renderers do with Phaser objects.
+ * The level and round drawn with three.js on the stage canvas under
+ * Phaser's. Phaser keeps the scene, the loop, sound and the fade; this syncs
+ * three.js objects keyed by entity id.
  */
 export class ThreeRoundRenderer implements RoundRenderer {
   private readonly stage: Stage;
@@ -221,7 +220,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
     this.pose = this.fit();
   };
 
-  /** Frames the level between the HUD bands, like the 2D camera. */
+  /** Frames the level between the HUD bands. */
   private fit(): CameraPose {
     const { width, height } = this.scene.scale;
     return fitCamera3d(
@@ -314,7 +313,7 @@ function putAt(obj: THREE.Object3D, p: Vec3): void {
   obj.position.set(p.x, p.y, p.z);
 }
 
-/** The `?render=3d` factory. */
+/** The `RoundRendererFactory` `main.ts` hands to `GameScene`. */
 export function createThreeRoundRenderer(
   scene: Phaser.Scene,
   map: LevelMap,
