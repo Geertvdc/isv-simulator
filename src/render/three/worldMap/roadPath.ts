@@ -113,8 +113,6 @@ export interface Drive {
 /** Closer than this to its target and slower than `STOP_SPEED`, the van is parked. */
 const STOP_DISTANCE = 0.002;
 const STOP_SPEED = 0.05;
-/** Reaching the target this slow (tiles a second) or slower, the van just stops there. */
-const ARRIVE_SPEED = 1.5;
 
 /**
  * The drive `deltaMs` later, heading for `target`: it speeds up at
@@ -146,8 +144,9 @@ export function stepDrive(
     const change = want - speed;
     speed += Math.sign(change) * Math.min(Math.abs(change), accel * h);
     const next = distance + speed * h;
-    // Arriving at a crawl is parking; only a sudden new target can be overshot.
-    if ((target - distance) * (target - next) <= 0 && Math.abs(speed) <= ARRIVE_SPEED) {
+    // Never drive past the target: reaching it is parking. (Braking keeps the speed
+    // there low; only a new target just ahead of a fast van stops it short.)
+    if ((target - distance) * (target - next) <= 0) {
       return { distance: target, speed: 0 };
     }
     distance = next;

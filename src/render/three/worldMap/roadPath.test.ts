@@ -118,6 +118,34 @@ describe('stepDrive', () => {
     expect(rushed.distance).toBeGreaterThan(calm.distance * 1.5);
   });
 
+  it('never backs up or passes the target at jittery frame times', () => {
+    let seed = 12345;
+    const jitter = (): number => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return 4 + (seed / 2147483648) * 30;
+    };
+    const tuning = { ...TUNING, hurryGap: 12 };
+    const nodes = PATH.nodeDistances;
+    for (const frame of [jitter, () => 1000 / 120, () => 1000 / 60, () => 1000 / 30]) {
+      for (let i = 0; i + 1 < nodes.length; i++) {
+        for (const [from, to] of [
+          [nodes[i], nodes[i + 1]],
+          [nodes[i + 1], nodes[i]],
+        ]) {
+          if (from === undefined || to === undefined) throw new Error('no node');
+          const dir = Math.sign(to - from);
+          let d: Drive = { distance: from, speed: 0 };
+          for (let k = 0; k < 600 && !(d.distance === to && d.speed === 0); k++) {
+            d = stepDrive(d, to, frame(), tuning);
+            expect(d.speed * dir).toBeGreaterThanOrEqual(0);
+            expect((to - d.distance) * dir).toBeGreaterThanOrEqual(0);
+          }
+          expect(d).toEqual({ distance: to, speed: 0 });
+        }
+      }
+    }
+  });
+
   it('stays parked when already there', () => {
     expect(stepDrive({ distance: 3, speed: 0 }, 3, 16, TUNING)).toEqual({ distance: 3, speed: 0 });
   });
