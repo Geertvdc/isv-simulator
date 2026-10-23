@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import type { MapPoint, WorldMap } from '../../../flow/worldMap';
+import type { WorldMap } from '../../../flow/worldMap';
 import { tileHash } from '../../mapShape';
 import { type Vec3, gridToWorld } from '../../projection';
 import { type KitMaterials, ModelBuilder } from '../kit';
 import { MAP_PALETTE, matte } from '../look';
+import { BACKLOT, type GroundKind, type GroundTile } from './cityPlan';
+import { LABEL, markerSpots } from './markers';
 
 /**
  * The world map diorama, built in code: an island of square land tiles
@@ -30,6 +32,8 @@ const SEA_SIZE = 400;
 const SHADE_JITTER = 0.07;
 /** Shallow water round the coast: a lighter band this many tiles wide. */
 const SHALLOWS = 1.6;
+/** Over how many tiles before a chapter border the grass turns toward the next chapter's. */
+const GRASS_BLEND = 1.5;
 
 /** The road: a light edge under the asphalt, the dashes on top, a round stop at each flag. */
 const ROAD = {
@@ -49,24 +53,9 @@ export const ROAD_SURFACE = ROAD.y + 0.01;
 
 /** Level flags: a plate, a pole with a gold ball and a cloth in the chapter's color. */
 const FLAG = {
-  /**
-   * How far beside the road (on the outside of its bend) the flag stands,
-   * clear of the van parked on the stop: further on the far side, where the
-   * van's cab and box stand up in front of the flag's foot.
-   */
-  aside: { near: 1.05, far: 1.35 },
   plate: 0.3,
   pole: 1.45,
   cloth: { width: 0.62, height: 0.4, depth: 0.04 },
-};
-/** The level number lying on the ground, by the flag. */
-const LABEL = {
-  aside: 0.8,
-  /** Left of a flag on the far side of the road, and a little nearer the camera. */
-  beside: 1.05,
-  lift: 0.2,
-  width: 1.4,
-  height: 0.7,
 };
 
 export interface Diorama {
@@ -75,36 +64,36 @@ export interface Diorama {
   flags: { cloth: THREE.Mesh; foot: Vec3 }[];
 }
 
-/** Builds the diorama for `map`; `chapterIds` names each region's chapter (for its colors). */
+/** Builds the diorama for `map`; `chapterIds` names each region's chapter (for its colors), `ground` paves its tiles. */
 export function buildDiorama(
   map: WorldMap,
   chapterIds: readonly string[],
+  ground: readonly GroundTile[],
   materials: KitMaterials,
 ): Diorama {
   const root = new THREE.Group();
-  root.add(...terrain(map, chapterIds), sea(), shallows(map), road(map, materials));
+  root.add(...terrain(map, chapterIds, ground), sea(), shallows(map), road(map, materials));
   const flags: Diorama['flags'] = [];
-  map.nodes.forEach((node, i) => {
-    const out = outside(map, i);
-    const ahead = out.y >= 0;
-    const aside = ahead ? FLAG.aside.near : FLAG.aside.far;
-    const foot = gridToWorld(node.x + out.x * aside, node.y + out.y * aside, ROAD.y);
+  // Every flag's stand in one mesh; the cloths wave one by one.
+  const stands = new ModelBuilder();
+  markerSpots(map).forEach((marker, i) => {
+    const foot = gridToWorld(marker.foot.x, marker.foot.y, ROAD.y);
     const chapterId = chapterIds[map.nodeChapters[i] ?? -1] ?? '';
-    const flag = flagModel(chapterId, materials);
-    flag.group.position.set(foot.x, foot.y, foot.z);
-    root.add(flag.group);
-    flags.push({ cloth: flag.cloth, foot });
+    flagStand(stands, foot);
+    const cloth = flagCloth(chapterId);
+    cloth.position.x += foot.x;
+    cloth.position.y += foot.y;
+    cloth.position.z += foot.z;
+    root.add(cloth);
+    flags.push({ cloth, foot });
     const label = labelMesh(levelNumber(map, i));
-    // In front of the flag on the near side of the road; where the flag stands on the far
-    // side, the number goes beside it instead, so the flag doesn't hide it.
-    const at = gridToWorld(
-      node.x + out.x * aside + (ahead ? out.x * LABEL.aside : -LABEL.beside),
-      node.y + out.y * aside + (ahead ? out.y * LABEL.aside : LABEL.lift),
-      ROAD.y - 0.02,
-    );
+    const at = gridToWorld(marker.label.x, marker.label.y, ROAD.y - 0.02);
     label.position.set(at.x, at.y, at.z);
     root.add(label);
   });
+  const standMesh = new THREE.Mesh(stands.build().body, materials.body);
+  standMesh.castShadow = true;
+  root.add(standMesh);
   return { root, flags };
 }
 
@@ -125,36 +114,38 @@ function hash01(x: number, y: number, salt = 0): number {
   return (h >>> 0) / 4294967296;
 }
 
-/** The land tiles (grass caps over dirt columns) and the ragged sandy shore round them. */
-function terrain(map: WorldMap, chapterIds: readonly string[]): THREE.Object3D[] {
+/** The land tiles (grass or paving caps over dirt columns) and the ragged sandy shore round them. */
+function terrain(
+  map: WorldMap,
+  chapterIds: readonly string[],
+  ground: readonly GroundTile[],
+): THREE.Object3D[] {
   interface Tile {
     x: number;
     y: number;
     top: number;
     color: number;
-    /** Under the cap: dirt on the island's sides, a darker grass in the seams inside. */
+    /** Under the cap: dirt on the island's sides, a darker shade in the seams inside. */
     seam: number;
   }
-  const tiles: Tile[] = [];
-  for (const region of map.regions) {
-    const base = MAP_PALETTE.ground[chapterIds[region.chapter] ?? ''] ?? MAP_PALETTE.groundFallback;
-    for (let y = region.y; y < region.y + region.height; y++) {
-      for (let x = region.x; x < region.x + region.width; x++) {
-        const shade = (hash01(x, y, 1) * 2 - 1) * SHADE_JITTER;
-        tiles.push({
-          x,
-          y,
-          top: GROUND_TOP + hash01(x, y, 2) * GROUND_JITTER,
-          color: shadeColor(base, shade),
-          seam: shadeColor(base, -0.35),
-        });
-      }
-    }
-  }
+  const top = -BACKLOT;
+  const tiles: Tile[] = ground.map(({ x, y, kind, chapter }) => {
+    const paved = kind !== 'grass' && kind !== 'lawn';
+    const base = groundColor(map, chapterIds, x, y, kind, chapter);
+    const shade = (hash01(x, y, 1) * 2 - 1) * (paved ? SHADE_JITTER * 0.4 : SHADE_JITTER);
+    const color = shadeColor(base, shade);
+    return {
+      x,
+      y,
+      top: GROUND_TOP + hash01(x, y, 2) * (paved ? GROUND_JITTER * 0.3 : GROUND_JITTER),
+      color,
+      seam: shadeColor(base, paved ? -0.12 : -0.35),
+    };
+  });
   // The shore: a ring of lower sand tiles, some missing, so the coast isn't a straight line.
-  for (let y = -1; y <= map.height; y++) {
+  for (let y = top - 1; y <= map.height; y++) {
     for (let x = -1; x <= map.width; x++) {
-      const ring = x === -1 || y === -1 || x === map.width || y === map.height;
+      const ring = x === -1 || y === top - 1 || x === map.width || y === map.height;
       if (!ring || hash01(x, y, 3) > SHORE_KEEP) continue;
       const shade = (hash01(x, y, 4) * 2 - 1) * SHADE_JITTER;
       tiles.push({
@@ -183,12 +174,41 @@ function terrain(map: WorldMap, chapterIds: readonly string[]): THREE.Object3D[]
     caps.setColorAt(i, color.setHex(tile.color));
     m.makeTranslation(p.x, p.y - CAP.height * 0.6, p.z);
     earth.setMatrixAt(i, m);
-    const edge = tile.x <= 0 || tile.y <= 0 || tile.x >= map.width - 1 || tile.y >= map.height - 1;
+    const edge =
+      tile.x <= 0 || tile.y <= top || tile.x >= map.width - 1 || tile.y >= map.height - 1;
     earth.setColorAt(i, color.setHex(edge ? MAP_PALETTE.earth : tile.seam));
   });
   caps.receiveShadow = true;
   earth.receiveShadow = true;
   return [caps, earth];
+}
+
+/**
+ * A ground tile's color: grass in its chapter's green (blended into the
+ * next chapter's over the last tiles before the border), a mown lawn in
+ * stripes, or paving.
+ */
+function groundColor(
+  map: WorldMap,
+  chapterIds: readonly string[],
+  x: number,
+  y: number,
+  kind: GroundKind,
+  chapter: number,
+): number {
+  if (kind === 'lawn') return x % 2 === 0 ? MAP_PALETTE.lawn : MAP_PALETTE.lawnStripe;
+  if (kind !== 'grass') return MAP_PALETTE.paving[kind];
+  const grass = (c: number): number =>
+    MAP_PALETTE.ground[chapterIds[c] ?? ''] ?? MAP_PALETTE.groundFallback;
+  const region = map.regions[chapter];
+  const next = map.regions[chapter + 1];
+  const here = new THREE.Color(grass(chapter));
+  if (!region || !next) return here.getHex();
+  const fromEnd = region.x + region.width - (x + 0.5);
+  const share = Math.max(0, (GRASS_BLEND - fromEnd) / (GRASS_BLEND * 2));
+  // Rows vary where the blend starts, so the border is ragged.
+  const ragged = hash01(x, y, 5) < 0.5 ? share : share * 0.6;
+  return here.lerp(new THREE.Color(grass(chapter + 1)), ragged).getHex();
 }
 
 /** `color` made lighter (positive `amount`) or darker. */
@@ -213,12 +233,12 @@ function sea(): THREE.Mesh {
 /** A lighter band of shallow water round the island, so the coast doesn't stand on a flat sea. */
 function shallows(map: WorldMap): THREE.Mesh {
   const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(map.width + SHALLOWS * 2, map.height + SHALLOWS * 2).rotateX(
+    new THREE.PlaneGeometry(map.width + SHALLOWS * 2, map.height + BACKLOT + SHALLOWS * 2).rotateX(
       -Math.PI / 2,
     ),
     matte(MAP_PALETTE.shallows, 0.5),
   );
-  const center = gridToWorld(map.width / 2, map.height / 2, SEA_LEVEL + 0.01);
+  const center = gridToWorld(map.width / 2, (map.height - BACKLOT) / 2, SEA_LEVEL + 0.01);
   mesh.position.set(center.x, center.y, center.z);
   mesh.receiveShadow = true;
   return mesh;
@@ -304,40 +324,16 @@ function disc(radius: number): THREE.BufferGeometry {
   return new THREE.CircleGeometry(radius, 28).rotateX(-Math.PI / 2);
 }
 
-/**
- * The side of the road a flag stands on at node `index`: away from the bend
- * (where the road goes on from it), so flag and number stay clear of the road.
- * A unit map direction.
- */
-function outside(map: WorldMap, index: number): MapPoint {
-  const w = map.nodeWaypoints[index] ?? 0;
-  const here = map.road[w] ?? { x: 0, y: 0 };
-  const before = map.road[Math.max(0, w - 3)] ?? here;
-  const after = map.road[Math.min(map.road.length - 1, w + 3)] ?? here;
-  const tx = after.x - before.x;
-  const ty = after.y - before.y;
-  const len = Math.hypot(tx, ty) || 1;
-  const n = { x: -ty / len, y: tx / len };
-  // Where the road bends to: both neighbours' pull from the flag.
-  const inward =
-    (before.x - here.x + after.x - here.x) * n.x + (before.y - here.y + after.y - here.y) * n.y;
-  const sign = Math.abs(inward) > 0.05 ? -Math.sign(inward) : n.y >= 0 ? 1 : -1;
-  return { x: n.x * sign, y: n.y * sign };
+/** A flag's plate, pole and gold ball, standing at `foot`. */
+function flagStand(b: ModelBuilder, foot: Vec3): void {
+  const { x, y, z } = foot;
+  b.cylinder(FLAG.plate, FLAG.plate + 0.04, 0.08, MAP_PALETTE.plate, { at: [x, y + 0.04, z] }, 24)
+    .cylinder(0.035, 0.035, FLAG.pole, MAP_PALETTE.pole, { at: [x, y + FLAG.pole / 2, z] }, 10)
+    .sphere(0.08, MAP_PALETTE.finial, { at: [x, y + FLAG.pole + 0.05, z] });
 }
 
-/** One level's flag, standing at its group's origin. */
-function flagModel(
-  chapterId: string,
-  materials: KitMaterials,
-): { group: THREE.Group; cloth: THREE.Mesh } {
-  const group = new THREE.Group();
-  const stand = new ModelBuilder()
-    .cylinder(FLAG.plate, FLAG.plate + 0.04, 0.08, MAP_PALETTE.plate, { at: [0, 0.04, 0] }, 24)
-    .cylinder(0.035, 0.035, FLAG.pole, MAP_PALETTE.pole, { at: [0, FLAG.pole / 2, 0] }, 10)
-    .sphere(0.08, MAP_PALETTE.finial, { at: [0, FLAG.pole + 0.05, 0] })
-    .build();
-  const standMesh = new THREE.Mesh(stand.body, materials.body);
-  standMesh.castShadow = true;
+/** A flag's cloth in its chapter's color, hinged at the pole of a flag standing at the origin. */
+function flagCloth(chapterId: string): THREE.Mesh {
   const { width, height, depth } = FLAG.cloth;
   const clothGeometry = new THREE.BoxGeometry(width, height, depth);
   // Hinged at the pole.
@@ -348,8 +344,7 @@ function flagModel(
   );
   cloth.position.set(0.03, FLAG.pole - height / 2 - 0.04, 0);
   cloth.castShadow = true;
-  group.add(standMesh, cloth);
-  return { group, cloth };
+  return cloth;
 }
 
 /** The level number, big and white with a soft shadow, as a plane lying on the ground. */
