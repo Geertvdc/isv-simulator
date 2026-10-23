@@ -10,7 +10,7 @@ An Overcooked-style couch co-op game about shipping software. 2 to 4 players sha
 | ---------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | [Stations](stations.md)            | Every tile you can walk up to: inbox, bug queue, keyboard, review, test bench, pipeline, ship, bin, counter |
 | [Tickets and events](mechanics.md) | Features, reviews, bugs, hotfixes, the pipeline breaking, throwing, the manager, meetings, scoring          |
-| [Levels](levels.md)                | All 12 levels in 4 chapters: layout, map, what's new, star targets                                          |
+| [Levels](levels.md)                | All 16 levels in 5 chapters: layout, map, what's new, star targets                                          |
 | This page                          | How a round works, controls, and every screen from title to results                                         |
 
 ## How a round works
@@ -42,7 +42,7 @@ Anywhere: **M** or the speaker button in the top right turns all sound off and o
 
 ### Title
 
-The title waits for any button. After that it shows the main menu: Play (couch play on this machine), Host online, Join online, Settings and Credits.
+The title screen says **OverEngineered** (the game's new name; only the title screen uses it so far) over the world map, which drifts slowly behind it with every chapter in view: the garage on the left, the city on the right, the journey ahead. It waits for any button. After that it shows the main menu: Play (couch play on this machine), Host online, Join online, Settings and Credits. Every menu is a paper card over the dimmed map; going on to the lobby, the camera swoops down and the clouds roll back in over the chapters you haven't opened yet.
 
 |                                            |                                               |
 | ------------------------------------------ | --------------------------------------------- |
@@ -89,9 +89,17 @@ For trying it out: `ROUND_SECONDS=30 npm run dev:online` makes every online roun
 
 ### Level select
 
-Four chapters side by side. Left/right picks a chapter, up/down a level. A level opens once the level before it has at least 1 star; a chapter opens once you have enough stars in total (4, 9 and 13). Each card shows your best stars and score.
+The level select is a 3D map of the campaign: startup to enterprise, left to right. A road runs from a garage in a small town, past the startup offices and a growing downtown, to the enterprise towers and the Big Tech campus. Every level is a numbered flag beside the road (1-1, 1-2, …) and a moving van drives to the selected one; the camera follows it. Arrows, WASD or the stick drive the van along the road to the next or previous flag; Enter, E or gamepad A plays that level, Esc or B goes back to the lobby.
 
-![Level select on a fresh save](images/screens/level-select.webp)
+The card in a top corner shows the selected level's name, blurb and your best stars and score; the banner top left names the chapter and its new trick, and the star counter top right adds up your best stars. Played flags carry their stars.
+
+A level opens once the level before it has at least 1 star; a chapter opens once you have enough stars in total (4, 9, 13 and 18). Locked chapters lie under clouds, with a striped barrier and a sign with the stars it needs where the road enters them; a locked flag is grey with a padlock, and the card says what opens it. When something opens, the next time you see the map the clouds roll away or the padlock drops off.
+
+|                                                                   |                                                                                                                       |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| ![Level select on a fresh save](images/screens/level-select.webp) | ![Further into the campaign: stars on the flags, the Enterprise still under clouds](images/screens/map-campaign.webp) |
+
+On a fresh save (left) only The Garage is open and everything past it is under clouds. Further in (right), the flags behind the van carry their stars, the Scale-Up is open, and the sign at the Enterprise's barrier asks for 13 stars.
 
 ### Level intro card
 
