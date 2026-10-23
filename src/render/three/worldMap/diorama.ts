@@ -44,18 +44,24 @@ const ROAD = {
   /** Space between road samples when resampling it smooth. */
   step: 0.12,
 };
+/** The road's top, where the van's wheels stand. */
+export const ROAD_SURFACE = ROAD.y + 0.01;
 
 /** Level flags: a plate, a pole with a gold ball and a cloth in the chapter's color. */
 const FLAG = {
-  /** How far beside the road (on the outside of its bend) the flag stands. */
-  aside: 0.8,
+  /**
+   * How far beside the road (on the outside of its bend) the flag stands,
+   * clear of the van parked on the stop: further on the far side, where the
+   * van's cab and box stand up in front of the flag's foot.
+   */
+  aside: { near: 1.05, far: 1.35 },
   plate: 0.3,
   pole: 1.45,
   cloth: { width: 0.62, height: 0.4, depth: 0.04 },
 };
 /** The level number lying on the ground, by the flag. */
 const LABEL = {
-  aside: 0.9,
+  aside: 0.8,
   /** Left of a flag on the far side of the road, and a little nearer the camera. */
   beside: 1.05,
   lift: 0.2,
@@ -80,7 +86,9 @@ export function buildDiorama(
   const flags: Diorama['flags'] = [];
   map.nodes.forEach((node, i) => {
     const out = outside(map, i);
-    const foot = gridToWorld(node.x + out.x * FLAG.aside, node.y + out.y * FLAG.aside, ROAD.y);
+    const ahead = out.y >= 0;
+    const aside = ahead ? FLAG.aside.near : FLAG.aside.far;
+    const foot = gridToWorld(node.x + out.x * aside, node.y + out.y * aside, ROAD.y);
     const chapterId = chapterIds[map.nodeChapters[i] ?? -1] ?? '';
     const flag = flagModel(chapterId, materials);
     flag.group.position.set(foot.x, foot.y, foot.z);
@@ -89,10 +97,9 @@ export function buildDiorama(
     const label = labelMesh(levelNumber(map, i));
     // In front of the flag on the near side of the road; where the flag stands on the far
     // side, the number goes beside it instead, so the flag doesn't hide it.
-    const ahead = out.y >= 0;
     const at = gridToWorld(
-      node.x + out.x * FLAG.aside + (ahead ? out.x * LABEL.aside : -LABEL.beside),
-      node.y + out.y * FLAG.aside + (ahead ? out.y * LABEL.aside : LABEL.lift),
+      node.x + out.x * aside + (ahead ? out.x * LABEL.aside : -LABEL.beside),
+      node.y + out.y * aside + (ahead ? out.y * LABEL.aside : LABEL.lift),
       ROAD.y - 0.02,
     );
     label.position.set(at.x, at.y, at.z);
