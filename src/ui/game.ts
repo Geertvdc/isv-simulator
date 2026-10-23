@@ -1,5 +1,5 @@
 import type { GameFrame } from '../render/GameScene';
-import { tileColor } from '../render/MapRenderer';
+import { tileColor } from '../render/mapLook';
 import { ORDER_URGENT_TICKS } from '../sim/balance';
 import {
   INCIDENT_BANNER_TEXT,

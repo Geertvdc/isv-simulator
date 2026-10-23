@@ -7,14 +7,21 @@ import { type LevelMap, getTile } from '../../sim/level';
 import { pipelineWarning } from '../../sim/pipeline';
 import type { GameState } from '../../sim/state';
 import { type QueueKind, queuedTickets } from '../../sim/tickets';
-import { HINT_TILES, createHintMarker, hintLabelOrigin } from '../HintRenderer';
 import { firstGroup } from '../mapShape';
 import { pipelinePulse } from '../effects';
-import { drawInvite } from '../MeetingRenderer';
-import { drawBadge } from '../PipelineRenderer';
 import { TILE_SIZE, type Vec3, gridToWorld } from '../projection';
 import type { RoundView } from '../roundView';
-import { PAIRING_COLOR, drawProgressBar, drawTicketCard, isPaired } from '../TicketRenderer';
+import {
+  HINT_TILES,
+  PAIRING_COLOR,
+  createHintMarker,
+  drawBadge,
+  drawInvite,
+  drawProgressBar,
+  drawTicketCard,
+  hintLabelOrigin,
+  isPaired,
+} from '../billboards';
 import { HAT_TOP, blockHeight, placeTicket, queueAnchor } from './layout';
 
 /** Where a world point lands on the canvas and how big things drawn there are. */

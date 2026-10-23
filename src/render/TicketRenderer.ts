@@ -2,58 +2,21 @@ import Phaser from 'phaser';
 import { stationWorkStep } from '../sim/interact';
 import { PAIR_RATE, THROW_RANGE, WORK_RATE } from '../sim/balance';
 import { pairingText } from '../sim/content';
-import { type BlockTile, getTile } from '../sim/level';
+import { getTile } from '../sim/level';
 import type { GameState } from '../sim/state';
-import {
-  QUEUE_TILE,
-  type QueueKind,
-  type StepKind,
-  type Ticket,
-  type TicketKind,
-  queuedTickets,
-} from '../sim/tickets';
+import { QUEUE_TILE, type QueueKind, type Ticket, queuedTickets } from '../sim/tickets';
 import type { RoundView } from './roundView';
-import { type MapRenderer, tileColor } from './MapRenderer';
+import {
+  BAR_GAP,
+  BAR_HEIGHT,
+  CARD_HEIGHT,
+  PAIRING_COLOR,
+  drawTicketCard,
+  isPaired,
+} from './billboards';
+import type { MapRenderer } from './MapRenderer';
 import { BODY_HEIGHT, PLAYER_DEPTH_OFFSET } from './PlayerRenderer';
 import { tileDepth, tileToScreen } from './projection';
-
-/** Placeholder ticket cards until the art pass. */
-const CARD_MIN_WIDTH = 34;
-const CARD_HEIGHT = 24;
-const CARD_COLOR: Readonly<Record<TicketKind, number>> = {
-  feature: 0xf4f1e8,
-  bug: 0xf6c4bd,
-  incident: 0xff6b57,
-  frontend: 0xcfe6ff,
-  backend: 0xd3f0d0,
-  fullstack: 0xe6d9ff,
-};
-const OUTLINE_COLOR: Readonly<Record<TicketKind, number>> = {
-  feature: 0x1a1d24,
-  bug: 0xb02a2a,
-  incident: 0x5c0000,
-  frontend: 0x2a5d9a,
-  backend: 0x2f6a3a,
-  fullstack: 0x5a3a9a,
-};
-const ICON_SPACING = 11;
-const ICON_RADIUS = 4.5;
-const ICON_TODO_COLOR = 0xc9c4b5;
-/** Each step's icon takes the color of the station that does it. */
-const STEP_STATION: Readonly<Record<StepKind, BlockTile>> = {
-  design: 'whiteboard',
-  code: 'keyboard',
-  merge: 'merge',
-  review: 'review',
-  test: 'testBench',
-  pipeline: 'pipeline',
-};
-
-const BAR_WIDTH = 44;
-const BAR_HEIGHT = 7;
-const BAR_GAP = 6;
-const BAR_BACK_COLOR = 0x1a1d24;
-const BAR_FILL_COLOR = 0x7cf07c;
 
 /** Queued tickets stack up on their queue; past this many only the count grows. */
 const QUEUE_STACK_MAX = 4;
@@ -276,61 +239,4 @@ export class TicketRenderer {
       .setOrigin(0.5, 1)
       .setVisible(false);
   }
-}
-
-/** The label over a ticket being pair-programmed, and its color. */
-export const PAIRING_COLOR = '#ffd166';
-
-/** Whether two players are coding `ticket` together right now (pair programming). */
-export function isPaired(state: GameState, ticket: Ticket): boolean {
-  const loc = ticket.location;
-  return loc.kind === 'tile' && state.pairing.some((p) => p.x === loc.x && p.y === loc.y);
-}
-
-/** Draws the card with its bottom center at (0, 0), and the progress bar above it if any. */
-export function drawTicketCard(
-  g: Phaser.GameObjects.Graphics,
-  ticket: Pick<Ticket, 'kind' | 'steps'>,
-  bar: number | null,
-): void {
-  g.clear();
-  const width = Math.max(CARD_MIN_WIDTH, (ticket.steps.length + 1) * ICON_SPACING);
-  const left = -width / 2;
-  const top = -CARD_HEIGHT;
-  const outline = OUTLINE_COLOR[ticket.kind];
-  g.fillStyle(CARD_COLOR[ticket.kind]);
-  g.lineStyle(2, outline);
-  g.fillRoundedRect(left, top, width, CARD_HEIGHT, 3);
-  g.strokeRoundedRect(left, top, width, CARD_HEIGHT, 3);
-  // Two "text" lines on the card.
-  g.fillStyle(ICON_TODO_COLOR);
-  g.fillRect(left + 5, top + 4, width - 10, 2);
-  g.fillRect(left + 5, top + 8, width - 16, 2);
-
-  const spacing = width / (ticket.steps.length + 1);
-  ticket.steps.forEach((step, i) => {
-    const x = left + spacing * (i + 1);
-    const y = -ICON_RADIUS - 3;
-    const done = step.progress >= 1;
-    g.fillStyle(done ? tileColor(STEP_STATION[step.kind]) : ICON_TODO_COLOR);
-    g.fillCircle(x, y, ICON_RADIUS);
-    g.lineStyle(1.5, done ? outline : tileColor(STEP_STATION[step.kind]));
-    g.strokeCircle(x, y, ICON_RADIUS);
-  });
-
-  if (bar !== null) drawProgressBar(g, 0, top - BAR_GAP - BAR_HEIGHT, bar);
-}
-
-/** A work progress bar centered on `x` with its top at `top`; `share` is 0 to 1. */
-export function drawProgressBar(
-  g: Phaser.GameObjects.Graphics,
-  x: number,
-  top: number,
-  share: number,
-): void {
-  const left = x - BAR_WIDTH / 2;
-  g.fillStyle(BAR_BACK_COLOR);
-  g.fillRect(left - 1, top - 1, BAR_WIDTH + 2, BAR_HEIGHT + 2);
-  g.fillStyle(BAR_FILL_COLOR);
-  g.fillRect(left, top, BAR_WIDTH * share, BAR_HEIGHT);
 }

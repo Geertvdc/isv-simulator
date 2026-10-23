@@ -1,6 +1,6 @@
 import type { BlockTile } from '../../sim/level';
 import type { TicketKind } from '../../sim/tickets';
-import type { FloorTheme, WallTheme } from '../MapRenderer';
+import type { FloorTheme, WallTheme } from '../mapLook';
 import type { WallPiece } from '../mapShape';
 import { type Model, ModelBuilder, tint } from './kit';
 import { CARD_SIZE, FRONT_WALL_HEIGHT, STATION_HEIGHT, WALL_HEIGHT } from './layout';

@@ -2,7 +2,7 @@ import type Phaser from 'phaser';
 import type { HintId } from '../flow/hints';
 import type { LevelMap } from '../sim/level';
 import type { GameEvent } from '../sim/orders';
-import type { MapLook } from './MapRenderer';
+import type { MapLook } from './mapLook';
 import type { Point } from './projection';
 import type { RoundView } from './roundView';
 

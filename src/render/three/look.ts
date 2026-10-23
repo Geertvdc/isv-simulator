@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import type { BlockTile, LevelMap } from '../../sim/level';
-import type { FloorTheme, WallTheme } from '../MapRenderer';
+import type { FloorTheme, WallTheme } from '../mapLook';
 import { gridToWorld } from '../projection';
 
 /**

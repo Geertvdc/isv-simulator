@@ -4,10 +4,9 @@ import type { GameState } from '../sim/state';
 import { pipelinePulse } from './effects';
 import { type MapRenderer, OVERLAY_DEPTH, vectors } from './MapRenderer';
 import { type Point, tileDepth } from './projection';
-import { drawProgressBar } from './TicketRenderer';
+import { WARN_COLOR, drawBadge, drawProgressBar } from './billboards';
 
 /** Placeholder looks until the art pass. */
-const WARN_COLOR = 0xff3030;
 const BROKEN_COLOR = 0x1a1d24;
 const BROKEN_ALPHA = 0.65;
 const SPARK_COLOR = 0xffd166;
@@ -18,7 +17,6 @@ const OVERLAY_DEPTH_OFFSET = 0.012;
 const REPAIR_BAR_LIFT = 16;
 /** The "!" badge over a pipeline about to break, up and right of its top center. */
 const BADGE_OFFSET = { x: 20, y: -26 };
-const BADGE_RADIUS = 9;
 
 /**
  * Draws pipeline state over the pipeline blocks: a pulsing red top while a
@@ -105,20 +103,4 @@ export function drawPipelineState(
   if (pipeline.repair > 0) {
     drawProgressBar(overlay, center.x, center.y - REPAIR_BAR_LIFT, pipeline.repair);
   }
-}
-
-/** A red "!" in a circle centered on (x, y). */
-export function drawBadge(
-  g: Phaser.GameObjects.Graphics,
-  x: number,
-  y: number,
-  alpha: number,
-): void {
-  g.fillStyle(WARN_COLOR, alpha);
-  g.fillCircle(x, y, BADGE_RADIUS);
-  g.lineStyle(2, 0xffffff, alpha);
-  g.strokeCircle(x, y, BADGE_RADIUS);
-  g.fillStyle(0xffffff, alpha);
-  g.fillRect(x - 1.5, y - 6, 3, 7);
-  g.fillRect(x - 1.5, y + 3, 3, 3);
 }
