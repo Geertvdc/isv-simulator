@@ -52,6 +52,7 @@ docs/plan/   phase specs
 Reusable agent workflows live in `.agents/skills/<name>/SKILL.md` (the cross-agent location read by Codex, GitHub Copilot and OpenCode). `.claude/skills` is a symlink to it for Claude Code. Add new skills there, not in a tool-specific folder.
 
 - `ship`: open a PR, wait for CI, rebase-merge into main, pull main.
+- `screenshots`: retake the docs screenshots (2D, 3D or both), check them and commit them.
 
 ## Working on phases
 
