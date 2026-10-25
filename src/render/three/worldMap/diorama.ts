@@ -6,12 +6,15 @@ import { type Vec3, gridToWorld } from '../../projection';
 import { type KitMaterials, ModelBuilder } from '../kit';
 import { MAP_PALETTE, matte } from '../look';
 import { BACKLOT, type GroundKind, type GroundTile } from './cityPlan';
+import { circuitOverlay, seaGridTexture } from './circuitBoard';
 import { LABEL, markerSpots } from './markers';
 
 /**
- * The world map diorama, built in code: an island of square land tiles
- * (grass on dirt, a sandy shore) in the sea, the road with its dashed
- * middle line, and a flag for each level with its number on the ground.
+ * The world map diorama, built in code: a circuit board of square tiles
+ * (green solder mask with traces and silkscreen, a dark board edge, gold
+ * pads round the rim) on a dark editor grid, the road as a data bus with
+ * copper edges and cyan packets, and a tag-shaped flag for each level with
+ * its number printed on the board.
  * Static pieces are merged or instanced, so the whole map is a few dozen
  * draw calls.
  */
@@ -84,7 +87,13 @@ export function buildDiorama(
   materials: KitMaterials,
 ): Diorama {
   const root = new THREE.Group();
-  root.add(...terrain(map, chapterIds, ground), sea(), shallows(map), road(map, materials));
+  root.add(
+    ...terrain(map, chapterIds, ground),
+    circuitOverlay(map, ground),
+    sea(),
+    shallows(map),
+    road(map, materials),
+  );
   const flags: Diorama['flags'] = [];
   // Each chapter's flag stands in one mesh; the cloths wave one by one.
   const builders = map.regions.map(() => new ModelBuilder());
@@ -238,24 +247,26 @@ function shadeColor(color: number, amount: number): number {
     : c.multiplyScalar(1 + amount).getHex();
 }
 
-/** The sea round the island, far past the camera's view. */
+/** The sea round the island, far past the camera's view: a dark editor background with a grid. */
 function sea(): THREE.Mesh {
+  const material = matte(0xffffff, 0.7);
+  material.map = seaGridTexture(SEA_SIZE);
   const mesh = new THREE.Mesh(
     new THREE.PlaneGeometry(SEA_SIZE, SEA_SIZE).rotateX(-Math.PI / 2),
-    matte(MAP_PALETTE.sea, 0.55),
+    material,
   );
   mesh.position.y = SEA_LEVEL;
   mesh.receiveShadow = true;
   return mesh;
 }
 
-/** A lighter band of shallow water round the island, so the coast doesn't stand on a flat sea. */
+/** A soft glow round the board, so its edge doesn't stand on a flat background. */
 function shallows(map: WorldMap): THREE.Mesh {
   const mesh = new THREE.Mesh(
     new THREE.PlaneGeometry(map.width + SHALLOWS * 2, map.height + BACKLOT + SHALLOWS * 2).rotateX(
       -Math.PI / 2,
     ),
-    matte(MAP_PALETTE.shallows, 0.5),
+    new THREE.MeshBasicMaterial({ color: MAP_PALETTE.shallows, transparent: true, opacity: 0.55 }),
   );
   const center = gridToWorld(map.width / 2, (map.height - BACKLOT) / 2, SEA_LEVEL + 0.01);
   mesh.position.set(center.x, center.y, center.z);
@@ -274,7 +285,7 @@ function roadPath(map: WorldMap): THREE.Vector3[] {
   return curve.getSpacedPoints(Math.max(2, Math.ceil(curve.getLength() / ROAD.step)));
 }
 
-/** The road, its stops and its dashes, merged into one mesh. */
+/** The road (a data bus: copper edges, cyan packets down the middle), its stops and its dashes, merged into one mesh. */
 function road(map: WorldMap, materials: KitMaterials): THREE.Mesh {
   const path = roadPath(map);
   const builder = new ModelBuilder();
@@ -284,6 +295,9 @@ function road(map: WorldMap, materials: KitMaterials): THREE.Mesh {
     const at = gridToWorld(node.x, node.y, ROAD.y);
     builder.add(disc(ROAD.stopEdge), MAP_PALETTE.roadEdge, { at: [at.x, at.y + 0.006, at.z] });
     builder.add(disc(ROAD.stop), MAP_PALETTE.road, { at: [at.x, at.y + 0.009, at.z] });
+    // A via in the middle of each stop: the bus's connection to the level.
+    builder.add(disc(ROAD.stop * 0.55), MAP_PALETTE.roadEdge, { at: [at.x, at.y + 0.011, at.z] });
+    builder.add(disc(ROAD.stop * 0.3), MAP_PALETTE.road, { at: [at.x, at.y + 0.013, at.z] });
   }
   // Dashes along the middle, skipping the stops.
   let along = 0;
@@ -351,26 +365,40 @@ function flagStand(b: ModelBuilder, foot: Vec3): void {
     .sphere(0.08, MAP_PALETTE.finial, { at: [x, y + FLAG.pole + 0.05, z] });
 }
 
-/** A flag's cloth in `color`, hinged at the pole of a flag standing at the origin. */
+/**
+ * A flag's cloth in `color`, hinged at the pole of a flag standing at the
+ * origin: a tag (like a git tag) with a pointed end and a hole by the point.
+ */
 function flagCloth(color: number): DioramaFlag['cloth'] {
   const { width, height, depth } = FLAG.cloth;
-  const clothGeometry = new THREE.BoxGeometry(width, height, depth);
-  // Hinged at the pole.
-  clothGeometry.translate(width / 2, 0, 0);
+  const half = height / 2;
+  const point = width - half * 0.9;
+  const shape = new THREE.Shape()
+    .moveTo(0, -half)
+    .lineTo(point, -half)
+    .lineTo(width, 0)
+    .lineTo(point, half)
+    .lineTo(0, half)
+    .lineTo(0, -half);
+  const hole = new THREE.Path().absarc(point - 0.02, 0, height * 0.13, 0, Math.PI * 2, true);
+  shape.holes.push(hole);
+  const clothGeometry = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
+  // Hinged at the pole, as thick on both sides of it.
+  clothGeometry.translate(0, 0, -depth / 2);
   const cloth = new THREE.Mesh(clothGeometry, matte(color, 0.8));
   cloth.position.set(0.03, FLAG.pole - height / 2 - 0.04, 0);
   cloth.castShadow = true;
   return cloth;
 }
 
-/** The level number, big and white with a soft shadow, as a plane lying on the ground. */
+/** The level number, big and white in a monospace face like a board's silkscreen, as a plane lying on the ground. */
 function labelMesh(text: string): THREE.Mesh {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
   canvas.height = 128;
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    ctx.font = '900 104px system-ui, sans-serif';
+    ctx.font = '800 92px ui-monospace, Menlo, Consolas, monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     // A darker copy a little lower: the number looks raised off the ground.
