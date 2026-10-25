@@ -50,40 +50,49 @@ export const PALETTE = {
 } as const;
 
 /**
- * The world map's colors (phase 19): grass that turns greyer and more paved
- * from the garage town to the Big Tech city, dirt under it, the sea around
- * the island, the road and the level flags.
+ * The world map's colors (phase 19, made a circuit board in phase 20): the
+ * island is a board whose solder mask turns from fresh green to grey city
+ * paving left to right, with a dark FR4 edge, gold contact pads round its
+ * rim and lighter traces on top; it floats on a dark editor-grid sea. The
+ * road is a data bus: dark, with copper edges and cyan packets.
  */
 export const MAP_PALETTE = {
-  /** Top of the land tiles, per chapter id. */
+  /** Top of the land tiles (the board's solder mask), per chapter id. */
   ground: {
-    garage: 0xa9cf55,
-    startup: 0x5cbd6e,
-    'scale-up': 0x93b98a,
-    enterprise: 0xaab3a2,
-    'big-tech': 0xbec6cb,
+    garage: 0x8fc94f,
+    startup: 0x4eb46a,
+    'scale-up': 0x82b38a,
+    enterprise: 0xa6b2a4,
+    'big-tech': 0xb9c4cb,
   } as Readonly<Record<string, number>>,
   groundFallback: 0x8fc46a,
   /** Big Tech's mown lawn, in stripes. */
-  lawn: 0x78c450,
-  lawnStripe: 0x6cb848,
+  lawn: 0x6fc052,
+  lawnStripe: 0x62b347,
   /** Paved ground: sidewalks round buildings, the back street, city concrete, the plaza. */
   paving: {
     paving: 0xd6d0c2,
     concrete: 0xb7bbbb,
-    asphalt: 0x5a5f69,
+    asphalt: 0x4a505c,
     plaza: 0xe6d8bb,
   },
-  /** The shore tiles round the island. */
-  sand: 0xe6d29a,
-  /** Under the grass: the cliff sides. */
-  earth: 0x8a5d3b,
-  sea: 0x3f8fae,
-  /** The lighter band of shallow water along the coast. */
-  shallows: 0x6fb8c8,
-  road: 0x474c56,
-  roadEdge: 0xdcd6c6,
-  roadDash: 0xfafaf2,
+  /** The contact pads round the board's rim. */
+  sand: 0xe2b448,
+  /** The board's edge under the solder mask: dark FR4. */
+  earth: 0x26332e,
+  /** The editor background the board floats on, and its grid lines. */
+  sea: 0x17213a,
+  seaGrid: 0x2c3c63,
+  /** A soft glow on the "water" round the board. */
+  shallows: 0x223c66,
+  /** The board's traces (drawn lighter than the mask), vias and silkscreen. */
+  trace: 'rgba(255, 255, 255, 0.24)',
+  via: '#e8bd55',
+  viaHole: '#2a2f26',
+  silkscreen: 'rgba(255, 255, 255, 0.78)',
+  road: 0x2a303c,
+  roadEdge: 0xd9993c,
+  roadDash: 0x62e6ff,
   /** Flag accents, per chapter id: the same as the chapter colors in the CSS. */
   flag: {
     garage: 0xd98b3a,

@@ -6,22 +6,28 @@ import { type KitMaterials, ModelBuilder } from '../kit';
 import type { Puff } from './locks';
 
 /**
- * The world map's locks, built in code: the cloud bank over a locked
- * chapter, the striped barrier with its "★ N" sign at a closed gate, a
+ * The world map's locks, built in code: the bank of not-yet-rendered
+ * wireframe clouds over a locked chapter, the striped barrier with its "★ N" sign at a closed gate, a
  * padlock for a locked level's flag and the little stars over a played one.
  */
 
 export const LOCK_COLORS = {
-  /** Cloud tops, and the cool shade on their undersides. */
-  cloudTop: 0xffffff,
-  cloudBottom: 0xc6d3e3,
+  /**
+   * The locked land's cloud: faceted like an unrendered mesh, pale blueprint
+   * blue on top and a deeper blue under, with a glowing wireframe over it.
+   */
+  cloudTop: 0x6f9be6,
+  cloudBottom: 0x2f56a3,
+  cloudWire: 0xbfe0ff,
   boomRed: 0xe0433a,
   boomWhite: 0xf6f3ec,
   post: 0x5b6270,
-  signBoard: 0xf6f3ec,
+  /** The gate's sign: a little terminal screen. */
+  signBoard: 0x1b2130,
   signBorder: '#d6453d',
-  signText: '#1f3d5c',
-  signStar: '#f0a800',
+  signText: '#e8edf7',
+  signStar: '#ffc83d',
+  signPrompt: '#5fe08a',
   padlock: 0xf2b632,
   shackle: 0xc9ccd2,
   keyhole: 0x3a3f47,
@@ -40,11 +46,14 @@ export interface CloudBank {
   update(timeMs: number, gone: number): void;
 }
 
-/** A soft, low-poly cloud bank from `puffs` (map units). */
+/**
+ * A cloud bank from `puffs` (map units) that looks not rendered yet: flat
+ * shaded low-poly puffs with a glowing wireframe drawn over them.
+ */
 export function buildCloudBank(puffs: readonly Puff[], drift: number): CloudBank {
-  // Detail 2 with smooth normals: soft round puffs, not faceted boulders.
-  const geometry = new THREE.IcosahedronGeometry(1, 2);
-  // Light on top, a cool shade underneath: reads as a cloud, not a snowball.
+  // Detail 1, flat shaded: facets that read as a mesh waiting for its render.
+  const geometry = new THREE.IcosahedronGeometry(1, 1);
+  // Light on top, a deeper blue underneath.
   const top = new THREE.Color(LOCK_COLORS.cloudTop);
   const bottom = new THREE.Color(LOCK_COLORS.cloudBottom);
   const positions = geometry.getAttribute('position');
@@ -58,13 +67,26 @@ export function buildCloudBank(puffs: readonly Puff[], drift: number): CloudBank
   const material = new THREE.MeshStandardMaterial({
     vertexColors: true,
     roughness: 1,
-    emissive: 0x3d4656,
+    flatShading: true,
+    emissive: 0x1a2c55,
   });
   const mesh = new THREE.InstancedMesh(geometry, material, Math.max(1, puffs.length));
   mesh.count = puffs.length;
   mesh.castShadow = true;
   // The puffs move about: never culled.
   mesh.frustumCulled = false;
+  // The wireframe: the same puffs a hair bigger, drawn as glowing lines.
+  const wireMaterial = new THREE.MeshBasicMaterial({
+    color: LOCK_COLORS.cloudWire,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.8,
+  });
+  const wire = new THREE.InstancedMesh(geometry, wireMaterial, Math.max(1, puffs.length));
+  wire.count = puffs.length;
+  wire.frustumCulled = false;
+  mesh.add(wire);
+  const wireScale = new THREE.Vector3();
   let cx = 0;
   let cy = 0;
   for (const p of puffs) {
@@ -88,8 +110,10 @@ export function buildCloudBank(puffs: readonly Puff[], drift: number): CloudBank
       size.set(r, r * p.squash, r);
       turn.setFromEuler(euler.set(0, p.phase, 0));
       mesh.setMatrixAt(i, m.compose(at, turn, size));
+      wire.setMatrixAt(i, m.compose(at, turn, wireScale.copy(size).multiplyScalar(1.004)));
     });
     mesh.instanceMatrix.needsUpdate = true;
+    wire.instanceMatrix.needsUpdate = true;
     const fading = gone > 0;
     if (material.transparent !== fading) {
       material.transparent = fading;
@@ -97,6 +121,7 @@ export function buildCloudBank(puffs: readonly Puff[], drift: number): CloudBank
     }
     // They shrink and rise first and only then fade, so they stay white clouds, not fog.
     material.opacity = 1 - Math.min(1, Math.max(0, (gone - 0.35) / 0.65));
+    wireMaterial.opacity = 0.8 * material.opacity;
     mesh.visible = gone < 1;
   };
   update(0, 0);
@@ -219,7 +244,7 @@ export function buildGate(
   };
 }
 
-/** The sign's face: "★ N" in a red frame on white. */
+/** The sign's face: a little terminal screen with "★ N" after a green prompt, in a red frame. */
 function signTexture(text: string): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
@@ -229,21 +254,25 @@ function signTexture(text: string): THREE.CanvasTexture {
     ctx.fillStyle = LOCK_COLORS.signBorder;
     ctx.fillRect(0, 0, 256, 164);
     ctx.fillStyle = '#' + new THREE.Color(LOCK_COLORS.signBoard).getHexString();
-    ctx.fillRect(14, 14, 228, 136);
-    ctx.font = '900 92px system-ui, sans-serif';
+    ctx.fillRect(12, 12, 232, 140);
+    ctx.font = '800 80px ui-monospace, Menlo, Consolas, monospace';
     ctx.textBaseline = 'middle';
-    // The star (up to the first space) in gold, the number after it dark.
+    // A prompt, then the star (up to the first space) in gold and the number light.
+    const prompt = '>';
     const space = text.indexOf(' ');
     const star = space < 0 ? '' : text.slice(0, space + 1);
     const number = space < 0 ? text : text.slice(space + 1);
-    const starWidth = ctx.measureText(star).width;
-    const numberWidth = ctx.measureText(number).width;
-    let x = 128 - (starWidth + numberWidth) / 2;
-    ctx.fillStyle = LOCK_COLORS.signStar;
-    ctx.fillText(star, x, 86);
-    x += starWidth;
-    ctx.fillStyle = LOCK_COLORS.signText;
-    ctx.fillText(number, x, 86);
+    const parts: [string, string][] = [
+      [prompt, LOCK_COLORS.signPrompt],
+      [star, LOCK_COLORS.signStar],
+      [number, LOCK_COLORS.signText],
+    ];
+    let x = 128 - parts.reduce((sum, [t]) => sum + ctx.measureText(t).width, 0) / 2;
+    for (const [t, color] of parts) {
+      ctx.fillStyle = color;
+      ctx.fillText(t, x, 86);
+      x += ctx.measureText(t).width;
+    }
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
