@@ -21,6 +21,10 @@ export const LABEL = {
   lift: 0.2,
   width: 1.4,
   height: 0.7,
+  /** It keeps this far in from the island's left and right ends, which the title's wide view crops. */
+  endGap: 0.5,
+  /** It lies nearer its own flag than any other, and at least this far from the others. */
+  otherFlag: 1.1,
   /** Its edge stays this far from the road's middle line (the road is 0.74 wide). */
   roadGap: 0.55,
 };
@@ -34,17 +38,30 @@ export interface Marker {
 
 /**
  * Each node's flag and number, in node order. The flag stands on the
- * outside of the road's bend (see `outside`), unless it or its number
+ * outside of the road's bend (see `sides`), unless it or its number
  * finds no clear place there and does on the other side. Where the
  * number's usual place (see `labelSpots`) would lie on the road or on
  * another number, it takes the first other place that is clear.
  */
 export function markerSpots(map: WorldMap): Marker[] {
   const placed: MapPoint[] = [];
+  // Every flag's foot: the ones placed so far, the rest where they would stand on
+  // their preferred side, so no number lies by a neighbour's flag either way round.
+  const feet = map.nodes.map((node, i) => footOn(node, sides(map, i)[0] ?? { x: 0, y: 1 }));
+  const nearOtherFlag = (spot: MapPoint, own: MapPoint, index: number): boolean => {
+    const mine = Math.hypot(spot.x - own.x, spot.y - own.y);
+    return feet.some((f, j) => {
+      if (j === index) return false;
+      const theirs = Math.hypot(spot.x - f.x, spot.y - f.y);
+      return theirs <= mine || theirs < LABEL.otherFlag;
+    });
+  };
   // How badly a number's spot breaks the rules: off the land is worst, then on the
-  // road, then on another number. 0 when it breaks none.
+  // road, then on another number or by another flag. 0 when it breaks none.
   const trouble = (spot: MapPoint): number => {
-    const offLand = spot.x - LABEL.width / 2 < 0 || spot.x + LABEL.width / 2 > map.width;
+    const offLand =
+      spot.x - LABEL.width / 2 < LABEL.endGap ||
+      spot.x + LABEL.width / 2 > map.width - LABEL.endGap;
     const onLabel = placed.some(
       (p) => Math.abs(p.x - spot.x) < LABEL.width && Math.abs(p.y - spot.y) < LABEL.height,
     );
@@ -52,16 +69,15 @@ export function markerSpots(map: WorldMap): Marker[] {
     return (offLand ? 100 : 0) + roadShort * 20 + (onLabel ? 5 : 0);
   };
   return map.nodes.map((node, i) => {
-    const preferred = outside(map, i);
     let best: (Marker & { trouble: number }) | null = null;
-    for (const out of [preferred, { x: -preferred.x, y: -preferred.y }]) {
+    for (const out of sides(map, i)) {
       const ahead = out.y >= 0;
       const aside = ahead ? FLAG_ASIDE.near : FLAG_ASIDE.far;
-      const foot = { x: node.x + out.x * aside, y: node.y + out.y * aside };
+      const foot = footOn(node, out);
       // A flag closer to the road than its side's distance stands on a bend's inside.
       const cramped = distanceToRoad(map.road, foot) < aside - 0.01 ? 100 : 0;
       for (const label of labelSpots(foot, out, ahead)) {
-        const t = cramped + trouble(label);
+        const t = cramped + trouble(label) + (nearOtherFlag(label, foot, i) ? 5 : 0);
         if (!best || t < best.trouble) best = { foot, label, trouble: t };
         if (t === 0) break;
       }
@@ -69,8 +85,15 @@ export function markerSpots(map: WorldMap): Marker[] {
     }
     const { foot, label } = best ?? { foot: node, label: node };
     placed.push(label);
+    feet[i] = foot;
     return { foot, label };
   });
+}
+
+/** The foot of a flag beside the stop at `node`, on side `out` of the road. */
+function footOn(node: MapPoint, out: MapPoint): MapPoint {
+  const aside = out.y >= 0 ? FLAG_ASIDE.near : FLAG_ASIDE.far;
+  return { x: node.x + out.x * aside, y: node.y + out.y * aside };
 }
 
 /**
@@ -113,13 +136,14 @@ function roadGap(road: readonly MapPoint[], at: MapPoint): number {
 }
 
 /**
- * The side of the road a flag stands on at node `index`: away from the bend
- * (where the road goes on from it), so flag and number stay clear of the road.
- * At the road's two ends, where it runs straight off to the shore, the flag
- * stands in front, so the van parked on the stop doesn't hide its number.
- * A unit map direction.
+ * The sides of the road a flag may stand on at node `index`, best first
+ * (unit map directions): away from the bend (where the road goes on from
+ * it), so flag and number stay clear of the road, else the other side. At
+ * the road's two ends, where it runs straight off to the shore, straight in
+ * front (toward the camera) comes first, so the van parked on the stop
+ * doesn't hide the number.
  */
-function outside(map: WorldMap, index: number): MapPoint {
+function sides(map: WorldMap, index: number): MapPoint[] {
   const w = map.nodeWaypoints[index] ?? 0;
   const here = map.road[w] ?? { x: 0, y: 0 };
   const before = map.road[Math.max(0, w - 3)] ?? here;
@@ -129,12 +153,17 @@ function outside(map: WorldMap, index: number): MapPoint {
   const len = Math.hypot(tx, ty) || 1;
   // Pointing to the near side: the road runs left to right.
   const n = { x: -ty / len, y: tx / len };
-  if (index === 0 || index === map.nodes.length - 1) return n;
+  if (index === 0 || index === map.nodes.length - 1) {
+    return [{ x: 0, y: 1 }, n, { x: -n.x, y: -n.y }];
+  }
   // Where the road bends to: both neighbours' pull from the flag.
   const inward =
     (before.x - here.x + after.x - here.x) * n.x + (before.y - here.y + after.y - here.y) * n.y;
   const sign = Math.abs(inward) > 0.05 ? -Math.sign(inward) : n.y >= 0 ? 1 : -1;
-  return { x: n.x * sign, y: n.y * sign };
+  return [
+    { x: n.x * sign, y: n.y * sign },
+    { x: -n.x * sign, y: -n.y * sign },
+  ];
 }
 
 /** How far `p` is from the road's middle line. */
