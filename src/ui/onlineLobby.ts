@@ -26,6 +26,7 @@ import { playerCssColor } from '../render/playerColors';
 import { NET_MAX_NAME_LENGTH } from '../sim/balance';
 import { ONLINE_TEXT, WINDOW_FILES } from '../sim/content';
 import { el } from './dom';
+import { statusBar } from './statusBar';
 import { deviceLabel } from './lobby';
 import { playerBadge } from './playerBadge';
 import { copyText } from './profile';
@@ -176,9 +177,9 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineLobbyDeps): Onli
   const members = el('div', 'online-members');
   const hint = el('div', 'lobby-hint');
   const leave = button('online-leave', ONLINE_TEXT.leave, deps.onLeave);
-  const keys = el('div', 'screen-hint');
+  const keys = statusBar();
   screen.append(
-    el('h1', 'lobby-title', ONLINE_TEXT.lobbyTitle),
+    el('h1', 'screen-title online-title', ONLINE_TEXT.lobbyTitle),
     codeCard,
     status,
     nameRow,

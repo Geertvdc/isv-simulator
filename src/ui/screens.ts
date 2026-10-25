@@ -29,6 +29,7 @@ import {
 } from '../sim/content';
 import { parseCredits } from './credits';
 import { el } from './dom';
+import { statusBar } from './statusBar';
 import { createLogo } from './logo';
 import { type MenuLine, createMenu } from './menu';
 
@@ -68,7 +69,7 @@ export function mountTitle(root: HTMLElement): ScreenView {
   const screen = panel(root, 'title-screen');
   const menu = createMenu(WINDOW_FILES.title);
   const press = el('div', 'title-press', PRESS_ANY_BUTTON_TEXT);
-  const hint = el('div', 'screen-hint', MENU_HINT);
+  const hint = statusBar(MENU_HINT);
   const head = el('div', 'title-head');
   head.append(createLogo(GAME_TITLE), el('div', 'title-tagline', GAME_TAGLINE));
   screen.append(head, press, menu.root, hint);
@@ -95,7 +96,7 @@ function mountMenuScreen(
 ): ScreenView {
   const screen = panel(root, className);
   const menu = createMenu(file);
-  screen.append(el('h1', 'screen-title', title), menu.root, el('div', 'screen-hint', MENU_HINT));
+  screen.append(el('h1', 'screen-title', title), menu.root, statusBar(MENU_HINT));
   return {
     render: (view) => {
       screen.hidden = view === null;
@@ -125,7 +126,7 @@ export function mountResults(root: HTMLElement): ScreenView {
   const unlocked = el('div', 'results-badge');
   const chapter = el('div', 'results-badge');
   const menu = createMenu(WINDOW_FILES.resultsMenu);
-  const hint = el('div', 'screen-hint', MENU_HINT);
+  const hint = statusBar(MENU_HINT);
   const card = el('div', 'results-card');
   card.dataset.file = WINDOW_FILES.results;
   card.append(stars, score, best, unlocked, chapter);
@@ -177,7 +178,7 @@ export function mountCredits(root: HTMLElement): ScreenView {
   const card = el('div', 'credits-card');
   card.dataset.file = WINDOW_FILES.credits;
   card.append(list, menu.root);
-  screen.append(el('h1', 'screen-title', CREDITS_TITLE), card, el('div', 'screen-hint', MENU_HINT));
+  screen.append(el('h1', 'screen-title', CREDITS_TITLE), card, statusBar(MENU_HINT));
   return {
     render: (view) => {
       const wasHidden = screen.hidden;

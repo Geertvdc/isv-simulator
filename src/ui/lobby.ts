@@ -4,6 +4,7 @@ import { KEY_SCHEMES, LEFT_KEYS, RIGHT_KEYS } from '../input/keyboard';
 import type { Lobby } from '../input/lobby';
 import { playerCssColor } from '../render/playerColors';
 import { playerBadge } from './playerBadge';
+import { statusBar } from './statusBar';
 import { LOBBY_BACK_HINT, playerFile } from '../sim/content';
 import { MAX_PLAYERS } from '../sim/level';
 
@@ -59,9 +60,7 @@ export function mountLobby(root: HTMLElement): LobbyView {
   const hint = document.createElement('div');
   hint.className = 'lobby-hint';
 
-  const back = document.createElement('div');
-  back.className = 'screen-hint';
-  back.textContent = LOBBY_BACK_HINT;
+  const back = statusBar(LOBBY_BACK_HINT);
 
   panel.append(title, slots, hint, back);
   root.append(panel);

@@ -173,6 +173,10 @@ async function launch(): Promise<{ chrome: ChildProcess; page: Page; profile: st
     deviceScaleFactor: 1,
     mobile: false,
   });
+  // Reduced motion holds the menus' blinking cursors solid, so every shot looks the same.
+  await page.send('Emulation.setEmulatedMedia', {
+    features: [{ name: 'prefers-reduced-motion', value: 'reduce' }],
+  });
   return { chrome, page, profile };
 }
 

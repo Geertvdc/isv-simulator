@@ -6,9 +6,11 @@ import type { FlowView } from '../render/GameScene';
 import { MAX_STARS, STARS_TO_UNLOCK } from '../sim/balance';
 import {
   CHAPTER_BLURBS,
+  CHAPTER_FOLDER,
   LEVEL_BLURBS,
   LEVEL_SELECT_GUEST_HINT,
   LEVEL_SELECT_HINT,
+  STAR_BADGE_LABEL,
   chapterGateHint,
   chapterGateShort,
   levelFile,
@@ -17,6 +19,7 @@ import {
 } from '../sim/content';
 import { CHAPTERS, LEVELS } from '../sim/levels';
 import { el } from './dom';
+import { statusBar } from './statusBar';
 
 export interface LevelSelectView {
   /** Shows the level select with its cursor, or hides it for `null`. */
@@ -40,9 +43,11 @@ export function mountLevelSelect(root: HTMLElement): LevelSelectView {
   const chapterBlurb = el('div', 'map-chapter-blurb');
   const chapterGate = el('div', 'map-chapter-gate');
   const banner = el('div', 'map-chapter');
+  banner.dataset.folder = CHAPTER_FOLDER;
   banner.append(chapterName, chapterBlurb, chapterGate);
 
   const total = el('div', 'map-stars');
+  total.dataset.label = STAR_BADGE_LABEL;
   const totalCount = el('span', 'map-stars-count');
   total.append(el('span', 'map-stars-icon', '★'), totalCount);
 
@@ -56,7 +61,7 @@ export function mountLevelSelect(root: HTMLElement): LevelSelectView {
   const status = el('div', 'map-card-status');
   card.append(number, name, blurb, stars, status);
 
-  const hint = el('div', 'screen-hint map-hint', LEVEL_SELECT_HINT);
+  const hint = statusBar(LEVEL_SELECT_HINT, 'map-hint');
   const left = el('div', 'map-column map-column-left');
   const right = el('div', 'map-column map-column-right');
   left.append(banner, card);
