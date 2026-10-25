@@ -48,11 +48,36 @@ export function firstGroup(map: LevelMap, tile: Tile): GridPoint[] {
 }
 
 /** Things hung on walls that show their front face, per theme. */
-const WALL_DECOS: Readonly<Record<WallTheme, readonly string[]>> = {
-  plaster: ['poster', 'whiteboard', 'clock', 'kanban', 'dashboard', 'plants'],
-  wood: ['poster', 'whiteboard', 'clock', 'kanban', 'dashboard', 'plants'],
-  glass: ['whiteboard', 'clock', 'dashboard'],
+export const WALL_DECOS: Readonly<Record<WallTheme, readonly string[]>> = {
+  plaster: [
+    'poster',
+    'whiteboard',
+    'clock',
+    'kanban',
+    'dashboard',
+    'plants',
+    'frames',
+    'shelf',
+    'pinboard',
+    'braces',
+    'tv',
+  ],
+  wood: [
+    'poster',
+    'whiteboard',
+    'clock',
+    'kanban',
+    'dashboard',
+    'plants',
+    'frames',
+    'shelf',
+    'pinboard',
+    'braces',
+  ],
+  glass: ['whiteboard', 'clock', 'dashboard', 'tv', 'braces'],
 };
+/** No two decorations this close along a wall are the same. */
+export const WALL_DECO_SPREAD = 4;
 /** One in this many front-facing walls gets a decoration. */
 const WALL_DECO_EVERY = 3;
 
@@ -61,10 +86,33 @@ export function tileHash(x: number, y: number): number {
   return (Math.imul(x, 73856093) ^ Math.imul(y, 19349663)) >>> 0;
 }
 
-/** The decoration hung on the front of the wall on tile (x, y) with this theme, if any. Only asked of `wall` pieces. */
+/** The decoration a tile would get by its hash alone, as an index, or null. */
+function decoIndex(x: number, y: number, count: number): number | null {
+  const hash = tileHash(x, y);
+  if (hash % WALL_DECO_EVERY !== 0 || count === 0) return null;
+  return Math.floor(hash / WALL_DECO_EVERY) % count;
+}
+
+/**
+ * The decoration hung on the front of the wall on tile (x, y) with this
+ * theme, if any. Only asked of `wall` pieces. Picked by the tile's hash, then
+ * moved on from any decoration just before it along the wall, so two close
+ * by never match.
+ */
 export function wallDeco(x: number, y: number, theme: WallTheme): string | null {
   const decos = WALL_DECOS[theme];
-  const hash = tileHash(x, y);
-  if (hash % WALL_DECO_EVERY !== 0 || decos.length === 0) return null;
-  return decos[Math.floor(hash / WALL_DECO_EVERY) % decos.length] ?? null;
+  if (decoIndex(x, y, decos.length) === null) return null;
+  // Walk the row from its start (maps are a few dozen tiles wide), so every tile settles the same way.
+  const picked: [number, number][] = [];
+  let mine = 0;
+  for (let k = Math.min(0, x); k <= x; k++) {
+    let index = decoIndex(k, y, decos.length);
+    if (index === null) continue;
+    const near = picked.filter(([px]) => k - px <= WALL_DECO_SPREAD).map(([, i]) => i);
+    for (let t = 0; t < decos.length && near.includes(index); t++)
+      index = (index + 1) % decos.length;
+    picked.push([k, index]);
+    mine = index;
+  }
+  return decos[mine] ?? null;
 }

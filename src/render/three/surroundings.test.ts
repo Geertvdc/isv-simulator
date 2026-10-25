@@ -81,6 +81,55 @@ describe('placeSetPieces', () => {
     expect(at.some((p) => p.z < -0.5 && p.x > 0 && p.x < 13)).toBe(true);
   });
 
+  /** The placements of each row, in order. */
+  const rows = (setting: string, width = 14, height = 10) => {
+    const placed = placeSetPieces(setting, width, height);
+    const out = new Map<string, typeof placed>();
+    for (const p of placed) {
+      const key = `${p.row}:${p.side}`;
+      out.set(key, [...(out.get(key) ?? []), p]);
+    }
+    return [...out.values()];
+  };
+
+  for (const setting of Object.keys(SETTINGS)) {
+    it(`never stands a ${setting} prop next to its own kind, nor the same look within four`, () => {
+      for (const row of rows(setting, 16, 24)) {
+        row.forEach((p, i) => {
+          const before = row.slice(Math.max(0, i - 2), i).map((q) => q.piece);
+          expect(before).not.toContain(p.piece);
+          const looks = row.slice(Math.max(0, i - 4), i);
+          expect(looks.some((q) => q.piece === p.piece && q.variant === p.variant)).toBe(false);
+        });
+      }
+    });
+
+    it(`shows many different ${setting} props and looks`, () => {
+      const placed = placeSetPieces(setting, 14, 10);
+      const pieces = new Set(placed.map((p) => p.piece));
+      const looks = new Set(placed.map((p) => `${[...pieces].indexOf(p.piece)}:${p.variant}`));
+      expect(pieces.size).toBeGreaterThanOrEqual(9);
+      expect(looks.size).toBeGreaterThanOrEqual(18);
+      // Most of what stands outside is a look nobody else in the level has.
+      expect(looks.size / placed.length).toBeGreaterThan(0.5);
+    });
+
+    it(`varies every ${setting} prop a little, within its footprint`, () => {
+      const placed = placeSetPieces(setting, 14, 10);
+      for (const p of placed) {
+        expect(p.variant).toBeGreaterThanOrEqual(0);
+        expect(p.variant).toBeLessThan(p.piece.variants ?? 1);
+        expect(p.scale[0]).toBeLessThanOrEqual(1);
+        expect(p.scale[2]).toBeLessThanOrEqual(1);
+        // Props people stand at keep their size.
+        if (p.piece.seats?.length) expect(p.scale).toEqual([1, 1, 1]);
+        for (const c of p.tint) expect(Math.abs(c - 1)).toBeLessThan(0.2);
+      }
+      const tints = new Set(placed.map((p) => p.tint.join()));
+      expect(tints.size).toBe(placed.length);
+    });
+  }
+
   it('places nothing for a level without a setting', () => {
     expect(placeSetPieces('nowhere', 14, 10)).toEqual([]);
   });

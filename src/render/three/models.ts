@@ -20,6 +20,7 @@ const INK = PALETTE.ink;
 const DARK = 0x2b2f38;
 const STEEL = 0x8b939e;
 const PAPER = 0xf7f3ea;
+const WOOD_FRAME = 0x8c5f3d;
 
 /** Tiles that get a station model: counters and stations (walls, belts and drops have their own). */
 export type StationTile = Exclude<BlockTile, 'wall' | 'conveyor'>;
@@ -546,6 +547,83 @@ export const WALL_DECO_MODELS: Readonly<Record<string, () => Model>> = {
       b.cylinder(0.06, 0.045, 0.1, 0xd0704a, { at: [x, 0.69, 0.57] });
       b.sphere(0.09, 0x4f9d4a, { at: [x, 0.8, 0.57] }, [1, 1.1, 1]);
       b.sphere(0.06, 0x67b85e, { at: [x + 0.05, 0.86, 0.6] });
+    }
+    return b.build();
+  },
+  frames: () => {
+    // Three framed pictures, hung a little unevenly: a team photo, a print, the first invoice.
+    const b = new ModelBuilder();
+    for (const [x, y, w, h, frame, art] of [
+      [-0.24, 0.74, 0.22, 0.28, 0x3a3f4a, 0x8aa0b8],
+      [0.04, 0.8, 0.2, 0.16, WOOD_FRAME, 0xd8a070],
+      [0.25, 0.66, 0.18, 0.22, 0xe8e4da, PAPER],
+    ] as const) {
+      b.box(w, h, 0.02, frame, { at: [x, y, 0.515] }, 0.004);
+      b.box(w - 0.05, h - 0.05, 0.004, art, { at: [x, y, 0.527] }, 0.001);
+    }
+    b.box(0.06, 0.012, 0.004, INK, { at: [0.25, 0.7, 0.53] }, 0.001);
+    b.box(0.08, 0.012, 0.004, INK, { at: [0.25, 0.66, 0.53] }, 0.001);
+    return b.build();
+  },
+  shelf: () => {
+    // A floating shelf: books, a rubber duck, a little cactus.
+    const b = new ModelBuilder();
+    b.box(0.66, 0.035, 0.16, WOOD_FRAME, { at: [0, 0.62, 0.58] }, 0.006);
+    const spines = [0x9a6a5a, 0x5a6a8a, 0xb8a67a, 0x6a7a6a, 0x7a5a8c];
+    spines.forEach((c, i) =>
+      b.box(
+        0.04,
+        0.17 - (i % 3) * 0.025,
+        0.12,
+        c,
+        { at: [-0.26 + i * 0.045, 0.72 - (i % 3) * 0.012, 0.58] },
+        0,
+      ),
+    );
+    b.sphere(0.045, 0xf2c94c, { at: [0.08, 0.67, 0.6] }, [1.2, 0.8, 1]);
+    b.sphere(0.03, 0xf2c94c, { at: [0.1, 0.71, 0.6] });
+    b.cylinder(0.04, 0.032, 0.06, 0xd0704a, { at: [0.24, 0.67, 0.58] }, 10);
+    b.capsule(0.025, 0.06, 0x5f9a62, { at: [0.24, 0.74, 0.58] });
+    return b.build();
+  },
+  pinboard: () => {
+    // A cork board: printouts, a sticky note, a lanyard.
+    const b = new ModelBuilder();
+    b.box(0.6, 0.42, 0.02, 0xb8905a, { at: [0, 0.7, 0.51] }, 0.006);
+    for (const [x, y, w, h, r] of [
+      [-0.16, 0.76, 0.16, 0.2, -0.06],
+      [0.06, 0.72, 0.14, 0.18, 0.05],
+      [0.2, 0.8, 0.1, 0.1, 0.1],
+    ] as const) {
+      b.box(w, h, 0.004, x > 0.15 ? 0xffe066 : PAPER, { at: [x, y, 0.523], rot: [0, 0, r] }, 0.001);
+      b.sphere(0.012, 0xd05a4a, { at: [x, y + h / 2 - 0.02, 0.528] });
+    }
+    b.box(0.02, 0.2, 0.004, 0x5a7ad0, { at: [0.2, 0.62, 0.524] }, 0.001);
+    b.box(0.07, 0.09, 0.004, PAPER, { at: [0.2, 0.52, 0.524] }, 0.001);
+    return b.build();
+  },
+  braces: () => {
+    // A neon sign: a pair of curly braces round a blinking cursor.
+    const b = new ModelBuilder();
+    b.box(0.6, 0.3, 0.02, 0x22262e, { at: [0, 0.74, 0.51] }, 0.008);
+    const cyan = 0x5ce0ff;
+    for (const s of [-1, 1]) {
+      const x = s * 0.18;
+      b.screen(0.025, 0.08, cyan, { at: [x, 0.79, 0.523], rot: [0, 0, s * 0.15] });
+      b.screen(0.025, 0.08, cyan, { at: [x, 0.69, 0.523], rot: [0, 0, -s * 0.15] });
+      b.screen(0.045, 0.022, cyan, { at: [x + s * 0.02, 0.74, 0.523] });
+    }
+    b.screen(0.05, 0.1, 0xff7ab0, { at: [0, 0.74, 0.523] });
+    return b.build();
+  },
+  tv: () => {
+    // A wall TV with the build status: a row of green checks and one amber.
+    const b = new ModelBuilder();
+    b.box(0.74, 0.44, 0.04, INK, { at: [0, 0.72, 0.52] }, 0.012);
+    b.screen(0.68, 0.38, 0x162a3a, { at: [0, 0.72, 0.542] });
+    for (let i = 0; i < 4; i++) {
+      b.screen(0.4, 0.04, 0x2f4a5f, { at: [0.06, 0.84 - i * 0.08, 0.543] });
+      b.screen(0.05, 0.05, i === 2 ? 0xffc04a : 0x5cf0a8, { at: [-0.22, 0.84 - i * 0.08, 0.544] });
     }
     return b.build();
   },
