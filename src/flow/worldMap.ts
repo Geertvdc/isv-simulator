@@ -137,6 +137,10 @@ const STRETCH_SHAPES: readonly {
   // A dip: the road swings down or up the map between the two flags.
   { weight: 1.5, bends: [{ at: [0.4, 0.6], off: [0, 0.2], lift: [0.9, 1.7] }] },
 ];
+/** How often a stretch's (first) bend goes to the left of the way (else the right). */
+const BEND_LEFT = 0.5;
+/** How often a dip swings up the map (else down). */
+const BEND_UP = 0.5;
 /** Shapes tried per stretch before it settles for the least bad one. */
 const LAYOUT_TRIES = 24;
 /** A stand-in for stretches not laid yet: one shallow bend. */
@@ -162,7 +166,7 @@ interface Row {
   dir: number;
 }
 
-/** A bend on a stretch: `at` the way along its straight line, `off` to its left (map units), `lift` down the map. */
+/** A bend on a stretch: `at` the way along its straight line, `off` to its right (left when negative), `lift` down the map (up when negative), in map units. */
 interface Bend {
   at: number;
   off: number;
@@ -192,6 +196,8 @@ export function buildWorldMap(chapters: readonly ChapterInfo[], seed = LAYOUT_SE
     chapter.levelIds.forEach((id, k) => {
       let jitter = (rng.next() * 2 - 1) * NODE_JITTER;
       if (k === 0) jitter = Math.abs(jitter);
+      // The very first flag keeps clear of the island's corner, where the title's view ends.
+      if (c === 0 && k === 0) jitter = NODE_JITTER;
       if (k === chapter.levelIds.length - 1) jitter = k === 0 ? 0 : -Math.abs(jitter);
       row = nextRow(rng, row);
       levelIds.push(id);
@@ -238,9 +244,9 @@ function between(rng: Rng, [min, max]: readonly [number, number]): number {
 
 /**
  * The next flag after one at `last` (or the first flag, near the front by
- * the garage, with `null`): a
- * step up or down the map, often the same way as the step before, so the
- * road climbs or drops over a few flags instead of zigzagging. A step that
+ * the garage, with `null`): a step up or down the map, often the same way
+ * as the step before, so the road climbs or drops over a few flags instead
+ * of zigzagging. A step that
  * doesn't fit the band is cut short, or turns round when too little is left.
  */
 function nextRow(rng: Rng, last: Row | null): Row {
@@ -257,8 +263,8 @@ function rollStretch(rng: Rng): Stretch {
   const total = STRETCH_SHAPES.reduce((n, s) => n + s.weight, 0);
   let r = rng.next() * total;
   const shape = STRETCH_SHAPES.find((s) => (r -= s.weight) < 0) ?? STRETCH_SHAPES[0];
-  const side = rng.next() < 0.5 ? -1 : 1;
-  const lift = rng.next() < 0.5 ? -1 : 1;
+  const side = rng.next() < BEND_LEFT ? -1 : 1;
+  const lift = rng.next() < BEND_UP ? -1 : 1;
   return (shape?.bends ?? []).map((b) => ({
     at: between(rng, b.at),
     off: between(rng, b.off) * side * (b.flip ? -1 : 1),
@@ -283,8 +289,8 @@ function layRoad(
   /**
    * The faults on the road stretches `first` to `last` shape: from the last span
    * before their first flag (checked before with a stand-in for them) to the turn at
-   * their last flag (with a stand-in for the next stretch, which checks it again).
-   * The last stretch, to the end.
+   * their last flag (with a stand-in for the next stretch, which checks it again),
+   * or to the road's end for the last stretch.
    */
   const score = (first: number, last: number): number => {
     const { road, nodeWaypoints } = buildRoad(nodes, width, stretches);
