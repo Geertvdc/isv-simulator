@@ -52,8 +52,8 @@ export const PALETTE = {
 /**
  * The world map's colors (phase 19, made a circuit board in phase 20): the
  * island is a board whose solder mask turns from fresh green to grey city
- * paving left to right, with a dark FR4 edge, gold contact pads round its
- * rim and lighter traces on top; it floats on a dark editor-grid sea. The
+ * paving left to right, with a dark FR4 edge, gold contact fingers round
+ * its rim and lighter traces on top; it floats on a dark editor-grid sea. The
  * road is a data bus: dark, with copper edges and cyan packets.
  */
 export const MAP_PALETTE = {
@@ -76,8 +76,9 @@ export const MAP_PALETTE = {
     asphalt: 0x4a505c,
     plaza: 0xe6d8bb,
   },
-  /** The contact pads round the board's rim. */
-  sand: 0xe2b448,
+  /** The board's rim round the land, and the gold contact fingers on it. */
+  rim: 0x2f3d36,
+  pad: 0xe2b448,
   /** The board's edge under the solder mask: dark FR4. */
   earth: 0x26332e,
   /** The editor background the board floats on, and its grid lines. */

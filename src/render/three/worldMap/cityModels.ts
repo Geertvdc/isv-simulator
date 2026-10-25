@@ -905,7 +905,6 @@ export function treeModel(kind: 'tree' | 'roundTree' | 'bush'): ModelBuilder {
   return b;
 }
 
-/** Each kind's model; trees are instanced instead (see `treeModel`). */
 // ---- Engineering ----
 
 /** Status LEDs on a server: mostly green, some blue, now and then an amber one. */
@@ -1000,6 +999,7 @@ function antenna(p: CityPiece, { body: b, blink }: Parts): void {
   blink.led(0.04, C.warn, { at: [0, h + 0.24, 0] });
 }
 
+/** Each kind's model; trees are instanced instead (see `treeModel`). */
 const MODELS: Record<PieceKind, ((p: CityPiece, parts: Parts, rng: () => number) => void) | null> =
   {
     house: house,

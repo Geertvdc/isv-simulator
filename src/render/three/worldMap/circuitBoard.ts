@@ -15,6 +15,8 @@ import { BACKLOT, type GroundTile, labelRects, seeded } from './cityPlan';
 const PX = 64;
 const CELLS = 4;
 const CELL = PX / CELLS;
+/** The overlay texture's widest side, at most. */
+const MAX_TEXTURE = 4096;
 const TRACE = {
   width: 4,
   via: 6.5,
@@ -50,11 +52,16 @@ const TURN = [0, 4, 1, 5, 2, 6, 3, 7] as const;
 /** A transparent plane over the whole island with the board's traces, vias and silkscreen. */
 export function circuitOverlay(map: WorldMap, ground: readonly GroundTile[]): THREE.Mesh {
   const rows = map.height + BACKLOT;
+  // A bigger map draws at a smaller scale, so the texture stays within what every GPU takes.
+  const scale = Math.min(1, MAX_TEXTURE / (Math.max(map.width, rows) * PX));
   const canvas = document.createElement('canvas');
-  canvas.width = map.width * PX;
-  canvas.height = rows * PX;
+  canvas.width = Math.round(map.width * PX * scale);
+  canvas.height = Math.round(rows * PX * scale);
   const ctx = canvas.getContext('2d');
-  if (ctx) drawBoard(ctx, map, ground);
+  if (ctx) {
+    ctx.scale(scale, scale);
+    drawBoard(ctx, map, ground);
+  }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 8;
