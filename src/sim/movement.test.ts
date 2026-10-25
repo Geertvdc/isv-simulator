@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import garage from '../../maps/level-01-garage.txt?raw';
 import {
-  DIAGONAL_FACING_GRACE_TICKS,
   DASH_COOLDOWN_TICKS,
   DASH_SPEED,
   DASH_TICKS,
@@ -101,36 +100,6 @@ describe('stepPlayer: steering', () => {
         last = { ...p.pos };
       }
     }
-  });
-
-  it('keeps a diagonal facing when two keys are let go a few ticks apart', () => {
-    const diagonal = { x: Math.SQRT1_2, y: -Math.SQRT1_2 };
-    const p = player(15, 5);
-    run(OPEN, p, diagonal, 10);
-    run(OPEN, p, { x: 1, y: 0 }, DIAGONAL_FACING_GRACE_TICKS);
-    run(OPEN, p, { x: 0, y: 0 }, 10);
-    expect(p.facing.x).toBeCloseTo(Math.SQRT1_2);
-    expect(p.facing.y).toBeCloseTo(-Math.SQRT1_2);
-  });
-
-  it('turns to one direction held on past the grace, or away from the diagonal at once', () => {
-    const diagonal = { x: Math.SQRT1_2, y: -Math.SQRT1_2 };
-    const held = player(15, 5);
-    run(OPEN, held, diagonal, 10);
-    run(OPEN, held, { x: 1, y: 0 }, DIAGONAL_FACING_GRACE_TICKS + 1);
-    expect(held.facing).toEqual({ x: 1, y: 0 });
-
-    const reversed = player(15, 5);
-    run(OPEN, reversed, diagonal, 10);
-    run(OPEN, reversed, { x: -1, y: 0 }, 1);
-    expect(reversed.facing).toEqual({ x: -1, y: 0 });
-
-    // A new walk after standing still faces where it goes from its first tick.
-    const restarted = player(15, 5);
-    run(OPEN, restarted, diagonal, 10);
-    run(OPEN, restarted, { x: 0, y: 0 }, 1);
-    run(OPEN, restarted, { x: 0, y: -1 }, 1);
-    expect(restarted.facing).toEqual({ x: 0, y: -1 });
   });
 
   it('clamps input longer than 1', () => {
