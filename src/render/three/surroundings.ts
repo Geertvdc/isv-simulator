@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { LevelMap } from '../../sim/level';
-import { tileHash } from '../mapShape';
+import { levelSalt, tileHash } from '../mapShape';
 import { type Vec3, gridToWorld } from '../projection';
 import { type Character, applyPose, createExtra } from './Characters';
 import { type KitMaterials, type Model, kitMaterials } from './kit';
@@ -108,14 +108,23 @@ function small(piece: SetPiece): boolean {
  * cat) shows once, at the start of a far row. Pure and deterministic; no
  * two props overlap and nothing lands on the slab.
  */
-export function placeSetPieces(setting: string, width: number, height: number): Placement[] {
+export function placeSetPieces(
+  setting: string,
+  width: number,
+  height: number,
+  level = 0,
+): Placement[] {
   const s = SETTINGS[setting];
   if (!s) return [];
   const out: Placement[] = [];
   const left = -0.5;
   const right = width - 0.5;
   const back = -0.5;
-  const rare = [...s.rare];
+  // Each level its own outside: the rare pieces in another order, every row from its own seed.
+  const turn = s.rare.length > 0 ? level % s.rare.length : 0;
+  const rare = [...s.rare.slice(turn), ...s.rare.slice(0, turn)];
+  /** A row's seed: apart from every other row's (and their jitter's +1 to +5) and from other levels'. */
+  const seed = (row: number) => (Math.imul(level % 100003, 1024) + row * 8) >>> 0;
   /**
    * The pieces of a row in order: never one of the last two again, and a
    * piece that comes back comes in its next look. Side far rows (in view
@@ -212,12 +221,12 @@ export function placeSetPieces(setting: string, width: number, height: number): 
       x += sx + ROW_GAP_MIN + unit(i, salt) * (ROW_GAP_MAX - ROW_GAP_MIN);
     }
   };
-  side(s.far, 'far', -1, 37);
-  side(s.far, 'far', 1, 41);
-  along(s.far, 'far', 67);
-  along(s.near, 'near', 53);
-  side(s.near, 'near', -1, 11);
-  side(s.near, 'near', 1, 23);
+  side(s.far, 'far', -1, seed(37));
+  side(s.far, 'far', 1, seed(41));
+  along(s.far, 'far', seed(67));
+  along(s.near, 'near', seed(53));
+  side(s.near, 'near', -1, seed(11));
+  side(s.near, 'near', 1, seed(23));
   return out;
 }
 
@@ -229,6 +238,8 @@ export class Surroundings {
   readonly root = new THREE.Group();
   private readonly extras: Extra[] = [];
   private readonly geometries: THREE.BufferGeometry[] = [];
+  /** The level's own number, so its people and props differ from the next level's. */
+  private level = 0;
 
   /**
    * The surroundings' own materials: the kit's, a third darker, and screens
@@ -287,7 +298,8 @@ export class Surroundings {
       this.root.add(path);
     }
 
-    const placements = placeSetPieces(setting ?? '', width, height);
+    this.level = levelSalt(map);
+    const placements = placeSetPieces(setting ?? '', width, height, this.level);
     this.addProps(placements);
     let n = 0;
     // People only in the near rows (further out they'd only be clutter), and not too many.
@@ -387,8 +399,10 @@ export class Surroundings {
       lit: boolean,
     ) => {
       if (list.length === 0) return;
-      const merged = mergeGeometries(list, false);
+      const merged = mergeGeometries(list, false) as THREE.BufferGeometry | null;
       for (const g of list) g.dispose();
+      // Null when the pieces' attributes don't match: leave the layer out rather than crash.
+      if (!merged) return;
       this.geometries.push(merged);
       const mesh = new THREE.Mesh(merged, material);
       mesh.castShadow = cast;
@@ -408,7 +422,7 @@ export class Surroundings {
     pose: Extra['pose'],
     walk?: Extra['walk'],
   ): void {
-    const character = createExtra(n * 7 + 3, this.materials);
+    const character = createExtra(n * 7 + 3 + (this.level % 61), this.materials);
     put(character.root, at);
     character.root.rotation.y = yaw;
     // Hands are too small to matter in a shadow out here.

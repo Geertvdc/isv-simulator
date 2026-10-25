@@ -580,8 +580,8 @@ export const WALL_DECO_MODELS: Readonly<Record<string, () => Model>> = {
         0,
       ),
     );
-    b.sphere(0.045, 0xf2c94c, { at: [0.08, 0.67, 0.6] }, [1.2, 0.8, 1]);
-    b.sphere(0.03, 0xf2c94c, { at: [0.1, 0.71, 0.6] });
+    b.sphere(0.045, 0x5fc4b8, { at: [0.08, 0.67, 0.6] }, [1.2, 0.8, 1]);
+    b.sphere(0.03, 0x5fc4b8, { at: [0.1, 0.71, 0.6] });
     b.cylinder(0.04, 0.032, 0.06, 0xd0704a, { at: [0.24, 0.67, 0.58] }, 10);
     b.capsule(0.025, 0.06, 0x5f9a62, { at: [0.24, 0.74, 0.58] });
     return b.build();

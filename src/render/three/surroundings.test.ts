@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { placeSetPieces } from './surroundings';
+import { parseLevelMap } from '../../sim/level';
+import { CHAPTERS } from '../../sim/levels';
+import { levelSalt } from '../mapShape';
+import { Surroundings, placeSetPieces } from './surroundings';
 import { SETTINGS, WALL_TOP_PROPS } from './setDressing';
 
 describe('placeSetPieces', () => {
@@ -130,6 +133,16 @@ describe('placeSetPieces', () => {
     });
   }
 
+  it('gives two levels of a chapter, the same size, their own surroundings', () => {
+    const a = placeSetPieces('garage', 14, 10, 1234567);
+    const b = placeSetPieces('garage', 14, 10, 7654321);
+    const look = (p: (typeof a)[number]) =>
+      `${SETTINGS.garage?.near.indexOf(p.piece)}:${p.variant}`;
+    expect(a.map(look)).not.toEqual(b.map(look));
+    // Still the same for the same level.
+    expect(placeSetPieces('garage', 14, 10, 1234567)).toEqual(a);
+  });
+
   it('places nothing for a level without a setting', () => {
     expect(placeSetPieces('nowhere', 14, 10)).toEqual([]);
   });
@@ -151,5 +164,48 @@ describe('set pieces', () => {
     expect(WALL_TOP_PROPS.length).toBeGreaterThanOrEqual(12);
     for (const prop of WALL_TOP_PROPS)
       expect(prop().body.getAttribute('position').count).toBeGreaterThan(0);
+  });
+});
+
+describe('Surroundings', () => {
+  const map = parseLevelMap(
+    ['##############', '#1...3....2.4#', '#............#', '##############'].join('\n'),
+  );
+
+  it('builds the world round a level for every chapter', () => {
+    for (const setting of Object.keys(SETTINGS)) {
+      const world = new Surroundings(map, setting);
+      expect(world.root.children.length, setting).toBeGreaterThan(4);
+      world.destroy();
+    }
+  });
+
+  it('salts every level apart by its map', () => {
+    const other = parseLevelMap(
+      ['##############', '#1..3.#...2.4#', '#............#', '##############'].join('\n'),
+    );
+    expect(levelSalt(map)).not.toBe(levelSalt(other));
+    expect(levelSalt(map)).toBe(
+      levelSalt(
+        parseLevelMap(
+          ['##############', '#1...3....2.4#', '#............#', '##############'].join('\n'),
+        ),
+      ),
+    );
+  });
+});
+
+describe('the real levels', () => {
+  it('each get their own surroundings, also next to a level of the same chapter and size', () => {
+    for (const chapter of CHAPTERS) {
+      const seen = new Set<string>();
+      for (const level of chapter.levels) {
+        const { width, height } = level.map;
+        const placed = placeSetPieces(chapter.id, width, height, levelSalt(level.map));
+        const key = placed.map((p) => `${p.variant}:${p.yaw.toFixed(3)}`).join();
+        expect(seen.has(key), level.id).toBe(false);
+        seen.add(key);
+      }
+    }
   });
 });
