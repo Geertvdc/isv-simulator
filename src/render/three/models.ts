@@ -617,13 +617,15 @@ export const WALL_DECO_MODELS: Readonly<Record<string, () => Model>> = {
     return b.build();
   },
   tv: () => {
-    // A wall TV with the build status: a row of green checks and one amber.
+    // A wall TV in a light bezel with the build status: green checks, an amber and a red one.
     const b = new ModelBuilder();
-    b.box(0.74, 0.44, 0.04, INK, { at: [0, 0.72, 0.52] }, 0.012);
+    b.box(0.74, 0.44, 0.04, 0xc9ccd2, { at: [0, 0.72, 0.52] }, 0.012);
     b.screen(0.68, 0.38, 0x162a3a, { at: [0, 0.72, 0.542] });
     for (let i = 0; i < 4; i++) {
       b.screen(0.4, 0.04, 0x2f4a5f, { at: [0.06, 0.84 - i * 0.08, 0.543] });
-      b.screen(0.05, 0.05, i === 2 ? 0xffc04a : 0x5cf0a8, { at: [-0.22, 0.84 - i * 0.08, 0.544] });
+      b.screen(0.05, 0.05, i === 2 ? 0xffc04a : i === 3 ? 0xff7a6a : 0x5cf0a8, {
+        at: [-0.22, 0.84 - i * 0.08, 0.544],
+      });
     }
     return b.build();
   },

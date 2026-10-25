@@ -126,26 +126,42 @@ export function placeSetPieces(
   /** A row's seed: apart from every other row's (and their jitter's +1 to +5) and from other levels'. */
   const seed = (row: number) => (Math.imul(level % 100003, 1024) + row * 8) >>> 0;
   /**
-   * The pieces of a row in order: never one of the last two again, and a
-   * piece that comes back comes in its next look. Side far rows (in view
-   * from the back edge forward) take the rare pieces at slots 0 and 2.
+   * The pieces of a row in order, dealt from a shuffled bag: every piece
+   * once (in an order hashed from the row's seed) before any comes again,
+   * never one of the last two again (at the bag's edge the next bag's first
+   * steps in), and a piece that comes back comes in its next look. Side far
+   * rows (in view from the back edge forward) take the rare pieces at slots
+   * 0 and 2.
    */
   const pick = (row: readonly SetPiece[], takesRare: boolean, salt: number) => {
     const recent: SetPiece[] = [];
     const uses = new Map<SetPiece, number>();
     const avoid = Math.min(AVOID_RECENT, row.length - 1);
+    const bag: SetPiece[] = [];
+    let deals = 0;
+    /** Adds the row's pieces to the bag in a freshly hashed order (Fisher-Yates). */
+    const refill = () => {
+      const fresh = [...row];
+      for (let k = fresh.length - 1; k > 0; k--) {
+        const j = mixed(deals * 97 + k, salt) % (k + 1);
+        [fresh[k], fresh[j]] = [fresh[j] as SetPiece, fresh[k] as SetPiece];
+      }
+      deals++;
+      bag.push(...fresh);
+    };
     let i = 0;
     return (): { piece: SetPiece; variant: number } | null => {
       const slot = i++;
       let piece: SetPiece | undefined;
       if (takesRare && (slot === 0 || slot === 2) && rare.length > 0) piece = rare.shift();
       else {
-        let index = mixed(slot, salt) % row.length;
         const blocked = recent.slice(recent.length - avoid);
-        for (let k = 0; k < row.length && blocked.includes(row[index] as SetPiece); k++) {
-          index = (index + 1) % row.length;
+        let at = bag.findIndex((p) => !blocked.includes(p));
+        if (at < 0) {
+          refill();
+          at = bag.findIndex((p) => !blocked.includes(p));
         }
-        piece = row[index];
+        piece = bag.splice(Math.max(0, at), 1)[0];
       }
       if (!piece) return null;
       if (avoid > 0) recent.push(piece);

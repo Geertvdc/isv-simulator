@@ -63,8 +63,8 @@ export const WALL_TOP_PROPS: readonly (() => Model)[] = [
     b.cylinder(0.004, 0.004, 0.05, STEEL, { at: [0, 0.26, 0] }, 4);
   }, 1.9),
   wallTop((b) => {
-    // A beige CRT, still on.
-    b.box(0.3, 0.24, 0.26, 0xd8d0b8, { at: [0, 0.12, 0] }, 0.03);
+    // An old grey CRT, still on: darker than any ticket.
+    b.box(0.3, 0.24, 0.26, 0x6a6e76, { at: [0, 0.12, 0] }, 0.03);
     b.screen(0.22, 0.16, 0x3a8a6a, { at: [0, 0.13, 0.131] });
   }, 1.3),
   wallTop((b) => {

@@ -152,7 +152,7 @@ export const bushes = looks([1, 1], 4, (b, v) => {
   }
   b.sphere(0.32, v === 3 ? LEAF_DARK : LEAF, { at: [-0.12, 0.25, 0] }, [1, 0.8, 1]);
   b.sphere(0.26, LEAF_LIGHT, { at: [0.2, 0.22, 0.1] }, [1, 0.8, 1]);
-  const flowers = nth([[0xff6b8a, 0xffd166], [0xc8a8ff, 0xf4f1ea], [], [0xf4f1ea, 0xf4f1ea]], v);
+  const flowers = nth([[0xe88ab8, 0xf2ecc8], [0xc8a8ff, 0xf4f1ea], [], [0xf4f1ea, 0xf4f1ea]], v);
   flowers.forEach((c, i) => b.sphere(0.06, c, { at: [i ? -0.2 : 0.1, 0.46, i ? 0.1 : 0.2] }));
 });
 

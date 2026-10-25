@@ -72,7 +72,7 @@ export function treeModel(kind: TreeKind): ModelBuilder {
     leaves(0.22, C.leaf, [-0.08, 0.17, 0], 0.8);
     leaves(0.18, C.leafLight, [0.14, 0.15, 0.07], 0.8);
     leaves(0.045, 0xff6b8a, [0.07, 0.31, 0.14]);
-    leaves(0.045, 0xffd166, [-0.14, 0.33, 0.07]);
+    leaves(0.045, 0xf2ecc8, [-0.14, 0.33, 0.07]);
   }
   return b;
 }
