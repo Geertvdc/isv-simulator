@@ -250,6 +250,13 @@ export const WINDOW_FILES = {
   roomCode: 'room.code',
 } as const;
 
+/** The branch on the left of the menus' status bar. */
+export const STATUS_BRANCH = '⎇ main';
+/** Over the chapter's name on the level select: the folder the chapters sit in. */
+export const CHAPTER_FOLDER = '~/campaign/';
+/** The label on the left half of the level select's star badge. */
+export const STAR_BADGE_LABEL = 'stars';
+
 /** A level's file in its window's title bar, e.g. "level-2-1.ts". */
 export function levelFile(chapter: number, level: number): string {
   return `level-${chapter}-${level}.ts`;

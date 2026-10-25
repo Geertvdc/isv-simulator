@@ -10,6 +10,7 @@ import type { OnlineError } from '../flow/flow';
 import { NET_JOIN_CODE_LENGTH } from '../sim/balance';
 import { ONLINE_TEXT } from '../sim/content';
 import { el } from './dom';
+import { statusBar } from './statusBar';
 import type { ScreenView } from './screens';
 
 export interface JoinCodeDeps {
@@ -43,7 +44,7 @@ export function mountJoinCode(root: HTMLElement, deps: JoinCodeDeps): ScreenView
     el('div', 'join-code-prompt', ONLINE_TEXT.joinPrompt),
     boxes,
     status,
-    el('div', 'screen-hint', ONLINE_TEXT.joinCodeHint),
+    statusBar(ONLINE_TEXT.joinCodeHint),
   );
   root.append(screen);
 

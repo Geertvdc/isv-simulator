@@ -14,6 +14,7 @@ import { type Identity, normalizeUserId } from '../flow/identity';
 import type { FlowView } from '../render/GameScene';
 import { MENU_HINT, MENU_LABELS, PROFILE_TEXT, WINDOW_FILES } from '../sim/content';
 import { el } from './dom';
+import { statusBar } from './statusBar';
 import { createMenu } from './menu';
 import type { ScreenView } from './screens';
 
@@ -99,7 +100,7 @@ export function mountProfile(root: HTMLElement, deps: ProfileDeps): ProfileScree
     card,
     menu.root,
     notes,
-    el('div', 'screen-hint', MENU_HINT),
+    statusBar(MENU_HINT),
   );
 
   // The dialog: a label, a text box, an error line and the keys.
