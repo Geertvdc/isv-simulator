@@ -24,6 +24,20 @@ export const CORNER_NUDGE = 0.25;
 /** Corner nudging only kicks in while sideways input is below this, so it never fights the player. */
 export const CORNER_NUDGE_MAX_SIDE_INPUT = 0.3;
 /**
+ * How far (tiles) steering feels ahead along each axis for a wall. Input
+ * into a wall it touches isn't accelerated toward, so a diagonal that grazes
+ * a corner keeps its speed along the wall instead of spending it on the wall.
+ */
+export const WALL_PROBE = 0.002;
+/**
+ * Ticks a diagonal facing survives input dropping to one of its two
+ * directions. Keyboard diagonals rarely release both keys on the same tick;
+ * without this the player would snap 45° as they stop.
+ */
+export const DIAGONAL_FACING_GRACE_TICKS = 4;
+/** A move counts as diagonal (for that grace) when both parts are at least this share of it. */
+export const DIAGONAL_MIN_SHARE = 0.38;
+/**
  * Share of the overlap between two players removed per tick. Below 1 so
  * bumping into someone is a soft, squishy shove instead of a hard wall.
  */
