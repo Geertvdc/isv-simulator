@@ -16,8 +16,8 @@ Each step is built by one agent, then checked twice by separate critic agents (t
 - [x] Diagonal walking looks as smooth as straight walking
 - [x] The world map road has no repeating zigzag; every chapter's stretch looks different
 - [x] The title, map and menu panels read as a software/engineering game, not an Overcooked copy
-- [ ] Props in levels and on the map show many more distinct models and variations, with few neighbours alike
-- [ ] `npm run check` and `npm run build` pass; screenshots retaken where the look changed
+- [x] Props in levels and on the map show many more distinct models and variations, with few neighbours alike
+- [x] `npm run check` and `npm run build` pass; screenshots retaken where the look changed
 
 ## Out of scope
 
@@ -34,3 +34,9 @@ Step 3, the software look:
 - **Type:** the system's monospace stack (`ui-monospace`, SF Mono, Cascadia Mono, Menlo, Consolas…) for labels, numbers, menus and headings; level names, blurbs and tips stay in the system sans for reading at couch distance. No font files.
 - **Words** shown by the CSS (title-bar file names, the status bar's branch, the chapter folder, the badge's `stars`) are text, so they live in `content.ts` (`WINDOW_FILES`, `levelFile`, `playerFile`, `STATUS_BRANCH`, `CHAPTER_FOLDER`, `STAR_BADGE_LABEL`) and reach the CSS through `data-*` attributes. The decorations (title bars, line numbers, prompts, brackets) have empty alt text, so screen readers skip them.
 - **Motion:** the cursors blink, except with reduced motion, where they stay lit (and the logo doesn't slide in). The screenshot script asks for reduced motion, so every shot shows the cursors the same way.
+
+Step 4, varied set dressing:
+
+- **Levels:** every chapter's rows draw from 11 to 13 pieces (was 4 to 7), new ones in each (workbenches, wheelie bins, tires, old PCs, sheds, fences and kennels in the Garage; standing desks, bookshelves, whiteboards on wheels, fridges, foosball, high tables, server racks and a mini ramp in the Startup; phone booths, kitchen islands and lockers in the Scale-Up; vending machines, coat racks and shredders in the Enterprise; benches, sorting bins, scooter docks, drone pads, lamp posts, solar panels, a shuttle stop and a sculpture at Big Tech). Most pieces come in 2 to 10 looks (`variants`): other plants and pots, other things on a desk or shelf, another paint job. A row never repeats its last two pieces, and a piece that comes back comes in its next look. Each copy gets its own brightness and a warm or cool cast, and props nobody stands at their own height, width (never past the footprint) and a wider turn when small. The props merge into four meshes (near, far, glow, glass) instead of one instanced mesh per kind, so the extra looks cost no draw calls.
+- **Office walls:** 15 things on wall tops (was 3: plants in five kinds, book piles, a rubber duck, a robot, a CRT, a lava lamp, a trophy, a globe, a coffee maker, a router), one wall in five, none the same as one within 4 tiles; five more wall decorations (frames, a shelf, a pinboard, a `{ }` neon sign, a build-status TV), none the same as one within 4 tiles along the wall.
+- **Map:** kinds have styles (`STYLES` in `cityPlan.ts`): houses 6 (gable either way with a porch, hip, flat with solar panels, shed roof, with a garage), offices 5 (window grid, ribbon windows, fins, setback, shops with awnings) with 5 kinds of roof (AC units, a water tower, a mast, solar panels, a lit sign), towers and glass towers 4, cars 4 bodies, and the small props 2 or 3; chimneys, dishes, lit windows and bushes come and go per piece. The planner gives a piece a style its nearest neighbour of the same kind doesn't have and that its chapter has used least, picks fillers again rather than clump one kind, and rows don't repeat a kind. New trees (pines, birches, palms at Big Tech), each tree tinted and widened on its own, and new props (bins, hydrants, bus stops, bike racks, food trucks, sheds, solar panels, cooling units, cable spools, drone pads, delivery robots, EV chargers). All of it is seeded, so the flow, server and renderer still agree.
