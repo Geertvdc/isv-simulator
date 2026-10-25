@@ -31,61 +31,65 @@ export const STREET = { row: -1, laneOffset: 0.2, end: 0.65 };
  */
 export const SILHOUETTE = 1 / Math.tan((56 * Math.PI) / 180);
 
-export type PieceKind =
+/** Every kind of piece on the map, by chapter theme. */
+export const PIECE_KINDS = [
   // Garage town
-  | 'house'
-  | 'garage'
-  | 'fence'
-  | 'mailbox'
-  | 'bike'
+  'house',
+  'garage',
+  'fence',
+  'mailbox',
+  'bike',
   // Startup park
-  | 'warehouse'
-  | 'cowork'
-  | 'kiosk'
-  | 'scooter'
-  | 'bench'
-  | 'pingPong'
-  | 'picnic'
+  'warehouse',
+  'cowork',
+  'kiosk',
+  'scooter',
+  'bench',
+  'pingPong',
+  'picnic',
   // Scale-up downtown
-  | 'office'
-  | 'crane'
-  | 'lamp'
-  | 'car'
+  'office',
+  'crane',
+  'lamp',
+  'car',
   // Enterprise city
-  | 'tower'
-  | 'hq'
-  | 'fountain'
-  | 'planter'
+  'tower',
+  'hq',
+  'fountain',
+  'planter',
   // Big Tech campus
-  | 'glassTower'
-  | 'campus'
-  | 'skyscraper'
-  | 'helipad'
-  | 'hedge'
+  'glassTower',
+  'campus',
+  'skyscraper',
+  'helipad',
+  'hedge',
   // Engineering, here and there from the garage on
-  | 'serverRack'
-  | 'dish'
-  | 'antenna'
-  | 'solar'
-  | 'cooling'
-  | 'spool'
-  | 'dronePad'
-  | 'robot'
-  | 'evCharger'
+  'serverRack',
+  'dish',
+  'antenna',
+  'solar',
+  'cooling',
+  'spool',
+  'dronePad',
+  'robot',
+  'evCharger',
   // Street furniture and the like
-  | 'shed'
-  | 'bin'
-  | 'hydrant'
-  | 'busStop'
-  | 'bikeRack'
-  | 'foodTruck'
+  'shed',
+  'bin',
+  'hydrant',
+  'busStop',
+  'bikeRack',
+  'foodTruck',
   // Everywhere: trees (instanced, they sway)
-  | 'tree'
-  | 'roundTree'
-  | 'pine'
-  | 'birch'
-  | 'palm'
-  | 'bush';
+  'tree',
+  'roundTree',
+  'pine',
+  'birch',
+  'palm',
+  'bush',
+] as const;
+
+export type PieceKind = (typeof PIECE_KINDS)[number];
 
 /** The trees and bushes: instanced and swaying, not merged. */
 export const TREE_KINDS = ['tree', 'roundTree', 'pine', 'birch', 'palm', 'bush'] as const;

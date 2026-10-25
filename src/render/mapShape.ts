@@ -81,32 +81,46 @@ export const WALL_DECO_SPREAD = 4;
 /** One in this many front-facing walls gets a decoration. */
 const WALL_DECO_EVERY = 3;
 
+/**
+ * A number for a level's own layout (from its tiles), so two levels of a
+ * chapter get different surroundings and wall clutter. Render only.
+ */
+export function levelSalt(map: Pick<LevelMap, 'width' | 'height' | 'tiles'>): number {
+  let h = 2166136261;
+  const text = `${map.width}x${map.height}:${map.tiles.join(',')}`;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
 /** Small deterministic hash of a tile, so decorations stay put between runs. */
 export function tileHash(x: number, y: number): number {
   return (Math.imul(x, 73856093) ^ Math.imul(y, 19349663)) >>> 0;
 }
 
 /** The decoration a tile would get by its hash alone, as an index, or null. */
-function decoIndex(x: number, y: number, count: number): number | null {
-  const hash = tileHash(x, y);
+function decoIndex(x: number, y: number, count: number, level: number): number | null {
+  const hash = (tileHash(x, y) ^ level) >>> 0;
   if (hash % WALL_DECO_EVERY !== 0 || count === 0) return null;
   return Math.floor(hash / WALL_DECO_EVERY) % count;
 }
 
 /**
  * The decoration hung on the front of the wall on tile (x, y) with this
- * theme, if any. Only asked of `wall` pieces. Picked by the tile's hash, then
+ * theme, if any, in the level `level` (its `levelSalt`). Only asked of `wall` pieces. Picked by the tile's hash, then
  * moved on from any decoration just before it along the wall, so two close
  * by never match.
  */
-export function wallDeco(x: number, y: number, theme: WallTheme): string | null {
+export function wallDeco(x: number, y: number, theme: WallTheme, level = 0): string | null {
   const decos = WALL_DECOS[theme];
-  if (decoIndex(x, y, decos.length) === null) return null;
+  if (decoIndex(x, y, decos.length, level) === null) return null;
   // Walk the row from its start (maps are a few dozen tiles wide), so every tile settles the same way.
   const picked: [number, number][] = [];
   let mine = 0;
   for (let k = Math.min(0, x); k <= x; k++) {
-    let index = decoIndex(k, y, decos.length);
+    let index = decoIndex(k, y, decos.length, level);
     if (index === null) continue;
     const near = picked.filter(([px]) => k - px <= WALL_DECO_SPREAD).map(([, i]) => i);
     for (let t = 0; t < decos.length && near.includes(index); t++)

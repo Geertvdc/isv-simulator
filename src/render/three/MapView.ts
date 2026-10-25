@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CONVEYOR_TICKS, TICKS_PER_SECOND } from '../../sim/balance';
 import { type LevelMap, type Tile, conveyorAt, getTile, isWorkSurface } from '../../sim/level';
 import type { MapLook } from '../mapLook';
-import { type WallPiece, tileHash, wallDeco, wallPiece } from '../mapShape';
+import { type WallPiece, levelSalt, tileHash, wallDeco, wallPiece } from '../mapShape';
 import { VIEW3D_PITCH, type Vec3, gridToWorld } from '../projection';
 import { type KitMaterials, type Model, ModelBuilder, kitMaterials } from './kit';
 import {
@@ -64,9 +64,10 @@ function wallClutter(
   y: number,
   piece: WallPiece,
   look: MapLook,
+  level: number,
 ): number | undefined {
   if (piece === 'wall-front' || look.walls === 'glass') return undefined;
-  const h = tileHash(x, y);
+  const h = (tileHash(x, y) ^ level) >>> 0;
   if (h % CLUTTER_EVERY !== 0) return undefined;
   if (getTile(map, x, y - 1) === 'floor') return undefined;
   for (let dy = -1; dy <= 1; dy++) {
@@ -145,6 +146,8 @@ export function buildMap(map: LevelMap, look: MapLook): MapView {
   };
 
   const clutterPlaced: { x: number; y: number; index: number }[] = [];
+  // Each level its own clutter and decorations, even where two maps share a wall.
+  const level = levelSalt(map);
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const tile = getTile(map, x, y);
@@ -182,15 +185,15 @@ export function buildMap(map: LevelMap, look: MapLook): MapView {
         });
         // Only on walls with open floor in front: not behind a station or counter.
         const open = getTile(map, x, y + 1) === 'floor';
-        const deco = piece === 'wall' && open ? wallDeco(x, y, look.walls) : null;
-        const wanted = wallClutter(map, x, y, piece, look);
+        const deco = piece === 'wall' && open ? wallDeco(x, y, look.walls, level) : null;
+        const wanted = wallClutter(map, x, y, piece, look, level);
         const clutterIndex =
           wanted === undefined ? undefined : unlikeNeighbours(wanted, x, y, clutterPlaced);
         const clutter = clutterIndex === undefined ? undefined : WALL_TOP_PROPS[clutterIndex];
         if (clutter && clutterIndex !== undefined) {
           clutterPlaced.push({ x, y, index: clutterIndex });
           // Square to the wall, give or take a little.
-          const h = tileHash(y, x);
+          const h = (tileHash(y, x) ^ level) >>> 0;
           const turn = ((h % 4) * Math.PI) / 2 + (((h >> 2) % 3) - 1) * 0.15;
           place(`clutter:${clutterIndex}`, clutter, {
             at: gridToWorld(x, y, WALL_HEIGHT),
