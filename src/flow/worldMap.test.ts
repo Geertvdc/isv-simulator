@@ -191,6 +191,11 @@ describe('world map layout', () => {
         if (!before) return;
         expect(node.x - before.x).toBeGreaterThanOrEqual(2.3);
         expect(Math.abs(node.y - before.y)).toBeGreaterThanOrEqual(1.2 - 1e-9);
+        // Steep enough for up or down to drive there (the cursor's dot product over 0.3),
+        // with a margin.
+        const dx = node.x - before.x;
+        const dy = node.y - before.y;
+        expect(Math.abs(dy) / Math.hypot(dx, dy)).toBeGreaterThan(0.31);
       });
     }
   });

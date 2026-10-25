@@ -246,8 +246,8 @@ function between(rng: Rng, [min, max]: readonly [number, number]): number {
  * The next flag after one at `last` (or the first flag, near the front by
  * the garage, with `null`): a step up or down the map, often the same way
  * as the step before, so the road climbs or drops over a few flags instead
- * of zigzagging. A step that
- * doesn't fit the band is cut short, or turns round when too little is left.
+ * of zigzagging. A step that doesn't fit the band is cut short, or turns
+ * round when too little is left.
  */
 function nextRow(rng: Rng, last: Row | null): Row {
   if (last === null) return { y: between(rng, [NODE_Y.max - FIRST_ROW_DEPTH, NODE_Y.max]), dir: 1 };
