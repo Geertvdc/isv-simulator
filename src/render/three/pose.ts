@@ -191,3 +191,112 @@ export function turnToward(from: number, to: number, maxStep: number): number {
   if (Math.abs(d) <= maxStep) return to;
   return from + Math.sign(d) * maxStep;
 }
+
+/**
+ * A character counts as standing once where they're drawn hasn't changed
+ * for this long: the game is paused, on the results, a scene shot is
+ * frozen, or they're pressed into a wall. Longer than a frame without a
+ * sim tick on a fast screen.
+ */
+const STILL_MS = 120;
+
+/** Where a character was last drawn somewhere new: visual-only memory. */
+export interface Motion {
+  x: number;
+  y: number;
+  movedAtMs: number;
+}
+
+export function createMotion(): Motion {
+  return { x: Number.NaN, y: Number.NaN, movedAtMs: -Infinity };
+}
+
+/**
+ * Notes where a character is drawn at `timeMs`; returns whether they're
+ * moving (drawn somewhere new within `STILL_MS`). Speeds frozen in a
+ * stopped game then don't keep them walking on the spot. Mutates `motion`.
+ */
+export function noteMotion(motion: Motion, pos: { x: number; y: number }, timeMs: number): boolean {
+  if (pos.x !== motion.x || pos.y !== motion.y) {
+    motion.x = pos.x;
+    motion.y = pos.y;
+    motion.movedAtMs = timeMs;
+  }
+  return timeMs - motion.movedAtMs < STILL_MS;
+}
+
+/**
+ * How long after the facing turns from a diagonal to one of its two
+ * straight directions a stop still keeps the diagonal. Keys of a keyboard
+ * diagonal are rarely let go on the same tick: the first one up turns the
+ * player straight a tick or few before they stop.
+ */
+const DIAGONAL_HOLD_MS = 120;
+/** Below this share of full speed a character counts as stopping. */
+const STOPPING_SHARE = 0.4;
+/** Yaws within this of a multiple of π/2 are straight; the rest diagonal. */
+const STRAIGHT_TOLERANCE = 0.2;
+
+/** What the facing shown on screen remembers: visual-only, the sim's facing is untouched. */
+export interface FacingHold {
+  /** The last diagonal yaw the sim faced, or `null`. */
+  diagonal: number | null;
+  /** When the facing went straight from that diagonal, or `null` while still on it. */
+  leftAtMs: number | null;
+  /** Stopped in time: the diagonal stays shown until they move or turn again. */
+  held: boolean;
+}
+
+export function createFacingHold(): FacingHold {
+  return { diagonal: null, leftAtMs: null, held: false };
+}
+
+function angleBetween(a: number, b: number): number {
+  const d = Math.abs(a - b) % (Math.PI * 2);
+  return d > Math.PI ? Math.PI * 2 - d : d;
+}
+
+function isStraight(yaw: number): boolean {
+  const quarter = Math.PI / 2;
+  const off = Math.abs(yaw / quarter - Math.round(yaw / quarter)) * quarter;
+  return off < STRAIGHT_TOLERANCE;
+}
+
+/**
+ * The yaw to draw a character turning toward, given the sim's facing `yaw`.
+ * When the facing goes from a diagonal to one of its straight halves and
+ * the character stops within `DIAGONAL_HOLD_MS`, they keep showing the
+ * diagonal (no 45° snap as two keys come up a tick apart). Acting along
+ * the facing (a dash, a throw wind-up), walking on or any other turn shows
+ * the sim's facing. Mutates `hold`.
+ */
+export function shownYaw(
+  hold: FacingHold,
+  yaw: number,
+  speed: number,
+  fullSpeed: number,
+  acting: boolean,
+  timeMs: number,
+): number {
+  const stopping = speed < fullSpeed * STOPPING_SHARE;
+  if (acting || !isStraight(yaw)) {
+    // A dash or a throw goes where the sim faces, so show that.
+    hold.diagonal = acting ? null : yaw;
+    hold.leftAtMs = null;
+    hold.held = false;
+    return yaw;
+  }
+  const near = hold.diagonal !== null && angleBetween(yaw, hold.diagonal) < Math.PI / 4 + 0.1;
+  if (near && hold.diagonal !== null) {
+    hold.leftAtMs ??= timeMs;
+    if (hold.held && stopping) return hold.diagonal;
+    if (!hold.held && timeMs - hold.leftAtMs <= DIAGONAL_HOLD_MS) {
+      if (stopping) hold.held = true;
+      return hold.diagonal;
+    }
+  }
+  hold.diagonal = null;
+  hold.leftAtMs = null;
+  hold.held = false;
+  return yaw;
+}
