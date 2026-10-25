@@ -14,7 +14,7 @@ Each step is built by one agent, then checked twice by separate critic agents (t
 ## Done when
 
 - [x] Diagonal walking looks as smooth as straight walking
-- [ ] The world map road has no repeating zigzag; every chapter's stretch looks different
+- [x] The world map road has no repeating zigzag; every chapter's stretch looks different
 - [ ] The title, map and menu panels read as a software/engineering game, not an Overcooked copy
 - [ ] Props in levels and on the map show many more distinct models and variations, with few neighbours alike
 - [ ] `npm run check` and `npm run build` pass; screenshots retaken where the look changed
