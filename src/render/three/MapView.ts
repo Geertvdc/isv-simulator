@@ -48,7 +48,9 @@ interface Placement {
 }
 
 /** One wall in this many gets clutter on top. */
-const CLUTTER_EVERY = 6;
+const CLUTTER_EVERY = 5;
+/** No two walls this close (in tiles, either way) carry the same clutter. */
+const CLUTTER_SPREAD = 4;
 
 /**
  * What stands on top of the wall on tile (x, y), if anything: plants, books
@@ -62,7 +64,7 @@ function wallClutter(
   y: number,
   piece: WallPiece,
   look: MapLook,
-): (() => Model) | undefined {
+): number | undefined {
   if (piece === 'wall-front' || look.walls === 'glass') return undefined;
   const h = tileHash(x, y);
   if (h % CLUTTER_EVERY !== 0) return undefined;
@@ -72,7 +74,27 @@ function wallClutter(
       if (isWorkSurface(getTile(map, x + dx, y + dy))) return undefined;
     }
   }
-  return WALL_TOP_PROPS[Math.floor(h / CLUTTER_EVERY) % WALL_TOP_PROPS.length];
+  return Math.floor(h / CLUTTER_EVERY) % WALL_TOP_PROPS.length;
+}
+
+/**
+ * `wanted`, or the next prop on from it that none of `placed` within
+ * `CLUTTER_SPREAD` tiles of (x, y) carries: neighbours never match.
+ */
+function unlikeNeighbours(
+  wanted: number,
+  x: number,
+  y: number,
+  placed: readonly { x: number; y: number; index: number }[],
+): number {
+  const near = placed
+    .filter((p) => Math.max(Math.abs(p.x - x), Math.abs(p.y - y)) <= CLUTTER_SPREAD)
+    .map((p) => p.index);
+  let index = wanted;
+  for (let t = 0; t < WALL_TOP_PROPS.length && near.includes(index); t++) {
+    index = (index + 1) % WALL_TOP_PROPS.length;
+  }
+  return index;
 }
 
 /** The level in 3D, and `update` for what moves on it (the belts). */
@@ -122,6 +144,7 @@ export function buildMap(map: LevelMap, look: MapLook): MapView {
     entry.at.push(p);
   };
 
+  const clutterPlaced: { x: number; y: number; index: number }[] = [];
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const tile = getTile(map, x, y);
@@ -160,12 +183,16 @@ export function buildMap(map: LevelMap, look: MapLook): MapView {
         // Only on walls with open floor in front: not behind a station or counter.
         const open = getTile(map, x, y + 1) === 'floor';
         const deco = piece === 'wall' && open ? wallDeco(x, y, look.walls) : null;
-        const clutter = wallClutter(map, x, y, piece, look);
-        if (clutter) {
+        const wanted = wallClutter(map, x, y, piece, look);
+        const clutterIndex =
+          wanted === undefined ? undefined : unlikeNeighbours(wanted, x, y, clutterPlaced);
+        const clutter = clutterIndex === undefined ? undefined : WALL_TOP_PROPS[clutterIndex];
+        if (clutter && clutterIndex !== undefined) {
+          clutterPlaced.push({ x, y, index: clutterIndex });
           // Square to the wall, give or take a little.
           const h = tileHash(y, x);
           const turn = ((h % 4) * Math.PI) / 2 + (((h >> 2) % 3) - 1) * 0.15;
-          place(`clutter:${WALL_TOP_PROPS.indexOf(clutter)}`, clutter, {
+          place(`clutter:${clutterIndex}`, clutter, {
             at: gridToWorld(x, y, WALL_HEIGHT),
             yaw: turn,
           });
