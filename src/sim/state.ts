@@ -2,7 +2,7 @@
  * The game state: plain JSON-serializable data, advanced only by `tick`.
  */
 
-import { INTERACT_REACH } from './balance';
+import { DIAGONAL_FACING_GRACE_TICKS, INTERACT_REACH } from './balance';
 import { type Belt, createBelts } from './conveyor';
 import type { GridPoint, LevelMap } from './level';
 import { type Level, type LevelSettings, settingsForPlayers } from './levels';
@@ -43,6 +43,11 @@ export interface Player {
   dashTicks: number;
   /** Ticks until the next dash may start. */
   dashCooldown: number;
+  /**
+   * Ticks since the move input was last diagonal (counts up to the grace
+   * period and stops). Lets a diagonal facing outlive keys let go one tick apart.
+   */
+  sinceDiagonal: number;
 }
 
 /**
@@ -112,6 +117,7 @@ export function newPlayer(id: PlayerId, pos: Vec): Player {
     dashHeld: false,
     dashTicks: 0,
     dashCooldown: 0,
+    sinceDiagonal: DIAGONAL_FACING_GRACE_TICKS + 1,
   };
 }
 

@@ -51,8 +51,8 @@ export function predictedView(
   const players = frame.state.players.map((player): Player => {
     const p = drawn.get(player.id);
     if (!p) return player;
-    const { pos, vel, facing, dashTicks, dashCooldown } = p;
-    return { ...player, pos, vel, facing, dashTicks, dashCooldown };
+    const { pos, vel, facing, dashTicks, dashCooldown, sinceDiagonal } = p;
+    return { ...player, pos, vel, facing, dashTicks, dashCooldown, sinceDiagonal };
   });
   return {
     state: { ...frame.state, players },
