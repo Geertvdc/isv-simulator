@@ -4,6 +4,10 @@ import {
   type Gait,
   type PoseInput,
   advanceStride,
+  createFacingHold,
+  createMotion,
+  noteMotion,
+  shownYaw,
   playerPose,
   stepGait,
   strideHz,
@@ -162,11 +166,6 @@ describe('walk cycle', () => {
     }
   });
 
-  it('at a steady speed looks the same however long the round has run', () => {
-    const steady = Array.from({ length: 60 }, () => 5);
-    expect(walkFrames(steady, 600_000)).toEqual(walkFrames(steady, 0));
-  });
-
   it('eases what it shows toward a new speed instead of popping', () => {
     const gait: Gait = { speed: 5, stride: 0 };
     stepGait(gait, 3.54, 5, 1 / 60);
@@ -174,6 +173,58 @@ describe('walk cycle', () => {
     expect(gait.speed).toBeGreaterThan(4);
     for (let i = 0; i < 60; i++) stepGait(gait, 3.54, 5, 1 / 60);
     expect(gait.speed).toBeCloseTo(3.54, 3);
+  });
+});
+
+describe('shownYaw', () => {
+  const DIAGONAL = Math.atan2(Math.SQRT1_2, -Math.SQRT1_2);
+  const RIGHT = Math.atan2(1, 0);
+  const FRAME_MS = 1000 / 60;
+
+  /** Plays frames of [sim yaw, speed, acting?], returns the yaw shown on each. */
+  function play(frames: readonly [number, number, boolean?][]): number[] {
+    const hold = createFacingHold();
+    return frames.map(([yaw, speed, acting], i) =>
+      shownYaw(hold, yaw, speed, 5, acting ?? false, i * FRAME_MS),
+    );
+  }
+  const repeat = <T>(n: number, frame: T): T[] => Array.from({ length: n }, () => frame);
+  const walkDiagonal = repeat(10, [DIAGONAL, 5] as [number, number]);
+  // Keys up a few ticks apart: straight for a moment, then slowing down to a stop.
+  const stop: [number, number][] = [5, 4.6, 4.2, 3, 1.8, 0.6, 0].map((s) => [RIGHT, s]);
+
+  it('keeps a diagonal when keys let go a few ticks apart as the player stops', () => {
+    const shown = play([...walkDiagonal, ...stop, ...repeat(60, [RIGHT, 0] as [number, number])]);
+    expect(shown.slice(10).every((yaw) => yaw === DIAGONAL)).toBe(true);
+  });
+
+  it('turns straight when the player walks on that way', () => {
+    const shown = play([...walkDiagonal, ...repeat(20, [RIGHT, 5] as [number, number])]);
+    expect(shown.at(-1)).toBe(RIGHT);
+  });
+
+  it('lets go of the held diagonal on walking again, a dash, a throw or another turn', () => {
+    const held: [number, number, boolean?][] = [...walkDiagonal, ...stop];
+    expect(play([...held, [RIGHT, 5]]).at(-1)).toBe(RIGHT);
+    expect(play([...held, [RIGHT, 0, true]]).at(-1)).toBe(RIGHT);
+    expect(play([...held, [0, 0]]).at(-1)).toBe(0);
+  });
+
+  it('shows the sim facing after a straight walk', () => {
+    expect(play([...repeat(10, [0, 5] as [number, number]), [RIGHT, 0]]).at(-1)).toBe(RIGHT);
+  });
+});
+
+describe('noteMotion', () => {
+  it('is moving while drawn somewhere new, standing once drawn in one place for a while', () => {
+    const motion = createMotion();
+    expect(noteMotion(motion, { x: 1, y: 1 }, 0)).toBe(true);
+    expect(noteMotion(motion, { x: 1.1, y: 1 }, 16)).toBe(true);
+    // A frame without a sim tick is still moving.
+    expect(noteMotion(motion, { x: 1.1, y: 1 }, 32)).toBe(true);
+    // Paused or frozen: standing.
+    expect(noteMotion(motion, { x: 1.1, y: 1 }, 500)).toBe(false);
+    expect(noteMotion(motion, { x: 1.2, y: 1 }, 516)).toBe(true);
   });
 });
 

@@ -17,18 +17,24 @@ import type { RoundView } from '../roundView';
 import { type Character, applyPose, createDeveloper, createManager } from './Characters';
 import type { KitMaterials } from './kit';
 import { facingYaw } from './layout';
-import { type Gait, type PoseInput, playerPose, stepGait, turnToward } from './pose';
+import {
+  type FacingHold,
+  type Gait,
+  type Motion,
+  type PoseInput,
+  createFacingHold,
+  createMotion,
+  noteMotion,
+  playerPose,
+  shownYaw,
+  stepGait,
+  turnToward,
+} from './pose';
 
 /** The ring on the floor around each player, in their color. */
 const RING = { inner: PLAYER_RADIUS * 0.95, outer: PLAYER_RADIUS * 1.25, lift: 0.006 };
 /** How fast characters turn to face a new way, radians per second. */
 const TURN_SPEED = 20;
-/**
- * The sim counts as stopped (paused, on the results, a frozen scene) once
- * its tick hasn't moved for this long; people then stop walking on the spot.
- * Longer than the gap between online snapshots.
- */
-const SIM_STALL_MS = 150;
 /** Working shows for this long after the last bit of progress, so a tick without any doesn't flicker. */
 const WORK_HOLD_MS = 200;
 
@@ -39,6 +45,10 @@ interface Person {
   phase: number;
   /** The walk cycle as drawn, integrated frame by frame so speed changes don't jump it. */
   gait: Gait;
+  /** Where they were last drawn moving, so frozen speeds don't walk them on the spot. */
+  motion: Motion;
+  /** Keeps a diagonal facing shown when they stop just after going straight. */
+  facing: FacingHold;
   /** Visual-only memory of the work in front of them. */
   work: WorkMemory;
   shovedAtMs: number | null;
@@ -58,8 +68,6 @@ export class People {
     -Math.PI / 2,
   );
   private lastMs: number | null = null;
-  private lastTick = -1;
-  private lastTickMs = -Infinity;
   private readonly seen = new Set<PlayerId>();
   private readonly seenManagers = new Set<number>();
 
@@ -78,12 +86,8 @@ export class People {
     const { state } = view;
     const dt = this.lastMs === null ? 0 : Math.max(0, (timeMs - this.lastMs) / 1000);
     this.lastMs = timeMs;
-    if (state.tick !== this.lastTick) {
-      this.lastTick = state.tick;
-      this.lastTickMs = timeMs;
-    }
-    // Stopped, the velocities stay frozen: don't keep walking on them.
-    const running = state.result === null && timeMs - this.lastTickMs < SIM_STALL_MS;
+    // Over, nobody walks: the last velocities stay frozen in the state.
+    const over = state.result !== null;
     for (const event of events) {
       if (event.type === 'shoved' || event.type === 'managerBumped') {
         const person = this.players.get(event.target);
@@ -98,15 +102,19 @@ export class People {
       if (!pos) continue;
       seen.add(player.id);
       let person = this.players.get(player.id);
-      const yaw = facingYaw(player.facing);
+      const simYaw = facingYaw(player.facing);
       if (!person) {
-        person = this.addDeveloper(player.id, yaw);
+        person = this.addDeveloper(player.id, simYaw);
         this.players.set(player.id, person);
       }
+      const moving = noteMotion(person.motion, pos, timeMs) && !over;
+      const speed = moving ? Math.hypot(player.vel.x, player.vel.y) : 0;
+      const acting = isDashing(player) || player.throwCharge > 0;
+      const yaw = shownYaw(person.facing, simYaw, speed, PLAYER_MAX_SPEED, acting, timeMs);
       this.place(person, gridToWorld(pos.x, pos.y), yaw, dt);
       applyPose(
         person.character,
-        playerPose(this.poseInput(state, player, person, timeMs, dt, running), timeMs),
+        playerPose(this.poseInput(state, player, person, timeMs, dt, speed), timeMs),
       );
     }
     this.drop(this.players, seen);
@@ -125,7 +133,8 @@ export class People {
       }
       this.place(person, gridToWorld(pos.x, pos.y), facingYaw(manager.facing), dt);
       const fullSpeed = MANAGER_SPEED * 1.6;
-      stepGait(person.gait, running && manager.walking ? MANAGER_SPEED : 0, fullSpeed, dt);
+      const moving = noteMotion(person.motion, pos, timeMs) && !over;
+      stepGait(person.gait, moving && manager.walking ? MANAGER_SPEED : 0, fullSpeed, dt);
       const input: PoseInput = {
         ...IDLE,
         speed: person.gait.speed,
@@ -154,10 +163,10 @@ export class People {
     person: Person,
     timeMs: number,
     dt: number,
-    running: boolean,
+    /** Speed over the floor as drawn: 0 when they aren't moving on screen. */
+    speed: number,
   ): PoseInput {
     const carrying = ticketCarriedBy(state, player.id) !== undefined;
-    const speed = running ? Math.hypot(player.vel.x, player.vel.y) : 0;
     stepGait(person.gait, speed, PLAYER_MAX_SPEED, dt);
     // The step on the station they face: its progress tells whether they work it.
     const target = targetTile(state, player.id);
@@ -213,6 +222,8 @@ export class People {
       phase: (id * 0.37) % 1,
       // Out of step with each other from the start too.
       gait: { speed: 0, stride: ((id * 0.37) % 1) * Math.PI * 2 },
+      motion: createMotion(),
+      facing: createFacingHold(),
       work: createWorkMemory(),
       shovedAtMs: null,
       ring,
