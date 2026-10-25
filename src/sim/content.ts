@@ -248,6 +248,7 @@ export const WINDOW_FILES = {
   profile: 'profile.json',
   profileMenu: 'profile.ts',
   roomCode: 'room.code',
+  profileDialog: 'prompt.txt',
 } as const;
 
 /** The branch on the left of the menus' status bar. */

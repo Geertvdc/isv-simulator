@@ -29,9 +29,9 @@ import {
 } from '../sim/content';
 import { parseCredits } from './credits';
 import { el } from './dom';
-import { statusBar } from './statusBar';
 import { createLogo } from './logo';
 import { type MenuLine, createMenu } from './menu';
+import { statusBar } from './statusBar';
 
 export interface ScreenView {
   /** Shows the screen for this flow, or hides it for `null`. */
