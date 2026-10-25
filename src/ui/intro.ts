@@ -14,6 +14,7 @@ import {
 } from '../sim/content';
 import { CHAPTERS } from '../sim/levels';
 import { el } from './dom';
+import { statusBar } from './statusBar';
 import { stepChips } from './game';
 import { introPicture } from './introPicture';
 import { levelRecipes } from './recipes';
@@ -32,7 +33,7 @@ export function mountIntro(root: HTMLElement): ScreenView {
   const screen = el('div', 'screen intro-screen');
   screen.hidden = true;
   const card = el('div', 'intro-card');
-  screen.append(card, el('div', 'screen-hint', INTRO_HINT));
+  screen.append(card, statusBar(INTRO_HINT));
   root.append(screen);
   /** The level and player count the card shows, so it is only built once per intro. */
   let shown = '';
