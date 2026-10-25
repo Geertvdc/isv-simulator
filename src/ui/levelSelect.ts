@@ -61,7 +61,7 @@ export function mountLevelSelect(root: HTMLElement): LevelSelectView {
   const status = el('div', 'map-card-status');
   card.append(number, name, blurb, stars, status);
 
-  const hint = statusBar(LEVEL_SELECT_HINT, 'map-hint');
+  const hint = statusBar(LEVEL_SELECT_HINT);
   const left = el('div', 'map-column map-column-left');
   const right = el('div', 'map-column map-column-right');
   left.append(banner, card);
