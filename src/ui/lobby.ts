@@ -4,7 +4,7 @@ import { KEY_SCHEMES, LEFT_KEYS, RIGHT_KEYS } from '../input/keyboard';
 import type { Lobby } from '../input/lobby';
 import { playerCssColor } from '../render/playerColors';
 import { playerBadge } from './playerBadge';
-import { LOBBY_BACK_HINT } from '../sim/content';
+import { LOBBY_BACK_HINT, playerFile } from '../sim/content';
 import { MAX_PLAYERS } from '../sim/level';
 
 export interface LobbyView {
@@ -76,6 +76,7 @@ export function mountLobby(root: HTMLElement): LobbyView {
         el.slot.classList.toggle('joined', player !== undefined);
         el.slot.style.setProperty('--player-color', playerCssColor(id));
         el.name.textContent = `Player ${id}`;
+        el.slot.dataset.file = playerFile(id);
         el.device.textContent = player ? deviceLabel(player.deviceId) : 'Enter or gamepad A';
       });
       hint.textContent = startHint(lobby) ?? '';

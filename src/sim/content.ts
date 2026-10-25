@@ -234,6 +234,32 @@ export const PAUSED_TITLE = 'Paused';
 export const SETTINGS_TITLE = 'Settings';
 export const CREDITS_TITLE = 'Credits';
 
+/**
+ * The file names in the menu windows' title bars: the menus look like a
+ * code editor, each window showing a file.
+ */
+export const WINDOW_FILES = {
+  title: 'main.ts',
+  pause: 'pause.ts',
+  settings: 'settings.json',
+  results: 'results.log',
+  resultsMenu: 'next.ts',
+  credits: 'CREDITS.md',
+  profile: 'profile.json',
+  profileMenu: 'profile.ts',
+  roomCode: 'room.code',
+} as const;
+
+/** A level's file in its window's title bar, e.g. "level-2-1.ts". */
+export function levelFile(chapter: number, level: number): string {
+  return `level-${chapter}-${level}.ts`;
+}
+
+/** A seat's file in the lobby, e.g. "player-2.ts". */
+export function playerFile(player: number): string {
+  return `player-${player}.ts`;
+}
+
 /** On a level's card: its chapter and place in it, e.g. "Level 2-1". */
 export function levelLabel(chapter: number, level: number): string {
   return `Level ${chapter}-${level}`;
