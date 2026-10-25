@@ -3,6 +3,8 @@ import type { WorldMap } from '../../../flow/worldMap';
 import { gridToWorld } from '../../projection';
 import { MAP_PALETTE } from '../look';
 import { BACKLOT, type GroundTile, labelRects, seeded } from './cityPlan';
+import { denseRoad, distanceToRoad } from './mapGeometry';
+import { markerSpots } from './markers';
 
 /**
  * The world map as a circuit board (phase 20): traces with vias at their
@@ -32,6 +34,10 @@ const TRACE = {
 const FOOTPRINT_EVERY = 8;
 /** How far round a level number the board stays plain, so the number reads (tiles). */
 const LABEL_CLEAR = 0.3;
+/** Nothing is printed this close to a flag's foot (its plate covers it). */
+const FLAG_CLEAR = 0.6;
+/** Footprints keep this far from the road's middle line, so no part name hides under its edge. */
+const FOOTPRINT_ROAD_CLEAR = 0.8;
 /** The overlay lies this high, just over the highest tile tops. */
 export const OVERLAY_Y = 0.056;
 
@@ -101,6 +107,13 @@ function drawBoard(
         y > r.y0 - LABEL_CLEAR &&
         y < r.y1 + LABEL_CLEAR,
     );
+  const feet = markerSpots(map).map((m) => m.foot);
+  const nearFlag = (x: number, y: number): boolean =>
+    feet.some((f) => Math.hypot(f.x - x, f.y - y) < FLAG_CLEAR);
+  const road = denseRoad(map);
+  const offRoad = (i: number, j: number): boolean =>
+    distanceToRoad(road, { x: (i + 0.5) / CELLS, y: (j + 0.5) / CELLS - BACKLOT }) >
+    FOOTPRINT_ROAD_CLEAR;
   const w = map.width * CELLS;
   const h = rows * CELLS;
   const free = new Uint8Array(w * h);
@@ -109,7 +122,8 @@ function drawBoard(
     for (let i = 0; i < w; i++) {
       const x = (i + 0.5) / CELLS;
       const y = (j + 0.5) / CELLS - BACKLOT;
-      if (board.has(`${Math.floor(x)},${Math.floor(y)}`) && !nearLabel(x, y)) free[j * w + i] = 1;
+      if (board.has(`${Math.floor(x)},${Math.floor(y)}`) && !nearLabel(x, y) && !nearFlag(x, y))
+        free[j * w + i] = 1;
     }
   }
   const isFree = (i: number, j: number): boolean =>
@@ -137,7 +151,7 @@ function drawBoard(
     const j0 = Math.floor(random() * (h - fh));
     let clear = true;
     for (let j = j0 - 1; j <= j0 + fh && clear; j++)
-      for (let i = i0 - 1; i <= i0 + fw && clear; i++) clear = isFree(i, j);
+      for (let i = i0 - 1; i <= i0 + fw && clear; i++) clear = isFree(i, j) && offRoad(i, j);
     if (!clear) continue;
     for (let j = j0; j < j0 + fh; j++) for (let i = i0; i < i0 + fw; i++) free[j * w + i] = 2;
     const x0 = i0 * CELL;

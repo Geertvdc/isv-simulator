@@ -14,12 +14,12 @@ import type { Puff } from './locks';
 
 export const LOCK_COLORS = {
   /**
-   * The locked land's cloud: faceted like an unrendered mesh, pale blueprint
-   * blue on top and a deeper blue under, with a glowing wireframe over it.
+   * The locked land's cloud: faceted like an unrendered mesh, a deep
+   * blueprint navy (darker underneath) with a faint blue wireframe over it.
    */
-  cloudTop: 0x4a6fb0,
-  cloudBottom: 0x223f7a,
-  cloudWire: 0xbfe0ff,
+  cloudTop: 0x2c4478,
+  cloudBottom: 0x16264a,
+  cloudWire: 0x8fb8ff,
   boomRed: 0xe0433a,
   boomWhite: 0xf6f3ec,
   post: 0x5b6270,
@@ -40,7 +40,7 @@ export const LOCK_COLORS = {
 } as const;
 
 /** How strongly the wireframe shows over the clouds' faces. */
-const WIRE_OPACITY = 0.45;
+const WIRE_OPACITY = 0.3;
 
 /** The clouds drift to and fro and bob, slowly; rolling away they shrink, rise and fade. */
 const CLOUD_MOTION = { driftMs: 9000, bobMs: 4200, bob: 0.08, rise: 1.2, spread: 0.35 };
@@ -73,7 +73,7 @@ export function buildCloudBank(puffs: readonly Puff[], drift: number): CloudBank
     vertexColors: true,
     roughness: 1,
     flatShading: true,
-    emissive: 0x16264a,
+    emissive: 0x0e1a36,
   });
   const mesh = new THREE.InstancedMesh(geometry, material, Math.max(1, puffs.length));
   mesh.count = puffs.length;
