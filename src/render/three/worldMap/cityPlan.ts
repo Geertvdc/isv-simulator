@@ -14,7 +14,10 @@
  */
 
 import type { MapPoint, MapRegion, WorldMap } from '../../../flow/worldMap';
+import { type Rect, denseRoad, rectDistance } from './mapGeometry';
 import { LABEL, markerSpots } from './markers';
+
+export { denseRoad, rectDistance } from './mapGeometry';
 
 /** Land added behind the island (render only), for the cities' tall back rows. */
 export const BACKLOT = 4;
@@ -404,6 +407,9 @@ const THEMES: Theme[] = [
 /** Street lamps along the back street's near curb, this far apart, from this chapter on. */
 const CURB_LAMPS = { every: 2.4, fromChapter: 2 };
 
+/** Extra tries for a filler kind the scatter left out. */
+const MISSING_TRIES = 120;
+
 /** Clearances, in map units. */
 const CLEAR = {
   /** Between a footprint and the road's middle line (the road is 0.74 wide). */
@@ -419,13 +425,6 @@ const CLEAR = {
   /** Inside the land's edge. */
   shore: 0.15,
 };
-
-interface Rect {
-  x0: number;
-  y0: number;
-  x1: number;
-  y1: number;
-}
 
 /** A piece's footprint. */
 export function footprint(p: Pick<CityPiece, 'x' | 'y' | 'w' | 'd'>): Rect {
@@ -444,29 +443,6 @@ function grow(r: Rect, by: number): Rect {
 
 function overlaps(a: Rect, b: Rect): boolean {
   return a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
-}
-
-/** Distance from point `p` to rectangle `r` (0 inside). */
-export function rectDistance(r: Rect, p: MapPoint): number {
-  const dx = Math.max(r.x0 - p.x, 0, p.x - r.x1);
-  const dy = Math.max(r.y0 - p.y, 0, p.y - r.y1);
-  return Math.hypot(dx, dy);
-}
-
-/** The road as closely spaced points, for clearance checks. */
-export function denseRoad(map: WorldMap, step = 0.1): MapPoint[] {
-  const out: MapPoint[] = [];
-  for (let i = 1; i < map.road.length; i++) {
-    const a = map.road[i - 1];
-    const b = map.road[i];
-    if (!a || !b) continue;
-    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / step));
-    for (let k = 0; k < n; k++)
-      out.push({ x: a.x + ((b.x - a.x) * k) / n, y: a.y + ((b.y - a.y) * k) / n });
-  }
-  const last = map.road[map.road.length - 1];
-  if (last) out.push({ ...last });
-  return out;
 }
 
 /** The rectangles of every level number on the map. */
@@ -595,6 +571,17 @@ export function planCity(map: WorldMap): CityPlan {
       const p = make(spec, region.chapter, x, y, rng);
       if (planner.fits(p, region)) planner.add(p);
     }
+    // Every kind of filler shows up at least once: one the scatter missed (the road
+    // took its spots) gets more tries of its own.
+    for (const spec of theme.fillers) {
+      const has = (q: CityPiece) => q.kind === spec.kind && q.chapter === region.chapter;
+      for (let i = 0; i < MISSING_TRIES && !planner.pieces.some(has); i++) {
+        const x = region.x + rng() * region.width;
+        const y = -BACKLOT + rng() * (map.height + BACKLOT);
+        const p = make(spec, region.chapter, x, y, rng);
+        if (planner.fits(p, region)) planner.add(p);
+      }
+    }
   }
   return { pieces: planner.pieces, ground: planGround(map, planner.pieces) };
 }
@@ -622,8 +609,20 @@ function placeLandmark(
     if (!p) continue;
     planner.add(p);
     for (const c of landmark.companions ?? []) {
-      const q = make(c.spec, region.chapter, p.x + c.dx, p.y + p.d / 2 + c.dy, rng);
-      if (planner.fits(q, region)) planner.add(q);
+      // Where it wants to be, else mirrored to the other side, else a little further out.
+      const q = make(c.spec, region.chapter, 0, 0, rng);
+      const spots = [
+        { dx: c.dx, dy: c.dy },
+        { dx: -c.dx, dy: c.dy },
+        { dx: c.dx, dy: c.dy + 0.4 },
+        { dx: -c.dx, dy: c.dy + 0.4 },
+      ];
+      for (const { dx, dy } of spots) {
+        const at = { ...q, x: p.x + dx, y: p.y + p.d / 2 + dy };
+        if (!planner.fits(at, region)) continue;
+        planner.add(at);
+        break;
+      }
     }
     return;
   }
