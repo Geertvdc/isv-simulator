@@ -109,17 +109,19 @@ function decoIndex(x: number, y: number, count: number, level: number): number |
 
 /**
  * The decoration hung on the front of the wall on tile (x, y) with this
- * theme, if any, in the level `level` (its `levelSalt`). Only asked of `wall` pieces. Picked by the tile's hash, then
- * moved on from any decoration just before it along the wall, so two close
- * by never match.
+ * theme, if any, in the level `level` (its `levelSalt`). Only asked of
+ * `wall` pieces. Picked by the tile's hash, then moved on from any
+ * decoration just before it along the wall, so two close by never match.
  */
 export function wallDeco(x: number, y: number, theme: WallTheme, level = 0): string | null {
   const decos = WALL_DECOS[theme];
-  if (decoIndex(x, y, decos.length, level) === null) return null;
-  // Walk the row from its start (maps are a few dozen tiles wide), so every tile settles the same way.
+  const own = decoIndex(x, y, decos.length, level);
+  if (own === null) return null;
+  // Walk the row from its start (maps are a few dozen tiles wide), so every
+  // tile settles the same way.
   const picked: [number, number][] = [];
-  let mine = 0;
-  for (let k = Math.min(0, x); k <= x; k++) {
+  let mine = own;
+  for (let k = 0; k <= x; k++) {
     let index = decoIndex(k, y, decos.length, level);
     if (index === null) continue;
     const near = picked.filter(([px]) => k - px <= WALL_DECO_SPREAD).map(([, i]) => i);

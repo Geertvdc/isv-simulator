@@ -519,6 +519,9 @@ const CURB_LAMPS = { every: 2.4, fromChapter: 2 };
 
 /** Fillers of a kind closer than this to each other count as a clump. */
 const CLUMP = 1.1;
+/** Most scattered small props (not trees) of one kind in a chapter: a few dishes, not a dish farm. */
+const SMALL_CAP = 4;
+const trees: readonly PieceKind[] = TREE_KINDS;
 
 /** Extra tries for a filler kind the scatter left out. */
 const MISSING_TRIES = 120;
@@ -624,6 +627,11 @@ class Planner {
     return placed;
   }
 
+  /** How many pieces of `kind` chapter `chapter` has so far. */
+  count(kind: PieceKind, chapter: number): number {
+    return this.pieces.filter((q) => q.kind === kind && q.chapter === chapter).length;
+  }
+
   /** A piece of `kind` within `radius` of (x, y): to keep the same kind from clumping. */
   near(kind: PieceKind, x: number, y: number, radius: number): boolean {
     return this.pieces.some((q) => q.kind === kind && Math.hypot(q.x - x, q.y - y) < radius);
@@ -720,11 +728,14 @@ export function planCity(map: WorldMap): CityPlan {
     for (let i = 0; i < theme.fillTries; i++) {
       const x = region.x + rng() * region.width;
       const y = -BACKLOT + rng() * (map.height + BACKLOT);
-      // Not the same kind as a piece right by it: pick again, once or twice.
+      // Not the same kind as a piece right by it, nor a small prop the chapter has enough of.
+      const full = (kind: PieceKind) =>
+        !trees.includes(kind) && planner.count(kind, region.chapter) >= SMALL_CAP;
       let spec = pick(rng, theme.fillers, (s) => s.weight ?? 1);
-      for (let t = 0; t < 2 && planner.near(spec.kind, x, y, CLUMP); t++) {
+      for (let t = 0; t < 4 && (full(spec.kind) || planner.near(spec.kind, x, y, CLUMP)); t++) {
         spec = pick(rng, theme.fillers, (s) => s.weight ?? 1);
       }
+      if (full(spec.kind)) continue;
       const p = make(spec, region.chapter, x, y, rng);
       if (planner.fits(p, region)) planner.add(p);
     }

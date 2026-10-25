@@ -107,6 +107,21 @@ describe('placeSetPieces', () => {
       }
     });
 
+    it(`deals the ${setting} pieces evenly down every row`, () => {
+      const s = SETTINGS[setting];
+      for (const row of rows(setting, 16, 30)) {
+        const counts = new Map<unknown, number>();
+        for (const p of row) {
+          if (s?.rare.includes(p.piece)) continue;
+          counts.set(p.piece, (counts.get(p.piece) ?? 0) + 1);
+        }
+        const kinds = (row[0]?.row === 'near' ? s?.near : s?.far)?.length ?? 1;
+        const total = [...counts.values()].reduce((a, b) => a + b, 0);
+        for (const n of counts.values())
+          expect(n).toBeLessThanOrEqual(Math.ceil(total / kinds) + 1);
+      }
+    });
+
     it(`shows many different ${setting} props and looks`, () => {
       const placed = placeSetPieces(setting, 14, 10);
       const pieces = new Set(placed.map((p) => p.piece));

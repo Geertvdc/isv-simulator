@@ -53,10 +53,11 @@ const CLUTTER_EVERY = 5;
 const CLUTTER_SPREAD = 4;
 
 /**
- * What stands on top of the wall on tile (x, y), if anything: plants, books
- * or a plant and a mug, on some full-height walls. Never next to a counter or
- * station (it'd look like something to pick up), never on a wall with floor
- * behind it (it'd hide someone standing there), never on glass.
+ * What stands on top of the wall on tile (x, y), if anything: plants, books,
+ * mugs and the like, on some full-height walls. Never next to a counter or
+ * station, nor with floor beside it (by the play area it'd look like
+ * something to pick up), never on a wall with floor behind it (it'd hide
+ * someone standing there), never on glass.
  */
 function wallClutter(
   map: LevelMap,
@@ -70,6 +71,7 @@ function wallClutter(
   const h = (tileHash(x, y) ^ level) >>> 0;
   if (h % CLUTTER_EVERY !== 0) return undefined;
   if (getTile(map, x, y - 1) === 'floor') return undefined;
+  if (getTile(map, x - 1, y) === 'floor' || getTile(map, x + 1, y) === 'floor') return undefined;
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
       if (isWorkSurface(getTile(map, x + dx, y + dy))) return undefined;
