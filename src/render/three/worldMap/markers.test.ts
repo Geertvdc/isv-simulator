@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { type WorldMap, buildWorldMap } from '../../../flow/worldMap';
 import { CHAPTERS } from '../../../sim/levels';
 import { denseRoad, labelRects, rectDistance } from './cityPlan';
-import { FLAG_ASIDE, markerSpots } from './markers';
+import { FLAG_ASIDE, LABEL, markerSpots } from './markers';
 
 const CHAPTER_INFO = CHAPTERS.map((c) => ({
   levelIds: c.levels.map((l) => l.id),
@@ -48,6 +48,21 @@ describe('markerSpots', () => {
         const gap = Math.min(...road.map((r) => rectDistance(rect, r)));
         expect(gap).toBeGreaterThan(ROAD_HALF);
       }
+    }
+  });
+
+  it('lays every number nearest its own flag, clear of the others', () => {
+    for (const map of [realMap, ...OTHER_MAPS]) {
+      const spots = markerSpots(map);
+      spots.forEach(({ foot, label }, i) => {
+        const own = Math.hypot(label.x - foot.x, label.y - foot.y);
+        spots.forEach((other, j) => {
+          if (j === i) return;
+          const theirs = Math.hypot(label.x - other.foot.x, label.y - other.foot.y);
+          expect(theirs, `number ${i} by flag ${j}`).toBeGreaterThan(own);
+          expect(theirs, `number ${i} by flag ${j}`).toBeGreaterThanOrEqual(LABEL.otherFlag);
+        });
+      });
     }
   });
 
