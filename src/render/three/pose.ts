@@ -69,6 +69,7 @@ const HAND_REST = { x: 0.4, y: 0.38, z: 0.05 };
 /** Half the gap between the hands holding a ticket: on its short sides. */
 const CARRY_HALF_GAP = 0.22;
 
+/** How far into the walk `speed` is: 0 standing, 1 at `fullSpeed` and above. */
 function walkAmount(speed: number, fullSpeed: number): number {
   return Math.min(1, speed / Math.max(0.01, fullSpeed));
 }

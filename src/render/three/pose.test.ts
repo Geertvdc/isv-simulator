@@ -126,7 +126,10 @@ function walkFrames(speeds: readonly number[], startMs: number): { swing: number
   const gait: Gait = { speed: speeds[0] ?? 0, stride: 0 };
   return speeds.map((speed, i) => {
     stepGait(gait, speed, 5, dt);
-    const pose = playerPose({ ...still, speed: gait.speed, stride: gait.stride }, startMs + i * dt);
+    const pose = playerPose(
+      { ...still, speed: gait.speed, stride: gait.stride },
+      startMs + (i * 1000) / 60,
+    );
     return { swing: pose.leftHand.z, bob: pose.bob };
   });
 }
