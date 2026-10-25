@@ -34,7 +34,7 @@ describe('markerSpots', () => {
       const road = denseRoad(map);
       for (const { foot } of markerSpots(map)) {
         const gap = Math.min(...road.map((r) => Math.hypot(r.x - foot.x, r.y - foot.y)));
-        expect(gap).toBeGreaterThan(FLAG_ASIDE.near - 0.01);
+        expect(gap).toBeGreaterThan(FLAG_ASIDE.clear - 0.01);
       }
     }
   });
@@ -62,6 +62,29 @@ describe('markerSpots', () => {
           expect(theirs, `number ${i} by flag ${j}`).toBeGreaterThan(own);
           expect(theirs, `number ${i} by flag ${j}`).toBeGreaterThanOrEqual(LABEL.otherFlag);
         });
+      });
+    }
+  });
+
+  it('keeps every number inside its chapter, clear of the clouds on the next', () => {
+    for (const map of [realMap, ...OTHER_MAPS]) {
+      markerSpots(map).forEach(({ label }, i) => {
+        const region = map.regions[map.nodeChapters[i] ?? 0];
+        if (!region || region.x + region.width >= map.width) return;
+        expect(label.x + LABEL.width / 2, `number ${i}`).toBeLessThanOrEqual(
+          region.x + region.width - LABEL.chapterGap,
+        );
+      });
+    }
+  });
+
+  it('never lays a number behind its own flag on the far side, where the flag hides it', () => {
+    for (const map of [realMap, ...OTHER_MAPS]) {
+      markerSpots(map).forEach(({ foot, label }, i) => {
+        const node = map.nodes[i];
+        if (!node || foot.y > node.y) return;
+        const overPole = Math.abs(label.x - foot.x) < LABEL.width / 2;
+        expect(overPole && label.y < foot.y, `number ${i}`).toBe(false);
       });
     }
   });
