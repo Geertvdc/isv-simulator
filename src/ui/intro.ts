@@ -9,6 +9,7 @@ import {
   INTRO_ORDERS_TITLE,
   LEVEL_BLURBS,
   LEVEL_INTRO_TIPS,
+  levelFile,
   levelLabel,
 } from '../sim/content';
 import { CHAPTERS } from '../sim/levels';
@@ -43,6 +44,7 @@ export function mountIntro(root: HTMLElement): ScreenView {
     const level = chapter?.levels[place?.level ?? 0];
     card.replaceChildren();
     if (!place || !chapter || !level) return;
+    card.dataset.file = levelFile(place.chapter + 1, place.level + 1);
 
     card.append(
       el(

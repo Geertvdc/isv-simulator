@@ -12,9 +12,13 @@ export interface Menu {
   render: (lines: readonly MenuLine[], selected: number, enabled?: boolean) => void;
 }
 
-/** The vertical menu every screen shares: big lines, one highlighted. */
-export function createMenu(): Menu {
+/**
+ * The vertical menu every screen shares: big lines, one highlighted, in a
+ * window whose title bar names `file`.
+ */
+export function createMenu(file = ''): Menu {
   const root = el('ul', 'menu');
+  root.dataset.file = file;
   const rows: { row: HTMLElement; label: HTMLElement; value: HTMLElement }[] = [];
   return {
     root,

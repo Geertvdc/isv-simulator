@@ -40,6 +40,10 @@ body {
   inset: 0;
   pointer-events: none;
   color: #e6e6e6;
+  /* System monospace only (no font files): labels, numbers, code motifs. */
+  --mono:
+    ui-monospace, 'SF Mono', 'Cascadia Mono', 'JetBrains Mono', Menlo, Consolas, 'Liberation Mono',
+    monospace;
   /* Menu palette: solid panels on a scrim over the 3D map, so text stays readable. */
   --menu-bg: #161a26;
   --menu-grid: #1d2232;
@@ -50,17 +54,28 @@ body {
   --text-faint: #767e95;
   --gold: #ffd166;
   --gold-panel: #3d3622;
-  /* Overcooked's light blue paper: the cards over the 3D map. */
-  --paper: #cfe2f3;
-  --paper-edge: #ffffff;
-  --paper-ink: #1f3d5c;
-  --paper-text: #34506e;
-  --paper-muted: #4d6a88;
-  --paper-faint: #8ea6be;
-  --paper-accent: #f0a020;
-  --banner: #2a5a86;
-  --ink-outline: #14243d;
+  /* The menus look like a code editor in dark mode: windows with a title
+     bar, a gutter of line numbers, a highlighted current line. */
+  --window: #181e2e;
+  --window-bar: #222a3f;
+  --window-edge: #34405f;
+  --code-ink: #f0f4fb;
+  --code-text: #c6cfe2;
+  --code-muted: #8f9cba;
+  --code-faint: #5a6684;
+  --accent: #5fe6ff;
+  --select: #26375e;
+  --shadow-ink: #0b1020;
   --scrim: rgba(10, 16, 30, 0.55);
+  /* Syntax colors. */
+  --syn-keyword: #d68cff;
+  --syn-string: #9ee37d;
+  --syn-number: #ffad66;
+  --syn-type: #ffd166;
+  --syn-func: #7fb4ff;
+  --syn-comment: #8a98b8;
+  /* The status bar along the bottom, like an editor's. */
+  --status: #2560d8;
 }
 
 .hud-version {
@@ -86,15 +101,21 @@ body {
   display: none;
 }
 
+/* A sentence to act on: a shell command, after a green prompt. */
 .lobby-title {
   margin: 0;
-  font-size: 2.5rem;
-  font-weight: 900;
-  letter-spacing: 0.02em;
-  color: #ffffff;
-  -webkit-text-stroke: 0.12em var(--ink-outline);
-  paint-order: stroke fill;
-  text-shadow: 0 0.09em 0 var(--ink-outline);
+  font-family: var(--mono);
+  font-size: 2.25rem;
+  font-weight: 800;
+  color: var(--code-ink);
+  text-shadow:
+    0 0.06em 0 var(--shadow-ink),
+    0 0 0.5em rgba(5, 8, 18, 0.8);
+}
+
+.lobby-title::before {
+  content: '$ ';
+  color: var(--syn-string);
 }
 
 .lobby-slots {
@@ -103,36 +124,33 @@ body {
   gap: 1rem;
 }
 
-/* A paper card per seat: dashed and pale while empty, the player's color on top once joined. */
+/* A window per seat: dim and dashed while empty (see below), the player's color under its title bar once joined. */
 .lobby-slot {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  padding: 1.25rem 1rem;
-  border: 3px dashed var(--paper-faint);
-  border-radius: 0.375rem;
-  background: rgba(207, 226, 243, 0.82);
-  color: var(--paper-muted);
+  padding: 2.75rem 1rem 1.25rem;
+  color: var(--code-muted);
   text-align: center;
 }
 
 .lobby-slot.joined {
-  border: 3px solid var(--paper-edge);
-  border-top: 0.625rem solid var(--player-color);
-  background: var(--paper);
-  box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.45);
-  color: var(--paper-text);
-  transform: rotate(-1deg);
+  color: var(--code-text);
+}
+
+.lobby-slot.joined::before {
+  border-bottom: 0.25rem solid var(--player-color);
 }
 
 .lobby-slot-name {
+  font-family: var(--mono);
   font-size: 1.375rem;
-  font-weight: 900;
-  color: var(--paper-muted);
+  font-weight: 800;
+  color: var(--code-muted);
 }
 
 .lobby-slot.joined .lobby-slot-name {
-  color: var(--paper-ink);
+  color: var(--code-ink);
 }
 
 .lobby-slot-device {
@@ -142,10 +160,13 @@ body {
 
 .lobby-hint {
   min-height: 1.4em;
+  font-family: var(--mono);
   font-size: 1.375rem;
   font-weight: 800;
   color: var(--gold);
-  text-shadow: 0 0.1em 0 var(--ink-outline);
+  text-shadow:
+    0 0.08em 0 var(--shadow-ink),
+    0 0 0.5em rgba(5, 8, 18, 0.9);
 }
 
 /* In-game HUD: order bar on top, score and clock in the bottom corners. */
@@ -565,7 +586,8 @@ body {
   align-items: center;
   justify-content: center;
   gap: 1.75rem;
-  padding: 1.5rem;
+  /* Room at the bottom for the status bar. */
+  padding: 1.5rem 1.5rem 3.75rem;
   box-sizing: border-box;
   /* A dim, slightly blurred scrim over the 3D world map (or the round, for
      pause and results): the world shows, the cards on it read clearly. */
@@ -603,36 +625,69 @@ body {
   }
 }
 
-/* Chunky white headings with a dark outline, like the logo's little sibling. */
+/* Headings are tags: <Settings />, in the editor's monospace. */
 .screen-title {
   margin: 0;
-  font-size: 3.25rem;
-  font-weight: 900;
-  letter-spacing: 0.02em;
-  color: #ffffff;
-  -webkit-text-stroke: 0.12em var(--ink-outline);
-  paint-order: stroke fill;
-  text-shadow: 0 0.09em 0 var(--ink-outline);
+  font-family: var(--mono);
+  font-size: 3rem;
+  font-weight: 800;
+  color: var(--code-ink);
+  text-shadow:
+    0 0.06em 0 var(--shadow-ink),
+    0 0 0.5em rgba(5, 8, 18, 0.8);
 }
 
-/* Which buttons do what: a dark pill, so it reads over the map. */
+.screen-title::before {
+  content: '<';
+  color: var(--syn-keyword);
+}
+
+.screen-title::after {
+  content: ' />';
+  color: var(--syn-keyword);
+}
+
+/* Which buttons do what: an editor's status bar along the bottom, with the branch on its left. */
 .screen-hint {
-  padding: 0.375rem 1.25rem;
-  border-radius: 999px;
-  background: rgba(20, 22, 28, 0.78);
-  font-size: 1.125rem;
-  color: #e6e6e6;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  height: 2.25rem;
+  padding-right: 1rem;
+  background: var(--status);
+  box-shadow: 0 -0.25rem 1rem rgba(0, 0, 0, 0.3);
+  font-family: var(--mono);
+  font-size: 1.0625rem;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* The title: the logo up top over the drifting map, the menu card below it. */
+.screen-hint::before {
+  content: '⎇ main';
+  flex: none;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding: 0 1rem;
+  background: rgba(0, 0, 0, 0.25);
+  font-weight: 700;
+}
+
+/* The title: the logo up top over the drifting map, the menu window below it. */
 .screen.title-screen {
   justify-content: flex-start;
   gap: 1.5rem;
   padding-top: 7vh;
   /* Lighter than the other menus: the world map is the show here. Dim only
-     at the top (behind the logo) and the bottom (behind the hint). */
+     at the top (behind the logo) and the bottom (behind the status bar). */
   background: linear-gradient(
-    rgba(10, 16, 30, 0.45),
+    rgba(10, 16, 30, 0.55),
     rgba(10, 16, 30, 0) 38%,
     rgba(10, 16, 30, 0) 70%,
     rgba(10, 16, 30, 0.5)
@@ -640,22 +695,17 @@ body {
   backdrop-filter: none;
 }
 
-/* The menu card sits low, over the road's near side, so the town and the
-   skyline behind stay in view; the hint under it. */
+/* The menu window sits low, over the road's near side, so the town and the
+   skyline behind stay in view. */
 .title-screen .menu {
   margin-top: auto;
-}
-
-.title-screen .screen-hint {
-  margin-top: -0.5rem;
 }
 
 .title-head {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.75rem;
-  transform: rotate(-2.5deg);
+  gap: 0.875rem;
 }
 
 /* Before anyone presses: the logo bigger, in the middle of the screen. */
@@ -664,41 +714,56 @@ body {
 }
 
 .title-screen:not(.awake) .logo {
-  font-size: min(7.5rem, 9vw);
+  font-size: min(6.25rem, 7vw);
 }
 
-/* The logo: two chunky words on an arch, a thick navy outline and a stacked
-   drop shadow, so it reads over anything the map shows. */
+/* The logo: the name as a self-closing tag in a heavy monospace,
+   <OverEngineered/>, with a blinking cursor after it. Dark shadows keep it
+   readable over anything the map shows. */
 .logo {
   margin: 0;
   display: flex;
-  align-items: flex-end;
-  font-family: 'Arial Rounded MT Bold', 'Arial Black', 'Segoe UI Black', system-ui, sans-serif;
+  align-items: baseline;
+  font-family: var(--mono);
   /* Held to the window's width too, so the long name fits a 4:3 screen. */
-  font-size: min(6rem, 8vw);
-  font-weight: 900;
+  font-size: min(5.25rem, 5.8vw);
+  font-weight: 800;
   line-height: 1;
-  letter-spacing: 0.01em;
+  letter-spacing: -0.03em;
   white-space: nowrap;
-  -webkit-text-stroke: 0.16em var(--ink-outline);
-  paint-order: stroke fill;
   text-shadow:
-    0 0.06em 0 var(--ink-outline),
-    0 0.12em 0 var(--ink-outline),
-    0 0.2em 0.25em rgba(0, 0, 0, 0.45);
-  animation: logo-in 0.6s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+    0 0.05em 0 var(--shadow-ink),
+    0 0.1em 0 var(--shadow-ink),
+    0 0.15em 0.4em rgba(0, 0, 0, 0.55);
+  animation: logo-in 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.logo-bracket {
+  color: var(--syn-keyword);
 }
 
 .logo-word {
   display: inline-flex;
 }
 
-.logo-letter {
+.logo-cursor {
   display: inline-block;
+  width: 0.42em;
+  height: 0.72em;
+  margin-left: 0.12em;
+  background: var(--accent);
+  box-shadow: 0 0.05em 0 var(--shadow-ink);
+  animation: cursor-blink 1.1s steps(1) infinite;
+}
+
+@keyframes cursor-blink {
+  50% {
+    opacity: 0;
+  }
 }
 
 .logo-word-0 {
-  color: #fff4d8;
+  color: #f0f4fb;
 }
 
 .logo-word-1 {
@@ -707,38 +772,55 @@ body {
 
 @keyframes logo-in {
   from {
-    transform: scale(0.6);
+    transform: translateY(0.3em);
     opacity: 0;
   }
 }
 
+/* The tagline is a code comment. */
 .title-tagline {
-  padding: 0.25rem 1.125rem;
-  border-radius: 0.5rem;
-  background: var(--banner);
-  box-shadow: 0 0.25rem 0 var(--ink-outline);
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #ffffff;
+  padding: 0.25rem 1rem;
+  border-radius: 0.375rem;
+  background: rgba(11, 16, 32, 0.78);
+  font-family: var(--mono);
+  font-size: 1.375rem;
+  font-weight: 600;
+  color: #b4c2df;
 }
 
+.title-tagline::before {
+  content: '// ';
+  color: var(--syn-comment);
+}
+
+/* Before anyone presses: a terminal prompt waiting for input. */
 .title-press {
   margin-top: 4vh;
-  padding: 0.5rem 2rem;
-  border: 3px solid var(--paper-edge);
-  border-radius: 999px;
-  background: var(--banner);
-  box-shadow: 0 0.3rem 0 var(--ink-outline);
-  font-size: 2rem;
-  font-weight: 900;
-  color: #ffffff;
-  animation: pulse 1.4s ease-in-out infinite;
+  padding: 0.625rem 1.5rem;
+  border: 1px solid var(--window-edge);
+  border-radius: 0.625rem;
+  background: var(--window);
+  box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.5);
+  font-family: var(--mono);
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--code-ink);
 }
 
-@keyframes pulse {
-  50% {
-    transform: scale(1.06);
-  }
+.title-press::before {
+  content: '$ ';
+  color: var(--syn-string);
+}
+
+.title-press::after {
+  content: '';
+  display: inline-block;
+  width: 0.55em;
+  height: 1em;
+  margin-left: 0.25em;
+  vertical-align: -0.15em;
+  background: var(--accent);
+  animation: cursor-blink 1.1s steps(1) infinite;
 }
 
 .title-press[hidden] {
@@ -751,21 +833,78 @@ body {
   }
 }
 
-/* The menu: a card of light blue paper, like the level card on the map. */
+/* Every card over the map is an editor window: dark, a thin edge, a title
+   bar with three dots and the file it shows (from data-file). */
+.menu,
+.results-card,
+.credits-card,
+.intro-card,
+.profile-card,
+.map-card,
+.online-code-card,
+.lobby-slot {
+  --bar: 2rem;
+  position: relative;
+  border: 1px solid var(--window-edge);
+  border-radius: 0.625rem;
+  background: var(--window);
+  box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.5);
+  color: var(--code-ink);
+}
+
+.menu::before,
+.results-card::before,
+.credits-card::before,
+.intro-card::before,
+.profile-card::before,
+.map-card::before,
+.online-code-card::before,
+.lobby-slot::before {
+  content: attr(data-file);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--bar);
+  padding-left: 4.5rem;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--window-edge);
+  border-radius: 0.625rem 0.625rem 0 0;
+  background:
+    radial-gradient(circle at 1.125rem 50%, #ff5f57 0.3rem, transparent 0.34rem),
+    radial-gradient(circle at 2.125rem 50%, #febc2e 0.3rem, transparent 0.34rem),
+    radial-gradient(circle at 3.125rem 50%, #28c840 0.3rem, transparent 0.34rem), var(--window-bar);
+  font-family: var(--mono);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: var(--bar);
+  color: var(--code-muted);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* An empty seat in the lobby: a dim window with a dashed edge, waiting. */
+.lobby-slot:not(.joined) {
+  border: 2px dashed var(--code-faint);
+  background: rgba(24, 30, 46, 0.72);
+  box-shadow: none;
+}
+
+.lobby-slot:not(.joined)::before {
+  opacity: 0.6;
+}
+
+/* The menu: lines of code with numbers in the gutter, the current one highlighted. */
 .menu {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: 0.25rem;
   min-width: 22.5rem;
   margin: 0;
-  padding: 0.875rem;
-  border: 3px solid var(--paper-edge);
-  border-top: 0.5rem solid var(--paper-accent);
-  border-radius: 0.375rem;
-  background: var(--paper);
-  box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.45);
-  transform: rotate(-1deg);
+  padding: calc(var(--bar) + 0.625rem) 0.625rem 0.75rem;
   list-style: none;
+  counter-reset: line;
 }
 
 .menu[hidden],
@@ -775,55 +914,90 @@ body {
 }
 
 .menu.disabled .menu-item {
-  color: var(--paper-faint);
+  color: var(--code-faint);
 }
 
 .menu-item {
   display: flex;
-  justify-content: space-between;
-  gap: 2rem;
-  padding: 0.5rem 1.5rem;
-  border-radius: 0.5rem;
-  font-size: 1.875rem;
-  font-weight: 800;
-  color: var(--paper-text);
+  align-items: baseline;
+  gap: 1.25rem;
+  padding: 0.375rem 1.25rem 0.375rem 0.5rem;
+  border-left: 0.25rem solid transparent;
+  border-radius: 0.25rem;
+  font-family: var(--mono);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--code-text);
+  counter-increment: line;
 }
 
-/* The selected line: a dark blue band with white text, like the chapter banner. */
+.menu-item::before {
+  content: counter(line);
+  min-width: 1.25em;
+  font-size: 0.6em;
+  font-weight: 400;
+  text-align: right;
+  color: var(--code-faint);
+}
+
+.menu-label {
+  flex: 1;
+}
+
+/* The current line: highlighted, with a prompt before it and the cursor after it. */
 .menu-item.selected {
-  background: var(--banner);
-  box-shadow: 0 0.2rem 0 var(--ink-outline);
+  border-left-color: var(--accent);
+  background: var(--select);
   color: #ffffff;
 }
 
+.menu-item.selected::before {
+  color: var(--accent);
+}
+
 .menu-item.selected .menu-label::before {
-  content: '▶ ';
-  color: var(--gold);
+  content: '> ';
+  color: var(--syn-string);
+}
+
+.menu-item.selected .menu-label::after {
+  content: '';
+  display: inline-block;
+  width: 0.5em;
+  height: 0.95em;
+  margin-left: 0.2em;
+  vertical-align: -0.12em;
+  background: var(--accent);
+  animation: cursor-blink 1.1s steps(1) infinite;
 }
 
 .menu.disabled .menu-item.selected {
-  background: var(--paper-faint);
-  box-shadow: none;
+  border-left-color: var(--code-faint);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.menu.disabled .menu-item.selected .menu-label::after {
+  display: none;
 }
 
 .menu-value {
   font-variant-numeric: tabular-nums;
-  color: var(--banner);
+  color: var(--syn-number);
 }
 
 .menu-item.selected .menu-value {
-  color: var(--gold);
+  color: var(--syn-type);
 }
 
 /* The title's menu: a little smaller, so the map shows round it. */
 .title-screen .menu {
   min-width: 18rem;
   gap: 0.125rem;
-  padding: 0.625rem;
+  padding: calc(var(--bar) + 0.5rem) 0.5rem 0.625rem;
 }
 
 .title-screen .menu-item {
-  padding: 0.375rem 1.25rem;
+  padding: 0.3125rem 1.25rem 0.3125rem 0.375rem;
   font-size: 1.5rem;
 }
 
@@ -834,8 +1008,7 @@ body {
 }
 
 .results-star {
-  color: #a9bdd1;
-  -webkit-text-stroke: 0.03em #4d6a88;
+  color: #39445f;
 }
 
 .results-star.earned {
@@ -845,7 +1018,7 @@ body {
 /* Starts as an empty star (also during its delay), then pops in gold. */
 @keyframes star-earn {
   from {
-    color: #a9bdd1;
+    color: #39445f;
     transform: scale(1);
   }
   50% {
@@ -858,34 +1031,33 @@ body {
   }
 }
 
-/* The round's stars, score and news on a paper card. */
+/* The round's stars, score and news in a window. */
 .results-card {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.5rem;
   min-width: 26rem;
-  padding: 0.75rem 2.5rem 1.25rem;
-  border: 3px solid var(--paper-edge);
-  border-top: 0.5rem solid var(--paper-accent);
-  border-radius: 0.375rem;
-  background: var(--paper);
-  box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.45);
-  color: var(--paper-ink);
-  transform: rotate(1deg);
+  padding: calc(var(--bar) + 0.5rem) 2.5rem 1.25rem;
 }
 
 .results-score {
+  font-family: var(--mono);
   font-size: 2.25rem;
-  font-weight: 900;
-  color: var(--paper-ink);
+  font-weight: 800;
+  color: var(--code-ink);
 }
 
 .results-badge {
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: #b0560a;
+  font-family: var(--mono);
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--syn-string);
   animation: badge-in 0.4s ease-out;
+}
+
+.results-badge::before {
+  content: '+ ';
 }
 
 .results-badge[hidden] {
@@ -899,7 +1071,7 @@ body {
   }
 }
 
-/* The credits on one paper card, with Back in its foot. */
+/* The credits in one window, with Back in its foot. */
 .credits-card {
   display: flex;
   flex-direction: column;
@@ -909,13 +1081,7 @@ body {
   min-height: 0;
   flex-shrink: 1;
   box-sizing: border-box;
-  padding: 0.5rem 2rem 1rem;
-  border: 3px solid var(--paper-edge);
-  border-top: 0.5rem solid var(--paper-accent);
-  border-radius: 0.375rem;
-  background: var(--paper);
-  box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.45);
-  color: var(--paper-ink);
+  padding: calc(var(--bar) + 0.25rem) 2rem 1rem;
 }
 
 .credits-card .menu {
@@ -924,7 +1090,15 @@ body {
   border: 0;
   background: none;
   box-shadow: none;
-  transform: none;
+}
+
+.credits-card .menu::before {
+  display: none;
+}
+
+.credits-card .menu-item::before {
+  content: '';
+  min-width: 0;
 }
 
 .credits-list {
@@ -942,14 +1116,20 @@ body {
 
 .credits-heading {
   margin: 1.125rem 0 0.5rem;
-  font-size: 1.625rem;
-  font-weight: 900;
-  color: var(--banner);
+  font-family: var(--mono);
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--syn-func);
+}
+
+.credits-heading::before {
+  content: '## ';
+  color: var(--code-faint);
 }
 
 .credits-row {
   font-size: 1rem;
-  color: var(--paper-text);
+  color: var(--code-text);
 }
 
 .credits-roll.rolling {
@@ -1017,101 +1197,132 @@ body {
   align-items: flex-end;
 }
 
-/* Top left: the chapter, a dark blue tab with its color down the side. */
+/* Top left: the chapter as a folder in the campaign, its color down the side. */
 .map-chapter {
   min-width: 15rem;
-  padding: 0.625rem 1.5rem 0.75rem 1.25rem;
-  border-left: 0.5rem solid var(--chapter-color);
-  border-radius: 0 0.875rem 0.875rem 0;
-  background: #2a5a86;
-  box-shadow: 0 0.375rem 1rem rgba(0, 0, 0, 0.35);
+  padding: 0.5rem 1.5rem 0.625rem 1.125rem;
+  border: 1px solid var(--window-edge);
+  border-left: 0.375rem solid var(--chapter-color);
+  border-radius: 0 0.625rem 0.625rem 0;
+  background: var(--window);
+  box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.45);
+  font-family: var(--mono);
+}
+
+.map-chapter::before {
+  content: '~/campaign/';
+  display: block;
+  font-size: 0.875rem;
+  color: var(--code-muted);
 }
 
 .map-chapter-name {
-  font-size: 2rem;
-  font-weight: 900;
-  letter-spacing: 0.02em;
-  color: #ffffff;
+  font-size: 1.875rem;
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--chapter-color);
+}
+
+.map-chapter-name::after {
+  content: '/';
+  color: var(--code-faint);
 }
 
 .map-chapter-blurb {
-  font-size: 1rem;
-  color: #d4e4f4;
+  font-size: 0.9375rem;
+  color: var(--syn-comment);
+}
+
+.map-chapter-blurb::before {
+  content: '// ';
 }
 
 .map-chapter-gate {
   margin-top: 0.25rem;
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 700;
-  color: #ffd166;
+  color: var(--gold);
 }
 
 .map-chapter-gate[hidden] {
   display: none;
 }
 
-/* Top right, under the sound button: the star total, like a badge. */
+/* Top right, under the sound button: the star total as a status badge. */
 .map-stars {
   display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid var(--window-edge);
+  border-right: 0;
+  border-radius: 0.5rem 0 0 0.5rem;
+  background: #f2b632;
+  box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.45);
+  font-family: var(--mono);
+  color: #1b2130;
+}
+
+.map-stars::before {
+  content: 'stars';
+  display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 1.5rem 0.25rem 1rem;
-  border-radius: 0.875rem 0 0 0.875rem;
-  background: #2a5a86;
-  box-shadow: 0 0.375rem 1rem rgba(0, 0, 0, 0.35);
+  padding: 0 0.875rem;
+  background: var(--window-bar);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--code-text);
 }
 
 .map-stars-icon {
-  font-size: 2.75rem;
+  align-self: center;
+  padding-left: 0.75rem;
+  font-size: 2.25rem;
   line-height: 1;
-  color: #ffd166;
-  text-shadow: 0 0.1875rem 0 #b07a00;
 }
 
 .map-stars-count {
-  font-size: 2.5rem;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  color: #ffffff;
+  align-self: center;
+  padding: 0.25rem 1.25rem 0.25rem 0.375rem;
+  font-size: 2.25rem;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 
-/* The selected level's card, light blue paper like Overcooked's, in a top corner. */
+/* The selected level's card: a window on the level's file, in a top corner. */
 .map-card {
   width: 20rem;
   margin: 0 1rem;
-  padding: 0.625rem 1.125rem 0.75rem;
+  padding: calc(var(--bar) + 0.5rem) 1.125rem 0.75rem;
   box-sizing: border-box;
-  transform: rotate(-1deg);
-  border: 3px solid #ffffff;
-  border-top: 0.5rem solid var(--chapter-color);
-  border-radius: 0.375rem;
-  background: #cfe2f3;
-  box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.4);
-  color: #1f3d5c;
-  text-align: center;
+  text-align: left;
+}
+
+.map-card::before {
+  border-bottom: 2px solid var(--chapter-color);
 }
 
 .map-card-number {
+  font-family: var(--mono);
   font-size: 0.875rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: #4d6a88;
+  color: var(--syn-comment);
+}
+
+.map-card-number::before {
+  content: '// ';
 }
 
 .map-card-name {
   font-size: 1.75rem;
-  font-weight: 900;
+  font-weight: 800;
   line-height: 1.15;
-  color: #1f3d5c;
+  color: var(--code-ink);
 }
 
 .map-card-blurb {
   margin-top: 0.25rem;
   font-size: 0.9375rem;
   line-height: 1.3;
-  color: #34506e;
+  color: var(--code-text);
 }
 
 .map-card-stars {
@@ -1122,42 +1333,35 @@ body {
 }
 
 .map-card-star {
-  color: #a9bdd1;
+  color: #39445f;
 }
 
 .map-card-star.earned {
   color: #ffc83d;
-  text-shadow: 0 0.125rem 0 #b07a00;
 }
 
 .map-card-status {
-  font-size: 1rem;
+  font-family: var(--mono);
+  font-size: 0.9375rem;
   font-weight: 700;
-  color: #34506e;
+  color: var(--code-muted);
+}
+
+.map-card-status[data-state='best'] {
+  color: var(--syn-string);
+}
+
+.map-card-status[data-state='locked'] {
+  color: var(--syn-number);
 }
 
 .map-card.locked {
-  background: #c3ccd6;
+  background: #141826;
 }
 
 .map-card.locked .map-card-name,
 .map-card.locked .map-card-blurb {
-  color: #5d6b7a;
-}
-
-/* Bottom: which buttons do what, on a dark strip so it reads over the map. */
-.map-hint {
-  position: absolute;
-  bottom: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: calc(100% - 2rem);
-  padding: 0.375rem 1.25rem;
-  border-radius: 999px;
-  background: rgba(20, 22, 28, 0.78);
-  color: #e6e6e6;
-  text-align: center;
-  white-space: nowrap;
+  color: var(--code-muted);
 }
 
 /* Level intro card: before the clock starts. */
@@ -1171,13 +1375,7 @@ body {
   align-items: center;
   gap: 0.875rem;
   max-width: 47.5rem;
-  padding: 1.5rem 2.5rem;
-  border: 3px solid var(--paper-edge);
-  border-top: 0.5rem solid var(--paper-accent);
-  border-radius: 0.375rem;
-  background: var(--paper);
-  box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.45);
-  color: var(--paper-ink);
+  padding: calc(var(--bar) + 1rem) 2.5rem 1.5rem;
   text-align: center;
   animation: card-in 0.35s ease-out;
 }
@@ -1190,22 +1388,24 @@ body {
 }
 
 .intro-place {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--paper-muted);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-family: var(--mono);
+  font-size: 1.125rem;
+  color: var(--syn-comment);
+}
+
+.intro-place::before {
+  content: '// ';
 }
 
 .intro-name {
   margin: -0.375rem 0 0;
   font-size: 3.25rem;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .intro-blurb {
   font-size: 1.25rem;
-  color: var(--paper-text);
+  color: var(--code-text);
 }
 
 .intro-tip {
@@ -1213,8 +1413,9 @@ body {
   align-items: center;
   gap: 1.25rem;
   padding: 0.75rem 1.125rem;
-  border-radius: 0.5rem;
-  background: rgba(42, 90, 134, 0.12);
+  border-left: 0.25rem solid var(--accent);
+  border-radius: 0.375rem;
+  background: rgba(127, 180, 255, 0.08);
   text-align: left;
 }
 
@@ -1222,7 +1423,7 @@ body {
   flex: none;
   width: 15rem;
   height: 5.625rem;
-  color: var(--banner);
+  color: #9fc3ff;
 }
 
 .intro-tip-text {
@@ -1241,10 +1442,9 @@ body {
 .intro-section {
   grid-column: 1 / -1;
   margin: 0;
+  font-family: var(--mono);
   font-size: 1.125rem;
-  color: var(--paper-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  color: var(--syn-keyword);
 }
 
 .intro-recipe {
@@ -1281,7 +1481,7 @@ body {
 
 .intro-control-keys {
   text-align: left;
-  color: var(--paper-text);
+  color: var(--code-text);
 }
 
 /* "3, 2, 1, Ship it!" over the map. */
@@ -1400,24 +1600,19 @@ body {
   gap: 0.5rem 1.5rem;
   align-items: baseline;
   max-width: calc(100% - 2rem);
-  padding: 1.25rem 1.75rem;
-  border: 3px solid var(--paper-edge);
-  border-top: 0.5rem solid var(--paper-accent);
-  border-radius: 0.375rem;
-  background: var(--paper);
-  box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.45);
-  color: var(--paper-ink);
+  padding: calc(var(--bar) + 1rem) 1.75rem 1.25rem;
 }
 
 .profile-label {
+  font-family: var(--mono);
   font-size: 1.125rem;
-  color: var(--paper-muted);
+  color: var(--syn-keyword);
 }
 
 .profile-id {
-  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: 1.375rem;
-  color: var(--banner);
+  color: var(--syn-string);
   overflow-wrap: anywhere;
   /* So it can be selected and copied by hand when the clipboard isn't allowed. */
   user-select: all;
@@ -1432,9 +1627,10 @@ body {
 .profile-status {
   grid-column: 1 / -1;
   min-height: 1.5rem;
+  font-family: var(--mono);
   font-size: 1.125rem;
   font-weight: 700;
-  color: #b06a00;
+  color: var(--syn-number);
 }
 
 .profile-about,
@@ -1493,7 +1689,7 @@ body {
 }
 
 .profile-input-id {
-  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: 1.125rem;
 }
 
@@ -1550,19 +1746,19 @@ body {
   justify-content: center;
   width: 4.5rem;
   height: 5.5rem;
-  border: 3px solid var(--paper-edge);
+  border: 1px solid var(--window-edge);
   border-radius: 0.5rem;
-  background: var(--paper);
-  box-shadow: 0 0.375rem 0 var(--ink-outline);
-  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  background: var(--window);
+  box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.5);
+  font-family: var(--mono);
   font-size: 3rem;
   font-weight: 700;
-  color: var(--paper-ink);
+  color: var(--syn-string);
 }
 
 .join-code-box.cursor {
-  border-color: var(--paper-accent);
-  background: #e4f0fa;
+  border: 2px solid var(--accent);
+  background: var(--select);
 }
 
 /* Invisible, over the boxes: it takes the typing (and pastes) and the clicks. */
@@ -1597,12 +1793,7 @@ body {
   display: flex;
   align-items: center;
   gap: 1.25rem;
-  padding: 0.75rem 1.5rem;
-  border: 3px solid var(--paper-edge);
-  border-radius: 0.375rem;
-  background: var(--paper);
-  box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.45);
-  color: var(--paper-ink);
+  padding: calc(var(--bar) + 0.5rem) 1.5rem 0.75rem;
   pointer-events: auto;
 }
 
@@ -1611,18 +1802,18 @@ body {
 }
 
 .online-code {
-  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: 4rem;
   font-weight: 700;
   letter-spacing: 0.25em;
-  color: var(--banner);
+  color: var(--syn-string);
   user-select: all;
 }
 
 .online-copied {
   min-width: 6rem;
   font-size: 1rem;
-  color: var(--paper-muted);
+  color: var(--code-muted);
 }
 
 .online-status {
@@ -1675,8 +1866,8 @@ body {
 .online-name-value,
 .online-name-error {
   text-shadow:
-    0 0.08em 0 var(--ink-outline),
-    0 0 0.3em var(--ink-outline),
+    0 0.08em 0 var(--shadow-ink),
+    0 0 0.3em var(--shadow-ink),
     0 0 0.6em rgba(10, 16, 30, 0.8);
 }
 
@@ -1685,7 +1876,7 @@ body {
 }
 
 .online-name .profile-label {
-  color: var(--paper);
+  color: var(--syn-keyword);
 }
 
 .online-members {
@@ -1700,15 +1891,16 @@ body {
   align-items: center;
   gap: 1rem;
   padding: 0.75rem 1rem;
-  border: 3px solid var(--paper-edge);
-  border-radius: 0.375rem;
-  background: var(--paper);
-  box-shadow: 0 0.375rem 1rem rgba(0, 0, 0, 0.4);
-  color: var(--paper-ink);
+  border: 1px solid var(--window-edge);
+  border-left: 0.25rem solid var(--window-edge);
+  border-radius: 0.5rem;
+  background: var(--window);
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.45);
+  color: var(--code-ink);
 }
 
 .online-member.you {
-  border-left: 0.5rem solid var(--paper-accent);
+  border-left-color: var(--accent);
 }
 
 .online-member-name {
@@ -1716,13 +1908,14 @@ body {
   align-items: center;
   gap: 0.5rem;
   min-width: 12rem;
+  font-family: var(--mono);
   font-size: 1.375rem;
   font-weight: 700;
 }
 
 .online-you {
   font-weight: 400;
-  color: var(--paper-muted);
+  color: var(--code-muted);
 }
 
 .online-host {
@@ -1730,6 +1923,7 @@ body {
   border-radius: 0.375rem;
   background: var(--gold);
   color: #1a1d24;
+  font-family: var(--mono);
   font-size: 0.875rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -1748,21 +1942,21 @@ body {
   padding: 0.375rem 0.75rem;
   border: 2px solid var(--player-color);
   border-radius: 0.5rem;
-  background: color-mix(in srgb, var(--player-color) 25%, var(--paper));
+  background: color-mix(in srgb, var(--player-color) 25%, var(--window));
 }
 
 .online-player-name {
   font-weight: 800;
-  color: var(--paper-ink);
+  color: var(--code-ink);
 }
 
 .online-player-device {
   font-size: 0.875rem;
-  color: var(--paper-text);
+  color: var(--code-text);
 }
 
 .online-no-players {
-  color: var(--paper-muted);
+  color: var(--code-muted);
 }
 
 .online-leave,
@@ -1834,7 +2028,7 @@ body {
 }
 
 .online-member .online-away {
-  color: #b0560a;
+  color: #ffb74d;
 }
 
 .online-bar-away[hidden],
@@ -1842,10 +2036,10 @@ body {
   display: none;
 }
 
-/* The second Esc in the online lobby leaves: say so loudly. */
+/* The second Esc in the online lobby leaves: the status bar turns orange. */
 .screen-hint.armed {
   font-weight: 700;
-  color: #ffb74d;
+  background: #c2561b;
 }
 
 /* This browser lost its connection: over the screen it was on until it's back. */

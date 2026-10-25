@@ -12,7 +12,7 @@
 import { type MenuItem, type ProfileAction, menuItems } from '../flow/flow';
 import { type Identity, normalizeUserId } from '../flow/identity';
 import type { FlowView } from '../render/GameScene';
-import { MENU_HINT, MENU_LABELS, PROFILE_TEXT } from '../sim/content';
+import { MENU_HINT, MENU_LABELS, PROFILE_TEXT, WINDOW_FILES } from '../sim/content';
 import { el } from './dom';
 import { createMenu } from './menu';
 import type { ScreenView } from './screens';
@@ -79,6 +79,7 @@ export function mountProfile(root: HTMLElement, deps: ProfileDeps): ProfileScree
   root.append(screen);
 
   const card = el('div', 'profile-card');
+  card.dataset.file = WINDOW_FILES.profile;
   const idValue = el('div', 'profile-id');
   const nameValue = el('div', 'profile-name');
   card.append(
@@ -90,7 +91,7 @@ export function mountProfile(root: HTMLElement, deps: ProfileDeps): ProfileScree
   const status = el('div', 'profile-status');
   card.append(status);
   const server = el('div', 'profile-server');
-  const menu = createMenu();
+  const menu = createMenu(WINDOW_FILES.profileMenu);
   const notes = el('div', 'profile-notes');
   notes.append(el('div', 'profile-about', PROFILE_TEXT.about), server);
   screen.append(
