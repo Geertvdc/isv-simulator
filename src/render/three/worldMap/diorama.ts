@@ -26,9 +26,10 @@ const GROUND_JITTER = 0.05;
 const CAP = { size: 0.985, height: 0.12, bevel: 0.035 };
 /** How deep the dirt under a tile reaches (under the sea). */
 const EARTH_DEPTH = 1.2;
-/** The shore ring: lower than the land; some tiles are left out so the coast is ragged. */
+/** The board's rim: a ring of lower tiles round the land, with gold contact fingers on it. */
 const SHORE_TOP = -0.22;
-const SHORE_KEEP = 0.8;
+/** The fingers, like a card's edge connector: this many per tile, this wide and long (tiles). */
+const FINGERS = { perTile: 2, width: 0.36, length: 0.78, height: 0.025 };
 const SEA_LEVEL = -0.34;
 const SEA_SIZE = 400;
 /** How much a tile's grass color varies, lighter or darker. */
@@ -141,7 +142,7 @@ function hash01(x: number, y: number, salt = 0): number {
   return (h >>> 0) / 4294967296;
 }
 
-/** The land tiles (grass or paving caps over dirt columns) and the ragged sandy shore round them. */
+/** The land tiles (solder-mask or paving caps over board columns) and the rim with its gold fingers. */
 function terrain(
   map: WorldMap,
   chapterIds: readonly string[],
@@ -169,19 +170,12 @@ function terrain(
       seam: shadeColor(base, paved ? -0.12 : -0.35),
     };
   });
-  // The shore: a ring of lower sand tiles, some missing, so the coast isn't a straight line.
+  // The rim: a ring of lower, dark board tiles round the land.
   for (let y = top - 1; y <= map.height; y++) {
     for (let x = -1; x <= map.width; x++) {
       const ring = x === -1 || y === top - 1 || x === map.width || y === map.height;
-      if (!ring || hash01(x, y, 3) > SHORE_KEEP) continue;
-      const shade = (hash01(x, y, 4) * 2 - 1) * SHADE_JITTER;
-      tiles.push({
-        x,
-        y,
-        top: SHORE_TOP,
-        color: shadeColor(MAP_PALETTE.sand, shade),
-        seam: MAP_PALETTE.earth,
-      });
+      if (!ring) continue;
+      tiles.push({ x, y, top: SHORE_TOP, color: MAP_PALETTE.rim, seam: MAP_PALETTE.earth });
     }
   }
 
@@ -208,7 +202,41 @@ function terrain(
   });
   caps.receiveShadow = true;
   earth.receiveShadow = true;
-  return [caps, earth];
+  return [caps, earth, fingers(map, top)];
+}
+
+/**
+ * Gold contact fingers along the rim, like a circuit card's edge connector:
+ * narrow and long, pointing out from the land, with thin gaps between them.
+ * The corners are left bare.
+ */
+function fingers(map: WorldMap, top: number): THREE.InstancedMesh {
+  const spots: { x: number; y: number; across: boolean }[] = [];
+  const step = 1 / FINGERS.perTile;
+  for (let x = step / 2; x < map.width; x += step) {
+    spots.push({ x, y: top - 0.5, across: false }, { x, y: map.height + 0.5, across: false });
+  }
+  for (let y = top + step / 2; y < map.height; y += step) {
+    spots.push({ x: -0.5, y, across: true }, { x: map.width + 0.5, y, across: true });
+  }
+  const geometry = new THREE.BoxGeometry(1, FINGERS.height, 1);
+  geometry.translate(0, FINGERS.height / 2, 0);
+  const material = new THREE.MeshStandardMaterial({ roughness: 0.35, metalness: 0.5 });
+  const mesh = new THREE.InstancedMesh(geometry, material, spots.length);
+  const m = new THREE.Matrix4();
+  const color = new THREE.Color();
+  spots.forEach((spot, i) => {
+    const p = gridToWorld(spot.x, spot.y, SHORE_TOP);
+    const [sx, sz] = spot.across
+      ? [FINGERS.length, FINGERS.width]
+      : [FINGERS.width, FINGERS.length];
+    m.makeScale(sx, 1, sz).setPosition(p.x, p.y, p.z);
+    mesh.setMatrixAt(i, m);
+    const shade = (hash01(Math.round(spot.x * 4), Math.round(spot.y * 4), 4) * 2 - 1) * 0.04;
+    mesh.setColorAt(i, color.setHex(shadeColor(MAP_PALETTE.pad, shade)));
+  });
+  mesh.receiveShadow = true;
+  return mesh;
 }
 
 /**
@@ -285,7 +313,10 @@ function roadPath(map: WorldMap): THREE.Vector3[] {
   return curve.getSpacedPoints(Math.max(2, Math.ceil(curve.getLength() / ROAD.step)));
 }
 
-/** The road (a data bus: copper edges, cyan packets down the middle), its stops and its dashes, merged into one mesh. */
+/**
+ * The road, a data bus: copper edges, cyan packets down the middle and a
+ * via in each stop, merged into one mesh.
+ */
 function road(map: WorldMap, materials: KitMaterials): THREE.Mesh {
   const path = roadPath(map);
   const builder = new ModelBuilder();
