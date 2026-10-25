@@ -14,9 +14,9 @@ import { type Identity, normalizeUserId } from '../flow/identity';
 import type { FlowView } from '../render/GameScene';
 import { MENU_HINT, MENU_LABELS, PROFILE_TEXT, WINDOW_FILES } from '../sim/content';
 import { el } from './dom';
-import { statusBar } from './statusBar';
 import { createMenu } from './menu';
 import type { ScreenView } from './screens';
+import { statusBar } from './statusBar';
 
 export type ServerStatus = 'syncing' | 'online' | 'offline';
 
@@ -107,6 +107,7 @@ export function mountProfile(root: HTMLElement, deps: ProfileDeps): ProfileScree
   const dialog = el('div', 'profile-dialog');
   dialog.hidden = true;
   const dialogBox = el('div', 'profile-dialog-box');
+  dialogBox.dataset.file = WINDOW_FILES.profileDialog;
   const prompt = el('div', 'profile-dialog-prompt');
   const input = document.createElement('input');
   input.className = 'profile-input';

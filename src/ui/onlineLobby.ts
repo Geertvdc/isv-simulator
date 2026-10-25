@@ -26,11 +26,11 @@ import { playerCssColor } from '../render/playerColors';
 import { NET_MAX_NAME_LENGTH } from '../sim/balance';
 import { ONLINE_TEXT, WINDOW_FILES } from '../sim/content';
 import { el } from './dom';
-import { statusBar } from './statusBar';
 import { deviceLabel } from './lobby';
 import { playerBadge } from './playerBadge';
 import { copyText } from './profile';
 import type { ScreenView } from './screens';
+import { statusBar } from './statusBar';
 
 export interface OnlineDeps {
   /** The Leave (or Back) button was clicked. */

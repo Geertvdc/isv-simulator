@@ -14,11 +14,11 @@ import {
 } from '../sim/content';
 import { CHAPTERS } from '../sim/levels';
 import { el } from './dom';
-import { statusBar } from './statusBar';
 import { stepChips } from './game';
 import { introPicture } from './introPicture';
 import { levelRecipes } from './recipes';
 import type { ScreenView } from './screens';
+import { statusBar } from './statusBar';
 
 /** Where level `levelId` sits: its chapter and level number, counted from 1. */
 function placeOf(levelId: string): { chapter: number; level: number } | null {
