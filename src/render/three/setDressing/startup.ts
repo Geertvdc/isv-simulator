@@ -96,8 +96,8 @@ export const arcade = looks([1, 1], 3, (b, v) => {
   b.box(0.5, 0.42, 0.06, INK, { at: [0, 1.15, 0.26] }, 0.01);
   b.screen(0.42, 0.34, nth([0x5cf0ff, 0xff8ad8, 0x9fff8a], v), { at: [0, 1.15, 0.295] });
   b.box(0.5, 0.1, 0.25, DARK, { at: [0, 0.8, 0.35] }, 0);
-  b.led(0.03, 0xff4f4f, { at: [-0.1, 0.87, 0.4] });
-  b.led(0.03, 0xffd166, { at: [0.1, 0.87, 0.4] });
+  b.led(0.03, 0xe86ad8, { at: [-0.1, 0.87, 0.4] });
+  b.led(0.03, 0x7ae0e0, { at: [0.1, 0.87, 0.4] });
 });
 
 /** A standing desk with a laptop or monitor, someone typing at it. */

@@ -7,6 +7,7 @@ import {
   NEIGHBOUR,
   STREET,
   STYLES,
+  TREE_KINDS,
   denseRoad,
   footprint,
   isBuilding,
@@ -152,6 +153,40 @@ describe('planCity', () => {
     expect(styles('office')).toBeGreaterThanOrEqual(4);
     expect(styles('tower')).toBeGreaterThanOrEqual(3);
     expect(styles('glassTower')).toBeGreaterThanOrEqual(3);
+  });
+
+  it('scatters no more than a few of any small prop over a chapter', () => {
+    const trees: readonly string[] = TREE_KINDS;
+    for (const region of realMap.regions) {
+      const counts = new Map<string, number>();
+      for (const p of plan.pieces.filter(
+        (q) => q.chapter === region.chapter && !isBuilding(q.kind),
+      )) {
+        if (!trees.includes(p.kind)) counts.set(p.kind, (counts.get(p.kind) ?? 0) + 1);
+      }
+      for (const [kind, n] of counts) {
+        // Rows and curb lamps add their own; the scatter adds at most four.
+        if (
+          [
+            'lamp',
+            'car',
+            'bench',
+            'scooter',
+            'hedge',
+            'planter',
+            'fence',
+            'bin',
+            'hydrant',
+            'busStop',
+            'bikeRack',
+            'robot',
+            'shed',
+          ].includes(kind)
+        )
+          continue;
+        expect(n, `${kind} in chapter ${region.chapter}`).toBeLessThanOrEqual(4);
+      }
+    }
   });
 
   it('keeps fillers of a kind from clumping', () => {
