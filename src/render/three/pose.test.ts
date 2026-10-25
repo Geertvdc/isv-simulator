@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { CARRY_HEIGHT, CARD_SIZE, carryPoint } from './layout';
-import { type PoseInput, playerPose, turnToward } from './pose';
+import {
+  type Gait,
+  type PoseInput,
+  advanceStride,
+  playerPose,
+  stepGait,
+  strideHz,
+  turnToward,
+} from './pose';
 
 const still: PoseInput = {
   speed: 0,
@@ -11,6 +19,7 @@ const still: PoseInput = {
   windUp: 0,
   shovedMs: null,
   phase: 0,
+  stride: 0,
 };
 
 describe('playerPose', () => {
@@ -27,7 +36,9 @@ describe('playerPose', () => {
     const slow = { ...still, speed: 1.5 };
     const fast = { ...still, speed: 5 };
     const bobs = (input: PoseInput) =>
-      Math.max(...Array.from({ length: 40 }, (_, i) => playerPose(input, i * 25).bob));
+      Math.max(
+        ...Array.from({ length: 40 }, (_, i) => playerPose({ ...input, stride: i * 0.1 }, 0).bob),
+      );
     expect(bobs(fast)).toBeGreaterThan(bobs(slow));
     expect(bobs(slow)).toBeGreaterThan(0);
     expect(playerPose(fast, 100).lean).toBeGreaterThan(playerPose(slow, 100).lean);
@@ -96,6 +107,70 @@ describe('playerPose', () => {
     );
     expect(Math.max(...rolls)).toBeGreaterThan(0.1);
     expect(playerPose({ ...still, shovedMs: 1000 }, 0).roll).toBe(0);
+  });
+});
+
+/**
+ * The sim's speed as a diagonal walk grazes a counter: full speed, the push
+ * into the counter lost in one tick, a slow climb back, then off the counter
+ * and back up to full speed (from a run of `stepPlayer` on a real level).
+ */
+const GRAZE_SPEEDS = [
+  5, 5, 5, 4.72, 3.54, 3.54, 3.1, 3.18, 3.25, 3.3, 3.35, 3.38, 3.41, 3.44, 3.54, 3.77, 4.09, 4.48,
+  4.94, 5, 5, 5,
+];
+
+/** Draws `speeds` (one per 60 Hz frame) the way `People` does, from `startMs` into a round. */
+function walkFrames(speeds: readonly number[], startMs: number): { swing: number; bob: number }[] {
+  const dt = 1 / 60;
+  const gait: Gait = { speed: speeds[0] ?? 0, stride: 0 };
+  return speeds.map((speed, i) => {
+    stepGait(gait, speed, 5, dt);
+    const pose = playerPose({ ...still, speed: gait.speed, stride: gait.stride }, startMs + i * dt);
+    return { swing: pose.leftHand.z, bob: pose.bob };
+  });
+}
+
+function biggestJump(values: readonly number[]): number {
+  let max = 0;
+  for (let i = 1; i < values.length; i++) {
+    max = Math.max(max, Math.abs((values[i] ?? 0) - (values[i - 1] ?? 0)));
+  }
+  return max;
+}
+
+describe('walk cycle', () => {
+  it('turns at the step rate whatever the time, and wraps', () => {
+    const dt = 1 / 60;
+    const step = advanceStride(0, 5, 5, dt);
+    expect(step).toBeCloseTo(Math.PI * 2 * strideHz(5, 5) * dt);
+    expect(advanceStride(Math.PI * 2 - 0.01, 5, 5, dt)).toBeCloseTo(step - 0.01);
+    expect(advanceStride(1, 5, 5, -1)).toBe(1);
+  });
+
+  it('never jumps when the speed changes, however long the round has run', () => {
+    // At full speed the cycle turns 2π·f·dt per frame: the swing (0.12 wide) and the
+    // bob (0.05 high) move at most that times their size. A hitch is many times more.
+    const perFrame = Math.PI * 2 * strideHz(5, 5) * (1 / 60) * 1.05;
+    for (const startMs of [0, 60_000, 600_000, 3_600_000]) {
+      const frames = walkFrames(GRAZE_SPEEDS, startMs);
+      expect(biggestJump(frames.map((f) => f.swing))).toBeLessThan(perFrame * 0.12);
+      expect(biggestJump(frames.map((f) => f.bob))).toBeLessThan(perFrame * 0.05);
+    }
+  });
+
+  it('at a steady speed looks the same however long the round has run', () => {
+    const steady = Array.from({ length: 60 }, () => 5);
+    expect(walkFrames(steady, 600_000)).toEqual(walkFrames(steady, 0));
+  });
+
+  it('eases what it shows toward a new speed instead of popping', () => {
+    const gait: Gait = { speed: 5, stride: 0 };
+    stepGait(gait, 3.54, 5, 1 / 60);
+    expect(gait.speed).toBeLessThan(5);
+    expect(gait.speed).toBeGreaterThan(4);
+    for (let i = 0; i < 60; i++) stepGait(gait, 3.54, 5, 1 / 60);
+    expect(gait.speed).toBeCloseTo(3.54, 3);
   });
 });
 

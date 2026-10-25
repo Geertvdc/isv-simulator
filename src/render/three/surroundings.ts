@@ -6,7 +6,7 @@ import { type Character, applyPose, createExtra } from './Characters';
 import { type KitMaterials, type Model, kitMaterials } from './kit';
 import { SLAB_DEPTH } from './layout';
 import { matte } from './look';
-import { type Pose, type PoseInput, playerPose } from './pose';
+import { type Pose, type PoseInput, playerPose, strideHz } from './pose';
 import { SETTINGS, type SeatPose, type SetPiece } from './setDressing';
 
 /**
@@ -339,15 +339,19 @@ const STILL: PoseInput = {
   windUp: 0,
   shovedMs: null,
   phase: 0,
+  stride: 0,
 };
 
 /** What a background person is doing now. */
 function poseFor(extra: Extra, timeMs: number): Pose {
+  const speed = extra.pose === 'walking' ? WALK_SPEED : 0;
   const input: PoseInput = {
     ...STILL,
     phase: extra.phase,
     working: extra.pose === 'typing',
-    speed: extra.pose === 'walking' ? WALK_SPEED : 0,
+    speed,
+    // They never change speed, so time times the step rate is the walk cycle.
+    stride: (timeMs / 1000 + extra.phase) * Math.PI * 2 * strideHz(speed, STILL.fullSpeed),
   };
   const pose = playerPose(input, timeMs);
   if (extra.pose === 'chatting') {

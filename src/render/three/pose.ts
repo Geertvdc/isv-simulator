@@ -25,6 +25,12 @@ export interface PoseInput {
   shovedMs: number | null;
   /** A per-character offset so a room of idle people doesn't breathe in sync. */
   phase: number;
+  /**
+   * Where the walk cycle is, radians: integrated frame by frame with
+   * `advanceStride`, so a change of speed changes how fast it turns, never
+   * where it is.
+   */
+  stride: number;
 }
 
 export interface Vec3 {
@@ -63,11 +69,60 @@ const HAND_REST = { x: 0.4, y: 0.38, z: 0.05 };
 /** Half the gap between the hands holding a ticket: on its short sides. */
 const CARRY_HALF_GAP = 0.22;
 
+function walkAmount(speed: number, fullSpeed: number): number {
+  return Math.min(1, speed / Math.max(0.01, fullSpeed));
+}
+
+/** Walk cycles per second at `speed`. */
+export function strideHz(speed: number, fullSpeed: number): number {
+  return STEP_HZ_SLOW + (STEP_HZ_FAST - STEP_HZ_SLOW) * walkAmount(speed, fullSpeed);
+}
+
+/**
+ * The walk cycle `dtSeconds` on from `stride` (radians) at `speed`, kept in
+ * [0, 2π). The cycle has to be integrated like this: working it out as
+ * `time × frequency(speed)` makes every change of speed (turning, grazing a
+ * counter on a diagonal) jump the cycle by `time × Δfrequency`, which is
+ * many whole steps a few minutes into a round, so the bob and the hand
+ * swing flick about.
+ */
+export function advanceStride(
+  stride: number,
+  speed: number,
+  fullSpeed: number,
+  dtSeconds: number,
+): number {
+  const next = stride + Math.PI * 2 * strideHz(speed, fullSpeed) * Math.max(0, dtSeconds);
+  return next % (Math.PI * 2);
+}
+
+/**
+ * How long the walk takes to follow a change of speed, seconds. The sim's
+ * speed changes in steps (a diagonal walk loses its push into a counter in
+ * one tick); easing what the walk shows keeps the bob and swing from popping.
+ */
+const GAIT_EASE_S = 0.06;
+
+/** A character's walk as drawn: visual-only memory kept between frames. */
+export interface Gait {
+  /** Speed the walk shows, easing toward the real one. */
+  speed: number;
+  /** Where the walk cycle is, radians (see `PoseInput.stride`). */
+  stride: number;
+}
+
+/** Moves `gait` on by `dtSeconds` of walking at `speed`. Mutates `gait`. */
+export function stepGait(gait: Gait, speed: number, fullSpeed: number, dtSeconds: number): void {
+  const dt = Math.max(0, dtSeconds);
+  gait.speed += (speed - gait.speed) * (1 - Math.exp(-dt / GAIT_EASE_S));
+  gait.stride = advanceStride(gait.stride, gait.speed, fullSpeed, dt);
+}
+
 /** The pose for `input` at `timeMs`. */
 export function playerPose(input: PoseInput, timeMs: number): Pose {
   const t = timeMs / 1000 + input.phase;
-  const walk = Math.min(1, input.speed / Math.max(0.01, input.fullSpeed));
-  const stepPhase = t * Math.PI * 2 * (STEP_HZ_SLOW + (STEP_HZ_FAST - STEP_HZ_SLOW) * walk);
+  const walk = walkAmount(input.speed, input.fullSpeed);
+  const stepPhase = input.stride;
 
   let bob = walk > 0.05 ? Math.abs(Math.sin(stepPhase)) * BOB * walk : 0;
   let lean = LEAN_WALK * walk;
