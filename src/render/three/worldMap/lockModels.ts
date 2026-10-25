@@ -7,8 +7,9 @@ import type { Puff } from './locks';
 
 /**
  * The world map's locks, built in code: the bank of not-yet-rendered
- * wireframe clouds over a locked chapter, the striped barrier with its "★ N" sign at a closed gate, a
- * padlock for a locked level's flag and the little stars over a played one.
+ * wireframe clouds over a locked chapter, the striped barrier with its
+ * "★ N" sign at a closed gate, a padlock for a locked level's flag and the
+ * little stars over a played one.
  */
 
 export const LOCK_COLORS = {
@@ -16,8 +17,8 @@ export const LOCK_COLORS = {
    * The locked land's cloud: faceted like an unrendered mesh, pale blueprint
    * blue on top and a deeper blue under, with a glowing wireframe over it.
    */
-  cloudTop: 0x6f9be6,
-  cloudBottom: 0x2f56a3,
+  cloudTop: 0x4a6fb0,
+  cloudBottom: 0x223f7a,
   cloudWire: 0xbfe0ff,
   boomRed: 0xe0433a,
   boomWhite: 0xf6f3ec,
@@ -27,7 +28,8 @@ export const LOCK_COLORS = {
   signBorder: '#d6453d',
   signText: '#e8edf7',
   signStar: '#ffc83d',
-  signPrompt: '#5fe08a',
+  signBar: '#2a3348',
+  signDots: ['#ff5f57', '#febc2e', '#28c840'],
   padlock: 0xf2b632,
   shackle: 0xc9ccd2,
   keyhole: 0x3a3f47,
@@ -36,6 +38,9 @@ export const LOCK_COLORS = {
   starEarned: 0xffc83d,
   starMissing: 0x7d8a9a,
 } as const;
+
+/** How strongly the wireframe shows over the clouds' faces. */
+const WIRE_OPACITY = 0.45;
 
 /** The clouds drift to and fro and bob, slowly; rolling away they shrink, rise and fade. */
 const CLOUD_MOTION = { driftMs: 9000, bobMs: 4200, bob: 0.08, rise: 1.2, spread: 0.35 };
@@ -68,7 +73,7 @@ export function buildCloudBank(puffs: readonly Puff[], drift: number): CloudBank
     vertexColors: true,
     roughness: 1,
     flatShading: true,
-    emissive: 0x1a2c55,
+    emissive: 0x16264a,
   });
   const mesh = new THREE.InstancedMesh(geometry, material, Math.max(1, puffs.length));
   mesh.count = puffs.length;
@@ -80,7 +85,7 @@ export function buildCloudBank(puffs: readonly Puff[], drift: number): CloudBank
     color: LOCK_COLORS.cloudWire,
     wireframe: true,
     transparent: true,
-    opacity: 0.8,
+    opacity: WIRE_OPACITY,
   });
   const wire = new THREE.InstancedMesh(geometry, wireMaterial, Math.max(1, puffs.length));
   wire.count = puffs.length;
@@ -119,9 +124,9 @@ export function buildCloudBank(puffs: readonly Puff[], drift: number): CloudBank
       material.transparent = fading;
       material.needsUpdate = true;
     }
-    // They shrink and rise first and only then fade, so they stay white clouds, not fog.
+    // They shrink and rise first and only then fade, so they stay solid shapes, not a haze.
     material.opacity = 1 - Math.min(1, Math.max(0, (gone - 0.35) / 0.65));
-    wireMaterial.opacity = 0.8 * material.opacity;
+    wireMaterial.opacity = WIRE_OPACITY * material.opacity;
     mesh.visible = gone < 1;
   };
   update(0, 0);
@@ -137,7 +142,8 @@ const BARRIER = {
   boomThick: 0.07,
   stripe: 0.115,
   raised: 1.4,
-  sign: { aside: 0.66, ahead: 0.25, height: 0.75, width: 0.95, tall: 0.6, tilt: -0.5 },
+  /** On the open side of the gate (`ahead` < 0), so the next chapter's clouds don't hide it. */
+  sign: { aside: 0.72, ahead: -0.35, height: 0.75, width: 1.1, tall: 0.7, tilt: -0.5 },
 };
 
 export interface GateModel {
@@ -244,35 +250,48 @@ export function buildGate(
   };
 }
 
-/** The sign's face: a little terminal screen with "★ N" after a green prompt, in a red frame. */
+/**
+ * The sign's face: a little terminal window (a red frame, a title bar with
+ * three dots) showing "★ N" big, the star gold and the number light.
+ */
 function signTexture(text: string): THREE.CanvasTexture {
+  const W = 320;
+  const H = 204;
   const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 164;
+  canvas.width = W;
+  canvas.height = H;
   const ctx = canvas.getContext('2d');
   if (ctx) {
+    const frame = 12;
+    const bar = 34;
     ctx.fillStyle = LOCK_COLORS.signBorder;
-    ctx.fillRect(0, 0, 256, 164);
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = LOCK_COLORS.signBar;
+    ctx.fillRect(frame, frame, W - frame * 2, bar);
+    LOCK_COLORS.signDots.forEach((dot, i) => {
+      ctx.fillStyle = dot;
+      ctx.beginPath();
+      ctx.arc(frame + 20 + i * 22, frame + bar / 2, 7, 0, Math.PI * 2);
+      ctx.fill();
+    });
     ctx.fillStyle = '#' + new THREE.Color(LOCK_COLORS.signBoard).getHexString();
-    ctx.fillRect(12, 12, 232, 140);
-    ctx.font = '800 80px ui-monospace, Menlo, Consolas, monospace';
+    ctx.fillRect(frame, frame + bar, W - frame * 2, H - frame * 2 - bar);
+    ctx.font = '800 92px ui-monospace, Menlo, Consolas, monospace';
     ctx.textBaseline = 'middle';
-    // A prompt, then the star (up to the first space) in gold and the number light.
-    const prompt = '>';
+    // The star (up to the first space) in gold, a gap, the number light.
     const space = text.indexOf(' ');
-    const star = space < 0 ? '' : text.slice(0, space + 1);
+    const star = space < 0 ? '' : text.slice(0, space);
     const number = space < 0 ? text : text.slice(space + 1);
-    const parts: [string, string][] = [
-      [prompt, LOCK_COLORS.signPrompt],
-      [star, LOCK_COLORS.signStar],
-      [number, LOCK_COLORS.signText],
-    ];
-    let x = 128 - parts.reduce((sum, [t]) => sum + ctx.measureText(t).width, 0) / 2;
-    for (const [t, color] of parts) {
-      ctx.fillStyle = color;
-      ctx.fillText(t, x, 86);
-      x += ctx.measureText(t).width;
-    }
+    const gap = star ? 30 : 0;
+    const starWidth = ctx.measureText(star).width;
+    const width = starWidth + gap + ctx.measureText(number).width;
+    let x = W / 2 - width / 2;
+    const y = frame + bar + (H - frame * 2 - bar) / 2 + 4;
+    ctx.fillStyle = LOCK_COLORS.signStar;
+    ctx.fillText(star, x, y);
+    x += starWidth + gap;
+    ctx.fillStyle = LOCK_COLORS.signText;
+    ctx.fillText(number, x, y);
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
