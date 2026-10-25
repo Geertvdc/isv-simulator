@@ -24,7 +24,7 @@ import {
 } from '../flow/online';
 import { playerCssColor } from '../render/playerColors';
 import { NET_MAX_NAME_LENGTH } from '../sim/balance';
-import { ONLINE_TEXT } from '../sim/content';
+import { ONLINE_TEXT, WINDOW_FILES } from '../sim/content';
 import { el } from './dom';
 import { deviceLabel } from './lobby';
 import { playerBadge } from './playerBadge';
@@ -93,6 +93,7 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineLobbyDeps): Onli
   screen.hidden = true;
 
   const codeCard = el('div', 'online-code-card');
+  codeCard.dataset.file = WINDOW_FILES.roomCode;
   const code = el('div', 'online-code');
   const copied = el('div', 'online-copied');
   const copy = button('online-copy', ONLINE_TEXT.copy, () => {

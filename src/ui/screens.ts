@@ -25,6 +25,7 @@ import {
   PAUSED_TITLE,
   PRESS_ANY_BUTTON_TEXT,
   SETTINGS_TITLE,
+  WINDOW_FILES,
 } from '../sim/content';
 import { parseCredits } from './credits';
 import { el } from './dom';
@@ -65,7 +66,7 @@ function panel(root: HTMLElement, className: string): HTMLElement {
 
 export function mountTitle(root: HTMLElement): ScreenView {
   const screen = panel(root, 'title-screen');
-  const menu = createMenu();
+  const menu = createMenu(WINDOW_FILES.title);
   const press = el('div', 'title-press', PRESS_ANY_BUTTON_TEXT);
   const hint = el('div', 'screen-hint', MENU_HINT);
   const head = el('div', 'title-head');
@@ -86,9 +87,14 @@ export function mountTitle(root: HTMLElement): ScreenView {
 }
 
 /** A title, a menu and the button hint: the pause and settings screens. */
-function mountMenuScreen(root: HTMLElement, className: string, title: string): ScreenView {
+function mountMenuScreen(
+  root: HTMLElement,
+  className: string,
+  title: string,
+  file: string,
+): ScreenView {
   const screen = panel(root, className);
-  const menu = createMenu();
+  const menu = createMenu(file);
   screen.append(el('h1', 'screen-title', title), menu.root, el('div', 'screen-hint', MENU_HINT));
   return {
     render: (view) => {
@@ -99,11 +105,11 @@ function mountMenuScreen(root: HTMLElement, className: string, title: string): S
 }
 
 export function mountPause(root: HTMLElement): ScreenView {
-  return mountMenuScreen(root, 'pause-screen', PAUSED_TITLE);
+  return mountMenuScreen(root, 'pause-screen', PAUSED_TITLE, WINDOW_FILES.pause);
 }
 
 export function mountSettings(root: HTMLElement): ScreenView {
-  return mountMenuScreen(root, 'settings-screen', SETTINGS_TITLE);
+  return mountMenuScreen(root, 'settings-screen', SETTINGS_TITLE, WINDOW_FILES.settings);
 }
 
 export function mountResults(root: HTMLElement): ScreenView {
@@ -118,9 +124,10 @@ export function mountResults(root: HTMLElement): ScreenView {
   const best = el('div', 'results-badge', NEW_BEST_TEXT);
   const unlocked = el('div', 'results-badge');
   const chapter = el('div', 'results-badge');
-  const menu = createMenu();
+  const menu = createMenu(WINDOW_FILES.resultsMenu);
   const hint = el('div', 'screen-hint', MENU_HINT);
   const card = el('div', 'results-card');
+  card.dataset.file = WINDOW_FILES.results;
   card.append(stars, score, best, unlocked, chapter);
   screen.append(title, card, menu.root, hint);
   return {
@@ -168,6 +175,7 @@ export function mountCredits(root: HTMLElement): ScreenView {
   const menu = createMenu();
   // Back sits in the card's foot.
   const card = el('div', 'credits-card');
+  card.dataset.file = WINDOW_FILES.credits;
   card.append(list, menu.root);
   screen.append(el('h1', 'screen-title', CREDITS_TITLE), card, el('div', 'screen-hint', MENU_HINT));
   return {

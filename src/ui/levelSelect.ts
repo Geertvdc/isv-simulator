@@ -11,6 +11,7 @@ import {
   LEVEL_SELECT_HINT,
   chapterGateHint,
   chapterGateShort,
+  levelFile,
   levelLabel,
   unlockHint,
 } from '../sim/content';
@@ -99,10 +100,12 @@ export function mountLevelSelect(root: HTMLElement): LevelSelectView {
       card.dataset.chapter = chapter?.id ?? '';
       card.classList.toggle('locked', !open);
       number.textContent = levelLabel(c + 1, place);
+      card.dataset.file = levelFile(c + 1, place);
       name.textContent = level?.name ?? '';
       blurb.textContent = LEVEL_BLURBS[id] ?? '';
       const earned = open ? (record?.bestStars ?? 0) : 0;
       starIcons.forEach((icon, i) => icon.classList.toggle('earned', i < earned));
+      status.dataset.state = !open ? 'locked' : record ? 'best' : 'new';
       if (!open) {
         status.textContent = `🔒 ${
           chapterOpen
