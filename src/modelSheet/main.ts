@@ -64,6 +64,7 @@ const IDLE: PoseInput = {
   windUp: 0,
   shovedMs: null,
   phase: 0,
+  stride: 0,
 };
 
 /** A station's base with its hero prop standing on it. */
