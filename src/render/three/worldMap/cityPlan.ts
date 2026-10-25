@@ -66,10 +66,64 @@ export type PieceKind =
   | 'serverRack'
   | 'dish'
   | 'antenna'
-  // Everywhere
+  | 'solar'
+  | 'cooling'
+  | 'spool'
+  | 'dronePad'
+  | 'robot'
+  | 'evCharger'
+  // Street furniture and the like
+  | 'shed'
+  | 'bin'
+  | 'hydrant'
+  | 'busStop'
+  | 'bikeRack'
+  | 'foodTruck'
+  // Everywhere: trees (instanced, they sway)
   | 'tree'
   | 'roundTree'
+  | 'pine'
+  | 'birch'
+  | 'palm'
   | 'bush';
+
+/** The trees and bushes: instanced and swaying, not merged. */
+export const TREE_KINDS = ['tree', 'roundTree', 'pine', 'birch', 'palm', 'bush'] as const;
+export type TreeKind = (typeof TREE_KINDS)[number];
+
+/**
+ * How many styles a kind comes in (its shape: a gabled house or a flat-roofed
+ * one, an office with ribbon windows or one with fins). The planner keeps
+ * pieces of a kind next to each other in different styles.
+ */
+export const STYLES: Partial<Record<PieceKind, number>> = {
+  house: 6,
+  cowork: 3,
+  office: 5,
+  tower: 4,
+  glassTower: 4,
+  car: 4,
+  serverRack: 3,
+  dish: 2,
+  antenna: 2,
+  bench: 2,
+  lamp: 2,
+  busStop: 2,
+  foodTruck: 3,
+  shed: 2,
+  cooling: 2,
+  bin: 3,
+  solar: 2,
+};
+
+/** Piece `p`'s style, from 0 to its kind's `STYLES` − 1. */
+export function styleOf(p: Pick<CityPiece, 'kind' | 'variant'>): number {
+  const n = STYLES[p.kind] ?? 1;
+  return Math.min(n - 1, Math.floor(p.variant * n));
+}
+
+/** Pieces of a kind this close (middle to middle, map units) count as neighbours. */
+export const NEIGHBOUR = 2.2;
 
 export interface CityPiece {
   kind: PieceKind;
@@ -195,10 +249,26 @@ const CAR = prop('car', 0.45, 0.85, 0.42, { weight: 1 });
 const BENCH = prop('bench', 0.6, 0.3, 0.3, { weight: 1 });
 const PLANTER = prop('planter', 0.5, 0.5, 0.55, { weight: 1 });
 const HEDGE = prop('hedge', 1.1, 0.35, 0.4, { weight: 1 });
+const PINE = prop('pine', 0.7, 0.7, 1.9, { weight: 2 });
+const BIRCH = prop('birch', 0.6, 0.6, 1.75, { weight: 2 });
+const PALM = prop('palm', 0.7, 0.7, 1.9, { weight: 2 });
 /** Engineering props: an outdoor server cabinet, a satellite dish, a radio mast. */
-const RACK = prop('serverRack', 0.45, 0.38, 0.8, { weight: 1 });
+const RACK: Spec = { ...prop('serverRack', 0.45, 0.38, 0.8), h: [0.6, 1.0] };
 const DISH = prop('dish', 0.55, 0.55, 0.75, { weight: 1 });
 const ANTENNA = prop('antenna', 0.5, 0.5, 1.7, { weight: 1 });
+const SOLAR = prop('solar', 0.8, 0.5, 0.35, { weight: 1 });
+const COOLING = prop('cooling', 0.55, 0.45, 0.45, { weight: 1 });
+const SPOOL = prop('spool', 0.35, 0.35, 0.3, { turns: true, weight: 1 });
+const DRONE_PAD = prop('dronePad', 0.5, 0.5, 0.25, { weight: 1 });
+const ROBOT = prop('robot', 0.2, 0.26, 0.22, { turns: true, weight: 1 });
+const EV = prop('evCharger', 0.25, 0.2, 0.5, { weight: 1 });
+/** Street furniture. */
+const SHED = prop('shed', 0.6, 0.5, 0.6, { weight: 1 });
+const BIN = prop('bin', 0.22, 0.22, 0.35, { weight: 1 });
+const HYDRANT = prop('hydrant', 0.18, 0.18, 0.3, { weight: 1 });
+const BUS_STOP = prop('busStop', 0.9, 0.35, 0.6, { weight: 1 });
+const BIKE_RACK = prop('bikeRack', 0.8, 0.35, 0.35, { weight: 1 });
+const FOOD_TRUCK = prop('foodTruck', 1.0, 0.5, 0.6, { weight: 1 });
 
 /** Back of the island's back street, and its front. */
 const STREET_BACK = STREET.row;
@@ -242,9 +312,14 @@ const THEMES: Theme[] = [
     rows: [
       { ...BACK_ROW, align: 'front', specs: [HOUSE], gap: [0.6, 1.3], fences: true },
       { ...FRONT_ROW, align: 'back', specs: [HOUSE], gap: [0.9, 1.8], fences: true },
-      { ...SHORE_ROW, align: 'front', specs: [BUSH, TREE, ROUND_TREE], gap: [0.6, 1.6] },
+      {
+        ...SHORE_ROW,
+        align: 'front',
+        specs: [BUSH, TREE, ROUND_TREE, PINE, BIRCH, SHED],
+        gap: [0.5, 1.4],
+      },
     ],
-    fillers: [TREE, ROUND_TREE, BUSH, DISH],
+    fillers: [TREE, ROUND_TREE, PINE, BIRCH, BUSH, DISH, SHED, BIN, HYDRANT, SOLAR],
     fillTries: 260,
     ground: () => 'grass',
     yard: 'grass',
@@ -288,14 +363,20 @@ const THEMES: Theme[] = [
       {
         ...SHORE_ROW,
         align: 'front',
-        specs: [prop('scooter', 0.22, 0.55, 0.45), BENCH, BUSH],
+        specs: [prop('scooter', 0.22, 0.55, 0.45), BENCH, BUSH, BIKE_RACK, BIN],
         gap: [0.4, 1.4],
       },
     ],
     fillers: [
       TREE,
       ROUND_TREE,
+      BIRCH,
       BUSH,
+      FOOD_TRUCK,
+      BIKE_RACK,
+      SPOOL,
+      SOLAR,
+      COOLING,
       prop('pingPong', 0.85, 0.5, 0.4),
       prop('picnic', 0.8, 0.65, 0.38),
       prop('scooter', 0.22, 0.55, 0.45, { turns: true }),
@@ -327,9 +408,14 @@ const THEMES: Theme[] = [
         specs: [{ kind: 'office', w: [1.3, 1.8], d: [1.1, 1.5], storeys: [3, 5], roof: 0.2 }],
         gap: [0.3, 0.7],
       },
-      { ...SHORE_ROW, align: 'front', specs: [CAR, CAR, LAMP], gap: [0.3, 0.8] },
+      {
+        ...SHORE_ROW,
+        align: 'front',
+        specs: [CAR, CAR, LAMP, BUS_STOP, HYDRANT, BIN],
+        gap: [0.3, 0.8],
+      },
     ],
-    fillers: [TREE, ROUND_TREE, BUSH, BUSH, RACK, ANTENNA],
+    fillers: [TREE, ROUND_TREE, PINE, BUSH, BUSH, RACK, ANTENNA, COOLING, EV, SPOOL, FOOD_TRUCK],
     fillTries: 200,
     ground: (_x, y) => (y < STREET_FRONT + 1.5 ? 'paving' : 'grass'),
     yard: 'paving',
@@ -366,9 +452,14 @@ const THEMES: Theme[] = [
         specs: [{ kind: 'tower', w: [1.3, 1.7], d: [1.2, 1.6], storeys: [5, 8], roof: 0.3 }],
         gap: [0.2, 0.45],
       },
-      { ...SHORE_ROW, align: 'front', specs: [CAR, CAR, LAMP, PLANTER], gap: [0.3, 0.7] },
+      {
+        ...SHORE_ROW,
+        align: 'front',
+        specs: [CAR, CAR, LAMP, PLANTER, BUS_STOP, BIN, HYDRANT],
+        gap: [0.3, 0.7],
+      },
     ],
-    fillers: [PLANTER, ROUND_TREE, ROUND_TREE, BUSH, RACK, RACK, ANTENNA],
+    fillers: [PLANTER, ROUND_TREE, PINE, BUSH, RACK, RACK, ANTENNA, COOLING, SPOOL, DISH, EV],
     fillTries: 200,
     ground: (_x, y) => (y < 3 || y > 9 ? 'concrete' : 'paving'),
     yard: 'paving',
@@ -405,9 +496,14 @@ const THEMES: Theme[] = [
         specs: [{ kind: 'glassTower', w: [1.3, 1.8], d: [1.2, 1.6], storeys: [7, 10], roof: 0.2 }],
         gap: [0.4, 0.9],
       },
-      { ...SHORE_ROW, align: 'front', specs: [HEDGE, ROUND_TREE, BENCH], gap: [0.35, 0.8] },
+      {
+        ...SHORE_ROW,
+        align: 'front',
+        specs: [HEDGE, ROUND_TREE, BENCH, PALM, BIKE_RACK, ROBOT],
+        gap: [0.35, 0.8],
+      },
     ],
-    fillers: [ROUND_TREE, ROUND_TREE, HEDGE, BUSH, RACK, DISH],
+    fillers: [ROUND_TREE, PALM, BIRCH, HEDGE, BUSH, RACK, DISH, DRONE_PAD, ROBOT, SOLAR, EV],
     fillTries: 200,
     ground: () => 'lawn',
     yard: 'plaza',
@@ -416,6 +512,9 @@ const THEMES: Theme[] = [
 
 /** Street lamps along the back street's near curb, this far apart, from this chapter on. */
 const CURB_LAMPS = { every: 2.4, fromChapter: 2 };
+
+/** Fillers of a kind closer than this to each other count as a clump. */
+const CLUMP = 1.1;
 
 /** Extra tries for a filler kind the scatter left out. */
 const MISSING_TRIES = 120;
@@ -514,9 +613,49 @@ class Planner {
     return true;
   }
 
-  add(p: CityPiece): void {
-    this.pieces.push(p);
+  /** Places `p`, restyled so it doesn't look like the pieces of its kind next to it. */
+  add(p: CityPiece): CityPiece {
+    const placed = restyle(p, this.pieces);
+    this.pieces.push(placed);
+    return placed;
   }
+
+  /** A piece of `kind` within `radius` of (x, y): to keep the same kind from clumping. */
+  near(kind: PieceKind, x: number, y: number, radius: number): boolean {
+    return this.pieces.some((q) => q.kind === kind && Math.hypot(q.x - x, q.y - y) < radius);
+  }
+}
+
+/**
+ * `p` in the style its neighbours of the same kind use least (never the
+ * nearest one's), and the chapter so far uses least, keeping the rest of its
+ * variant: two houses side by side get different roofs, two offices
+ * different windows, and a chapter shows off all its styles.
+ */
+function restyle(p: CityPiece, pieces: readonly CityPiece[]): CityPiece {
+  const n = STYLES[p.kind] ?? 1;
+  if (n < 2) return p;
+  const kin = pieces.filter((q) => q.kind === p.kind);
+  const weight = Array.from({ length: n }, () => 0);
+  let nearest: { q: CityPiece; d: number } | null = null;
+  for (const q of kin) {
+    const d = Math.hypot(q.x - p.x, q.y - p.y);
+    const s = styleOf(q);
+    const balance = q.chapter === p.chapter ? 0.15 : 0;
+    weight[s] = (weight[s] ?? 0) + balance + (d < NEIGHBOUR ? 1 / (0.5 + d) : 0);
+    if (d < NEIGHBOUR && (!nearest || d < nearest.d)) nearest = { q, d };
+  }
+  if (nearest) weight[styleOf(nearest.q)] = Infinity;
+  const own = styleOf(p);
+  let best = own;
+  for (let t = 0; t < n; t++) {
+    const s = (own + t) % n;
+    if ((weight[s] ?? 0) < (weight[best] ?? 0)) best = s;
+  }
+  if (best === own) return p;
+  // The same place inside the style's slice of [0, 1), so its colors and details still vary.
+  const within = p.variant * n - own;
+  return { ...p, variant: (best + within) / n };
 }
 
 function pick<T>(rng: () => number, items: readonly T[], weight: (t: T) => number = () => 1): T {
@@ -575,9 +714,13 @@ export function planCity(map: WorldMap): CityPlan {
     }
     for (const row of theme.rows) placeRow(planner, region, row, rng);
     for (let i = 0; i < theme.fillTries; i++) {
-      const spec = pick(rng, theme.fillers, (s) => s.weight ?? 1);
       const x = region.x + rng() * region.width;
       const y = -BACKLOT + rng() * (map.height + BACKLOT);
+      // Not the same kind as a piece right by it: pick again, once or twice.
+      let spec = pick(rng, theme.fillers, (s) => s.weight ?? 1);
+      for (let t = 0; t < 2 && planner.near(spec.kind, x, y, CLUMP); t++) {
+        spec = pick(rng, theme.fillers, (s) => s.weight ?? 1);
+      }
       const p = make(spec, region.chapter, x, y, rng);
       if (planner.fits(p, region)) planner.add(p);
     }
@@ -641,8 +784,13 @@ function placeLandmark(
 function placeRow(planner: Planner, region: MapRegion, row: Row, rng: () => number): void {
   let x = region.x + CLEAR.shore + rng() * 0.4;
   const end = region.x + region.width;
+  let last: PieceKind | null = null;
   while (x < end) {
-    const spec = pick(rng, row.specs, (s) => s.weight ?? 1);
+    let spec = pick(rng, row.specs, (s) => s.weight ?? 1);
+    // Not the same kind twice running, where the row has others.
+    for (let t = 0; t < 3 && spec.kind === last; t++) {
+      spec = pick(rng, row.specs, (s) => s.weight ?? 1);
+    }
     let p: CityPiece | null = make(spec, region.chapter, 0, 0, rng);
     const d = Math.min(p.d, row.to - row.from);
     const y = row.align === 'back' ? row.from + d / 2 : row.to - d / 2;
@@ -652,7 +800,8 @@ function placeRow(planner: Planner, region: MapRegion, row: Row, rng: () => numb
       x += 0.25;
       continue;
     }
-    planner.add(p);
+    p = planner.add(p);
+    last = p.kind;
     if (row.fences && p.kind === 'house') {
       const fence = make(
         prop('fence', p.w + 0.3, 0.08, 0.3),

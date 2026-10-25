@@ -4,7 +4,9 @@ import { CHAPTERS } from '../../../sim/levels';
 import {
   BACKLOT,
   type CityPiece,
+  NEIGHBOUR,
   STREET,
+  STYLES,
   denseRoad,
   footprint,
   isBuilding,
@@ -13,6 +15,7 @@ import {
   rectDistance,
   silhouette,
   streetLoop,
+  styleOf,
 } from './cityPlan';
 import { markerSpots } from './markers';
 
@@ -116,6 +119,51 @@ describe('planCity', () => {
     expect(
       Math.hypot((garage?.x ?? 99) - (first?.x ?? 0), (garage?.y ?? 99) - (first?.y ?? 0)),
     ).toBeLessThan(4);
+  });
+
+  it('never stands a piece by the nearest of its kind in the same style', () => {
+    for (const p of plan.pieces) {
+      if ((STYLES[p.kind] ?? 1) < 2) continue;
+      const nearest = plan.pieces
+        .filter((q) => q !== p && q.kind === p.kind)
+        .map((q) => ({ q, d: Math.hypot(q.x - p.x, q.y - p.y) }))
+        .filter(({ d }) => d < NEIGHBOUR)
+        .sort((a, b) => a.d - b.d)[0];
+      if (!nearest) continue;
+      // Only the later of the two had to move off the other's style.
+      if (plan.pieces.indexOf(nearest.q) > plan.pieces.indexOf(p)) continue;
+      expect(styleOf(nearest.q), `${p.kind} at ${p.x.toFixed(1)}, ${p.y.toFixed(1)}`).not.toBe(
+        styleOf(p),
+      );
+    }
+  });
+
+  it('builds every chapter from many kinds, its houses and offices in many styles', () => {
+    for (const region of realMap.regions) {
+      const mine = plan.pieces.filter((p) => p.chapter === region.chapter);
+      expect(
+        new Set(mine.map((p) => p.kind)).size,
+        `chapter ${region.chapter}`,
+      ).toBeGreaterThanOrEqual(12);
+    }
+    const styles = (kind: string) =>
+      new Set(plan.pieces.filter((p) => p.kind === kind).map((p) => styleOf(p))).size;
+    expect(styles('house')).toBeGreaterThanOrEqual(5);
+    expect(styles('office')).toBeGreaterThanOrEqual(4);
+    expect(styles('tower')).toBeGreaterThanOrEqual(3);
+    expect(styles('glassTower')).toBeGreaterThanOrEqual(3);
+  });
+
+  it('keeps fillers of a kind from clumping', () => {
+    const fillers = plan.pieces.filter((p) => !isBuilding(p.kind));
+    let clumped = 0;
+    for (const p of fillers) {
+      const twin = fillers.some(
+        (q) => q !== p && q.kind === p.kind && Math.hypot(q.x - p.x, q.y - p.y) < 0.8,
+      );
+      if (twin) clumped++;
+    }
+    expect(clumped / fillers.length).toBeLessThan(0.25);
   });
 
   it('is the same every time', () => {

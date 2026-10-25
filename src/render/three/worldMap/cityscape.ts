@@ -3,8 +3,16 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { WorldMap } from '../../../flow/worldMap';
 import { gridToWorld } from '../../projection';
 import { type KitMaterials, ModelBuilder } from '../kit';
-import { CRANE, type PieceBuilders, buildPiece, carModel, craneJib, treeModel } from './cityModels';
-import { type CityPiece, type CityPlan, STREET, streetLoop } from './cityPlan';
+import {
+  CRANE,
+  type PieceBuilders,
+  TREE_HEIGHT,
+  buildPiece,
+  carModel,
+  craneJib,
+  treeModel,
+} from './cityModels';
+import { type CityPiece, type CityPlan, STREET, TREE_KINDS, streetLoop } from './cityPlan';
 
 /**
  * The towns and cities on the world map, built from the city plan: every
@@ -36,8 +44,13 @@ export interface Cityscape {
   update(timeMs: number, deltaMs: number): void;
 }
 
-type TreeKind = 'tree' | 'roundTree' | 'bush';
-const TREES: readonly TreeKind[] = ['tree', 'roundTree', 'bush'];
+/**
+ * Each tree's own look (phase 20): its leaves a little lighter or darker,
+ * warmer or cooler, and its crown a little wider or narrower.
+ */
+const TREE_VARIATION = { brightness: [0.82, 1.1], warmth: 0.12, width: [0.85, 1.15] } as const;
+/** Body styles of the cars round the back street: sedans, hatchbacks, vans, pickups. */
+const CAR_STYLES = 4;
 
 interface Layers {
   body: THREE.BufferGeometry[];
@@ -62,7 +75,7 @@ export function buildCityscape(map: WorldMap, plan: CityPlan, materials: KitMate
   const m = new THREE.Matrix4();
 
   plan.pieces.forEach((piece, i) => {
-    if ((TREES as readonly string[]).includes(piece.kind)) return;
+    if ((TREE_KINDS as readonly string[]).includes(piece.kind)) return;
     const builders: PieceBuilders = {
       body: new ModelBuilder(),
       shiny: new ModelBuilder(),
@@ -149,17 +162,29 @@ export function buildCityscape(map: WorldMap, plan: CityPlan, materials: KitMate
 
   // Cars round the back street.
   const loop = streetLoop(map.width);
-  // One instanced car in white, painted per instance.
-  const carBuilder = new ModelBuilder();
-  carModel(carBuilder, new ModelBuilder(), 0xffffff, CARS.width, CARS.length);
-  const cars = new THREE.InstancedMesh(carBuilder.build().body, materials.body, CARS.count);
-  cars.castShadow = true;
+  // Instanced cars in white, one mesh per body style, painted per instance.
+  const carMeshes = Array.from({ length: CAR_STYLES }, (_, style) => {
+    const builder = new ModelBuilder();
+    carModel(builder, new ModelBuilder(), 0xffffff, CARS.width, CARS.length, style);
+    const count = Math.ceil((CARS.count - style) / CAR_STYLES);
+    const mesh = new THREE.InstancedMesh(builder.build().body, materials.body, Math.max(1, count));
+    mesh.count = Math.max(0, count);
+    mesh.castShadow = true;
+    return mesh;
+  });
   const paint = new THREE.Color();
-  for (let k = 0; k < CARS.count; k++)
-    cars.setColorAt(k, paint.setHex(CARS.colors[k % CARS.colors.length] ?? 0xffffff));
+  for (let k = 0; k < CARS.count; k++) {
+    const mesh = carMeshes[k % CAR_STYLES];
+    mesh?.setColorAt(
+      Math.floor(k / CAR_STYLES),
+      paint.setHex(CARS.colors[k % CARS.colors.length] ?? 0xffffff),
+    );
+  }
   // The cars move all over the island: never culled.
-  cars.frustumCulled = false;
-  root.add(cars);
+  for (const mesh of carMeshes) {
+    mesh.frustumCulled = false;
+    root.add(mesh);
+  }
   const carOffsets = Array.from(
     { length: CARS.count },
     (_, k) => (loop.length * k) / CARS.count + (k % 3) * 0.7,
@@ -178,9 +203,12 @@ export function buildCityscape(map: WorldMap, plan: CityPlan, materials: KitMate
         const spot = loop.at(offset + (timeMs / 1000) * CARS.speed);
         // Map x and y are world x and z (see `gridToWorld`): no new vector per car per frame.
         carQuaternion.setFromAxisAngle(up, spot.yaw);
-        cars.setMatrixAt(k, m.compose(carPosition.set(spot.x, GROUND, spot.y), carQuaternion, one));
+        carMeshes[k % CAR_STYLES]?.setMatrixAt(
+          Math.floor(k / CAR_STYLES),
+          m.compose(carPosition.set(spot.x, GROUND, spot.y), carQuaternion, one),
+        );
       });
-      cars.instanceMatrix.needsUpdate = true;
+      for (const mesh of carMeshes) mesh.instanceMatrix.needsUpdate = true;
       jibs.forEach((jib, k) => {
         jib.rotation.y =
           CRANE_SWING.base +
@@ -216,12 +244,12 @@ function streetDashes(map: WorldMap, regions: Map<number, Layers>): void {
   }
 }
 
-/** One instanced mesh per tree kind; each tree sways a little round its foot. */
+/** One instanced mesh per tree kind; each tree sways a little round its foot, and has its own tint and width. */
 function buildTrees(
   pieces: readonly CityPiece[],
   materials: KitMaterials,
 ): { mesh: THREE.InstancedMesh; sway: (timeMs: number) => void }[] {
-  return TREES.flatMap((kind) => {
+  return TREE_KINDS.flatMap((kind) => {
     const list = pieces.filter((p) => p.kind === kind);
     if (list.length === 0) return [];
     const geometry = treeModel(kind).build().body;
@@ -229,20 +257,30 @@ function buildTrees(
     mesh.count = list.length;
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    const base = list.map((p) => {
+    const v = TREE_VARIATION;
+    const lerp = ([a, b]: readonly [number, number], t: number) => a + (b - a) * t;
+    const color = new THREE.Color();
+    const base = list.map((p, i) => {
       const at = gridToWorld(p.x, p.y, GROUND);
-      // Model height 1.75 (tree), 1.35 (round tree), 0.45 (bush): scaled to the piece.
-      const natural = kind === 'tree' ? 1.75 : kind === 'roundTree' ? 1.35 : 0.45;
+      // Numbers from the variant's later digits, so they don't follow its yaw.
+      const digit = (k: number) => (p.variant * 10 ** k) % 1;
+      const bright = lerp(v.brightness, digit(2));
+      const warm = (digit(3) * 2 - 1) * v.warmth;
+      mesh.setColorAt(i, color.setRGB(bright * (1 + warm), bright, bright * (1 - warm * 1.5)));
+      const height = p.h / TREE_HEIGHT[kind];
       return {
         at: new THREE.Vector3(at.x, at.y, at.z),
-        scale: p.h / natural,
+        scale: new THREE.Vector3(
+          height * lerp(v.width, digit(4)),
+          height,
+          height * lerp(v.width, digit(5)),
+        ),
         yaw: p.variant * Math.PI * 2,
         phase: p.variant * 40,
       };
     });
     const q = new THREE.Quaternion();
     const e = new THREE.Euler();
-    const s = new THREE.Vector3();
     const m = new THREE.Matrix4();
     const sway = (timeMs: number): void => {
       base.forEach((t, i) => {
@@ -250,8 +288,7 @@ function buildTrees(
         const lean = kind === 'bush' ? 0 : SWAY.angle;
         e.set(Math.sin(a) * lean, t.yaw, Math.cos(a * 0.7) * lean * 0.6);
         q.setFromEuler(e);
-        s.setScalar(t.scale);
-        mesh.setMatrixAt(i, m.compose(t.at, q, s));
+        mesh.setMatrixAt(i, m.compose(t.at, q, t.scale));
       });
       mesh.instanceMatrix.needsUpdate = true;
     };

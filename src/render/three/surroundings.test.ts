@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { placeSetPieces } from './surroundings';
-import { SETTINGS } from './setDressing';
+import { SETTINGS, WALL_TOP_PROPS } from './setDressing';
 
 describe('placeSetPieces', () => {
   for (const setting of Object.keys(SETTINGS)) {
@@ -132,5 +132,24 @@ describe('placeSetPieces', () => {
 
   it('places nothing for a level without a setting', () => {
     expect(placeSetPieces('nowhere', 14, 10)).toEqual([]);
+  });
+});
+
+describe('set pieces', () => {
+  it('builds every look of every prop', () => {
+    const pieces = new Set(
+      Object.values(SETTINGS).flatMap((s) => [...s.near, ...s.far, ...s.rare]),
+    );
+    for (const piece of pieces) {
+      for (let v = 0; v < (piece.variants ?? 1); v++) {
+        expect(piece.model(v).body.getAttribute('position').count).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('puts many different things on the office walls', () => {
+    expect(WALL_TOP_PROPS.length).toBeGreaterThanOrEqual(12);
+    for (const prop of WALL_TOP_PROPS)
+      expect(prop().body.getAttribute('position').count).toBeGreaterThan(0);
   });
 });
