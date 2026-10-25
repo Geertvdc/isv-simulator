@@ -16,8 +16,6 @@ import {
   DASH_SPEED,
   DASH_TICKS,
   CORNER_NUDGE_MAX_SIDE_INPUT,
-  DIAGONAL_FACING_GRACE_TICKS,
-  DIAGONAL_MIN_SHARE,
   PLAYER_ACCEL,
   PLAYER_DECEL,
   PLAYER_MAX_SPEED,
@@ -187,26 +185,6 @@ function steerAlongWalls(map: LevelMap, pos: Vec, move: Vec, target: Vec): void 
   else if (blocked(dy)) target.y = 0;
 }
 
-/**
- * Turns the player to face along `move` (non-zero). A diagonal facing
- * holds for `DIAGONAL_FACING_GRACE_TICKS` while the input drops to one of
- * its two directions, so letting go of two keys a tick or two apart
- * doesn't snap the player round as they stop. Mutates the player.
- */
-function steerFacing(player: Player, move: Vec): void {
-  const len = length(move);
-  const dir = { x: move.x / len, y: move.y / len };
-  if (Math.min(Math.abs(dir.x), Math.abs(dir.y)) >= DIAGONAL_MIN_SHARE) {
-    player.sinceDiagonal = 0;
-    player.facing = dir;
-    return;
-  }
-  player.sinceDiagonal = Math.min(player.sinceDiagonal + 1, DIAGONAL_FACING_GRACE_TICKS + 1);
-  const along = dir.x * player.facing.x + dir.y * player.facing.y;
-  const holding = player.sinceDiagonal <= DIAGONAL_FACING_GRACE_TICKS && along > 0.5;
-  if (!holding) player.facing = dir;
-}
-
 export function isDashing(player: Player): boolean {
   return player.dashTicks > 0;
 }
@@ -241,9 +219,10 @@ export function stepPlayer(map: LevelMap, player: Player, rawMove: Vec): void {
     const target = { x: move.x * PLAYER_MAX_SPEED, y: move.y * PLAYER_MAX_SPEED };
     if (moving) steerAlongWalls(map, player.pos, move, target);
     player.vel = approach(player.vel, target, (moving ? PLAYER_ACCEL : PLAYER_DECEL) * DT);
-    if (moving) steerFacing(player, move);
-    // Standing still ends the grace: the next input faces wherever it says.
-    else player.sinceDiagonal = DIAGONAL_FACING_GRACE_TICKS + 1;
+    if (moving) {
+      const len = length(move);
+      player.facing = { x: move.x / len, y: move.y / len };
+    }
   }
 
   const pos = player.pos;

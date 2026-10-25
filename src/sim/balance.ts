@@ -30,14 +30,6 @@ export const CORNER_NUDGE_MAX_SIDE_INPUT = 0.3;
  */
 export const WALL_PROBE = 0.002;
 /**
- * Ticks a diagonal facing survives input dropping to one of its two
- * directions. Keyboard diagonals rarely release both keys on the same tick;
- * without this the player would snap 45° as they stop.
- */
-export const DIAGONAL_FACING_GRACE_TICKS = 4;
-/** A move counts as diagonal (for that grace) when both parts are at least this share of it. */
-export const DIAGONAL_MIN_SHARE = 0.38;
-/**
  * Share of the overlap between two players removed per tick. Below 1 so
  * bumping into someone is a soft, squishy shove instead of a hard wall.
  */
