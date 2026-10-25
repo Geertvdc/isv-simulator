@@ -23,6 +23,12 @@ import { type Gait, type PoseInput, playerPose, stepGait, turnToward } from './p
 const RING = { inner: PLAYER_RADIUS * 0.95, outer: PLAYER_RADIUS * 1.25, lift: 0.006 };
 /** How fast characters turn to face a new way, radians per second. */
 const TURN_SPEED = 20;
+/**
+ * The sim counts as stopped (paused, on the results, a frozen scene) once
+ * its tick hasn't moved for this long; people then stop walking on the spot.
+ * Longer than the gap between online snapshots.
+ */
+const SIM_STALL_MS = 150;
 /** Working shows for this long after the last bit of progress, so a tick without any doesn't flicker. */
 const WORK_HOLD_MS = 200;
 
@@ -52,6 +58,8 @@ export class People {
     -Math.PI / 2,
   );
   private lastMs: number | null = null;
+  private lastTick = -1;
+  private lastTickMs = -Infinity;
   private readonly seen = new Set<PlayerId>();
   private readonly seenManagers = new Set<number>();
 
@@ -70,6 +78,12 @@ export class People {
     const { state } = view;
     const dt = this.lastMs === null ? 0 : Math.max(0, (timeMs - this.lastMs) / 1000);
     this.lastMs = timeMs;
+    if (state.tick !== this.lastTick) {
+      this.lastTick = state.tick;
+      this.lastTickMs = timeMs;
+    }
+    // Stopped, the velocities stay frozen: don't keep walking on them.
+    const running = state.result === null && timeMs - this.lastTickMs < SIM_STALL_MS;
     for (const event of events) {
       if (event.type === 'shoved' || event.type === 'managerBumped') {
         const person = this.players.get(event.target);
@@ -92,7 +106,7 @@ export class People {
       this.place(person, gridToWorld(pos.x, pos.y), yaw, dt);
       applyPose(
         person.character,
-        playerPose(this.poseInput(state, player, person, timeMs, dt), timeMs),
+        playerPose(this.poseInput(state, player, person, timeMs, dt, running), timeMs),
       );
     }
     this.drop(this.players, seen);
@@ -111,7 +125,7 @@ export class People {
       }
       this.place(person, gridToWorld(pos.x, pos.y), facingYaw(manager.facing), dt);
       const fullSpeed = MANAGER_SPEED * 1.6;
-      stepGait(person.gait, manager.walking ? MANAGER_SPEED : 0, fullSpeed, dt);
+      stepGait(person.gait, running && manager.walking ? MANAGER_SPEED : 0, fullSpeed, dt);
       const input: PoseInput = {
         ...IDLE,
         speed: person.gait.speed,
@@ -140,9 +154,10 @@ export class People {
     person: Person,
     timeMs: number,
     dt: number,
+    running: boolean,
   ): PoseInput {
     const carrying = ticketCarriedBy(state, player.id) !== undefined;
-    const speed = Math.hypot(player.vel.x, player.vel.y);
+    const speed = running ? Math.hypot(player.vel.x, player.vel.y) : 0;
     stepGait(person.gait, speed, PLAYER_MAX_SPEED, dt);
     // The step on the station they face: its progress tells whether they work it.
     const target = targetTile(state, player.id);
