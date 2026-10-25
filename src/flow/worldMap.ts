@@ -80,7 +80,13 @@ const NODE_Y = { min: 3.8, max: 8.2 };
  * How much higher or lower each flag stands than the one before it: at
  * least enough for up or down to drive there (see `CURSOR_MIN_DOT`).
  */
-const NODE_STEP = { min: 1.2, max: 2.1 };
+const NODE_STEP = { min: 1.2, max: 2.4 };
+/**
+ * The first flag stands this far up from the band's near edge at most: by
+ * the garage, in front of the road, where the van parked on its stop
+ * doesn't hide its number.
+ */
+const FIRST_ROW_DEPTH = 1.2;
 /** How often a flag steps the same way (up or down) as the one before. */
 const NODE_KEEP_GOING = 0.6;
 /** The band the road keeps to, its bends included. */
@@ -140,11 +146,13 @@ const SAFE_STRETCH: Stretch = [{ at: 0.5, off: 0.3, lift: 0 }];
  * the campaign's map looks good with it. A new chapter or level reshapes
  * the map; if the world map tests then fail, try another seed.
  */
-const LAYOUT_SEED = 89;
+const LAYOUT_SEED = 84;
 /** Road waypoints per stretch between two control points. */
 const ROAD_SAMPLES = 6;
 /** Where the road starts and ends: this far in from the island's left and right shores. */
 const ROAD_SHORE = 1;
+/** The steepest the road runs off to the shore at either end (map y per x). */
+const SHORE_SLOPE = 0.5;
 /** How well a press has to point at a level to drive there (cosine of the angle). */
 const CURSOR_MIN_DOT = 0.3;
 
@@ -229,13 +237,14 @@ function between(rng: Rng, [min, max]: readonly [number, number]): number {
 }
 
 /**
- * The next flag after one at `last` (or the first flag, with `null`): a
+ * The next flag after one at `last` (or the first flag, near the front by
+ * the garage, with `null`): a
  * step up or down the map, often the same way as the step before, so the
  * road climbs or drops over a few flags instead of zigzagging. A step that
  * doesn't fit the band is cut short, or turns round when too little is left.
  */
 function nextRow(rng: Rng, last: Row | null): Row {
-  if (last === null) return { y: between(rng, [NODE_Y.min, NODE_Y.max]), dir: 1 };
+  if (last === null) return { y: between(rng, [NODE_Y.max - FIRST_ROW_DEPTH, NODE_Y.max]), dir: 1 };
   const step = between(rng, [NODE_STEP.min, NODE_STEP.max]);
   const room = (dir: number): number => (dir < 0 ? last.y - NODE_Y.min : NODE_Y.max - last.y);
   let dir = rng.next() < NODE_KEEP_GOING ? last.dir : -last.dir;
@@ -315,17 +324,18 @@ function buildRoad(
   const first = nodes[0];
   const last = nodes[nodes.length - 1];
   if (!first || !last) return { road: [], nodeWaypoints: [] };
-  // Control points: shore, flag, its stretch's bends, flag, ..., flag, shore.
-  const controls: MapPoint[] = [{ x: ROAD_SHORE, y: first.y }];
+  // Control points: flag, its stretch's bends, flag, ..., flag; then a shore at each end.
+  const inner: MapPoint[] = [];
   const nodeControls: number[] = [];
   nodes.forEach((node, i) => {
-    nodeControls.push(controls.length);
-    controls.push(node);
+    nodeControls.push(inner.length + 1);
+    inner.push(node);
     const next = nodes[i + 1];
-    if (next) for (const b of stretches[i] ?? SAFE_STRETCH) controls.push(bendPoint(node, next, b));
+    if (next) for (const b of stretches[i] ?? SAFE_STRETCH) inner.push(bendPoint(node, next, b));
   });
-  const end = { x: width - ROAD_SHORE, y: last.y };
-  controls.push(end);
+  const start = shore(first, inner[1], ROAD_SHORE);
+  const end = shore(last, inner[inner.length - 2], width - ROAD_SHORE);
+  const controls = [start, ...inner, end];
 
   const road: MapPoint[] = [];
   for (let i = 0; i < controls.length - 1; i++) {
@@ -338,6 +348,19 @@ function buildRoad(
   }
   road.push({ ...end });
   return { road, nodeWaypoints: nodeControls.map((c) => c * ROAD_SAMPLES) };
+}
+
+/**
+ * Where the road meets the shore at `x`, coming from the flag `node` at
+ * the road's end: on the line from the control point `inward` through the
+ * flag (but no steeper than `SHORE_SLOPE`), so the road runs on straight
+ * off the map instead of swinging round.
+ */
+function shore(node: MapPoint, inward: MapPoint | undefined, x: number): MapPoint {
+  if (!inward || inward.x === node.x) return { x, y: node.y };
+  const slope = (node.y - inward.y) / (node.x - inward.x);
+  const held = Math.min(Math.max(slope, -SHORE_SLOPE), SHORE_SLOPE);
+  return { x, y: node.y + held * (x - node.x) };
 }
 
 /** The bend `b` on the stretch from `a` to `c`. */

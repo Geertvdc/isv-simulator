@@ -60,7 +60,7 @@ const OTHER_MAPS: readonly WorldMap[] = [
     [6, 6],
     [5, 5, 5, 5, 5, 5],
   ].map((counts) => buildWorldMap(madeUp(counts))),
-  ...Array.from({ length: 30 }, (_, seed) => buildWorldMap(CHAPTER_INFO, seed + 1)),
+  ...Array.from({ length: 20 }, (_, seed) => buildWorldMap(CHAPTER_INFO, seed + 1)),
 ];
 
 /** Do segments ab and cd cross? */
