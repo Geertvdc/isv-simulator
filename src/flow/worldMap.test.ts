@@ -48,7 +48,7 @@ function madeUp(counts: readonly number[]): ChapterInfo[] {
   }));
 }
 
-/** Made-up campaigns, and the real one with other seeds: the layout rules hold for any. */
+/** Made-up campaigns, and the real one with other seeds: the layout rules hold for these too. */
 const OTHER_MAPS: readonly WorldMap[] = [
   ...[
     [1],
@@ -62,18 +62,6 @@ const OTHER_MAPS: readonly WorldMap[] = [
   ].map((counts) => buildWorldMap(madeUp(counts))),
   ...Array.from({ length: 20 }, (_, seed) => buildWorldMap(CHAPTER_INFO, seed + 1)),
 ];
-
-/** Do segments ab and cd cross? */
-function crosses(
-  a: { x: number; y: number },
-  b: { x: number; y: number },
-  c: { x: number; y: number },
-  d: { x: number; y: number },
-): boolean {
-  const side = (p: typeof a, q: typeof a, r: typeof a) =>
-    (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
-  return side(a, b, c) * side(a, b, d) < 0 && side(c, d, a) * side(c, d, b) < 0;
-}
 
 /** The road's height across chapter `c`'s land, at `n` evenly spaced places. */
 function profile(map: WorldMap, c: number, n = 24): number[] {
@@ -163,21 +151,14 @@ describe('world map layout', () => {
     expect(rows.size).toBeGreaterThan(MAP.nodes.length * 0.75);
   });
 
-  it('runs left to right without crossing itself', () => {
+  it('runs left to right, so it never crosses itself', () => {
     for (const map of [MAP, ...OTHER_MAPS]) {
-      for (let i = 1; i < map.road.length; i++) {
-        expect(map.road[i]?.x ?? 0).toBeGreaterThan(map.road[i - 1]?.x ?? 0);
-      }
-      for (let i = 1; i < map.road.length; i++) {
-        for (let j = i + 2; j < map.road.length; j++) {
-          const [a, b, c, d] = [map.road[i - 1], map.road[i], map.road[j - 1], map.road[j]];
-          if (a && b && c && d) expect(crosses(a, b, c, d), `segments ${i} and ${j}`).toBe(false);
-        }
-      }
+      const backward = map.road.findIndex((p, i) => i > 0 && p.x <= (map.road[i - 1]?.x ?? 0));
+      expect(backward).toBe(-1);
     }
   });
 
-  it('keeps its rules on any map: in its band, no sharp turns, never back near a flag', () => {
+  it('keeps its rules on every map: in its band, no sharp turns, never back near a flag', () => {
     for (const map of [MAP, ...OTHER_MAPS]) {
       expect(faults(map.road, map.nodeWaypoints, map.nodes)).toBe(0);
       for (const p of map.road) {
