@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { LevelMap } from '../../sim/level';
 import { tileHash } from '../mapShape';
 import { type Vec3, gridToWorld } from '../projection';
@@ -28,6 +29,21 @@ const ROW_GAP_MIN = 0.35;
 const ROW_GAP_MAX = 1.2;
 /** Loose props turn up to this much either way from facing the office. */
 const YAW_JITTER = 0.2;
+/** Small loose props (one tile, nobody at them) turn further: a bin, a plant, a bike. */
+const SMALL_YAW_JITTER = 0.6;
+/**
+ * Per-prop variation (phase 20), so two of the same prop rarely look alike:
+ * brightness, a warm or cool cast, height and (never past its footprint)
+ * width. Props people use keep their size, so the people still fit.
+ */
+export const PROP_VARIATION = {
+  brightness: [0.86, 1.04],
+  warmth: 0.07,
+  height: [0.88, 1.12],
+  width: [0.9, 1],
+} as const;
+/** A row never repeats any of its last this many pieces (fewer when it has fewer pieces). */
+const AVOID_RECENT = 2;
 /** How far the rows run past the level, in tiles. */
 const RUN_OVER = 3;
 const WALK_SPEED = 0.9;
@@ -39,8 +55,14 @@ export type Row = 'near' | 'far';
 /** One prop placed in the world: where its center goes, how it's turned, and in which row. */
 export interface Placement {
   piece: SetPiece;
+  /** Which of the piece's looks (0 to its `variants` − 1). */
+  variant: number;
   at: Vec3;
   yaw: number;
+  /** Size along the prop's own x, y and z. */
+  scale: [number, number, number];
+  /** Multiplies its colors: red, green, blue. */
+  tint: [number, number, number];
   row: Row;
   side: 'left' | 'right' | 'back';
 }
@@ -68,6 +90,15 @@ function unit(i: number, salt: number): number {
   return (mixed(i * 31 + 7, salt) % 1000) / 1000;
 }
 
+/** Nobody stands at it: it may turn and resize freely. */
+function loose(piece: SetPiece): boolean {
+  return !piece.seats || piece.seats.length === 0;
+}
+
+function small(piece: SetPiece): boolean {
+  return piece.size[0] === 1 && piece.size[1] === 1;
+}
+
 /**
  * Where a chapter's props go around a `width` × `height` level: a near and
  * a far row down each side (facing the office, from the back edge forward)
@@ -86,23 +117,49 @@ export function placeSetPieces(setting: string, width: number, height: number): 
   const back = -0.5;
   const rare = [...s.rare];
   /**
-   * The pieces of a row in order, never the same twice running. Side far rows
-   * (in view from the back edge forward) take the rare pieces at slots 0 and 2.
+   * The pieces of a row in order: never one of the last two again, and a
+   * piece that comes back comes in its next look. Side far rows (in view
+   * from the back edge forward) take the rare pieces at slots 0 and 2.
    */
   const pick = (row: readonly SetPiece[], takesRare: boolean, salt: number) => {
-    let last: SetPiece | null = null;
+    const recent: SetPiece[] = [];
+    const uses = new Map<SetPiece, number>();
+    const avoid = Math.min(AVOID_RECENT, row.length - 1);
     let i = 0;
-    return (): SetPiece | null => {
+    return (): { piece: SetPiece; variant: number } | null => {
       const slot = i++;
-      if (takesRare && (slot === 0 || slot === 2) && rare.length > 0) {
-        return (last = rare.shift() ?? null);
+      let piece: SetPiece | undefined;
+      if (takesRare && (slot === 0 || slot === 2) && rare.length > 0) piece = rare.shift();
+      else {
+        let index = mixed(slot, salt) % row.length;
+        const blocked = recent.slice(recent.length - avoid);
+        for (let k = 0; k < row.length && blocked.includes(row[index] as SetPiece); k++) {
+          index = (index + 1) % row.length;
+        }
+        piece = row[index];
       }
-      let index = mixed(slot, salt) % row.length;
-      if (row[index] === last && row.length > 1) index = (index + 1) % row.length;
-      return (last = row[index] ?? null);
+      if (!piece) return null;
+      if (avoid > 0) recent.push(piece);
+      const n = uses.get(piece) ?? 0;
+      uses.set(piece, n + 1);
+      const variants = piece.variants ?? 1;
+      const start = mixed(row.indexOf(piece) + 101, salt);
+      return { piece, variant: (start + n) % variants };
     };
   };
-  const jitter = (i: number, salt: number) => (unit(i, salt + 1) * 2 - 1) * YAW_JITTER;
+  const jitter = (i: number, salt: number, piece: SetPiece) =>
+    (unit(i, salt + 1) * 2 - 1) * (loose(piece) && small(piece) ? SMALL_YAW_JITTER : YAW_JITTER);
+  const vary = (i: number, salt: number, piece: SetPiece) => {
+    const v = PROP_VARIATION;
+    const lerp = ([a, b]: readonly [number, number], t: number) => a + (b - a) * t;
+    const bright = lerp(v.brightness, unit(i, salt + 2));
+    const warm = (unit(i, salt + 3) * 2 - 1) * v.warmth;
+    const tint: [number, number, number] = [bright * (1 + warm), bright, bright * (1 - warm)];
+    if (!loose(piece)) return { tint, scale: [1, 1, 1] as [number, number, number] };
+    const width = lerp(v.width, unit(i, salt + 4));
+    const height = lerp(v.height, unit(i, salt + 5));
+    return { tint, scale: [width, height, width] as [number, number, number] };
+  };
   // Down the sides, from the back edge forward: the prop's front (+z) turns toward the office.
   const side = (row: readonly SetPiece[], kind: Row, dir: -1 | 1, salt: number) => {
     if (row.length === 0) return;
@@ -110,14 +167,23 @@ export function placeSetPieces(setting: string, width: number, height: number): 
     const gap = kind === 'near' ? NEAR_GAP : FAR_GAP;
     let z = back;
     for (let i = 0; z < height + RUN_OVER; i++) {
-      const piece = next();
-      if (!piece) break;
+      const picked = next();
+      if (!picked) break;
+      const { piece, variant } = picked;
       const [sx, sz] = piece.size;
       // Turned a quarter, the prop's depth (sz) runs across x and its width along z.
       const x = dir < 0 ? left - gap - sz / 2 : right + gap + sz / 2;
-      const yaw = (dir * -Math.PI) / 2 + jitter(i, salt);
+      const yaw = (dir * -Math.PI) / 2 + jitter(i, salt, piece);
       const at = gridToWorld(x, z + sx / 2, GROUND_Y);
-      out.push({ piece, at, yaw, row: kind, side: dir < 0 ? 'left' : 'right' });
+      out.push({
+        piece,
+        variant,
+        at,
+        yaw,
+        ...vary(i, salt, piece),
+        row: kind,
+        side: dir < 0 ? 'left' : 'right',
+      });
       z += sx + ROW_GAP_MIN + unit(i, salt) * (ROW_GAP_MAX - ROW_GAP_MIN);
     }
   };
@@ -129,11 +195,20 @@ export function placeSetPieces(setting: string, width: number, height: number): 
     const reach = gap + 2 + 1;
     let x = left - reach;
     for (let i = 0; x < right + reach; i++) {
-      const piece = next();
-      if (!piece) break;
+      const picked = next();
+      if (!picked) break;
+      const { piece, variant } = picked;
       const [sx, sz] = piece.size;
       const at = gridToWorld(x + sx / 2, back - gap - sz / 2, GROUND_Y);
-      out.push({ piece, at, yaw: jitter(i, salt), row: kind, side: 'back' });
+      out.push({
+        piece,
+        variant,
+        at,
+        yaw: jitter(i, salt, piece),
+        ...vary(i, salt, piece),
+        row: kind,
+        side: 'back',
+      });
       x += sx + ROW_GAP_MIN + unit(i, salt) * (ROW_GAP_MAX - ROW_GAP_MIN);
     }
   };
@@ -148,7 +223,7 @@ export function placeSetPieces(setting: string, width: number, height: number): 
 
 /**
  * The surroundings for a level, as one group, and `update` to move the
- * people in them. Props of a kind share one instanced mesh.
+ * people in them. The props merge into a few meshes.
  */
 export class Surroundings {
   readonly root = new THREE.Group();
@@ -267,47 +342,63 @@ export class Surroundings {
   }
 
   private addProps(placements: readonly Placement[]): void {
-    // One instanced mesh per piece and row: far props cast no shadow (they're
-    // outside the sun's shadow map anyway, and it'd cut off with a hard line).
-    const groups = new Map<string, { piece: SetPiece; row: Row; at: Placement[] }>();
-    const models = new Map<SetPiece, Model>();
+    // Every prop is static: all of them merge into one mesh per layer (and per
+    // row for the matte layer, as far props cast no shadow: they're outside
+    // the sun's shadow map anyway, and it'd cut off with a hard line). Each
+    // copy is turned, sized and tinted on its own, for a handful of draw calls.
+    const models = new Map<string, Model>();
+    const lists = { near: [], far: [], glow: [], glass: [] } as Record<
+      'near' | 'far' | 'glow' | 'glass',
+      THREE.BufferGeometry[]
+    >;
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0);
     const ids = new Map<SetPiece, number>();
     for (const p of placements) {
       const id = ids.get(p.piece) ?? ids.size;
       ids.set(p.piece, id);
-      const key = `${id}:${p.row}`;
-      const group = groups.get(key) ?? { piece: p.piece, row: p.row, at: [] };
-      group.at.push(p);
-      groups.set(key, group);
-    }
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const up = new THREE.Vector3(0, 1, 0);
-    const one = new THREE.Vector3(1, 1, 1);
-    for (const { piece, row, at } of groups.values()) {
-      let model = models.get(piece);
+      const key = `${id}:${p.variant}`;
+      let model = models.get(key);
       if (!model) {
-        model = piece.model();
-        models.set(piece, model);
-        for (const g of [model.body, model.glow, model.glass]) if (g) this.geometries.push(g);
+        model = p.piece.model(p.variant);
+        models.set(key, model);
       }
-      const layers: [THREE.BufferGeometry | null, THREE.Material, boolean][] = [
-        [model.body, this.materials.body, true],
-        [model.glow, this.materials.glow, false],
-        [model.glass, this.materials.glass, false],
+      q.setFromAxisAngle(up, p.yaw);
+      m.compose(new THREE.Vector3(p.at.x, p.at.y, p.at.z), q, new THREE.Vector3(...p.scale));
+      const layers: [THREE.BufferGeometry | null, THREE.BufferGeometry[]][] = [
+        [model.body, lists[p.row]],
+        [model.glow, lists.glow],
+        [model.glass, lists.glass],
       ];
-      for (const [geometry, material, lit] of layers) {
+      for (const [geometry, list] of layers) {
         if (!geometry?.getAttribute('position')) continue;
-        const mesh = new THREE.InstancedMesh(geometry, material, at.length);
-        at.forEach((p, i) => {
-          q.setFromAxisAngle(up, p.yaw);
-          mesh.setMatrixAt(i, m.compose(new THREE.Vector3(p.at.x, p.at.y, p.at.z), q, one));
-        });
-        mesh.castShadow = lit && row === 'near';
-        mesh.receiveShadow = lit;
-        this.root.add(mesh);
+        const copy = geometry.clone().applyMatrix4(m);
+        tintColors(copy, p.tint);
+        list.push(copy);
       }
     }
+    for (const model of models.values())
+      for (const g of [model.body, model.glow, model.glass]) g?.dispose();
+    const add = (
+      list: THREE.BufferGeometry[],
+      material: THREE.Material,
+      cast: boolean,
+      lit: boolean,
+    ) => {
+      if (list.length === 0) return;
+      const merged = mergeGeometries(list, false);
+      for (const g of list) g.dispose();
+      this.geometries.push(merged);
+      const mesh = new THREE.Mesh(merged, material);
+      mesh.castShadow = cast;
+      mesh.receiveShadow = lit;
+      this.root.add(mesh);
+    };
+    add(lists.near, this.materials.body, true, true);
+    add(lists.far, this.materials.body, false, true);
+    add(lists.glow, this.materials.glow, false, false);
+    add(lists.glass, this.materials.glass, false, false);
   }
 
   private addExtra(
@@ -361,6 +452,15 @@ function poseFor(extra: Extra, timeMs: number): Pose {
     pose.rightHand = { x: 0.36, y: 0.6 + Math.max(0, Math.sin(t * 3.1)) * 0.15, z: 0.25 };
   }
   return pose;
+}
+
+/** Multiplies `g`'s vertex colors by `tint`. */
+function tintColors(g: THREE.BufferGeometry, [r, gr, b]: [number, number, number]): void {
+  // Every kit piece is painted, so every model has colors.
+  const colors = g.getAttribute('color');
+  for (let i = 0; i < colors.count; i++) {
+    colors.setXYZ(i, colors.getX(i) * r, colors.getY(i) * gr, colors.getZ(i) * b);
+  }
 }
 
 function put(obj: THREE.Object3D, p: Vec3): void {
