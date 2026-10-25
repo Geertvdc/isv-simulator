@@ -62,6 +62,10 @@ export type PieceKind =
   | 'skyscraper'
   | 'helipad'
   | 'hedge'
+  // Engineering, here and there from the garage on
+  | 'serverRack'
+  | 'dish'
+  | 'antenna'
   // Everywhere
   | 'tree'
   | 'roundTree'
@@ -191,6 +195,10 @@ const CAR = prop('car', 0.45, 0.85, 0.42, { weight: 1 });
 const BENCH = prop('bench', 0.6, 0.3, 0.3, { weight: 1 });
 const PLANTER = prop('planter', 0.5, 0.5, 0.55, { weight: 1 });
 const HEDGE = prop('hedge', 1.1, 0.35, 0.4, { weight: 1 });
+/** Engineering props: an outdoor server cabinet, a satellite dish, a radio mast. */
+const RACK = prop('serverRack', 0.45, 0.38, 0.8, { weight: 1 });
+const DISH = prop('dish', 0.55, 0.55, 0.75, { weight: 1 });
+const ANTENNA = prop('antenna', 0.5, 0.5, 1.7, { weight: 1 });
 
 /** Back of the island's back street, and its front. */
 const STREET_BACK = STREET.row;
@@ -236,7 +244,7 @@ const THEMES: Theme[] = [
       { ...FRONT_ROW, align: 'back', specs: [HOUSE], gap: [0.9, 1.8], fences: true },
       { ...SHORE_ROW, align: 'front', specs: [BUSH, TREE, ROUND_TREE], gap: [0.6, 1.6] },
     ],
-    fillers: [TREE, ROUND_TREE, BUSH],
+    fillers: [TREE, ROUND_TREE, BUSH, DISH],
     fillTries: 260,
     ground: () => 'grass',
     yard: 'grass',
@@ -291,6 +299,8 @@ const THEMES: Theme[] = [
       prop('pingPong', 0.85, 0.5, 0.4),
       prop('picnic', 0.8, 0.65, 0.38),
       prop('scooter', 0.22, 0.55, 0.45, { turns: true }),
+      RACK,
+      DISH,
     ],
     fillTries: 240,
     ground: () => 'grass',
@@ -319,7 +329,7 @@ const THEMES: Theme[] = [
       },
       { ...SHORE_ROW, align: 'front', specs: [CAR, CAR, LAMP], gap: [0.3, 0.8] },
     ],
-    fillers: [TREE, ROUND_TREE, BUSH, BUSH],
+    fillers: [TREE, ROUND_TREE, BUSH, BUSH, RACK, ANTENNA],
     fillTries: 200,
     ground: (_x, y) => (y < STREET_FRONT + 1.5 ? 'paving' : 'grass'),
     yard: 'paving',
@@ -358,7 +368,7 @@ const THEMES: Theme[] = [
       },
       { ...SHORE_ROW, align: 'front', specs: [CAR, CAR, LAMP, PLANTER], gap: [0.3, 0.7] },
     ],
-    fillers: [PLANTER, ROUND_TREE, ROUND_TREE, BUSH],
+    fillers: [PLANTER, ROUND_TREE, ROUND_TREE, BUSH, RACK, RACK, ANTENNA],
     fillTries: 200,
     ground: (_x, y) => (y < 3 || y > 9 ? 'concrete' : 'paving'),
     yard: 'paving',
@@ -397,7 +407,7 @@ const THEMES: Theme[] = [
       },
       { ...SHORE_ROW, align: 'front', specs: [HEDGE, ROUND_TREE, BENCH], gap: [0.35, 0.8] },
     ],
-    fillers: [ROUND_TREE, ROUND_TREE, HEDGE, BUSH],
+    fillers: [ROUND_TREE, ROUND_TREE, HEDGE, BUSH, RACK, DISH],
     fillTries: 200,
     ground: () => 'lawn',
     yard: 'plaza',

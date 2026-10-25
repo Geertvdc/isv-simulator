@@ -906,6 +906,100 @@ export function treeModel(kind: 'tree' | 'roundTree' | 'bush'): ModelBuilder {
 }
 
 /** Each kind's model; trees are instanced instead (see `treeModel`). */
+// ---- Engineering ----
+
+/** Status LEDs on a server: mostly green, some blue, now and then an amber one. */
+const LED_COLORS = [0x5fe08a, 0x5fe08a, 0x5fe08a, 0x7fd8ff, 0xffc23d];
+
+/** An outdoor server cabinet: dark, with vents, a row of servers and their LEDs behind the door glass. */
+function serverRack(p: CityPiece, { body: b, glow, blink }: Parts, rng: () => number): void {
+  const h = p.h;
+  const z = p.d / 2;
+  b.box(p.w, h, p.d, 0x2c3340, { at: [0, h / 2, 0] }, 0.03);
+  b.box(p.w + 0.03, 0.04, p.d + 0.03, 0x4a5262, { at: [0, h + 0.02, 0] }, 0.01);
+  b.box(p.w + 0.02, 0.06, p.d + 0.02, 0x1d222b, { at: [0, 0.03, 0] }, 0);
+  // Servers behind the door, each with a little row of LEDs.
+  const units = 5;
+  for (let u = 0; u < units; u++) {
+    const y = 0.16 + u * ((h - 0.28) / (units - 1));
+    b.box(p.w - 0.1, 0.07, 0.01, 0x3d4657, { at: [0, y, z + 0.006] }, 0);
+    for (let k = 0; k < 3; k++) {
+      glow.led(0.016, choose(LED_COLORS, rng()), {
+        at: [-p.w / 2 + 0.1 + k * 0.05, y, z + 0.014],
+      });
+    }
+  }
+  // Vent slats on the side, and the warning light on top that blinks with the cranes'.
+  for (let k = 0; k < 4; k++)
+    b.box(0.01, 0.03, p.d * 0.6, 0x1d222b, { at: [p.w / 2 + 0.004, h * 0.55 + k * 0.06, 0] }, 0);
+  blink.led(0.03, 0x5fe08a, { at: [p.w * 0.3, h + 0.07, 0] });
+}
+
+/** A satellite dish on a short post, its bowl turned up toward the sky and the camera. */
+function dish(p: CityPiece, { body: b, glow }: Parts): void {
+  b.box(0.22, 0.06, 0.22, C.concrete, { at: [0, 0.03, 0] }, 0.01);
+  b.cylinder(0.025, 0.03, 0.4, C.steel, { at: [0, 0.26, 0] }, 8);
+  // Which way the bowl faces: up and toward the camera, a little more or less per dish.
+  const tilt = 0.75 + p.variant * 0.35;
+  const face = (k: number): [number, number, number] => [
+    0,
+    0.5 + Math.cos(tilt) * k,
+    Math.sin(tilt) * k,
+  ];
+  const rot: [number, number, number] = [tilt, 0, 0];
+  b.cylinder(0.3, 0.07, 0.12, C.white, { at: face(0), rot }, 20);
+  b.cylinder(0.25, 0.25, 0.01, 0xc9d0da, { at: face(0.062), rot }, 20);
+  // The feed on its arm, out in front of the bowl.
+  b.cylinder(0.012, 0.012, 0.24, C.steel, { at: face(0.18), rot }, 6);
+  glow.led(0.03, 0x7fd8ff, { at: face(0.3) });
+}
+
+/** A radio mast: a tapering steel tower with antenna panels and a blinking light on top. */
+function antenna(p: CityPiece, { body: b, blink }: Parts): void {
+  const h = p.h;
+  b.box(0.36, 0.08, 0.36, C.concrete, { at: [0, 0.04, 0] }, 0.01);
+  for (const [x, z] of [
+    [-1, -1],
+    [1, -1],
+    [-1, 1],
+    [1, 1],
+  ] as const) {
+    // Each leg leans in toward the top.
+    b.cylinder(
+      0.012,
+      0.02,
+      h,
+      C.steel,
+      {
+        at: [x * 0.07, h / 2, z * 0.07],
+        rot: [z * 0.05, 0, -x * 0.05],
+      },
+      6,
+    );
+  }
+  for (let y = 0.3; y < h - 0.2; y += 0.28) {
+    const s = 0.2 - (y / h) * 0.12;
+    b.box(s, 0.015, 0.015, C.steel, { at: [0, y, s / 2] }, 0);
+    b.box(0.015, 0.015, s, C.steel, { at: [s / 2, y, 0] }, 0);
+  }
+  for (let k = 0; k < 3; k++) {
+    const a = (k / 3) * Math.PI * 2 + 0.4;
+    b.box(
+      0.07,
+      0.22,
+      0.03,
+      C.white,
+      {
+        at: [Math.sin(a) * 0.09, h - 0.3, Math.cos(a) * 0.09],
+        rot: [0, a, 0],
+      },
+      0.01,
+    );
+  }
+  b.cylinder(0.008, 0.01, 0.25, C.steel, { at: [0, h + 0.1, 0] }, 6);
+  blink.led(0.04, C.warn, { at: [0, h + 0.24, 0] });
+}
+
 const MODELS: Record<PieceKind, ((p: CityPiece, parts: Parts, rng: () => number) => void) | null> =
   {
     house: house,
@@ -933,6 +1027,9 @@ const MODELS: Record<PieceKind, ((p: CityPiece, parts: Parts, rng: () => number)
     skyscraper: skyscraper,
     helipad: helipad,
     hedge: hedge,
+    serverRack: serverRack,
+    dish: dish,
+    antenna: antenna,
     tree: null,
     roundTree: null,
     bush: null,
