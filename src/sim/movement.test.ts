@@ -80,6 +80,28 @@ describe('stepPlayer: steering', () => {
     expect(Math.hypot(diagonal.pos.x - 5, diagonal.pos.y - 3)).toBeCloseTo(straight.pos.x - 5);
   });
 
+  it('walks a diagonal at a steady speed and facing, every tick, like a straight line', () => {
+    // Keyboard diagonals arrive as unit vectors from `toWorldMove`.
+    for (const move of [
+      { x: Math.SQRT1_2, y: Math.SQRT1_2 },
+      { x: -Math.SQRT1_2, y: -Math.SQRT1_2 },
+      { x: 1, y: 0 },
+    ]) {
+      const p = player(15, 5);
+      run(OPEN, p, move, 15);
+      let last = { ...p.pos };
+      for (let i = 0; i < 40; i++) {
+        stepPlayer(OPEN, p, move);
+        const moved = Math.hypot(p.pos.x - last.x, p.pos.y - last.y) * TICKS_PER_SECOND;
+        expect(moved).toBeCloseTo(PLAYER_MAX_SPEED, 9);
+        expect(speed(p)).toBeCloseTo(PLAYER_MAX_SPEED, 9);
+        expect(p.facing.x).toBeCloseTo(move.x, 9);
+        expect(p.facing.y).toBeCloseTo(move.y, 9);
+        last = { ...p.pos };
+      }
+    }
+  });
+
   it('clamps input longer than 1', () => {
     expect(clampMove({ x: 3, y: 4 })).toEqual({ x: 0.6, y: 0.8 });
     expect(clampMove({ x: 0.3, y: 0 })).toEqual({ x: 0.3, y: 0 });
@@ -136,6 +158,18 @@ describe('stepPlayer: collision', () => {
     expect(p.pos.x).toBeGreaterThan(4.5);
     // Sliding keeps the along-wall part of the input's speed.
     expect(p.vel.x).toBeCloseTo(PLAYER_MAX_SPEED * Math.SQRT1_2);
+    // ...at a steady speed and facing while it slides, not flickering tick to tick
+    // (crossing the seam between two wall tiles nudges it by about a pixel).
+    run(OPEN, p, { x: 1, y: -1 }, 30);
+    for (let i = 0; i < 40; i++) {
+      const x = p.pos.x;
+      stepPlayer(OPEN, p, { x: 1, y: -1 });
+      const moved = (p.pos.x - x) * TICKS_PER_SECOND;
+      expect(Math.abs(moved / (PLAYER_MAX_SPEED * Math.SQRT1_2) - 1)).toBeLessThan(0.03);
+      expect(p.pos.y).toBeCloseTo(0.5 + PLAYER_RADIUS, 9);
+      expect(p.facing.x).toBeCloseTo(Math.SQRT1_2, 9);
+      expect(p.facing.y).toBeCloseTo(-Math.SQRT1_2, 9);
+    }
   });
 
   it('slides around a corner it only just clips instead of sticking', () => {
