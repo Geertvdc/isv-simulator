@@ -17,7 +17,7 @@ import type { RoundView } from '../roundView';
 import { type Character, applyPose, createDeveloper, createManager } from './Characters';
 import type { KitMaterials } from './kit';
 import { facingYaw } from './layout';
-import { type PoseInput, playerPose, turnToward } from './pose';
+import { type Gait, type PoseInput, playerPose, stepGait, turnToward } from './pose';
 
 /** The ring on the floor around each player, in their color. */
 const RING = { inner: PLAYER_RADIUS * 0.95, outer: PLAYER_RADIUS * 1.25, lift: 0.006 };
@@ -31,6 +31,8 @@ interface Person {
   /** The way they face on screen now, turning toward where the sim says. */
   yaw: number;
   phase: number;
+  /** The walk cycle as drawn, integrated frame by frame so speed changes don't jump it. */
+  gait: Gait;
   /** Visual-only memory of the work in front of them. */
   work: WorkMemory;
   shovedAtMs: number | null;
@@ -90,7 +92,7 @@ export class People {
       this.place(person, gridToWorld(pos.x, pos.y), yaw, dt);
       applyPose(
         person.character,
-        playerPose(this.poseInput(state, player, person, timeMs), timeMs),
+        playerPose(this.poseInput(state, player, person, timeMs, dt), timeMs),
       );
     }
     this.drop(this.players, seen);
@@ -108,11 +110,14 @@ export class People {
         this.managers.set(manager.id, person);
       }
       this.place(person, gridToWorld(pos.x, pos.y), facingYaw(manager.facing), dt);
+      const fullSpeed = MANAGER_SPEED * 1.6;
+      stepGait(person.gait, manager.walking ? MANAGER_SPEED : 0, fullSpeed, dt);
       const input: PoseInput = {
         ...IDLE,
-        speed: manager.walking ? MANAGER_SPEED : 0,
-        fullSpeed: MANAGER_SPEED * 1.6,
+        speed: person.gait.speed,
+        fullSpeed,
         phase: person.phase,
+        stride: person.gait.stride,
       };
       const pose = playerPose(input, timeMs);
       // The coffee stays level in front: only the free hand swings.
@@ -129,16 +134,23 @@ export class People {
     this.ringGeometry.dispose();
   }
 
-  private poseInput(state: GameState, player: Player, person: Person, timeMs: number): PoseInput {
+  private poseInput(
+    state: GameState,
+    player: Player,
+    person: Person,
+    timeMs: number,
+    dt: number,
+  ): PoseInput {
     const carrying = ticketCarriedBy(state, player.id) !== undefined;
     const speed = Math.hypot(player.vel.x, player.vel.y);
+    stepGait(person.gait, speed, PLAYER_MAX_SPEED, dt);
     // The step on the station they face: its progress tells whether they work it.
     const target = targetTile(state, player.id);
     const onTarget = carrying ? undefined : ticketOnTile(state, target.x, target.y);
     const step = onTarget && stationWorkStep(onTarget, getTile(state.level, target.x, target.y));
     const sample = onTarget && step ? { ticketId: onTarget.id, progress: step.progress } : null;
     return {
-      speed,
+      speed: person.gait.speed,
       fullSpeed: PLAYER_MAX_SPEED,
       carrying,
       working: noteWork(person.work, sample, speed, timeMs),
@@ -146,6 +158,7 @@ export class People {
       windUp: carrying ? player.throwCharge / THROW_HOLD_TICKS : 0,
       shovedMs: person.shovedAtMs === null ? null : timeMs - person.shovedAtMs,
       phase: person.phase,
+      stride: person.gait.stride,
     };
   }
 
@@ -183,6 +196,8 @@ export class People {
       yaw,
       // Spread out so idle people don't breathe in step.
       phase: (id * 0.37) % 1,
+      // Out of step with each other from the start too.
+      gait: { speed: 0, stride: ((id * 0.37) % 1) * Math.PI * 2 },
       work: createWorkMemory(),
       shovedAtMs: null,
       ring,
@@ -211,6 +226,7 @@ const IDLE: PoseInput = {
   windUp: 0,
   shovedMs: null,
   phase: 0,
+  stride: 0,
 };
 
 /** What a player last saw of the step in front of them. */
