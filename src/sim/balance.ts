@@ -283,6 +283,23 @@ export const NET_MESSAGE_BURST = 60;
 export const NET_FLOOD_KICK_FACTOR = 5;
 /** A room where nobody pressed or moved anything for this long closes. */
 export const NET_ROOM_IDLE_MS = 30 * 60 * 1000;
+/**
+ * Server abuse limits, per client IP (`server/httpGuard.ts`). Each is a token
+ * bucket: up to `BURST` at once, then one more every `REFILL_MS`.
+ */
+/** Rooms one IP may create. */
+export const NET_ROOM_CREATE_BURST = 10;
+export const NET_ROOM_CREATE_REFILL_MS = 6000;
+/** Failed joins (wrong code) and failed `/rooms/:code` lookups one IP may make, against brute-forcing codes. */
+export const NET_FAILED_JOIN_BURST = 10;
+export const NET_FAILED_JOIN_REFILL_MS = 6000;
+/** `PUT /profiles/:userId` calls one IP may make. */
+export const NET_PROFILE_WRITE_BURST = 30;
+export const NET_PROFILE_WRITE_REFILL_MS = 1000;
+/** Largest request body the server reads (a full profile update is about 20 KB); bigger gets a 413. */
+export const NET_MAX_BODY_BYTES = 64 * 1024;
+/** Most profiles the server stores; new ones past this are refused, existing ones still update. */
+export const NET_MAX_PROFILES = 10_000;
 /** In the online lobby, a second Esc within this long leaves the room. */
 export const NET_LEAVE_CONFIRM_MS = 3000;
 /**
