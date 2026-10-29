@@ -11,7 +11,7 @@ import type { Invite } from './meetings';
 import type { GameEvent, LevelResult, Order, PendingBug } from './orders';
 import { type Pipeline, createPipelines } from './pipeline';
 import { type RngState, createRng } from './rng';
-import { isRoleId, type RoleId, type TicketDomain } from './roles';
+import { isRoleId, type RoleId, type TicketDomain, type WorkTask } from './roles';
 import type { Ticket } from './tickets';
 
 /** A direction or velocity in grid units. */
@@ -21,6 +21,16 @@ export interface Vec {
 }
 
 export type PlayerId = number;
+
+/** Resolved contributors from the last tick, never inferred from proximity or held input. */
+export interface WorkFeedback {
+  playerId: PlayerId;
+  task: WorkTask;
+  rate: number;
+  /** Total station output for a pair; rate is this player's contribution to it. */
+  teamRate?: number;
+  ticketId?: number;
+}
 
 export interface Player {
   id: PlayerId;
@@ -78,6 +88,7 @@ export interface GameState {
   belts: Belt[];
   /** Keyboards two or more players coded at together last tick (pair programming), for drawing. */
   pairing: GridPoint[];
+  workFeedback: WorkFeedback[];
   nextTicketId: number;
   orders: Order[];
   nextOrderId: number;
@@ -156,6 +167,7 @@ export function createGame(
     pipelines: createPipelines(map),
     belts: createBelts(map),
     pairing: [],
+    workFeedback: [],
     nextTicketId: 1,
     orders: [],
     nextOrderId: 1,

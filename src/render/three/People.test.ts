@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import { DEVELOPER_TOP } from './DeveloperRig';
 import { HEAD_TOP, carryPoint, placeTicket } from './layout';
-import { People, createWorkMemory, noteWork } from './People';
+import { People, createWorkMemory, noteWork, workSample } from './People';
 import { kitMaterials } from './kit';
 import { ROLE_IDS } from '../../sim/roles';
 import { levelById } from '../../sim/levels';
@@ -12,6 +12,19 @@ import { runScene, sceneById } from '../../sim/scenes';
 import { THROW_HOLD_TICKS } from '../../sim/balance';
 
 describe('noteWork', () => {
+  it('animates only actual paired/test/repair contributors, not nearby contenders', () => {
+    const fixture = sceneById('roles-work');
+    if (!fixture) throw new Error('Missing work fixture');
+    const state = runScene(fixture).state;
+    expect(state.workFeedback).toHaveLength(4);
+    for (const id of [1, 2, 3, 4]) {
+      expect(workSample(state, id)?.progress).toBe(state.tick);
+    }
+    state.workFeedback = state.workFeedback.filter((work) => work.playerId !== 3);
+    expect(workSample(state, 3)).toBeNull();
+    expect(workSample(state, 4)).toEqual({ ticketId: -1, progress: state.tick });
+  });
+
   it('shows working while the step in front moves, a moment longer, then stops', () => {
     const m = createWorkMemory();
     expect(noteWork(m, { ticketId: 1, progress: 0.1 }, 0, 0)).toBe(false);

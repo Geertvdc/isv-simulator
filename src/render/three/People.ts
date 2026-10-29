@@ -5,12 +5,10 @@ import {
   PLAYER_RADIUS,
   THROW_HOLD_TICKS,
 } from '../../sim/balance';
-import { stationWorkStep } from '../../sim/interact';
-import { getTile } from '../../sim/level';
 import type { GameEvent } from '../../sim/orders';
 import { isDashing } from '../../sim/movement';
-import { type GameState, type Player, type PlayerId, targetTile } from '../../sim/state';
-import { ticketCarriedBy, ticketOnTile } from '../../sim/tickets';
+import { type GameState, type Player, type PlayerId } from '../../sim/state';
+import { ticketCarriedBy } from '../../sim/tickets';
 import { playerColor } from '../playerColors';
 import { type Vec3, gridToWorld } from '../projection';
 import type { RoundView } from '../roundView';
@@ -181,11 +179,7 @@ export class People {
   ): PoseInput {
     const carrying = ticketCarriedBy(state, player.id) !== undefined;
     stepGait(person.gait, speed, PLAYER_MAX_SPEED, dt);
-    // The step on the station they face: its progress tells whether they work it.
-    const target = targetTile(state, player.id);
-    const onTarget = carrying ? undefined : ticketOnTile(state, target.x, target.y);
-    const step = onTarget && stationWorkStep(onTarget, getTile(state.level, target.x, target.y));
-    const sample = onTarget && step ? { ticketId: onTarget.id, progress: step.progress } : null;
+    const sample = workSample(state, player.id);
     return {
       speed: person.gait.speed,
       fullSpeed: PLAYER_MAX_SPEED,
@@ -284,14 +278,21 @@ export function createWorkMemory(): WorkMemory {
   return { ticketId: null, progress: 0, workedAtMs: -Infinity };
 }
 
+/** Only resolved contributors animate, including pipeline repair without a ticket. */
+export function workSample(
+  state: GameState,
+  playerId: PlayerId,
+): { ticketId: number; progress: number } | null {
+  const contribution = state.workFeedback.find((work) => work.playerId === playerId);
+  return contribution ? { ticketId: contribution.ticketId ?? -1, progress: state.tick } : null;
+}
+
 /** Faster than this and they're walking past, not working. */
 const WORK_MAX_SPEED = 0.5;
 
 /**
- * Whether a player looks like they're working: standing at a station whose
- * step on the same ticket moved since last frame (shown a moment longer,
- * so a tick without progress doesn't flicker). The sim doesn't say who
- * works a station, so two players at one station both look busy.
+ * Hold a resolved work sample a moment longer so a frame between sim
+ * snapshots does not flicker.
  */
 export function noteWork(
   memory: WorkMemory,

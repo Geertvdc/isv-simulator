@@ -272,12 +272,11 @@ export function finishCoding(state: GameState, tickWork: TickWork): void {
         return [];
       }
       const paired =
-        state.settings.pairing &&
-        currentTicket === worker.ticket &&
-        partner !== undefined;
+        state.settings.pairing && currentTicket === worker.ticket && partner !== undefined;
       return [
         {
           worker,
+          partner,
           paired,
           rate: paired ? PAIR_WORKER_FACTOR * (worker.rate + partner.rate) : worker.rate,
         },
@@ -291,6 +290,17 @@ export function finishCoding(state: GameState, tickWork: TickWork): void {
     )[0];
     if (!selected) continue;
     advanceStep(selected.worker.step, selected.rate);
+    const workers =
+      selected.paired && selected.partner ? [selected.worker, selected.partner] : [selected.worker];
+    for (const worker of workers) {
+      state.workFeedback.push({
+        playerId: worker.playerId,
+        task: 'code',
+        ticketId: worker.ticket.id,
+        rate: (worker.rate / WORK_RATE) * (selected.paired ? PAIR_WORKER_FACTOR : 1),
+        ...(selected.paired ? { teamRate: selected.rate / WORK_RATE } : {}),
+      });
+    }
     if (selected.paired) state.pairing.push({ x, y });
   }
 }
@@ -304,11 +314,20 @@ export function finishManualWork(state: GameState, tickWork: TickWork): void {
     );
     if (worker) {
       advanceStep(worker.step, worker.rate);
+      state.workFeedback.push({
+        playerId: worker.playerId,
+        task: worker.step.kind,
+        ticketId: worker.ticket.id,
+        rate: worker.rate / (worker.step.kind === 'design' ? DESIGN_RATE : WORK_RATE),
+      });
     }
   }
   for (const contributors of tickWork.repairs.values()) {
     const [repairer] = strongest(contributors);
-    if (repairer) repairPipeline(state, repairer.x, repairer.y, repairer.rate);
+    if (repairer) {
+      repairPipeline(state, repairer.x, repairer.y, repairer.rate);
+      state.workFeedback.push({ playerId: repairer.playerId, task: 'repair', rate: repairer.rate });
+    }
   }
 }
 
@@ -355,6 +374,10 @@ export function finishReviews(state: GameState, tickWork: TickWork): void {
     const y = Math.floor(key / width);
     const ticket = ticketOnTile(state, x, y);
     const step = ticket && stationWorkStep(ticket, 'review');
-    if (step) advanceStep(step, REVIEW_RATE);
+    if (step) {
+      advanceStep(step, REVIEW_RATE);
+      for (const playerId of players)
+        state.workFeedback.push({ playerId, task: 'review', ticketId: ticket.id, rate: 1 });
+    }
   }
 }

@@ -25,6 +25,7 @@ import type { GameState, InputCommand } from './state';
  */
 export function tick(state: GameState, inputs: readonly InputCommand[]): void {
   state.events = [];
+  state.workFeedback = [];
   if (state.result) return;
 
   for (const player of state.players) {

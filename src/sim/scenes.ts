@@ -23,7 +23,7 @@ import {
   getPlayer,
 } from './state';
 import { tick } from './tick';
-import type { RoleId } from './roles';
+import type { RoleId, TicketDomain } from './roles';
 import {
   DESIGNED_FEATURE_STEPS,
   REVIEWED_FEATURE_STEPS,
@@ -109,14 +109,15 @@ export function openOrder(
     review = false,
     design = false,
     left = 0.8,
-  }: { review?: boolean; design?: boolean; left?: number } = {},
+    domain,
+  }: { review?: boolean; design?: boolean; left?: number; domain?: TicketDomain } = {},
 ): Ticket {
   const steps = review
     ? REVIEWED_FEATURE_STEPS
     : design
       ? DESIGNED_FEATURE_STEPS
       : TICKET_STEPS[kind];
-  const order = createOrder(state, kind, title, steps);
+  const order = createOrder(state, kind, title, steps, domain);
   const limit = order.expiresTick - order.createdTick;
   order.createdTick = state.tick - Math.round(limit * (1 - left));
   order.expiresTick = order.createdTick + limit;
@@ -299,6 +300,38 @@ export const SCENES: readonly Scene[] = [
   castScene('cast-duplicates', ['generalist', 'generalist', 'generalist', 'generalist']),
   castScene('cast-windup', ['platform', 'qa', 'frontend', 'backend'], 'windup'),
   castScene('cast-release', ['platform', 'qa', 'frontend', 'backend'], 'release'),
+  {
+    id: 'roles-work',
+    levelId: 'lab-roles',
+    players: 4,
+    roleByPlayer: { 1: 'frontend', 2: 'frontend', 3: 'qa', 4: 'platform' },
+    setup(state) {
+      const keyboard = tileAt(state, 'keyboard', 2);
+      putOn(
+        workOn(
+          openOrder(state, 'feature', 'Center a div', { design: true, domain: 'frontend' }),
+          1,
+          0.1,
+        ),
+        keyboard,
+      );
+      standBeside(state, 1, keyboard, 'above');
+      standBeside(state, 2, keyboard, 'below');
+      const test = tileAt(state, 'testBench');
+      putOn(
+        workOn(openOrder(state, 'feature', 'Verify the API', { domain: 'backend' }), 1, 0.1),
+        test,
+      );
+      standBeside(state, 3, test, 'left');
+      const at = tileAt(state, 'pipeline');
+      const pipeline = pipelineAt(state, at.x, at.y);
+      if (!pipeline) throw new Error('Missing role review pipeline');
+      pipeline.broken = true;
+      standBeside(state, 4, at, 'left');
+    },
+    input: holdWork(1, 2, 3, 4),
+    ticks: 15,
+  },
 
   {
     // The order bar with one of everything, an incident open and an invite out.
