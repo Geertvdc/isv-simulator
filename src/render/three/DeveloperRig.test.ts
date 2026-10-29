@@ -6,7 +6,7 @@ import { applyPose, createDeveloper, disposeCharacter } from './Characters';
 import { DEVELOPER_TOP, DEVELOPER_HAIRSTYLES, developerAppearance } from './DeveloperRig';
 import { kitMaterials } from './kit';
 import { carryPoint } from './layout';
-import { ticketModel } from './models';
+import { ticketModel } from './ticketModels';
 import { playerPose } from './pose';
 
 function intersectsMesh(box: THREE.Box3, mesh: THREE.Object3D): boolean {

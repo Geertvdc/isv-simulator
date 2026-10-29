@@ -18,7 +18,7 @@ import { buildMap } from '../render/three/MapView';
 import { type Model, kitMaterials } from '../render/three/kit';
 import { levelBox } from '../render/three/layout';
 import { createLights, dressScene } from '../render/three/look';
-import { ticketModel } from '../render/three/models';
+import { ticketModel } from '../render/three/ticketModels';
 import { Stage, disposeTree } from '../render/three/stage';
 import { STUDY_ACTIONS, STUDY_LOOP_MS, type StudyAction, studyFrame } from './studyScenes';
 import './studies.css';

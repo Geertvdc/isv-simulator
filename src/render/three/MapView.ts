@@ -17,15 +17,8 @@ import {
 import { COLOR } from './palette';
 import { WALL_TOP_PROPS } from './setDressing';
 import { PALETTE } from './look';
-import {
-  STATION_MODELS,
-  conveyorModel,
-  type StationModel,
-  type StationTile,
-  WALL_DECO_MODELS,
-  floorModel,
-  wallModel,
-} from './models';
+import { conveyorModel, WALL_DECO_MODELS, floorModel, wallModel } from './roomModels';
+import { STATION_MODELS, type StationModel, type StationTile } from './stationModels';
 
 /** Station glyphs on the station tops, the same tiles as the step tiles on the order cards. */
 const STATION_GLYPHS: Partial<Record<Tile, { glyph: GlyphId; color: number }>> = {
@@ -119,8 +112,9 @@ const SIDES: readonly { dx: number; dy: number; yaw: number }[] = [
 /**
  * The level itself in 3D: the wooden slab (following the map's outline),
  * the floor, gaps, belts and every block on it, built from the office kit
- * (`models.ts`). Each model kind is one instanced mesh (plus one for its
- * screens and one for its glass), so the whole map is a few dozen draw calls.
+ * (`stationModels.ts`, `roomModels.ts`). Each model kind is one instanced
+ * mesh (plus one for its screens and one for its glass), so the whole map is
+ * a few dozen draw calls.
  */
 export function buildMap(map: LevelMap, look: MapLook): MapView {
   const root = new THREE.Group();

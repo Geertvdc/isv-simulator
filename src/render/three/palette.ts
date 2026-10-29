@@ -10,6 +10,7 @@ const swatches = {
   white: 0xfdfdf6,
   offWhite: 0xf4f1ea,
   chalk: 0xf3efe6,
+  paper: 0xf7f3ea,
   cream: 0xf2e5cf,
   porcelain: 0xe8e4da,
   birch: 0xe8dcc4,

@@ -9,14 +9,9 @@ import { applyPose, createDeveloper, createManager } from '../render/three/Chara
 import { type KitMaterials, type Model, kitMaterials } from '../render/three/kit';
 import { type PoseInput, playerPose } from '../render/three/pose';
 import { createLights, dressScene } from '../render/three/look';
-import {
-  STATION_MODELS,
-  type StationModel,
-  WALL_DECO_MODELS,
-  floorModel,
-  ticketModel,
-  wallModel,
-} from '../render/three/models';
+import { STATION_MODELS, type StationModel } from '../render/three/stationModels';
+import { WALL_DECO_MODELS, floorModel, wallModel } from '../render/three/roomModels';
+import { ticketModel } from '../render/three/ticketModels';
 import { VIEW3D_PITCH } from '../render/projection';
 import { STATION_HEIGHT } from '../render/three/layout';
 import { FLOOR_THEMES, WALL_THEMES } from '../render/mapLook';
