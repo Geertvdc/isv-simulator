@@ -1,3 +1,4 @@
+import { COLOR } from './palette';
 import type { SetPiece } from './setDressing/shared';
 import {
   bike,
@@ -108,7 +109,7 @@ export const SETTINGS: Readonly<Record<string, Setting>> = {
   },
   startup: {
     // Polished concrete: apart from the wood walls and the slab's edge.
-    ground: 0x3a3f47,
+    ground: COLOR.gunmetal,
     path: null,
     near: [bigPlant, coffeeBar, arcade, beanbags, standingDesk, bookshelf, whiteboardStand, fridge],
     far: [pingPong, sofa, foosball, highTable, serverRack, miniRamp],

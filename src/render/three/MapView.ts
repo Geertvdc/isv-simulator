@@ -14,6 +14,7 @@ import {
   heroPlacement,
   stationFacing,
 } from './layout';
+import { COLOR } from './palette';
 import { WALL_TOP_PROPS } from './setDressing';
 import { PALETTE } from './look';
 import {
@@ -280,9 +281,9 @@ function pitWallModel(): Model {
 /** A glass railing along a gap's edge where it meets the floor, on the floor side (−z of the gap). */
 function railingModel(): Model {
   const b = new ModelBuilder();
-  b.pane(1, 0.32, 0.03, 0xd6f0fa, { at: [0, 0.2, 0.47] });
+  b.pane(1, 0.32, 0.03, COLOR.glassClear, { at: [0, 0.2, 0.47] });
   b.box(1, 0.04, 0.06, 0xb8c4d0, { at: [0, 0.38, 0.47] }, 0);
-  for (const x of [-0.48, 0.48]) b.box(0.04, 0.38, 0.04, 0x8a96a3, { at: [x, 0.19, 0.47] }, 0);
+  for (const x of [-0.48, 0.48]) b.box(0.04, 0.38, 0.04, COLOR.zinc, { at: [x, 0.19, 0.47] }, 0);
   return b.build();
 }
 

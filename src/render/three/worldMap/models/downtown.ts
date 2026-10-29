@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { ModelBuilder, tint } from '../../kit';
+import { COLOR } from '../../palette';
 import { type CityPiece, STOREY, styleOf } from '../cityPlan';
 import {
   C,
@@ -62,7 +63,10 @@ export function office(p: CityPiece, { body: b, glow, blink }: Parts, rng: () =>
     // Shop awnings along the street.
     const n = Math.max(1, Math.floor(p.w / 0.55));
     for (let i = 0; i < n; i++) {
-      const c = choose([0x4f7f6a, 0xc85a4a, 0x3f5f8a, 0xd9784a], frac(p.variant * 3 + i * 0.37));
+      const c = choose(
+        [COLOR.forestGreen, COLOR.brickRed, COLOR.steelBlue, COLOR.burntOrange],
+        frac(p.variant * 3 + i * 0.37),
+      );
       b.box(
         p.w / n - 0.08,
         0.035,
@@ -114,7 +118,7 @@ export function office(p: CityPiece, { body: b, glow, blink }: Parts, rng: () =>
     ] as const)
       b.box(0.025, 0.2, 0.025, C.ink, { at: [tw * 0.2 + x * 0.08, top + 0.18, tz + z * 0.08] }, 0);
     b.cylinder(0.13, 0.13, 0.22, 0x9a6a4a, { at: [tw * 0.2, top + 0.38, tz] }, 12);
-    b.cone(0.15, 0.1, 0x6a4a3a, { at: [tw * 0.2, top + 0.54, tz] }, 12);
+    b.cone(0.15, 0.1, COLOR.cocoa, { at: [tw * 0.2, top + 0.54, tz] }, 12);
   } else if (roof === 2) {
     // A mast with a blinking light.
     b.cylinder(0.015, 0.02, 0.6, C.steel, { at: [-tw * 0.25, top + 0.38, tz - td * 0.2] }, 6);
@@ -127,14 +131,17 @@ export function office(p: CityPiece, { body: b, glow, blink }: Parts, rng: () =>
         tw * 0.7,
         0.025,
         0.14,
-        0x2b3a5a,
+        COLOR.solarPanel,
         { at: [0, top + 0.14, tz - td * 0.3 + i * td * 0.25], rot: [-0.4, 0, 0] },
         0,
       );
   } else {
     // A glowing sign on the front edge: a logo dot and a bar.
     b.box(tw * 0.6, 0.22, 0.04, C.ink, { at: [0, top + 0.2, tz + td / 2 - 0.05] }, 0.02);
-    const c = choose([0x7fd8ff, 0x9fff8a, 0xff9fd0, 0xffd98a], frac(p.variant * 11.3));
+    const c = choose(
+      [COLOR.ledCyan, COLOR.neonLime, 0xff9fd0, COLOR.windowLit],
+      frac(p.variant * 11.3),
+    );
     glow.add(
       new THREE.CircleGeometry(0.06, 16),
       c,
@@ -155,16 +162,16 @@ export function crane(p: CityPiece, { body: b, blink }: Parts): void {
   // Hoarding round the lot.
   const z = p.d / 2;
   for (const s of [-1, 1])
-    b.box(0.05, 0.28, p.d, 0xf3efe6, { at: [s * (p.w / 2 - 0.03), 0.14, 0] }, 0);
-  b.box(p.w, 0.28, 0.05, 0xf3efe6, { at: [0, 0.14, -z + 0.03] }, 0);
+    b.box(0.05, 0.28, p.d, COLOR.chalk, { at: [s * (p.w / 2 - 0.03), 0.14, 0] }, 0);
+  b.box(p.w, 0.28, 0.05, COLOR.chalk, { at: [0, 0.14, -z + 0.03] }, 0);
   for (const s of [-1, 1])
-    b.box(p.w * 0.32, 0.28, 0.05, 0xf3efe6, { at: [s * p.w * 0.34, 0.14, z - 0.03] }, 0);
+    b.box(p.w * 0.32, 0.28, 0.05, COLOR.chalk, { at: [s * p.w * 0.34, 0.14, z - 0.03] }, 0);
   for (let i = 0; i < 4; i++)
     b.box(
       0.12,
       0.06,
       0.06,
-      0xe8483f,
+      COLOR.accentRed,
       { at: [-p.w * 0.45 + i * 0.12, 0.2, z], rot: [0, 0, 0.6] },
       0,
     );
@@ -197,12 +204,12 @@ export function crane(p: CityPiece, { body: b, blink }: Parts): void {
     }
   }
   // Pallets and a cement mixer by the gate.
-  b.box(0.28, 0.12, 0.28, 0xc8955a, { at: [p.w * 0.32, 0.06, p.d * 0.25] }, 0.01);
+  b.box(0.28, 0.12, 0.28, COLOR.cardboard, { at: [p.w * 0.32, 0.06, p.d * 0.25] }, 0.01);
   b.cylinder(
     0.11,
     0.15,
     0.28,
-    0xff8a3d,
+    COLOR.orange,
     { at: [p.w * 0.33, 0.24, -p.d * 0.15], rot: [0.5, 0, 0] },
     12,
   );
@@ -260,7 +267,7 @@ export function craneJib(): PieceBuilders {
   const hookX = jib * 0.72;
   b.box(0.12, 0.05, 0.12, C.ink, { at: [hookX, 0.18, 0] }, 0);
   b.box(0.012, 1.1, 0.012, C.ink, { at: [hookX, -0.4, 0] }, 0);
-  b.box(0.5, 0.06, 0.08, 0xe8483f, { at: [hookX, -0.98, 0] }, 0);
+  b.box(0.5, 0.06, 0.08, COLOR.accentRed, { at: [hookX, -0.98, 0] }, 0);
   blink.led(0.05, C.warn, { at: [jib, 0.32, 0] });
   return { body: b, shiny: new ModelBuilder(), blink };
 }
@@ -270,14 +277,14 @@ export function lamp(p: CityPiece, { body: b, glow }: Parts): void {
   b.cylinder(0.025, 0.03, 1.0, C.ink, { at: [0, 0.5, 0] }, 8);
   if (styleOf(p) === 1) {
     // A globe on top.
-    glow.led(0.08, 0xfff0c0, { at: [0, 1.06, 0] });
+    glow.led(0.08, COLOR.lampLight, { at: [0, 1.06, 0] });
     return;
   }
   b.box(0.04, 0.03, 0.22, C.ink, { at: [0, 1.0, 0.09] }, 0);
   b.box(0.12, 0.05, 0.14, C.ink, { at: [0, 0.99, 0.2] }, 0.01);
   glow.add(
     new THREE.PlaneGeometry(0.09, 0.1).rotateX(Math.PI / 2),
-    0xfff0c0,
+    COLOR.lampLight,
     { at: [0, 0.96, 0.2] },
     'glow',
   );
@@ -310,7 +317,7 @@ export function carModel(
     b.box(w * 0.88, 0.16, l * 0.36, paint, { at: [0, 0.29, l * 0.12] }, 0.05);
     b.box(w * 0.9, 0.1, l * 0.3, C.paneDark, { at: [0, 0.29, l * 0.12] }, 0.03);
     b.box(w * 0.8, 0.04, l * 0.4, C.ink, { at: [0, 0.22, -l * 0.26] }, 0);
-    b.box(w * 0.4, 0.08, l * 0.2, 0xc8955a, { at: [0, 0.27, -l * 0.28] }, 0.01);
+    b.box(w * 0.4, 0.08, l * 0.2, COLOR.cardboard, { at: [0, 0.27, -l * 0.28] }, 0.01);
   }
   for (const [x, z] of [
     [-1, 1],
@@ -327,8 +334,8 @@ export function carModel(
       10,
     );
   }
-  glow.led(0.03, 0xfff4c0, { at: [-w * 0.3, 0.16, l / 2] });
-  glow.led(0.03, 0xfff4c0, { at: [w * 0.3, 0.16, l / 2] });
-  glow.led(0.025, 0xff5040, { at: [-w * 0.32, 0.17, -l / 2] });
-  glow.led(0.025, 0xff5040, { at: [w * 0.32, 0.17, -l / 2] });
+  glow.led(0.03, COLOR.headlight, { at: [-w * 0.3, 0.16, l / 2] });
+  glow.led(0.03, COLOR.headlight, { at: [w * 0.3, 0.16, l / 2] });
+  glow.led(0.025, COLOR.tailLight, { at: [-w * 0.32, 0.17, -l / 2] });
+  glow.led(0.025, COLOR.tailLight, { at: [w * 0.32, 0.17, -l / 2] });
 }

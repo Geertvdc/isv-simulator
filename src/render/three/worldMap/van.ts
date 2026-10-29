@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { type KitMaterials, ModelBuilder } from '../kit';
+import { COLOR } from '../palette';
 
 /**
  * The company's moving van, built in code: a box truck with a sunny cargo
@@ -9,12 +10,12 @@ import { type KitMaterials, ModelBuilder } from '../kit';
  */
 
 export const VAN_COLORS = {
-  box: 0xffc83d,
+  box: COLOR.sunYellow,
   cab: 0xf08a24,
   stripe: 0xffffff,
   logo: 0x2f6fb4,
-  chassis: 0x3a3f47,
-  bumper: 0xc9ccd2,
+  chassis: COLOR.gunmetal,
+  bumper: COLOR.lightSteel,
   window: 0x2b4a66,
   tyre: 0x2a2d33,
   hub: 0xd9dbe0,

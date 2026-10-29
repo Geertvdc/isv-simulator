@@ -6,12 +6,13 @@ import { pipelinePulse } from '../effects';
 import { type Vec3, gridToWorld } from '../projection';
 import { blockHeight, facingYaw, heroPlacement, stationFacing } from './layout';
 import { PIPELINE_SERVER_AT } from './models';
+import { COLOR } from './palette';
 
 const WARN_COLOR = 0xff3030;
 const BROKEN_COLOR = 0x111317;
 /** Dark, so it reads against light walls. */
 const SMOKE_COLOR = 0x26282d;
-const SPARK_COLOR = 0xffd166;
+const SPARK_COLOR = COLOR.gold;
 const ALARM_COLOR = 0xff3020;
 /** Height of the build server's top over the block's top (see `models.ts`). */
 const SERVER_TOP = 0.42;
@@ -229,7 +230,7 @@ export class WorldFx {
     putAt(alarm, gridToWorld(server.x, server.y, top + SERVER_TOP + 0.38));
     const pole = new THREE.Mesh(
       new THREE.CylinderGeometry(0.015, 0.015, 0.3, 8),
-      new THREE.MeshBasicMaterial({ color: 0x2b2f38 }),
+      new THREE.MeshBasicMaterial({ color: COLOR.charcoal }),
     );
     pole.position.y = -0.23;
     alarm.add(pole);

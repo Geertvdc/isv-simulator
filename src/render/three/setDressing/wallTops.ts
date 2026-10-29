@@ -1,4 +1,5 @@
 import { type Model, ModelBuilder } from '../kit';
+import { COLOR } from '../palette';
 import { books, DARK, mug, nth, plantPot, SPINES, STEEL, WOOD_DARK } from './shared';
 
 /** On the office's own walls: what stands on top of them. */
@@ -48,18 +49,19 @@ export const WALL_TOP_PROPS: readonly (() => Model)[] = [
   }, 1.4),
   wallTop((b) => {
     // A rubber duck, the debugging kind.
-    b.sphere(0.08, 0x5fc4b8, { at: [0, 0.06, 0] }, [1.2, 0.8, 1]);
-    b.sphere(0.05, 0x5fc4b8, { at: [0.04, 0.14, 0] });
-    b.box(0.05, 0.015, 0.04, 0xe08a3a, { at: [0.09, 0.135, 0] }, 0);
+    b.sphere(0.08, COLOR.aqua, { at: [0, 0.06, 0] }, [1.2, 0.8, 1]);
+    b.sphere(0.05, COLOR.aqua, { at: [0.04, 0.14, 0] });
+    b.box(0.05, 0.015, 0.04, COLOR.tangerine, { at: [0.09, 0.135, 0] }, 0);
     mug(b, -0.16, 0, 0.04, 1);
   }, 1.8),
   wallTop((b) => {
     // A little robot figurine.
-    b.box(0.1, 0.12, 0.08, 0x9aa3ad, { at: [0, 0.1, 0] }, 0.02);
+    b.box(0.1, 0.12, 0.08, COLOR.silver, { at: [0, 0.1, 0] }, 0.02);
     b.box(0.08, 0.07, 0.07, 0xb8c0c8, { at: [0, 0.2, 0] }, 0.02);
-    b.led(0.012, 0x7cf0c8, { at: [-0.02, 0.21, 0.036] });
-    b.led(0.012, 0x7cf0c8, { at: [0.02, 0.21, 0.036] });
-    for (const x of [-0.03, 0.03]) b.box(0.03, 0.05, 0.04, 0x6a7280, { at: [x, 0.025, 0] }, 0);
+    b.led(0.012, COLOR.screenGlow, { at: [-0.02, 0.21, 0.036] });
+    b.led(0.012, COLOR.screenGlow, { at: [0.02, 0.21, 0.036] });
+    for (const x of [-0.03, 0.03])
+      b.box(0.03, 0.05, 0.04, COLOR.metalGrey, { at: [x, 0.025, 0] }, 0);
     b.cylinder(0.004, 0.004, 0.05, STEEL, { at: [0, 0.26, 0] }, 4);
   }, 1.9),
   wallTop((b) => {
@@ -71,34 +73,35 @@ export const WALL_TOP_PROPS: readonly (() => Model)[] = [
     // A lava lamp.
     b.cone(0.07, 0.08, STEEL, { at: [0, 0.04, 0] }, 12);
     b.cylinder(0.035, 0.055, 0.2, 0x5a3a6a, { at: [0, 0.18, 0] }, 12);
-    b.led(0.025, 0xff7ab0, { at: [0, 0.15, 0] });
-    b.led(0.018, 0xff7ab0, { at: [0, 0.22, 0] });
+    b.led(0.025, COLOR.hotPink, { at: [0, 0.15, 0] });
+    b.led(0.018, COLOR.hotPink, { at: [0, 0.22, 0] });
     b.cone(0.035, 0.04, STEEL, { at: [0, 0.3, 0], rot: [Math.PI, 0, 0] }, 12);
   }, 1.6),
   wallTop((b) => {
     // A trophy, for the hackathon nobody remembers.
     b.box(0.12, 0.05, 0.12, WOOD_DARK, { at: [0, 0.025, 0] }, 0.01);
-    b.cylinder(0.015, 0.02, 0.08, 0xc8a050, { at: [0, 0.09, 0] }, 8);
-    b.cylinder(0.07, 0.03, 0.1, 0xc8a050, { at: [0, 0.18, 0] }, 12);
+    b.cylinder(0.015, 0.02, 0.08, COLOR.brass, { at: [0, 0.09, 0] }, 8);
+    b.cylinder(0.07, 0.03, 0.1, COLOR.brass, { at: [0, 0.18, 0] }, 12);
   }, 1.8),
   wallTop((b) => {
     // A globe.
     b.cylinder(0.05, 0.06, 0.02, WOOD_DARK, { at: [0, 0.01, 0] }, 10);
     b.cylinder(0.008, 0.008, 0.08, STEEL, { at: [0, 0.05, 0] }, 4);
     b.sphere(0.09, 0x5a8aa0, { at: [0, 0.17, 0] });
-    b.sphere(0.05, 0x7aa86a, { at: [0.04, 0.2, 0.05] }, [1, 0.6, 0.6]);
+    b.sphere(0.05, COLOR.fern, { at: [0.04, 0.2, 0.05] }, [1, 0.6, 0.6]);
   }, 1.8),
   wallTop((b) => {
     // A coffee maker and its pot.
-    b.box(0.16, 0.24, 0.16, 0x2b2f38, { at: [0, 0.12, 0] }, 0.02);
+    b.box(0.16, 0.24, 0.16, DARK, { at: [0, 0.12, 0] }, 0.02);
     b.cylinder(0.05, 0.06, 0.1, 0x8fb0c0, { at: [0, 0.06, 0.06] }, 10);
     b.led(0.012, 0xff7a4a, { at: [0.05, 0.2, 0.082] });
   }, 1.6),
   wallTop((b) => {
     // A Wi-Fi router with its antennas.
-    b.box(0.24, 0.04, 0.16, 0xe8e4da, { at: [0, 0.02, 0] }, 0.01);
+    b.box(0.24, 0.04, 0.16, COLOR.porcelain, { at: [0, 0.02, 0] }, 0.01);
     for (const x of [-0.09, 0, 0.09])
       b.box(0.015, 0.14, 0.015, DARK, { at: [x, 0.1, -0.07], rot: [0, 0, x * 2] }, 0);
-    for (let i = 0; i < 4; i++) b.led(0.008, 0x5cf08a, { at: [-0.06 + i * 0.04, 0.03, 0.081] });
+    for (let i = 0; i < 4; i++)
+      b.led(0.008, COLOR.ledGreen, { at: [-0.06 + i * 0.04, 0.03, 0.081] });
   }, 1.8),
 ];

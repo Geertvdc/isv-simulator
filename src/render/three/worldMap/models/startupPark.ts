@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { tint } from '../../kit';
+import { COLOR } from '../../palette';
 import { type CityPiece, STOREY, styleOf } from '../cityPlan';
 import { C, choose, COWORK_ACCENT, frac, type Parts, windowGrid } from './shared';
 
@@ -38,12 +39,12 @@ export function warehouse(p: CityPiece, { body: b, glow }: Parts, rng: () => num
       const x = -p.w * 0.12 - winW / 2 + (winW / cols) * (c + 0.5);
       const y = 0.48 - winH / 2 + (winH / rows) * (r + 0.5);
       const g = new THREE.PlaneGeometry(winW / cols - 0.035, winH / rows - 0.035);
-      if (rng() < 0.6) glow.add(g, 0xe8c27a, { at: [x, y, z + 0.02] }, 'glow');
+      if (rng() < 0.6) glow.add(g, COLOR.windowGlow, { at: [x, y, z + 0.02] }, 'glow');
       else b.add(g, C.pane, { at: [x, y, z + 0.02] });
     }
   }
   // Loading door.
-  b.box(0.5, 0.62, 0.03, 0x9fb3c8, { at: [p.w * 0.36, 0.31, z] }, 0.01);
+  b.box(0.5, 0.62, 0.03, COLOR.rollerDoor, { at: [p.w * 0.36, 0.31, z] }, 0.01);
   for (let i = 0; i < 5; i++)
     b.box(0.48, 0.015, 0.035, 0x7f93a8, { at: [p.w * 0.36, 0.08 + i * 0.12, z + 0.005] }, 0);
   // The neon sign on the roof's front: a dark board with glowing brackets.
@@ -97,7 +98,7 @@ export function warehouse(p: CityPiece, { body: b, glow }: Parts, rng: () => num
 
 export function cowork(p: CityPiece, { body: b }: Parts, rng: () => number): void {
   const style = styleOf(p);
-  const wall = choose([0xf3efe6, 0xe3d3b8, 0xd9e6ee, 0xc8d0c0], frac(p.variant * 3.7));
+  const wall = choose([COLOR.chalk, COLOR.sandstone, 0xd9e6ee, 0xc8d0c0], frac(p.variant * 3.7));
   const accent = choose(COWORK_ACCENT, frac(p.variant * 5.1));
   const top = p.storeys * STOREY;
   b.box(p.w, top, p.d, wall, { at: [0, top / 2, 0] }, 0.04);
@@ -130,7 +131,7 @@ export function cowork(p: CityPiece, { body: b }: Parts, rng: () => number): voi
         0.035,
         top - 0.05,
         0.02,
-        0xb5824f,
+        COLOR.wood,
         { at: [-p.w / 2 + 0.06 + i * 0.12, top / 2, p.d / 2 + 0.012] },
         0,
       );
@@ -139,7 +140,7 @@ export function cowork(p: CityPiece, { body: b }: Parts, rng: () => number): voi
   // A roof garden, or roof boxes.
   b.box(p.w - 0.1, 0.06, p.d - 0.1, tint(wall, -0.2), { at: [0, top + 0.03, 0] }, 0.02);
   if (rng() < 0.6) {
-    b.box(p.w * 0.5, 0.08, p.d * 0.5, 0x6cbf5a, { at: [-p.w * 0.15, top + 0.08, 0] }, 0.03);
+    b.box(p.w * 0.5, 0.08, p.d * 0.5, C.leafLight, { at: [-p.w * 0.15, top + 0.08, 0] }, 0.03);
     b.sphere(0.13, C.leaf, { at: [p.w * 0.25, top + 0.15, -p.d * 0.15] });
   } else {
     b.box(0.3, 0.14, 0.24, C.steel, { at: [p.w * 0.2, top + 0.13, -p.d * 0.1] }, 0.03);
@@ -151,8 +152,8 @@ export function cowork(p: CityPiece, { body: b }: Parts, rng: () => number): voi
 
 export function kiosk(p: CityPiece, { body: b, glow }: Parts): void {
   const h = 0.62;
-  b.box(p.w, h, p.d - 0.2, 0x4fbf74, { at: [0, h / 2, -0.1] }, 0.05);
-  b.box(p.w * 0.8, 0.06, 0.16, 0xe8dcc4, { at: [0, 0.38, p.d / 2 - 0.25] }, 0.02);
+  b.box(p.w, h, p.d - 0.2, COLOR.freshGreen, { at: [0, h / 2, -0.1] }, 0.05);
+  b.box(p.w * 0.8, 0.06, 0.16, COLOR.birch, { at: [0, 0.38, p.d / 2 - 0.25] }, 0.02);
   glow.screen(p.w * 0.6, 0.18, 0xffe6a8, { at: [0, 0.52, p.d / 2 - 0.29] });
   // A striped awning.
   const n = 6;
@@ -161,7 +162,7 @@ export function kiosk(p: CityPiece, { body: b, glow }: Parts): void {
       p.w / n,
       0.03,
       0.34,
-      i % 2 ? C.white : 0xe8483f,
+      i % 2 ? C.white : COLOR.accentRed,
       {
         at: [-p.w / 2 + (p.w / n) * (i + 0.5), h + 0.02, p.d / 2 - 0.2],
         rot: [0.35, 0, 0],
@@ -171,12 +172,12 @@ export function kiosk(p: CityPiece, { body: b, glow }: Parts): void {
   }
   // The giant cup on the roof.
   b.cylinder(0.17, 0.13, 0.26, C.white, { at: [0, h + 0.2, -0.1] }, 16);
-  b.cylinder(0.16, 0.16, 0.03, 0x7a5236, { at: [0, h + 0.33, -0.1] }, 16);
+  b.cylinder(0.16, 0.16, 0.03, COLOR.walnut, { at: [0, h + 0.33, -0.1] }, 16);
   b.torus(0.07, 0.022, C.white, { at: [0.18, h + 0.2, -0.1] });
 }
 
 export function scooter(p: CityPiece, { body: b }: Parts): void {
-  const paint = choose([0x4fbf74, 0x2fb8b0, 0xff8a5c], p.variant);
+  const paint = choose([COLOR.freshGreen, C.teal, COLOR.salmon], p.variant);
   for (const z of [-0.2, 0.2])
     b.cylinder(0.06, 0.06, 0.04, C.ink, { at: [0, 0.06, z], rot: [0, 0, Math.PI / 2] }, 10);
   b.box(0.1, 0.03, 0.42, paint, { at: [0, 0.08, 0] }, 0);
@@ -185,7 +186,10 @@ export function scooter(p: CityPiece, { body: b }: Parts): void {
 }
 
 export function bench(p: CityPiece, { body: b }: Parts): void {
-  const wood = choose([0xb5824f, 0x8a6448, 0xc8a070, 0x6a7a8a], frac(p.variant * 4.3));
+  const wood = choose(
+    [COLOR.wood, COLOR.chestnut, COLOR.woodLight, COLOR.stormGrey],
+    frac(p.variant * 4.3),
+  );
   b.box(p.w, 0.05, 0.2, wood, { at: [0, 0.18, 0] }, 0.01);
   if (styleOf(p) === 0) {
     b.box(p.w, 0.14, 0.04, wood, { at: [0, 0.3, -0.09] }, 0.01);
@@ -209,15 +213,15 @@ export function pingPong(_p: CityPiece, { body: b }: Parts): void {
     [0.34, 0.18],
   ] as const)
     b.box(0.03, 0.28, 0.03, C.ink, { at: [x, 0.14, z] }, 0);
-  b.sphere(0.025, 0xff8a3d, { at: [0.18, 0.4, 0.05] });
+  b.sphere(0.025, COLOR.orange, { at: [0.18, 0.4, 0.05] });
 }
 
 export function picnic(p: CityPiece, { body: b }: Parts): void {
-  const wood = 0xb5824f;
+  const wood = COLOR.wood;
   b.box(p.w, 0.04, 0.3, wood, { at: [0, 0.3, 0] }, 0.01);
   for (const z of [-0.26, 0.26]) b.box(p.w, 0.03, 0.12, wood, { at: [0, 0.17, z] }, 0.01);
   for (const x of [-p.w / 2 + 0.08, p.w / 2 - 0.08])
     b.box(0.04, 0.3, 0.6, tint(wood, -0.25), { at: [x, 0.15, 0] }, 0);
   b.cylinder(0.04, 0.035, 0.08, C.white, { at: [0.1, 0.36, 0.05] }, 10);
-  b.cylinder(0.035, 0.03, 0.07, 0xff8a5c, { at: [-0.15, 0.355, -0.04] }, 10);
+  b.cylinder(0.035, 0.03, 0.07, COLOR.salmon, { at: [-0.15, 0.355, -0.04] }, 10);
 }

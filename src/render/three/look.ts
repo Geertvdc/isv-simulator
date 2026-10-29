@@ -3,28 +3,29 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import type { BlockTile, LevelMap } from '../../sim/level';
 import type { FloorTheme, WallTheme } from '../mapLook';
 import { gridToWorld } from '../projection';
+import { COLOR } from './palette';
 
 /**
  * The 3D look's palette and light: warm and saturated like a toy diorama.
- * Every color of the 3D look lives here, so the whole game can be retinted
- * in one place.
+ * The colors with a role (stations, tickets, the slab) live here; the
+ * swatches several models share are named in `palette.ts`.
  */
 export const PALETTE = {
   /** The diorama's slab: a thick wooden base. */
-  slab: 0x7a5236,
+  slab: COLOR.walnut,
   slabEdge: 0x9a6b47,
   /** Behind the diorama: dark blue, lighter in the middle. */
-  backdropInner: 0x2b3756,
+  backdropInner: COLOR.midnight,
   backdropOuter: 0x12141b,
   /** Counter tops (light laminate) over darker fronts. */
   counterTop: 0xf0e6d2,
-  counterFront: 0x8a6448,
+  counterFront: COLOR.chestnut,
   /** Every station keeps its signature color (`tileColor`), which the HUD recipes use too. */
   station: {
-    inbox: 0x4fa3e0,
+    inbox: COLOR.skyBlue,
     bugQueue: 0xe05a5a,
     keyboard: 0x6cc070,
-    testBench: 0xe8b84a,
+    testBench: COLOR.mustard,
     review: 0xb07ce0,
     pipeline: 0xe9804f,
     ship: 0x3fd6a6,
@@ -33,20 +34,20 @@ export const PALETTE = {
     // Raspberry: apart from the pipeline's orange and the review's purple.
     merge: 0xe8459a,
   } satisfies Readonly<Record<Exclude<BlockTile, 'wall' | 'counter' | 'conveyor'>, number>>,
-  conveyor: 0x4a505c,
+  conveyor: COLOR.asphalt,
   ticket: {
     feature: 0xf6f1e4,
-    bug: 0xf6c4bd,
+    bug: COLOR.blush,
     incident: 0xff6b57,
     frontend: 0xcfe6ff,
     backend: 0xd3f0d0,
     fullstack: 0xe6d9ff,
   },
   manager: 0x3b3f4a,
-  skin: 0xf2c6a0,
-  white: 0xfdfdf6,
+  skin: COLOR.skinLight,
+  white: COLOR.white,
   ink: 0x1a1d24,
-  screenGlow: 0x7cf0c8,
+  screenGlow: COLOR.screenGlow,
 } as const;
 
 /**
@@ -73,7 +74,7 @@ export const MAP_PALETTE = {
   paving: {
     paving: 0xd6d0c2,
     concrete: 0xb7bbbb,
-    asphalt: 0x4a505c,
+    asphalt: COLOR.asphalt,
     plaza: 0xe6d8bb,
   },
   /** The board's rim round the land, and the gold contact fingers on it. */
@@ -97,17 +98,17 @@ export const MAP_PALETTE = {
   /** Flag accents, per chapter id: the same as the chapter colors in the CSS. */
   flag: {
     garage: 0xd98b3a,
-    startup: 0x4fbf74,
+    startup: COLOR.freshGreen,
     'scale-up': 0x4f8fe0,
-    enterprise: 0xa46ad8,
-    'big-tech': 0x2fb8b0,
+    enterprise: COLOR.purple,
+    'big-tech': COLOR.teal,
   } as Readonly<Record<string, number>>,
   flagFallback: 0xe0e0e0,
   pole: 0xf1efe8,
   plate: 0xe3dccb,
-  finial: 0xffc83d,
+  finial: COLOR.sunYellow,
   /** The ring round the selected flag. */
-  selected: 0xffd166,
+  selected: COLOR.gold,
 } as const;
 
 /** Floor colors per theme: base and the alternate tile for a gentle checker. */
@@ -115,14 +116,14 @@ export const FLOOR_COLORS: Readonly<Record<FloorTheme, readonly [number, number]
   concrete: [0xb8a487, 0xab977b],
   // A warm teal: blue carpet sank into the backdrop.
   carpet: [0x3f8a80, 0x3a8078],
-  parquet: [0xb5824f, 0xab7947],
+  parquet: [COLOR.wood, 0xab7947],
 };
 
 /** Wall colors per theme: face and top. Caps stay darker than stations, so the eye goes to the stations. */
 export const WALL_COLORS: Readonly<Record<WallTheme, { face: number; top: number }>> = {
   plaster: { face: 0x8fa3b8, top: 0x5e6f82 },
   wood: { face: 0x9a5a32, top: 0x6b4529 },
-  glass: { face: 0xd6f0fa, top: 0x7d8c9a },
+  glass: { face: COLOR.glassClear, top: 0x7d8c9a },
 };
 
 /** Sun color and strength; it shines from behind and left (see `createLights`). */

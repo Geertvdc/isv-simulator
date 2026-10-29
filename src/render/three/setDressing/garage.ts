@@ -1,4 +1,5 @@
 import { tint } from '../kit';
+import { COLOR } from '../palette';
 import {
   books,
   CARDBOARD,
@@ -20,7 +21,7 @@ import {
 /** Garage: a suburban street round the founders' garage. */
 
 /** Car paint: dull, never a player's color. */
-const CAR_PAINT = [0x9aa4ae, 0x6a7a8a, 0x8a7a6a, 0x5a6a5a, 0xb8b0a0];
+const CAR_PAINT = [0x9aa4ae, COLOR.stormGrey, COLOR.mushroom, 0x5a6a5a, 0xb8b0a0];
 
 export const car = looks([2, 3], 3, (b, v) => {
   const paint = nth(CAR_PAINT, v * 2);
@@ -28,11 +29,13 @@ export const car = looks([2, 3], 3, (b, v) => {
   if (v === 2) {
     // A camper van: a tall box behind the cab.
     b.box(1.45, 0.75, 1.7, tint(paint, 0.3), { at: [0, 1.0, -0.4] }, 0.12);
-    b.pane(1.3, 0.3, 0.6, 0xbfe2f0, { at: [0, 0.82, 0.75] });
+    b.pane(1.3, 0.3, 0.6, COLOR.glassPale, { at: [0, 0.82, 0.75] });
     b.box(1.47, 0.08, 1.72, tint(paint, -0.2), { at: [0, 0.8, -0.4] }, 0);
   } else {
     b.box(1.3, 0.42, v === 1 ? 1.9 : 1.4, paint, { at: [0, 0.82, v === 1 ? -0.35 : -0.15] }, 0.16);
-    b.pane(1.32, 0.34, v === 1 ? 1.7 : 1.2, 0xbfe2f0, { at: [0, 0.84, v === 1 ? -0.35 : -0.15] });
+    b.pane(1.32, 0.34, v === 1 ? 1.7 : 1.2, COLOR.glassPale, {
+      at: [0, 0.84, v === 1 ? -0.35 : -0.15],
+    });
   }
   if (v === 1) b.box(1.1, 0.06, 1.4, DARK, { at: [0, 1.06, -0.4] }, 0);
   for (const [x, z] of [
@@ -44,10 +47,10 @@ export const car = looks([2, 3], 3, (b, v) => {
     b.cylinder(0.24, 0.24, 0.18, INK, { at: [x, 0.24, z], rot: [0, 0, Math.PI / 2] }, 16);
     b.cylinder(0.12, 0.12, 0.19, STEEL, { at: [x, 0.24, z], rot: [0, 0, Math.PI / 2] }, 12);
   }
-  b.led(0.07, 0xfff4c0, { at: [-0.5, 0.48, 1.3] });
-  b.led(0.07, 0xfff4c0, { at: [0.5, 0.48, 1.3] });
-  b.led(0.06, 0xff5040, { at: [-0.55, 0.5, -1.3] });
-  b.led(0.06, 0xff5040, { at: [0.55, 0.5, -1.3] });
+  b.led(0.07, COLOR.headlight, { at: [-0.5, 0.48, 1.3] });
+  b.led(0.07, COLOR.headlight, { at: [0.5, 0.48, 1.3] });
+  b.led(0.06, COLOR.tailLight, { at: [-0.55, 0.5, -1.3] });
+  b.led(0.06, COLOR.tailLight, { at: [0.55, 0.5, -1.3] });
 });
 
 export const bike = looks([1, 1], 4, (b, v) => {
@@ -68,9 +71,9 @@ export const bike = looks([1, 1], 4, (b, v) => {
 
 /** Shelf stock: cardboard, dull tins, an old monitor, paint pots. Nothing in a player's color. */
 export const shelves = looks([2, 1], 4, (b, v) => {
-  const post = nth([STEEL, WOOD, 0x5a6470, STEEL], v);
+  const post = nth([STEEL, WOOD, COLOR.pewter, STEEL], v);
   for (const x of [-0.85, 0.85]) b.box(0.06, 1.4, 0.4, post, { at: [x, 0.7, 0] }, 0);
-  const colors = [CARDBOARD, 0x9a7a6a, 0x8a96a3, 0xb8a67a, 0x7a8a7a, 0xa88a6a];
+  const colors = [CARDBOARD, 0x9a7a6a, COLOR.zinc, COLOR.khaki, 0x7a8a7a, 0xa88a6a];
   for (let s = 0; s < 3; s++) {
     const y = 0.15 + s * 0.45;
     b.box(1.7, 0.04, 0.4, post, { at: [0, y, 0] }, 0);
@@ -83,7 +86,7 @@ export const shelves = looks([2, 1], 4, (b, v) => {
           0.14,
           0.012,
           0.14,
-          nth([INK, 0x5a6a8a, INK, 0x8a5a5a], k),
+          nth([INK, COLOR.dustyBlue, INK, COLOR.dustyRose], k),
           { at: [0.3, y + 0.03 + k * 0.014, 0] },
           0,
         );
@@ -102,7 +105,7 @@ export const shelves = looks([2, 1], 4, (b, v) => {
         b.box(0.3, 0.26, 0.3, c, { at: [-0.6 + i * 0.38, y + 0.15, 0] }, 0.02);
       } else {
         // A coil of cable.
-        b.torus(0.1, 0.04, 0x3a3f4a, {
+        b.torus(0.1, 0.04, COLOR.graphite, {
           at: [-0.6 + i * 0.38, y + 0.06, 0],
           rot: [Math.PI / 2, 0, 0],
         });
@@ -114,7 +117,7 @@ export const shelves = looks([2, 1], 4, (b, v) => {
 /** The trees: a round oak, a pine, a birch, a fruit tree. */
 export const tree = looks([2, 2], 4, (b, v) => {
   if (v === 1) {
-    b.cylinder(0.1, 0.14, 0.6, 0x6a4a32, { at: [0, 0.3, 0] }, 8);
+    b.cylinder(0.1, 0.14, 0.6, WOOD_DARK, { at: [0, 0.3, 0] }, 8);
     for (const [y, r, c] of [
       [0.85, 0.75, LEAF_DARK],
       [1.4, 0.58, 0x4a8a50],
@@ -123,12 +126,12 @@ export const tree = looks([2, 2], 4, (b, v) => {
       b.cone(r, 0.8, c, { at: [0, y, 0] }, 9);
     }
   } else if (v === 2) {
-    b.cylinder(0.07, 0.1, 1.6, 0xe8e4da, { at: [0, 0.8, 0] }, 8);
+    b.cylinder(0.07, 0.1, 1.6, COLOR.porcelain, { at: [0, 0.8, 0] }, 8);
     for (const y of [0.4, 0.75, 1.1]) b.box(0.08, 0.02, 0.15, INK, { at: [0, y, 0.06] }, 0);
-    b.sphere(0.45, 0x8ab85a, { at: [0.1, 1.75, 0] }, [0.9, 1.3, 0.9]);
+    b.sphere(0.45, COLOR.grassGreen, { at: [0.1, 1.75, 0] }, [0.9, 1.3, 0.9]);
     b.sphere(0.32, 0x9ac86a, { at: [-0.25, 1.5, 0.1] });
   } else {
-    b.cylinder(0.12, 0.16, 1.1, 0x7a5236, { at: [0, 0.55, 0] }, 10);
+    b.cylinder(0.12, 0.16, 1.1, COLOR.walnut, { at: [0, 0.55, 0] }, 10);
     b.sphere(0.7, LEAF, { at: [0, 1.4, 0] }, [1, 0.9, 1]);
     b.sphere(0.5, LEAF_LIGHT, { at: [0.35, 1.75, 0.2] });
     b.sphere(0.45, LEAF, { at: [-0.4, 1.65, -0.15] });
@@ -152,20 +155,28 @@ export const bushes = looks([1, 1], 4, (b, v) => {
   }
   b.sphere(0.32, v === 3 ? LEAF_DARK : LEAF, { at: [-0.12, 0.25, 0] }, [1, 0.8, 1]);
   b.sphere(0.26, LEAF_LIGHT, { at: [0.2, 0.22, 0.1] }, [1, 0.8, 1]);
-  const flowers = nth([[0xe88ab8, 0xf2ecc8], [0xc8a8ff, 0xf4f1ea], [], [0xf4f1ea, 0xf4f1ea]], v);
+  const flowers = nth(
+    [
+      [0xe88ab8, COLOR.blossom],
+      [COLOR.lavender, COLOR.offWhite],
+      [],
+      [COLOR.offWhite, COLOR.offWhite],
+    ],
+    v,
+  );
   flowers.forEach((c, i) => b.sphere(0.06, c, { at: [i ? -0.2 : 0.1, 0.46, i ? 0.1 : 0.2] }));
 });
 
 export const hoop = looks([1, 1], 1, (b) => {
   b.cylinder(0.05, 0.05, 2, STEEL, { at: [0, 1, -0.2] }, 10);
   b.box(0.8, 0.55, 0.05, WHITE, { at: [0, 2, -0.1] }, 0.02);
-  b.box(0.3, 0.22, 0.01, 0x8a6a5a, { at: [0, 1.92, -0.07] }, 0);
+  b.box(0.3, 0.22, 0.01, COLOR.cinnamon, { at: [0, 1.92, -0.07] }, 0);
   b.torus(0.18, 0.02, 0xff7a2f, { at: [0, 1.78, 0.12], rot: [Math.PI / 2, 0, 0] });
   b.sphere(0.12, 0xff7a2f, { at: [0.3, 0.12, 0.4] });
 });
 
 export const drums = looks([1, 1], 3, (b, v) => {
-  const a = nth([0x7a6a5a, 0x5a6a7a, 0x6a5a5a], v);
+  const a = nth([COLOR.taupe, COLOR.blueGrey, 0x6a5a5a], v);
   b.cylinder(0.22, 0.22, 0.6, a, { at: [-0.15, 0.3, 0] }, 16);
   b.torus(0.21, 0.015, tint(a, -0.3), { at: [-0.15, 0.45, 0], rot: [Math.PI / 2, 0, 0] });
   if (v === 1) {
@@ -179,14 +190,14 @@ export const drums = looks([1, 1], 3, (b, v) => {
       0.02,
     );
   } else {
-    b.cylinder(0.2, 0.2, 0.55, 0x6a7a6a, { at: [0.25, 0.28, 0.1] }, 16);
-    if (v === 2) b.cylinder(0.18, 0.18, 0.5, 0x8a7a5a, { at: [0.05, 0.25, -0.3] }, 16);
+    b.cylinder(0.2, 0.2, 0.55, COLOR.sage, { at: [0.25, 0.28, 0.1] }, 16);
+    if (v === 2) b.cylinder(0.18, 0.18, 0.5, COLOR.olive, { at: [0.05, 0.25, -0.3] }, 16);
   }
 });
 
 export const cat = looks([1, 1], 1, (b) => {
-  const fur = 0xe08a3a;
-  b.box(0.5, 0.06, 0.4, 0x8c5f3d, { at: [0, 0.03, 0] }, 0.02);
+  const fur = COLOR.tangerine;
+  b.box(0.5, 0.06, 0.4, COLOR.woodFrame, { at: [0, 0.03, 0] }, 0.02);
   b.sphere(0.16, fur, { at: [0, 0.16, 0] }, [1.3, 0.75, 1]);
   b.sphere(0.1, fur, { at: [0.18, 0.24, 0.05] });
   b.cone(0.04, 0.07, fur, { at: [0.15, 0.34, 0.03] }, 4);
@@ -196,7 +207,7 @@ export const cat = looks([1, 1], 1, (b) => {
 
 /** A workbench: a vise and tools, a PC being built, or a soldering corner. */
 export const workbench = looks([2, 1], 3, (b, v) => {
-  const top = nth([WOOD_LIGHT, WOOD, 0x8a8a7a], v);
+  const top = nth([WOOD_LIGHT, WOOD, COLOR.stone], v);
   b.box(1.6, 0.06, 0.6, top, { at: [0, 0.8, 0] }, 0.02);
   for (const x of [-0.72, 0.72])
     for (const z of [-0.24, 0.24]) b.box(0.06, 0.78, 0.06, WOOD_DARK, { at: [x, 0.39, z] }, 0);
@@ -204,7 +215,7 @@ export const workbench = looks([2, 1], 3, (b, v) => {
   // A pegboard behind it.
   b.box(1.6, 0.7, 0.03, 0xb8a888, { at: [0, 1.25, -0.28] }, 0.01);
   if (v === 0) {
-    b.box(0.2, 0.12, 0.14, 0x5a6a7a, { at: [-0.55, 0.89, 0.15] }, 0.02);
+    b.box(0.2, 0.12, 0.14, COLOR.blueGrey, { at: [-0.55, 0.89, 0.15] }, 0.02);
     for (let i = 0; i < 4; i++)
       b.box(
         0.03,
@@ -217,15 +228,15 @@ export const workbench = looks([2, 1], 3, (b, v) => {
     b.box(0.5, 0.25, 0.25, 0x7a5a4a, { at: [0.4, 0.96, 0.05] }, 0.03);
   } else if (v === 1) {
     // An open PC case, a fan glowing inside.
-    b.box(0.25, 0.45, 0.45, 0x3a3f4a, { at: [-0.3, 1.06, 0] }, 0.02);
-    b.screen(0.3, 0.3, 0x7ab8ff, { at: [-0.17, 1.06, 0], rot: [0, Math.PI / 2, 0] });
+    b.box(0.25, 0.45, 0.45, COLOR.graphite, { at: [-0.3, 1.06, 0] }, 0.02);
+    b.screen(0.3, 0.3, COLOR.screenBlue, { at: [-0.17, 1.06, 0], rot: [0, Math.PI / 2, 0] });
     b.box(0.3, 0.02, 0.2, 0x4a7a5a, { at: [0.3, 0.84, 0.05] }, 0);
     b.box(0.08, 0.02, 0.06, INK, { at: [0.3, 0.86, 0.05] }, 0);
   } else {
     // Soldering: a lamp, a board, a spool.
     b.cylinder(0.01, 0.01, 0.4, DARK, { at: [-0.5, 1.05, 0], rot: [0, 0, 0.3] }, 6);
     b.cylinder(0.07, 0.07, 0.03, DARK, { at: [-0.44, 1.25, 0.05] }, 12);
-    b.led(0.04, 0xfff0c0, { at: [-0.44, 1.22, 0.05] });
+    b.led(0.04, COLOR.lampLight, { at: [-0.44, 1.22, 0.05] });
     b.box(0.3, 0.015, 0.2, 0x3a7a5a, { at: [-0.3, 0.84, 0.1] }, 0);
     b.torus(0.06, 0.03, 0xc8b070, { at: [0.3, 0.87, 0.1], rot: [Math.PI / 2, 0, 0] });
   }
@@ -235,7 +246,7 @@ export const workbench = looks([2, 1], 3, (b, v) => {
 export const bins = looks([1, 1], 3, (b, v) => {
   const n = v === 2 ? 1 : 2;
   for (let i = 0; i < n; i++) {
-    const c = nth([0x5a6470, 0x4a6a4a, 0x6a5a4a], v + i);
+    const c = nth([COLOR.pewter, 0x4a6a4a, 0x6a5a4a], v + i);
     const x = n === 1 ? 0 : -0.2 + i * 0.4;
     b.box(0.34, 0.6, 0.4, c, { at: [x, 0.32, 0] }, 0.03);
     b.box(0.37, 0.04, 0.44, tint(c, -0.2), { at: [x, 0.64, 0.01] }, 0.01);
@@ -246,7 +257,7 @@ export const bins = looks([1, 1], 3, (b, v) => {
 export const tires = looks([1, 1], 3, (b, v) => {
   const n = 2 + v;
   for (let i = 0; i < n; i++)
-    b.torus(0.26, 0.09, 0x2b2f38, {
+    b.torus(0.26, 0.09, DARK, {
       at: [((i * 7) % 3) * 0.02, 0.09 + i * 0.17, 0],
       rot: [Math.PI / 2, 0, 0],
     });
@@ -262,18 +273,18 @@ export const oldPCs = looks([1, 1], 2, (b, v) => {
 });
 
 export const shed = looks([2, 2], 3, (b, v) => {
-  const wall = nth([0x8a7a6a, 0x6a7a7a, 0x9a8a6a], v);
-  const roof = nth([0x5a4a48, 0x4a5a5a, 0x6a4a3a], v);
+  const wall = nth([COLOR.mushroom, 0x6a7a7a, 0x9a8a6a], v);
+  const roof = nth([COLOR.umber, COLOR.roofSlate, COLOR.cocoa], v);
   b.box(1.5, 1.1, 1.3, wall, { at: [0, 0.55, 0] }, 0.03);
   for (let i = 0; i < 6; i++)
     b.box(0.015, 1.08, 0.01, tint(wall, -0.2), { at: [-0.6 + i * 0.24, 0.55, 0.655] }, 0);
   b.box(1.7, 0.06, 1.55, roof, { at: [0, 1.2, 0], rot: [0.2, 0, 0] }, 0.02);
   b.box(0.5, 0.85, 0.03, tint(wall, -0.25), { at: [-0.3, 0.44, 0.66] }, 0.01);
-  if (v !== 1) b.box(0.3, 0.25, 0.02, 0xbfe2f0, { at: [0.4, 0.75, 0.66] }, 0.01);
+  if (v !== 1) b.box(0.3, 0.25, 0.02, COLOR.glassPale, { at: [0.4, 0.75, 0.66] }, 0.01);
 });
 
 export const fencePanel = looks([2, 1], 2, (b, v) => {
-  const c = nth([0xc8b8a0, 0x8a6a4a], v);
+  const c = nth([COLOR.linen, COLOR.hazel], v);
   for (const y of [0.22, 0.55]) b.box(1.8, 0.05, 0.04, c, { at: [0, y, -0.05] }, 0);
   for (let i = 0; i < (v ? 6 : 12); i++) {
     const w = v ? 0.28 : 0.1;
@@ -285,8 +296,8 @@ export const fencePanel = looks([2, 1], 2, (b, v) => {
 export const kennel = looks([1, 1], 2, (b, v) => {
   const c = nth([0xa88a6a, 0x7a8a9a], v);
   b.box(0.6, 0.45, 0.65, c, { at: [0, 0.23, 0] }, 0.02);
-  b.box(0.72, 0.05, 0.72, 0x6a4a3a, { at: [0.18, 0.55, 0], rot: [0, 0, -0.6] }, 0);
-  b.box(0.72, 0.05, 0.72, 0x6a4a3a, { at: [-0.18, 0.55, 0], rot: [0, 0, 0.6] }, 0);
+  b.box(0.72, 0.05, 0.72, COLOR.cocoa, { at: [0.18, 0.55, 0], rot: [0, 0, -0.6] }, 0);
+  b.box(0.72, 0.05, 0.72, COLOR.cocoa, { at: [-0.18, 0.55, 0], rot: [0, 0, 0.6] }, 0);
   b.box(0.24, 0.3, 0.02, INK, { at: [0, 0.18, 0.33] }, 0);
-  b.cylinder(0.1, 0.08, 0.05, 0x8a96a3, { at: [0.3, 0.03, 0.42] }, 12);
+  b.cylinder(0.1, 0.08, 0.05, COLOR.zinc, { at: [0.3, 0.03, 0.42] }, 12);
 });

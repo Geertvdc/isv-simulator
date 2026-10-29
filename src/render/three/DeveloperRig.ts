@@ -4,15 +4,16 @@ import type { PlayerId } from '../../sim/state';
 import { playerColor } from '../playerColors';
 import { type KitMaterials, ModelBuilder, tint } from './kit';
 import { PALETTE } from './look';
+import { COLOR } from './palette';
 import type { Pose } from './pose';
 
 /** Compact angular production crew. Shared targets/cadence, different garment and head cuts. */
 export const DEVELOPER_TOP = 1.54;
 const UP = new THREE.Vector3(0, 1, 0);
-const TROUSERS = 0x29384e;
-const CREAM = 0xf2e5cf;
-const SKINS = [0xf2c6a0, 0x8d5a3b, 0xc68b59, 0xe8b48a] as const;
-const HAIRS = [0x302728, 0x171c23, 0x885030, 0x493834] as const;
+const TROUSERS = COLOR.denim;
+const CREAM = COLOR.cream;
+const SKINS = [COLOR.skinLight, COLOR.skinDeep, COLOR.skinTan, COLOR.skinWarm] as const;
+const HAIRS = [COLOR.hairDark, 0x171c23, 0x885030, 0x493834] as const;
 export const DEVELOPER_HAIRSTYLES = ['swept', 'cropped', 'long', 'tied'] as const;
 export type DeveloperHairstyle = (typeof DEVELOPER_HAIRSTYLES)[number];
 

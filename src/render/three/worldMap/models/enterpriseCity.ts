@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { tint } from '../../kit';
+import { COLOR } from '../../palette';
 import { type CityPiece, STOREY, styleOf } from '../cityPlan';
 import { C, choose, frac, type Parts, TOWER_WALLS, windowGrid } from './shared';
 
@@ -55,7 +56,7 @@ export function tower(p: CityPiece, { body: b, glow, blink }: Parts, rng: () => 
     for (let s = p.storeys - 3; s < p.storeys; s++)
       glow.add(
         new THREE.PlaneGeometry(p.w * 0.9, STOREY * 0.35),
-        0x9a8a60,
+        COLOR.windowDim,
         {
           at: [0, s * STOREY + STOREY * 0.55, p.d / 2 + 0.008],
         },
@@ -145,8 +146,8 @@ export function fountain(p: CityPiece, { body: b }: Parts): void {
 }
 
 export function planter(p: CityPiece, { body: b }: Parts): void {
-  b.box(p.w, 0.26, p.d, 0xc9c6bd, { at: [0, 0.13, 0] }, 0.03);
-  b.box(p.w - 0.06, 0.02, p.d - 0.06, 0x6a4a32, { at: [0, 0.26, 0] }, 0);
+  b.box(p.w, 0.26, p.d, C.concrete, { at: [0, 0.13, 0] }, 0.03);
+  b.box(p.w - 0.06, 0.02, p.d - 0.06, COLOR.woodDark, { at: [0, 0.26, 0] }, 0);
   b.sphere(0.2, C.leaf, { at: [0, 0.38, 0] }, [1, 0.9, 1]);
-  b.sphere(0.06, 0xff6b8a, { at: [0.1, 0.5, 0.1] });
+  b.sphere(0.06, COLOR.pink, { at: [0.1, 0.5, 0.1] });
 }

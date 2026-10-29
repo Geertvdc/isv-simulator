@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { tint } from '../../kit';
+import { COLOR } from '../../palette';
 import { type CityPiece, styleOf } from '../cityPlan';
 import { C, choose, DOORS, frac, HOUSE_ROOFS, HOUSE_WALLS, type Parts, prism } from './shared';
 
@@ -44,13 +45,13 @@ export function house(p: CityPiece, { body: b, glow }: Parts, rng: () => number)
   } else if (style === 3) {
     // Flat and modern: a parapet, a wood-clad half, solar panels on the roof.
     b.box(hw + 0.04, 0.06, p.d + 0.04, tint(wall, -0.3), { at: [0, wallH + 0.03, 0] }, 0.01);
-    b.box(hw * 0.45, wallH - 0.02, 0.02, 0xb5824f, { at: [-hw * 0.27, wallH / 2, z + 0.005] }, 0);
+    b.box(hw * 0.45, wallH - 0.02, 0.02, COLOR.wood, { at: [-hw * 0.27, wallH / 2, z + 0.005] }, 0);
     for (let i = 0; i < 2; i++)
       b.box(
         hw * 0.32,
         0.03,
         p.d * 0.35,
-        0x2b3a5a,
+        COLOR.solarPanel,
         { at: [-hw * 0.18 + i * hw * 0.36, wallH + 0.12, -p.d * 0.1], rot: [-0.35, 0, 0] },
         0,
       );
@@ -87,7 +88,7 @@ export function house(p: CityPiece, { body: b, glow }: Parts, rng: () => number)
     const gx = p.w / 2 - gw / 2;
     b.box(gw, 0.55, p.d * 0.9, tint(wall, -0.08), { at: [gx, 0.275, -p.d * 0.05] }, 0.03);
     b.box(gw + 0.04, 0.05, p.d * 0.9 + 0.04, roof, { at: [gx, 0.57, -p.d * 0.05] }, 0.01);
-    b.box(gw * 0.75, 0.4, 0.02, 0xe8e4da, { at: [gx, 0.2, z - p.d * 0.05 + 0.01] }, 0);
+    b.box(gw * 0.75, 0.4, 0.02, COLOR.porcelain, { at: [gx, 0.2, z - p.d * 0.05 + 0.01] }, 0);
     for (let i = 0; i < 4; i++)
       b.box(
         gw * 0.74,
@@ -107,7 +108,7 @@ export function house(p: CityPiece, { body: b, glow }: Parts, rng: () => number)
     const wide = style === 3 ? 0.5 : 0.34;
     b.box(wide, 0.28, 0.03, style === 3 ? C.ink : C.white, { at: [winX, 0.42, z + 0.01] }, 0.01);
     const pane = new THREE.PlaneGeometry(wide - 0.08, 0.2);
-    if (rng() < 0.35) glow.add(pane, 0xe8c27a, { at: [winX, 0.42, z + 0.03] }, 'glow');
+    if (rng() < 0.35) glow.add(pane, COLOR.windowGlow, { at: [winX, 0.42, z + 0.03] }, 'glow');
     else b.add(pane, C.pane, { at: [winX, 0.42, z + 0.03] });
   }
   // A chimney, a dish on the wall, a bush by the door: each on or off.
@@ -135,14 +136,14 @@ export function house(p: CityPiece, { body: b, glow }: Parts, rng: () => number)
 
 export function garage(p: CityPiece, { body: b, glow }: Parts): void {
   const wall = 0xf0e2c4;
-  const roof = 0xc85a4a;
+  const roof = COLOR.brickRed;
   const wallH = 0.98;
   const t = 0.08;
   const open = 1.08;
   const lintel = 0.1;
   const z = p.d / 2;
   // Floor, back and side walls, and the front either side of the open door.
-  b.box(p.w, 0.04, p.d, 0x9a9a92, { at: [0, 0.02, 0] }, 0);
+  b.box(p.w, 0.04, p.d, COLOR.cement, { at: [0, 0.02, 0] }, 0);
   b.box(p.w, wallH, t, wall, { at: [0, wallH / 2, -z + t / 2] }, 0.02);
   for (const s of [-1, 1])
     b.box(t, wallH, p.d, wall, { at: [s * (p.w / 2 - t / 2), wallH / 2, 0] }, 0.02);
@@ -155,31 +156,50 @@ export function garage(p: CityPiece, { body: b, glow }: Parts): void {
   // A window on the house side.
   const winX = -p.w / 2 + leftW / 2;
   b.box(0.3, 0.26, 0.03, C.white, { at: [winX, 0.55, z + 0.01] }, 0.01);
-  b.add(new THREE.PlaneGeometry(0.22, 0.18), 0x9a8a60, { at: [winX, 0.55, z + 0.027] }, 'glow');
+  b.add(
+    new THREE.PlaneGeometry(0.22, 0.18),
+    COLOR.windowDim,
+    { at: [winX, 0.55, z + 0.027] },
+    'glow',
+  );
   // The roll-up door, rolled up under the lintel, and a dark inside.
-  b.box(open + 0.04, 0.08, 0.1, 0x9fb3c8, { at: [doorX, wallH - lintel - 0.05, z - 0.07] }, 0.03);
+  b.box(
+    open + 0.04,
+    0.08,
+    0.1,
+    COLOR.rollerDoor,
+    { at: [doorX, wallH - lintel - 0.05, z - 0.07] },
+    0.03,
+  );
   b.box(p.w - 2 * t, 0.01, p.d - 2 * t, 0x6a655d, { at: [0, 0.045, 0] }, 0);
   b.box(p.w - 2 * t, wallH - 0.05, 0.01, 0x4a4640, { at: [0, wallH / 2, -z + t + 0.01] }, 0);
   // The desk where it all began, pulled up to the open door so it shows: a glowing
   // monitor facing out, a laptop, a lamp, and the chair out on the driveway.
   const dz = z - 0.2;
-  b.box(0.7, 0.04, 0.3, 0xb5824f, { at: [doorX, 0.36, dz] }, 0.01);
+  b.box(0.7, 0.04, 0.3, COLOR.wood, { at: [doorX, 0.36, dz] }, 0.01);
   for (const sx of [-0.31, 0.31])
-    b.box(0.04, 0.34, 0.26, 0x8a6448, { at: [doorX + sx, 0.18, dz] }, 0.01);
+    b.box(0.04, 0.34, 0.26, COLOR.chestnut, { at: [doorX + sx, 0.18, dz] }, 0.01);
   b.box(0.34, 0.24, 0.03, C.ink, { at: [doorX - 0.08, 0.55, dz - 0.08] }, 0.01);
-  glow.screen(0.3, 0.2, 0x7fd8ff, { at: [doorX - 0.08, 0.55, dz - 0.063] });
+  glow.screen(0.3, 0.2, COLOR.ledCyan, { at: [doorX - 0.08, 0.55, dz - 0.063] });
   b.box(0.04, 0.06, 0.04, C.ink, { at: [doorX - 0.08, 0.41, dz - 0.08] }, 0);
-  b.box(0.16, 0.012, 0.11, 0xc9ccd2, { at: [doorX + 0.2, 0.385, dz + 0.04] }, 0);
-  b.box(0.16, 0.1, 0.01, 0xc9ccd2, { at: [doorX + 0.2, 0.43, dz - 0.02], rot: [-0.3, 0, 0] }, 0);
+  b.box(0.16, 0.012, 0.11, COLOR.lightSteel, { at: [doorX + 0.2, 0.385, dz + 0.04] }, 0);
+  b.box(
+    0.16,
+    0.1,
+    0.01,
+    COLOR.lightSteel,
+    { at: [doorX + 0.2, 0.43, dz - 0.02], rot: [-0.3, 0, 0] },
+    0,
+  );
   glow.screen(0.13, 0.08, 0x9fffb0, { at: [doorX + 0.2, 0.43, dz - 0.012], rot: [-0.3, 0, 0] });
   b.cylinder(0.01, 0.01, 0.2, C.ink, { at: [doorX - 0.3, 0.48, dz - 0.05] }, 6);
   glow.led(0.045, 0xffe2a0, { at: [doorX - 0.3, 0.6, dz - 0.05] });
-  b.box(0.2, 0.04, 0.2, 0xd9784a, { at: [doorX, 0.26, z + 0.16] }, 0.01);
-  b.box(0.2, 0.2, 0.04, 0xd9784a, { at: [doorX, 0.37, z + 0.26] }, 0.01);
+  b.box(0.2, 0.04, 0.2, COLOR.burntOrange, { at: [doorX, 0.26, z + 0.16] }, 0.01);
+  b.box(0.2, 0.2, 0.04, COLOR.burntOrange, { at: [doorX, 0.37, z + 0.26] }, 0.01);
   b.box(0.03, 0.24, 0.03, C.ink, { at: [doorX, 0.12, z + 0.16] }, 0);
   // A string of fairy lights over the door.
   for (let i = 0; i < 7; i++) {
-    glow.led(0.026, choose([0xffd166, 0xff7a7a, 0x7fd8ff], i / 7 + 0.01), {
+    glow.led(0.026, choose([COLOR.gold, 0xff7a7a, COLOR.ledCyan], i / 7 + 0.01), {
       at: [
         doorX - open / 2 + 0.06 + i * ((open - 0.12) / 6),
         wallH - lintel - 0.02 - Math.sin((i / 6) * Math.PI) * 0.06,
@@ -216,16 +236,16 @@ export function fence(p: CityPiece, { body: b }: Parts): void {
 }
 
 export function mailbox(_p: CityPiece, { body: b }: Parts): void {
-  b.box(0.05, 0.42, 0.05, 0x8a6448, { at: [0, 0.21, 0] }, 0);
-  b.box(0.16, 0.14, 0.24, 0x3f7fe0, { at: [0, 0.48, 0] }, 0.05);
-  b.box(0.02, 0.12, 0.04, 0xe8483f, { at: [0.09, 0.56, -0.04] }, 0);
+  b.box(0.05, 0.42, 0.05, COLOR.chestnut, { at: [0, 0.21, 0] }, 0);
+  b.box(0.16, 0.14, 0.24, COLOR.brightBlue, { at: [0, 0.48, 0] }, 0.05);
+  b.box(0.02, 0.12, 0.04, COLOR.accentRed, { at: [0.09, 0.56, -0.04] }, 0);
 }
 
 export function bike(_p: CityPiece, { body: b }: Parts): void {
   for (const z of [-0.2, 0.2])
     b.torus(0.12, 0.018, C.ink, { at: [0, 0.13, z], rot: [0, Math.PI / 2, 0] });
-  b.box(0.025, 0.025, 0.4, 0xe8483f, { at: [0, 0.22, 0], rot: [0.25, 0, 0] }, 0);
-  b.box(0.025, 0.18, 0.025, 0xe8483f, { at: [0, 0.24, 0.08] }, 0);
+  b.box(0.025, 0.025, 0.4, COLOR.accentRed, { at: [0, 0.22, 0], rot: [0.25, 0, 0] }, 0);
+  b.box(0.025, 0.18, 0.025, COLOR.accentRed, { at: [0, 0.24, 0.08] }, 0);
   b.box(0.05, 0.025, 0.1, C.ink, { at: [0, 0.33, 0.07] }, 0);
   b.box(0.22, 0.02, 0.02, C.steel, { at: [0, 0.33, -0.17] }, 0);
 }

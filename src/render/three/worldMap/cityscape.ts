@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { WorldMap } from '../../../flow/worldMap';
 import { gridToWorld } from '../../projection';
 import { type KitMaterials, ModelBuilder } from '../kit';
+import { COLOR } from '../palette';
 import {
   CRANE,
   type PieceBuilders,
@@ -30,7 +31,15 @@ const CARS = {
   speed: 1.1,
   width: 0.26,
   length: 0.5,
-  colors: [0xe8483f, 0x3f7fe0, 0xffc83d, 0xf4f1ea, 0x2fb8b0, 0x8a5ad8, 0xff8a3d],
+  colors: [
+    COLOR.accentRed,
+    COLOR.brightBlue,
+    COLOR.sunYellow,
+    COLOR.offWhite,
+    COLOR.teal,
+    COLOR.violet,
+    COLOR.orange,
+  ],
 };
 const CRANE_SWING = { angle: 0.55, ms: 9000, base: -0.6 };
 const BLINK_MS = 1300;

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { ModelBuilder } from '../../kit';
+import { COLOR } from '../../palette';
 import { type TreeKind } from '../cityPlan';
 import { C } from './shared';
 
@@ -71,8 +72,8 @@ export function treeModel(kind: TreeKind): ModelBuilder {
   } else {
     leaves(0.22, C.leaf, [-0.08, 0.17, 0], 0.8);
     leaves(0.18, C.leafLight, [0.14, 0.15, 0.07], 0.8);
-    leaves(0.045, 0xff6b8a, [0.07, 0.31, 0.14]);
-    leaves(0.045, 0xf2ecc8, [-0.14, 0.33, 0.07]);
+    leaves(0.045, COLOR.pink, [0.07, 0.31, 0.14]);
+    leaves(0.045, COLOR.blossom, [-0.14, 0.33, 0.07]);
   }
   return b;
 }
