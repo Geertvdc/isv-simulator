@@ -16,8 +16,10 @@
  *   (`isvNet.trace`) while walking into walls, along stations, around
  *   corners and dashing. A backward step is a frame where the drawn player
  *   moves against the keys held (more than 0.005 tiles, ignoring the first
- *   200 ms after a key change, when the old velocity still carries it); a
- *   snap is a frame that moves further than a dash can.
+ *   200 ms after a key change, when the old velocity still carries it). On
+ *   the course the keys count from when the drawn player answers them (the
+ *   measured key to motion), so without prediction the lag isn't judged as a
+ *   backward step. A snap is a frame that moves further than a dash can.
  * - Drift: standing still afterwards, the drawn player is where the server
  *   has it.
  * And once, with lag and prediction: a pause pressed while walking (the
@@ -228,10 +230,16 @@ interface Jitter {
   fastestTilesPerS: number;
 }
 
-/** Backward steps and snaps of player `id` over a recording (see the top). */
-function jitter(trace: TraceFrame[], keys: KeyEvent[], id: number): Jitter {
+/**
+ * Backward steps and snaps of player `id` over a recording (see the top).
+ * The drawn player answers keys `keyDelayMs` late: frames are judged against
+ * the keys held that long before, and not from a key change until that
+ * delay plus `SETTLE_MS` later.
+ */
+function jitter(trace: TraceFrame[], keys: KeyEvent[], id: number, keyDelayMs = 0): Jitter {
   const held = new Set<string>();
   let k = 0;
+  let changed = 0;
   let lastChange = -Infinity;
   const result: Jitter = {
     frames: trace.length,
@@ -245,12 +253,14 @@ function jitter(trace: TraceFrame[], keys: KeyEvent[], id: number): Jitter {
     const prev = trace[i - 1];
     const frame = trace[i];
     if (!prev || !frame) continue;
-    while (k < keys.length && (keys[k]?.t ?? Infinity) <= frame.t) {
+    while (k < keys.length && (keys[k]?.t ?? Infinity) + keyDelayMs <= frame.t) {
       const e = keys[k++];
       if (!e) continue;
       if (e.down) held.add(e.code);
       else held.delete(e.code);
-      lastChange = e.t;
+    }
+    while (changed < keys.length && (keys[changed]?.t ?? Infinity) <= frame.t) {
+      lastChange = keys[changed++]?.t ?? lastChange;
     }
     const a = prev.players[id];
     const b = frame.players[id];
@@ -261,7 +271,7 @@ function jitter(trace: TraceFrame[], keys: KeyEvent[], id: number): Jitter {
     result.fastestTilesPerS = Math.max(result.fastestTilesPerS, speed);
     // Faster than a dash, over a frame of at least 8 ms: a jump.
     if (dt > 0.008 && speed > DASH_SPEED * 1.3) result.snaps++;
-    if (frame.t - lastChange < SETTLE_MS) continue;
+    if (frame.t - lastChange < keyDelayMs + SETTLE_MS) continue;
     const dir = [...held].reduce(
       (s, c) => {
         const v = DIRS[c];
@@ -339,7 +349,12 @@ async function measureLatency(page: Page, id: number): Promise<number[]> {
 }
 
 /** Walls, the station row, corners and dashes; returns the drawn frames' jitter. */
-async function runCourse(page: Page, id: number, label: string): Promise<Jitter> {
+async function runCourse(
+  page: Page,
+  id: number,
+  label: string,
+  keyDelayMs: number,
+): Promise<Jitter> {
   await walkTo(page, id, 3, 3);
   await sleep(500);
   await startRecording(page);
@@ -361,7 +376,7 @@ async function runCourse(page: Page, id: number, label: string): Promise<Jitter>
   await sleep(600);
   const { trace, keys } = await stopRecording(page);
   writeFileSync(join(OUT, `trace-${label}.json`), JSON.stringify({ trace, keys }));
-  return jitter(trace, keys, id);
+  return jitter(trace, keys, id, keyDelayMs);
 }
 
 /** Into the room again with `query` on the URL, through the rejoin ticket. */
@@ -428,7 +443,7 @@ async function main(): Promise<void> {
     const rttMs = await host.eval<number | null>(`window.isvNet.rttMs`);
     const before = await predictStats(host);
     const latency = await measureLatency(host, 1);
-    const course = await runCourse(host, 1, setting.query || 'default');
+    const course = await runCourse(host, 1, setting.query || 'default', median(latency) || 0);
     await sleep(800);
     const after = await predictStats(host);
     const drawnPos = await localPos(host, 1);
@@ -462,7 +477,7 @@ async function main(): Promise<void> {
     }
     check(
       `${setting.name}: no backward steps or snaps walking into walls, around corners and dashing`,
-      course.backward === 0 && course.snaps === 0 && course.judged > 100,
+      course.backward === 0 && course.snaps === 0 && course.judged > 50,
       `${course.backward} backward, ${course.snaps} snaps, ${course.judged} frames judged`,
     );
     check(
