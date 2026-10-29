@@ -1,111 +1,34 @@
 import { describe, expect, it } from 'vitest';
-import type { DevicePress } from '../input/controller';
-import {
-  DEMO_IDLE_MS,
-  DEMO_KIOSK_IDLE_MS,
-  DEMO_RESULTS_MS,
-  END_SCREEN_INPUT_DELAY_MS,
-  SFX_VOLUME_MAX,
-  STARS_TO_UNLOCK,
-} from '../sim/balance';
+import { END_SCREEN_INPUT_DELAY_MS, STARS_TO_UNLOCK } from '../sim/balance';
 import {
   type Flow,
   type FlowContext,
   type MenuItem,
   COUNTDOWN_MS,
-  cancelJoinCode,
-  editJoinCode,
-  finishDemoRound,
-  joinFailed,
-  joinSucceeded,
-  onlineEnded,
-  submitJoinCode,
   countdownNumber,
   createFlow,
   finishRound,
   isRoundRunning,
   menuItems,
   resultsReady,
-  updateFlow,
 } from './flow';
-import { createSave } from './save';
-
-const IDS = ['garage', 'open-plan', 'scale-up'];
-/** One level per chapter, all open: left and right walk the levels like a plain list. */
-const FLAT = IDS.map((id) => ({ levelIds: [id], starGate: 0 }));
-
-function ctx(extra: Partial<FlowContext> = {}): FlowContext {
-  return {
-    save: createSave(),
-    levelIds: IDS,
-    chapters: FLAT,
-    unlockAll: false,
-    nowMs: 0,
-    ...extra,
-  };
-}
-
-function press(deviceId: string, extra: Partial<DevicePress> = {}): DevicePress {
-  return {
-    deviceId,
-    joinGroup: deviceId.startsWith('kb') ? 'keyboard' : deviceId,
-    join: false,
-    interact: false,
-    dash: false,
-    menu: false,
-    nav: { x: 0, y: 0 },
-    ...extra,
-  };
-}
-
-const confirm = (id = 'pad-0'): DevicePress[] => [press(id, { interact: true, join: true })];
-const back = (id = 'pad-0'): DevicePress[] => [press(id, { dash: true })];
-const menu = (id = 'pad-0'): DevicePress[] => [press(id, { menu: true })];
-const down = (id = 'pad-0'): DevicePress[] => [press(id, { nav: { x: 0, y: 1 } })];
-const right = (id = 'pad-0'): DevicePress[] => [press(id, { nav: { x: 1, y: 0 } })];
-const left = (id = 'pad-0'): DevicePress[] => [press(id, { nav: { x: -1, y: 0 } })];
-/** Enter: a join press on both keyboard schemes at once. */
-const enter = (): DevicePress[] => [
-  press('kb-left', { join: true }),
-  press('kb-right', { join: true }),
-];
-
-/** Highlights `item` in the current menu and confirms it. */
-function pick(flow: Flow, item: MenuItem, c: FlowContext, id = 'pad-0') {
-  const index = menuItems(flow).indexOf(item);
-  expect(index).toBeGreaterThanOrEqual(0);
-  flow.menuIndex = index;
-  return updateFlow(flow, confirm(id), c);
-}
-
-/** Title → lobby with pad-0 (player 1) and kb-left joined → level select. */
-function atLevelSelect(c = ctx()): Flow {
-  const flow = createFlow();
-  updateFlow(flow, confirm(), c);
-  pick(flow, 'play', c);
-  updateFlow(flow, confirm(), c);
-  updateFlow(flow, enter(), c);
-  updateFlow(flow, confirm(), c);
-  expect(flow.screen).toBe('levelSelect');
-  return flow;
-}
-
-/** From the level select: picks the highlighted level, skips its intro and waits out the countdown. */
-function play(flow: Flow, c: FlowContext): void {
-  updateFlow(flow, confirm(), c);
-  expect(flow.screen).toBe('intro');
-  updateFlow(flow, confirm(), c);
-  updateFlow(flow, confirm('kb-left'), c);
-  expect(flow.screen).toBe('countdown');
-  updateFlow(flow, [], { ...c, nowMs: c.nowMs + COUNTDOWN_MS });
-  expect(flow.screen).toBe('playing');
-}
-
-function playing(c = ctx()): Flow {
-  const flow = atLevelSelect(c);
-  play(flow, c);
-  return flow;
-}
+import { updateFlow } from './updateFlow';
+import {
+  atLevelSelect,
+  back,
+  confirm,
+  ctx,
+  down,
+  enter,
+  left,
+  menu,
+  pick,
+  play,
+  playing,
+  press,
+  right,
+  IDS,
+} from './flowTesting';
 
 describe('title', () => {
   it('waits for any button, which only wakes it', () => {
@@ -373,164 +296,6 @@ describe('pause', () => {
   });
 });
 
-describe('settings', () => {
-  function fromPause(c = ctx()): Flow {
-    const flow = playing(c);
-    updateFlow(flow, menu(), c);
-    pick(flow, 'settings', c);
-    expect(flow).toMatchObject({ screen: 'settings', settingsFrom: 'paused', menuIndex: 0 });
-    return flow;
-  }
-
-  it('changes the volume with left and right, within its range', () => {
-    const c = ctx();
-    const flow = fromPause(c);
-    expect(updateFlow(flow, right(), c).effects).toEqual([]);
-    expect(c.save.settings.sfxVolume).toBe(SFX_VOLUME_MAX);
-    const update = updateFlow(flow, left(), c);
-    expect(update.effects.map((e) => e.type).sort()).toEqual(['saveChanged', 'settingsChanged']);
-    expect(c.save.settings.sfxVolume).toBe(SFX_VOLUME_MAX - 1);
-    for (let i = 0; i < SFX_VOLUME_MAX + 3; i++) updateFlow(flow, left(), c);
-    expect(c.save.settings.sfxVolume).toBe(0);
-  });
-
-  it('changes the music volume on its own line, apart from the sound volume', () => {
-    const c = ctx();
-    const flow = fromPause(c);
-    updateFlow(flow, down(), c);
-    expect(menuItems(flow)[flow.menuIndex]).toBe('music');
-    const before = c.save.settings.musicVolume;
-    const update = updateFlow(flow, left(), c);
-    expect(update.effects.map((e) => e.type).sort()).toEqual(['saveChanged', 'settingsChanged']);
-    expect(c.save.settings.musicVolume).toBe(before - 1);
-    expect(c.save.settings.sfxVolume).toBe(SFX_VOLUME_MAX);
-    for (let i = 0; i < SFX_VOLUME_MAX + 3; i++) updateFlow(flow, right(), c);
-    expect(c.save.settings.musicVolume).toBe(SFX_VOLUME_MAX);
-  });
-
-  it('toggles screen shake with left, right or confirm', () => {
-    const c = ctx();
-    const flow = fromPause(c);
-    updateFlow(flow, down(), c);
-    updateFlow(flow, down(), c);
-    updateFlow(flow, right(), c);
-    expect(c.save.settings.screenShake).toBe(false);
-    const update = updateFlow(flow, confirm(), c);
-    expect(c.save.settings.screenShake).toBe(true);
-    expect(update.effects.map((e) => e.type)).toContain('saveChanged');
-  });
-
-  it('steps Graphics through auto, high, medium and low, wrapping round', () => {
-    const c = ctx();
-    const flow = fromPause(c);
-    flow.menuIndex = menuItems(flow).indexOf('graphics');
-    expect(c.save.settings.graphics).toBe('auto');
-    updateFlow(flow, right(), c);
-    expect(c.save.settings.graphics).toBe('high');
-    updateFlow(flow, left(), c);
-    const update = updateFlow(flow, left(), c);
-    expect(c.save.settings.graphics).toBe('low');
-    expect(update.effects.map((e) => e.type)).toContain('saveChanged');
-    updateFlow(flow, confirm(), c);
-    expect(c.save.settings.graphics).toBe('auto');
-  });
-
-  it('returns to the pause menu with the cursor on Settings', () => {
-    const flow = fromPause();
-    updateFlow(flow, menu(), ctx());
-    expect(flow.screen).toBe('paused');
-    expect(menuItems(flow)[flow.menuIndex]).toBe('settings');
-    expect(isRoundRunning(flow)).toBe(false);
-  });
-
-  it('opens the online profile and comes back to its line', () => {
-    const c = ctx();
-    const flow = fromPause(c);
-    pick(flow, 'profile', c);
-    expect(flow.screen).toBe('profile');
-    expect(menuItems(flow)).toEqual(['copyId', 'changeName', 'changeId', 'back']);
-    updateFlow(flow, back(), c);
-    expect(flow.screen).toBe('settings');
-    expect(menuItems(flow)[flow.menuIndex]).toBe('profile');
-    pick(flow, 'profile', c);
-    pick(flow, 'back', c);
-    expect(flow.screen).toBe('settings');
-    expect(flow.settingsFrom).toBe('paused');
-  });
-
-  it('asks the UI to copy the id, change the name or use another id', () => {
-    const c = ctx();
-    const flow = fromPause(c);
-    pick(flow, 'profile', c);
-    for (const action of ['copyId', 'changeName', 'changeId'] as const) {
-      flow.menuIndex = menuItems(flow).indexOf(action);
-      const update = updateFlow(flow, confirm(), c);
-      expect(update.effects).toEqual([{ type: 'profileAction', action }]);
-      expect(flow.screen).toBe('profile');
-    }
-  });
-
-  it('only takes presses from players once opened from the pause menu', () => {
-    const c = ctx();
-    const flow = fromPause(c);
-    updateFlow(flow, left('pad-3'), c);
-    updateFlow(flow, back('pad-3'), c);
-    expect(flow.screen).toBe('settings');
-    expect(c.save.settings.sfxVolume).toBe(SFX_VOLUME_MAX);
-  });
-});
-
-describe('chapter view', () => {
-  const CHAPTER_IDS = ['a1', 'a2', 'a3', 'b1', 'b2', 'b3', 'c1', 'c2'];
-  const CHAPTERS = [
-    { levelIds: ['a1', 'a2', 'a3'], starGate: 0 },
-    { levelIds: ['b1', 'b2', 'b3'], starGate: 3 },
-    { levelIds: ['c1', 'c2'], starGate: 6 },
-  ];
-  const chapterCtx = (extra: Partial<FlowContext> = {}): FlowContext =>
-    ctx({ levelIds: CHAPTER_IDS, chapters: CHAPTERS, ...extra });
-
-  it('drives the level select cursor, locked chapters included', () => {
-    const c = chapterCtx();
-    const flow = atLevelSelect(c);
-    for (let i = 0; i < 4; i++) updateFlow(flow, right(), c);
-    expect(flow.levelIndex).toBe(4);
-    for (let i = 0; i < 5; i++) updateFlow(flow, right(), c);
-    expect(flow.levelIndex).toBe(7);
-    expect(updateFlow(flow, confirm(), c).effects).toEqual([]);
-  });
-
-  it('starts the first level of a chapter once its gate is met', () => {
-    const c = chapterCtx();
-    const flow = atLevelSelect(c);
-    flow.levelIndex = 3;
-    c.save.levels.a1 = { bestStars: 1, bestScore: 1, plays: 1 };
-    c.save.levels.a2 = { bestStars: 1, bestScore: 1, plays: 1 };
-    c.save.levels.a3 = { bestStars: 1, bestScore: 1, plays: 1 };
-    expect(updateFlow(flow, confirm(), c).effects).toEqual([{ type: 'startLevel', levelIndex: 3 }]);
-  });
-
-  it('the results say when a round opened a chapter, and offer it as next level', () => {
-    const c = chapterCtx();
-    c.save.levels.a1 = { bestStars: 1, bestScore: 1, plays: 1 };
-    c.save.levels.a2 = { bestStars: 1, bestScore: 1, plays: 1 };
-    const flow = atLevelSelect(c);
-    flow.levelIndex = 2;
-    play(flow, c);
-    finishRound(flow, { score: 60, stars: 1 }, c);
-    expect(flow.results).toMatchObject({ unlockedChapter: 1, unlockedIndex: 3, canGoNext: true });
-  });
-
-  it('a chapter opened by stars on another level still shows as opened', () => {
-    const c = chapterCtx();
-    c.save.levels.a1 = { bestStars: 1, bestScore: 1, plays: 1 };
-    const flow = atLevelSelect(c);
-    play(flow, c);
-    finishRound(flow, { score: 180, stars: 3 }, c);
-    expect(flow.results).toMatchObject({ unlockedChapter: 1, unlockedIndex: null });
-  });
-});
-
 describe('results', () => {
   function finished(stars: number, c = ctx(), levelIndex = 0): Flow {
     const flow = atLevelSelect(c);
@@ -600,118 +365,6 @@ describe('results', () => {
   });
 });
 
-describe('online: hosting and joining', () => {
-  function title(c = ctx()): Flow {
-    const flow = createFlow();
-    updateFlow(flow, confirm(), c);
-    return flow;
-  }
-
-  function joinScreen(c = ctx()): Flow {
-    const flow = title(c);
-    pick(flow, 'joinOnline', c);
-    expect(flow.screen).toBe('joinCode');
-    return flow;
-  }
-
-  it('Host online hands the screens to the online session', () => {
-    const c = ctx();
-    const flow = title(c);
-    expect(pick(flow, 'hostOnline', c).effects).toEqual([{ type: 'hostOnline' }]);
-    expect(flow.screen).toBe('online');
-    // The local flow waits: presses do nothing until the session ends.
-    expect(updateFlow(flow, [...confirm(), ...back(), ...menu()], c)).toEqual({
-      changed: false,
-      effects: [],
-    });
-    onlineEnded(flow);
-    expect(flow).toMatchObject({ screen: 'title', awake: true });
-    expect(menuItems(flow)[flow.menuIndex]).toBe('hostOnline');
-  });
-
-  it('takes typed codes in any case, keeping code letters only', () => {
-    const flow = joinScreen();
-    expect(editJoinCode(flow, 'ab')).toBe(true);
-    expect(flow.joinCode).toMatchObject({ text: 'AB', cursor: 2, error: null });
-    // I and O aren't code letters; spaces, dashes and digits go too; at most 4.
-    editJoinCode(flow, ' x-io1yzwv ');
-    expect(flow.joinCode).toMatchObject({ text: 'XYZW', cursor: 3 });
-    expect(editJoinCode(flow, 'xyzw')).toBe(false);
-  });
-
-  it('says a short code is not a code, and joins with a whole one', () => {
-    const flow = joinScreen();
-    editJoinCode(flow, 'abc');
-    expect(submitJoinCode(flow).effects).toEqual([]);
-    expect(flow.joinCode.error).toBe('badCode');
-    editJoinCode(flow, 'abcd');
-    expect(flow.joinCode.error).toBe(null);
-    expect(submitJoinCode(flow).effects).toEqual([{ type: 'joinOnline', code: 'ABCD' }]);
-    expect(flow.joinCode.busy).toBe(true);
-    // While the join is out, typing and joining again do nothing.
-    expect(editJoinCode(flow, 'zz')).toBe(false);
-    expect(submitJoinCode(flow).effects).toEqual([]);
-  });
-
-  it('shows why a join failed and lets them try again', () => {
-    const flow = joinScreen();
-    editJoinCode(flow, 'abcd');
-    submitJoinCode(flow);
-    joinFailed(flow, 'wrongCode');
-    expect(flow.joinCode).toMatchObject({ busy: false, error: 'wrongCode', text: 'ABCD' });
-    expect(submitJoinCode(flow).effects).toEqual([{ type: 'joinOnline', code: 'ABCD' }]);
-    joinSucceeded(flow);
-    expect(flow.screen).toBe('online');
-    onlineEnded(flow, 'joinOnline');
-    expect(menuItems(flow)[flow.menuIndex]).toBe('joinOnline');
-  });
-
-  it('turns letters with a gamepad: up and down change, left and right move', () => {
-    const c = ctx();
-    const flow = joinScreen(c);
-    updateFlow(flow, down(), c);
-    expect(flow.joinCode.text).toBe('A');
-    updateFlow(flow, down(), c);
-    expect(flow.joinCode.text).toBe('B');
-    updateFlow(flow, [press('pad-0', { nav: { x: 0, y: -1 } })], c);
-    updateFlow(flow, [press('pad-0', { nav: { x: 0, y: -1 } })], c);
-    // Wraps around the alphabet.
-    expect(flow.joinCode.text).toBe('Z');
-    // The cursor can't skip past the end of what's there.
-    updateFlow(flow, right(), c);
-    updateFlow(flow, right(), c);
-    expect(flow.joinCode.cursor).toBe(1);
-    for (let i = 0; i < 3; i++) {
-      updateFlow(flow, down(), c);
-      updateFlow(flow, right(), c);
-    }
-    expect(flow.joinCode).toMatchObject({ text: 'ZAAA', cursor: 3 });
-    updateFlow(flow, left(), c);
-    updateFlow(flow, down(), c);
-    expect(flow.joinCode.text).toBe('ZABA');
-    expect(updateFlow(flow, confirm(), c).effects).toEqual([{ type: 'joinOnline', code: 'ZABA' }]);
-  });
-
-  it('goes back to the title, dropping a join that is out', () => {
-    const c = ctx();
-    const flow = joinScreen(c);
-    expect(updateFlow(flow, back(), c).effects).toEqual([]);
-    expect(flow.screen).toBe('title');
-    expect(menuItems(flow)[flow.menuIndex]).toBe('joinOnline');
-    pick(flow, 'joinOnline', c);
-    editJoinCode(flow, 'abcd');
-    submitJoinCode(flow);
-    expect(updateFlow(flow, menu(), c).effects).toEqual([{ type: 'cancelJoin' }]);
-    pick(flow, 'joinOnline', c);
-    // A fresh screen every time.
-    expect(flow.joinCode).toEqual({ text: '', cursor: 0, error: null, busy: false });
-    editJoinCode(flow, 'abcd');
-    submitJoinCode(flow);
-    expect(cancelJoinCode(flow).effects).toEqual([{ type: 'cancelJoin' }]);
-    expect(flow.screen).toBe('title');
-  });
-});
-
 describe("a room's flow (online)", () => {
   function roomLobby(): Flow {
     const flow = createFlow();
@@ -747,78 +400,5 @@ describe("a room's flow (online)", () => {
     const flow = roomLobby();
     flow.screen = 'paused';
     expect(menuItems(flow)).toEqual(['resume', 'restart', 'levelSelect', 'changePlayers']);
-  });
-});
-
-describe('demo', () => {
-  const demo = (kiosk = false) => ({ kiosk, levels: [2, 0] });
-
-  it('starts on the title after a while without a button press, with nobody joined', () => {
-    const flow = createFlow();
-    updateFlow(flow, confirm(), ctx({ demo: demo(), nowMs: 1000 }));
-    expect(
-      updateFlow(flow, [], ctx({ demo: demo(), nowMs: 1000 + DEMO_IDLE_MS - 1 })).changed,
-    ).toBe(false);
-    const update = updateFlow(flow, [], ctx({ demo: demo(), nowMs: 1000 + DEMO_IDLE_MS }));
-    expect(update.effects).toEqual([{ type: 'startLevel', levelIndex: 2 }]);
-    expect(flow).toMatchObject({ screen: 'demo', levelIndex: 2, demoRounds: 1, demoEnd: null });
-    expect(flow.lobby.players).toEqual([]);
-    expect(isRoundRunning(flow)).toBe(true);
-  });
-
-  it('never starts without demo options (an online room)', () => {
-    const flow = createFlow();
-    updateFlow(flow, [], ctx({ nowMs: DEMO_IDLE_MS * 10 }));
-    expect(flow.screen).toBe('title');
-  });
-
-  it('only leaves other menus for the demo in a kiosk', () => {
-    const c = ctx({ demo: demo() });
-    const flow = atLevelSelect(c);
-    updateFlow(flow, [], { ...c, nowMs: DEMO_KIOSK_IDLE_MS * 2 });
-    expect(flow.screen).toBe('levelSelect');
-    updateFlow(flow, [], { ...c, demo: demo(true), nowMs: DEMO_KIOSK_IDLE_MS - 1 });
-    expect(flow.screen).toBe('levelSelect');
-    updateFlow(flow, [], { ...c, demo: demo(true), nowMs: DEMO_KIOSK_IDLE_MS });
-    expect(flow.screen).toBe('demo');
-  });
-
-  it('does not interrupt a round being played, even in a kiosk', () => {
-    const c = ctx({ demo: demo(true) });
-    const flow = playing(c);
-    updateFlow(flow, [], { ...c, nowMs: DEMO_KIOSK_IDLE_MS * 10 });
-    expect(flow.screen).toBe('playing');
-  });
-
-  it('shows the score when a round ends, then plays the next demo level, in turn', () => {
-    const flow = createFlow();
-    const c = (nowMs: number) => ctx({ demo: demo(), nowMs });
-    updateFlow(flow, [], c(DEMO_IDLE_MS));
-    expect(finishDemoRound(flow, { score: 420, stars: 2 }, 5000).changed).toBe(true);
-    expect(flow.demoEnd).toEqual({ score: 420, stars: 2, atMs: 5000 });
-    expect(isRoundRunning(flow)).toBe(false);
-    expect(updateFlow(flow, [], c(5000 + DEMO_RESULTS_MS - 1)).changed).toBe(false);
-    expect(updateFlow(flow, [], c(5000 + DEMO_RESULTS_MS)).effects).toEqual([
-      { type: 'startLevel', levelIndex: 0 },
-    ]);
-    expect(flow).toMatchObject({ screen: 'demo', levelIndex: 0, demoEnd: null });
-    finishDemoRound(flow, { score: 1, stars: 0 }, 0);
-    expect(updateFlow(flow, [], c(DEMO_RESULTS_MS)).effects).toEqual([
-      { type: 'startLevel', levelIndex: 2 },
-    ]);
-  });
-
-  it('ends on any button: the title with its menu up, the round dropped, nothing saved', () => {
-    const c = ctx({ demo: demo(), nowMs: DEMO_IDLE_MS });
-    const flow = createFlow();
-    updateFlow(flow, [], c);
-    finishDemoRound(flow, { score: 999, stars: 3 }, DEMO_IDLE_MS);
-    const update = updateFlow(flow, [press('kb-left', { nav: { x: 1, y: 0 } })], c);
-    expect(update.effects).toEqual([{ type: 'stopRound' }]);
-    expect(flow).toMatchObject({ screen: 'title', awake: true, menuIndex: 0, demoEnd: null });
-    expect(c.save.levels).toEqual(createSave().levels);
-    // The idle clock starts over from that press.
-    updateFlow(flow, [], { ...c, nowMs: DEMO_IDLE_MS * 2 - 1 });
-    expect(flow.screen).toBe('title');
   });
 });

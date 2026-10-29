@@ -4,14 +4,9 @@
  * buffers, snapshots, and finished rounds queued for the profiles.
  */
 
-import {
-  type FlowContext,
-  type FlowEffect,
-  finishRound,
-  isRoundRunning,
-  updateFlow,
-} from '../src/flow/flow';
+import { type FlowContext, type FlowEffect, finishRound, isRoundRunning } from '../src/flow/flow';
 import { rolesForRoster } from '../src/flow/roster';
+import { updateFlow } from '../src/flow/updateFlow';
 import { type ChapterInfo, recordLevel } from '../src/flow/save';
 import { createInputBuffer, pushInput, takeInput } from '../src/net/inputBuffer';
 import { createSnapshotLog, isSnapshotTick, recordTick, takeSnapshot } from '../src/net/snapshot';

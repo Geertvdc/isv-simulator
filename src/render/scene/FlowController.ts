@@ -7,15 +7,13 @@ import {
   type FlowContext,
   type FlowUpdate,
   type Screen,
-  cancelJoinCode,
   countdownNumber,
   createFlow,
-  editJoinCode,
   finishRound,
   resultsReady,
-  submitJoinCode,
-  updateFlow,
 } from '../../flow/flow';
+import { cancelJoinCode, editJoinCode, submitJoinCode } from '../../flow/joinFlow';
+import { updateFlow } from '../../flow/updateFlow';
 import { type OnlineState, onlineNowMs } from '../../flow/online';
 import type { ChapterInfo, SaveData } from '../../flow/save';
 import { DEMO_KIOSK_IDLE_MS } from '../../sim/balance';

@@ -5,37 +5,22 @@
  * into an online room (typing a join code), and the demo (bots play while
  * nobody does, for a big screen at a booth). The server runs the same flow
  * for a room (`flow.online`), with a few online rules.
- * `updateFlow` turns this frame's button presses into a new screen and a
- * list of effects for the scene to run (start a round, save, ...). Like the
+ * `updateFlow` (in `updateFlow.ts`) turns this frame's button presses into a
+ * new screen and a list of effects for the scene to run (start a round,
+ * save, ...); the menu actions live in `menuActions.ts` and the join-code
+ * screen in `joinFlow.ts`. This module holds the state, its queries and the
+ * small moves they share. Like the
  * sim it never touches Phaser or the DOM, and time only comes in as an
  * argument.
  */
 
 import type { DevicePress } from '../input/controller';
 import type { DeviceId } from '../input/controller';
-import { type Lobby, createLobby, updateLobby } from '../input/lobby';
-import { JOIN_CODE_ALPHABET, normalizeJoinCode } from '../net/joinCode';
-import {
-  COUNTDOWN_STEPS,
-  COUNTDOWN_STEP_MS,
-  DEMO_IDLE_MS,
-  DEMO_KIOSK_IDLE_MS,
-  DEMO_RESULTS_MS,
-  END_SCREEN_INPUT_DELAY_MS,
-  NET_JOIN_CODE_LENGTH,
-  SFX_VOLUME_MAX,
-} from '../sim/balance';
+import { type Lobby, createLobby } from '../input/lobby';
+import { COUNTDOWN_STEPS, COUNTDOWN_STEP_MS, END_SCREEN_INPUT_DELAY_MS } from '../sim/balance';
 import type { LevelResult } from '../sim/orders';
-import {
-  type ChapterInfo,
-  GRAPHICS_LEVELS,
-  type SaveData,
-  isChapterOpen,
-  isUnlocked,
-  recordResult,
-} from './save';
-import { mapCursor } from './worldMap';
-import { resetReadiness, rosterPresses, selection } from './roster';
+import { type ChapterInfo, type SaveData, isChapterOpen, isUnlocked, recordResult } from './save';
+import { resetReadiness } from './roster';
 
 export type Screen =
   | 'title'
@@ -150,16 +135,6 @@ export interface DemoEnd {
   atMs: number;
 }
 
-/** Screens a kiosk leaves for the demo when nobody presses anything for a while. */
-const KIOSK_IDLE_SCREENS: readonly Screen[] = [
-  'lobby',
-  'levelSelect',
-  'intro',
-  'results',
-  'paused',
-  'credits',
-];
-
 /** Screens that can open the settings, and get them back after. */
 export type SettingsFrom = 'title' | 'paused';
 
@@ -268,7 +243,7 @@ export function createFlow(): Flow {
   };
 }
 
-function emptyJoinCode(): JoinCodeEntry {
+export function emptyJoinCode(): JoinCodeEntry {
   return { text: '', cursor: 0, error: null, busy: false };
 }
 
@@ -315,23 +290,23 @@ export function resultsReady(flow: Flow, nowMs: number): boolean {
 }
 
 /** What a press means in a menu. */
-function isConfirm(press: DevicePress): boolean {
+export function isConfirm(press: DevicePress): boolean {
   return press.interact || press.join;
 }
 
-function isBack(press: DevicePress): boolean {
+export function isBack(press: DevicePress): boolean {
   return press.dash || press.menu;
 }
 
-function hasAnything(press: DevicePress): boolean {
+export function hasAnything(press: DevicePress): boolean {
   return isConfirm(press) || isBack(press) || press.nav.x !== 0 || press.nav.y !== 0;
 }
 
-function clamp(value: number, min: number, max: number): number {
+export function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-function goTo(flow: Flow, screen: Screen, menuIndex = 0): void {
+export function goTo(flow: Flow, screen: Screen, menuIndex = 0): void {
   flow.screen = screen;
   flow.menuIndex = menuIndex;
   if (screen !== 'results') flow.results = null;
@@ -339,125 +314,16 @@ function goTo(flow: Flow, screen: Screen, menuIndex = 0): void {
 }
 
 /** Back on the title with nobody joined. */
-function quitToTitle(flow: Flow, item: MenuItem = 'play'): void {
+export function quitToTitle(flow: Flow, item: MenuItem = 'play'): void {
   flow.lobby = createLobby();
   goTo(flow, 'title', TITLE_ITEMS.indexOf(item));
 }
 
 /** To the lobby, keeping everyone who joined, so players can join or leave. */
-function changePlayers(flow: Flow): void {
+export function changePlayers(flow: Flow): void {
   flow.lobby.started = false;
   resetReadiness(flow.lobby);
   goTo(flow, 'lobby');
-}
-
-/**
- * Applies this frame's presses. On the title and in the lobby any device
- * counts; after the lobby only devices that joined. One confirm or back
- * counts per frame, so Enter (which presses on both keyboard schemes) acts
- * once.
- */
-export function updateFlow(
-  flow: Flow,
-  presses: readonly DevicePress[],
-  ctx: FlowContext,
-): FlowUpdate {
-  const update: FlowUpdate = { changed: false, effects: [] };
-  if (presses.some(hasAnything)) flow.lastPressMs = ctx.nowMs;
-  if (flow.screen === 'demo') return updateDemo(flow, presses, ctx);
-  if (isIdle(flow, ctx)) return startDemo(flow, ctx);
-  if (flow.screen === 'lobby') return updateLobbyScreen(flow, presses, ctx);
-  if (flow.screen === 'joinCode') return updateJoinCodeScreen(flow, presses);
-  // Online, the server's flow drives the screens; this one waits for the room to end.
-  if (flow.screen === 'online') return update;
-  if (ctx.practice && flow.screen === 'levelSelect') {
-    changePlayers(flow);
-    return { changed: true, effects: [{ type: 'stopRound' }] };
-  }
-  // Nobody can do anything during the countdown, not even pause: it only waits.
-  if (flow.screen === 'countdown') {
-    if (ctx.nowMs - flow.countdownStartMs < COUNTDOWN_MS) return update;
-    goTo(flow, 'playing');
-    return { changed: true, effects: [] };
-  }
-  const joined = new Set(flow.lobby.players.map((p) => p.deviceId));
-  const own = flow.lobby.started ? presses.filter((p) => joined.has(p.deviceId)) : presses;
-  if (flow.screen === 'intro') {
-    if (own.some(isBack)) {
-      back(flow, update);
-      return { ...update, changed: true };
-    }
-    const changed = rosterPresses(flow.lobby, 'intro', own);
-    const participants = flow.lobby.players.filter((p) => ctx.participates?.(p.deviceId) ?? true);
-    if (
-      participants.length > 0 &&
-      participants.every((p) => selection(flow.lobby, p.playerId).ready)
-    ) {
-      startCountdown(flow, ctx);
-      return { changed: true, effects: [{ type: 'lockRoster' }] };
-    }
-    return { changed, effects: [] };
-  }
-  if (own.length === 0) return update;
-
-  if (flow.screen === 'title' && !flow.awake) {
-    if (!own.some(hasAnything)) return update;
-    flow.awake = true;
-    flow.menuIndex = 0;
-    return { changed: true, effects: [] };
-  }
-  if (flow.screen === 'playing') {
-    if (!own.some((p) => p.menu)) return update;
-    goTo(flow, 'paused');
-    return { changed: true, effects: [] };
-  }
-  if (flow.screen === 'results' && !resultsReady(flow, ctx.nowMs)) return update;
-
-  for (const press of own) {
-    if (navigate(flow, press, ctx, update)) update.changed = true;
-  }
-  const action = own.find((p) => isConfirm(p) || isBack(p));
-  if (action) {
-    const screen = flow.screen;
-    if (isBack(action)) back(flow, update);
-    else confirm(flow, ctx, update);
-    if (flow.screen !== screen) update.changed = true;
-  }
-  return update;
-}
-
-/** Whether nobody pressed anything for long enough that the demo should start. */
-function isIdle(flow: Flow, ctx: FlowContext): boolean {
-  if (!ctx.demo || ctx.demo.levels.length === 0) return false;
-  const idleMs = ctx.nowMs - flow.lastPressMs;
-  if (flow.screen === 'title') return idleMs >= DEMO_IDLE_MS;
-  return ctx.demo.kiosk && KIOSK_IDLE_SCREENS.includes(flow.screen) && idleMs >= DEMO_KIOSK_IDLE_MS;
-}
-
-/** Bots start a round of the next demo level; whoever had joined is let go. */
-function startDemo(flow: Flow, ctx: FlowContext): FlowUpdate {
-  const levels = ctx.demo?.levels ?? [];
-  const levelIndex = levels[flow.demoRounds % levels.length];
-  if (levelIndex === undefined) return { changed: false, effects: [] };
-  flow.demoRounds++;
-  flow.levelIndex = levelIndex;
-  flow.lobby = createLobby();
-  flow.demoEnd = null;
-  goTo(flow, 'demo');
-  return { changed: true, effects: [{ type: 'startLevel', levelIndex }] };
-}
-
-/** Any button ends the demo on the title, menu up; a finished demo round moves on to the next. */
-function updateDemo(flow: Flow, presses: readonly DevicePress[], ctx: FlowContext): FlowUpdate {
-  if (presses.some(hasAnything)) {
-    flow.awake = true;
-    quitToTitle(flow);
-    return { changed: true, effects: [{ type: 'stopRound' }] };
-  }
-  if (flow.demoEnd && ctx.nowMs - flow.demoEnd.atMs >= DEMO_RESULTS_MS) {
-    return startDemo(flow, ctx);
-  }
-  return { changed: false, effects: [] };
 }
 
 /** The demo round ended: its score shows until the next one starts. Nothing is saved. */
@@ -465,325 +331,6 @@ export function finishDemoRound(flow: Flow, result: LevelResult, nowMs: number):
   if (flow.screen !== 'demo' || flow.demoEnd) return { changed: false, effects: [] };
   flow.demoEnd = { score: result.score, stars: result.stars, atMs: nowMs };
   return { changed: true, effects: [] };
-}
-
-function updateLobbyScreen(
-  flow: Flow,
-  presses: readonly DevicePress[],
-  ctx: FlowContext,
-): FlowUpdate {
-  const joined = new Set(flow.lobby.players.map((p) => p.deviceId));
-  const backPress = presses.find((p) => isBack(p) && (joined.size === 0 || joined.has(p.deviceId)));
-  if (backPress && !flow.online) {
-    quitToTitle(flow);
-    return { changed: true, effects: [] };
-  }
-  const changed = updateLobby(flow.lobby, presses, ctx.canStart);
-  const roleChanged = rosterPresses(flow.lobby, 'lobby', presses);
-  if (flow.lobby.started) {
-    if (ctx.practice) {
-      const update: FlowUpdate = { changed: true, effects: [] };
-      startLevel(flow, 0, update);
-      return update;
-    }
-    goTo(flow, 'levelSelect');
-  }
-  return { changed: changed || roleChanged, effects: [] };
-}
-
-/** Moves a cursor or changes a setting. Returns whether anything changed. */
-function navigate(flow: Flow, press: DevicePress, ctx: FlowContext, update: FlowUpdate): boolean {
-  const { x, y } = press.nav;
-  if (x === 0 && y === 0) return false;
-  if (flow.screen === 'levelSelect') {
-    const index = mapCursor(ctx, flow.levelIndex, x, y);
-    if (index === flow.levelIndex) return false;
-    flow.levelIndex = index;
-    return true;
-  }
-  const items = menuItems(flow);
-  if (items.length === 0) return false;
-  if (y !== 0) {
-    const index = clamp(flow.menuIndex + y, 0, items.length - 1);
-    if (index === flow.menuIndex) return false;
-    flow.menuIndex = index;
-    return true;
-  }
-  const item = items[flow.menuIndex];
-  const settings = ctx.save.settings;
-  if (item === 'volume' || item === 'music') {
-    const key = item === 'volume' ? 'sfxVolume' : 'musicVolume';
-    const volume = clamp(settings[key] + x, 0, SFX_VOLUME_MAX);
-    if (volume === settings[key]) return false;
-    settings[key] = volume;
-    update.effects.push({ type: 'settingsChanged' }, { type: 'saveChanged' });
-    return true;
-  }
-  if (item === 'shake') {
-    toggleShake(ctx, update);
-    return true;
-  }
-  if (item === 'graphics') {
-    stepGraphics(ctx, update, Math.sign(x));
-    return true;
-  }
-  return false;
-}
-
-function toggleShake(ctx: FlowContext, update: FlowUpdate): void {
-  ctx.save.settings.screenShake = !ctx.save.settings.screenShake;
-  update.effects.push({ type: 'settingsChanged' }, { type: 'saveChanged' });
-  update.changed = true;
-}
-
-/** Moves the Graphics setting `step` along its list, wrapping round. */
-function stepGraphics(ctx: FlowContext, update: FlowUpdate, step: number): void {
-  const settings = ctx.save.settings;
-  const n = GRAPHICS_LEVELS.length;
-  const index = GRAPHICS_LEVELS.indexOf(settings.graphics);
-  settings.graphics = GRAPHICS_LEVELS[(index + step + n) % n] ?? 'auto';
-  update.effects.push({ type: 'settingsChanged' }, { type: 'saveChanged' });
-  update.changed = true;
-}
-
-function back(flow: Flow, update: FlowUpdate): void {
-  switch (flow.screen) {
-    case 'levelSelect':
-      changePlayers(flow);
-      return;
-    case 'intro':
-      update.effects.push({ type: 'stopRound' });
-      goTo(flow, 'levelSelect');
-      return;
-    case 'paused':
-      goTo(flow, 'playing');
-      update.effects.push({ type: 'resumeRound' });
-      return;
-    case 'results':
-      update.effects.push({ type: 'stopRound' });
-      goTo(flow, 'levelSelect');
-      return;
-    case 'settings':
-      closeSettings(flow);
-      return;
-    case 'profile':
-      goTo(flow, 'settings', menuItems({ ...flow, screen: 'settings' }).indexOf('profile'));
-      return;
-    case 'credits':
-      quitToTitle(flow, 'credits');
-      return;
-    default:
-      return;
-  }
-}
-
-function closeSettings(flow: Flow): void {
-  const from = flow.settingsFrom;
-  goTo(flow, from);
-  flow.menuIndex = menuItems(flow).indexOf('settings');
-}
-
-/**
- * A fresh round of `levelIndex`. A level picked from the menus first shows
- * its team confirmation card, including Restart and Retry.
- */
-function startLevel(flow: Flow, levelIndex: number, update: FlowUpdate): void {
-  flow.levelIndex = levelIndex;
-  resetReadiness(flow.lobby);
-  goTo(flow, 'intro');
-  update.effects.push({ type: 'startLevel', levelIndex });
-}
-
-function startCountdown(flow: Flow, ctx: FlowContext): void {
-  goTo(flow, 'countdown');
-  flow.countdownStartMs = ctx.nowMs;
-}
-
-function confirm(flow: Flow, ctx: FlowContext, update: FlowUpdate): void {
-  if (flow.screen === 'levelSelect') {
-    if (isUnlocked(ctx.save, ctx.levelIds, flow.levelIndex, ctx.unlockAll, ctx.chapters)) {
-      startLevel(flow, flow.levelIndex, update);
-    }
-    return;
-  }
-  const item = menuItems(flow)[flow.menuIndex];
-  switch (item) {
-    case 'play':
-      flow.lobby = createLobby();
-      goTo(flow, 'lobby');
-      return;
-    case 'hostOnline':
-      goTo(flow, 'online');
-      update.effects.push({ type: 'hostOnline' });
-      return;
-    case 'joinOnline':
-      flow.joinCode = emptyJoinCode();
-      goTo(flow, 'joinCode');
-      return;
-    case 'settings':
-      flow.settingsFrom = flow.screen === 'paused' ? 'paused' : 'title';
-      goTo(flow, 'settings');
-      return;
-    case 'credits':
-      goTo(flow, 'credits');
-      return;
-    case 'resume':
-      goTo(flow, 'playing');
-      update.effects.push({ type: 'resumeRound' });
-      return;
-    case 'restart':
-    case 'retry':
-      startLevel(flow, flow.levelIndex, update);
-      return;
-    case 'next':
-      startLevel(flow, flow.levelIndex + 1, update);
-      return;
-    case 'levelSelect':
-      update.effects.push({ type: 'stopRound' });
-      goTo(flow, 'levelSelect');
-      return;
-    case 'changePlayers':
-      update.effects.push({ type: 'stopRound' });
-      changePlayers(flow);
-      return;
-    case 'quit':
-      update.effects.push({ type: 'stopRound' });
-      quitToTitle(flow);
-      return;
-    case 'shake':
-      toggleShake(ctx, update);
-      return;
-    case 'graphics':
-      stepGraphics(ctx, update, 1);
-      return;
-    case 'profile':
-      goTo(flow, 'profile');
-      return;
-    case 'copyId':
-    case 'changeName':
-    case 'changeId':
-      update.effects.push({ type: 'profileAction', action: item });
-      update.changed = true;
-      return;
-    case 'back':
-      back(flow, update);
-      return;
-    case 'volume':
-    case 'music':
-    case undefined:
-      return;
-  }
-}
-
-// ---------------------------------------------------------------- joining online
-
-const NOT_CODE_LETTERS = new RegExp(`[^${JOIN_CODE_ALPHABET}]`, 'g');
-
-/**
- * The join-code screen with a gamepad (keyboards type into the UI's text
- * box, see `editJoinCode`): up and down turn the letter under the cursor,
- * left and right move the cursor, confirm joins and back goes to the title.
- * While a join is out only back counts, and drops it.
- */
-function updateJoinCodeScreen(flow: Flow, presses: readonly DevicePress[]): FlowUpdate {
-  const update: FlowUpdate = { changed: false, effects: [] };
-  const entry = flow.joinCode;
-  if (presses.some(isBack)) {
-    if (entry.busy) update.effects.push({ type: 'cancelJoin' });
-    quitToTitle(flow, 'joinOnline');
-    update.changed = true;
-    return update;
-  }
-  if (entry.busy) return update;
-  for (const { nav } of presses) {
-    if (nav.y !== 0) turnLetter(entry, nav.y);
-    else if (nav.x !== 0) {
-      entry.cursor = clamp(
-        entry.cursor + nav.x,
-        0,
-        Math.min(entry.text.length, NET_JOIN_CODE_LENGTH - 1),
-      );
-    } else continue;
-    entry.error = null;
-    update.changed = true;
-  }
-  if (presses.some(isConfirm)) {
-    const submitted = submitJoinCode(flow);
-    update.effects.push(...submitted.effects);
-    update.changed = true;
-  }
-  return update;
-}
-
-/** The gamepad wheel: the letter under the cursor one step on (down) or back (up). */
-function turnLetter(entry: JoinCodeEntry, step: number): void {
-  const n = JOIN_CODE_ALPHABET.length;
-  const at = entry.cursor;
-  const current = entry.text[at];
-  const index = current === undefined ? (step > 0 ? -1 : 0) : JOIN_CODE_ALPHABET.indexOf(current);
-  const letter = JOIN_CODE_ALPHABET[(((index + step) % n) + n) % n] ?? 'A';
-  entry.text = (entry.text.slice(0, at) + letter + entry.text.slice(at + 1)).slice(
-    0,
-    NET_JOIN_CODE_LENGTH,
-  );
-}
-
-/**
- * Typed into the join-code box (any case, pasted with spaces or dashes):
- * kept as code letters only, upper case, at most a code long. The cursor
- * follows the end. Returns whether anything changed.
- */
-export function editJoinCode(flow: Flow, typed: string): boolean {
-  const entry = flow.joinCode;
-  if (flow.screen !== 'joinCode' || entry.busy) return false;
-  const text = typed.toUpperCase().replace(NOT_CODE_LETTERS, '').slice(0, NET_JOIN_CODE_LENGTH);
-  if (text === entry.text) return false;
-  entry.text = text;
-  entry.cursor = Math.min(text.length, NET_JOIN_CODE_LENGTH - 1);
-  entry.error = null;
-  return true;
-}
-
-/** Joins with the typed code, or says it can't be one. */
-export function submitJoinCode(flow: Flow): FlowUpdate {
-  const entry = flow.joinCode;
-  if (flow.screen !== 'joinCode' || entry.busy) return { changed: false, effects: [] };
-  const code = normalizeJoinCode(entry.text);
-  if (!code) {
-    entry.error = 'badCode';
-    return { changed: true, effects: [] };
-  }
-  entry.error = null;
-  entry.busy = true;
-  return { changed: true, effects: [{ type: 'joinOnline', code }] };
-}
-
-/** The join-code screen's text box was closed with Esc: back to the title. */
-export function cancelJoinCode(flow: Flow): FlowUpdate {
-  if (flow.screen !== 'joinCode') return { changed: false, effects: [] };
-  const effects: FlowEffect[] = flow.joinCode.busy ? [{ type: 'cancelJoin' }] : [];
-  quitToTitle(flow, 'joinOnline');
-  return { changed: true, effects };
-}
-
-/** The join worked: the online screens take over. */
-export function joinSucceeded(flow: Flow): void {
-  if (flow.screen !== 'joinCode') return;
-  flow.joinCode.busy = false;
-  goTo(flow, 'online');
-}
-
-/** Back into an online room at boot (a reloaded page rejoins its room): the online screens take over. */
-export function enterOnline(flow: Flow): void {
-  flow.awake = true;
-  goTo(flow, 'online');
-}
-
-/** The join was refused or the server is away: say why, and let them try again. */
-export function joinFailed(flow: Flow, error: OnlineError): void {
-  if (flow.screen !== 'joinCode') return;
-  flow.joinCode.busy = false;
-  flow.joinCode.error = error;
 }
 
 /** The online room is over (left, or the connection is gone): back on the title. */
