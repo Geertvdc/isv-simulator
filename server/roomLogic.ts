@@ -28,7 +28,8 @@ import {
 } from '../src/flow/save';
 import type { DevicePress } from '../src/input/controller';
 import { createLobby } from '../src/input/lobby';
-import { configureRoster, rolesForRoster, selection } from '../src/flow/roster';
+import { applyCommand, type CommandFailure, commandFailureText } from '../src/flow/commands';
+import { rolesForRoster, selection } from '../src/flow/roster';
 import { type InputBuffer, createInputBuffer, pushInput, takeInput } from '../src/net/inputBuffer';
 import {
   type ErrorCode,
@@ -239,6 +240,17 @@ export function lobbyMessage(room: RoomState): Outgoing {
   };
 }
 
+const COMMAND_ERROR_CODES: Record<CommandFailure, ErrorCode> = {
+  rosterLocked: 'roundRunning',
+  unknownPlayer: 'notOwner',
+  unknownRole: 'badMessage',
+};
+
+/** A refused `applyCommand` as the protocol's `error`. */
+function commandErrorTo(to: string, reason: CommandFailure): Outgoing {
+  return errorTo(to, COMMAND_ERROR_CODES[reason], commandFailureText(reason));
+}
+
 function errorTo(to: string, code: ErrorCode, message: string): Outgoing {
   return { to, message: { type: 'error', code, message } };
 }
@@ -432,13 +444,8 @@ export function dropMember(room: RoomState, sessionId: string): Outgoing[] {
   if (!member?.connected) return [];
   member.connected = false;
   for (const id of playerIdsOf(room, sessionId)) {
-    if (room.flow.screen === 'intro' || room.flow.screen === 'lobby') {
-      configureRoster(room.flow.lobby, room.flow.screen, {
-        type: 'ready',
-        playerId: id,
-        ready: false,
-      });
-    }
+    // Refused outside the lobby and intro, where readiness doesn't count.
+    applyCommand(room.flow, { type: 'ready', playerId: id, ready: false });
   }
   room.presses = room.presses.filter((p) => !isFromSession(p.deviceId, sessionId));
   followHost(room);
@@ -479,8 +486,8 @@ export function handleMessage(room: RoomState, sessionId: string, raw: unknown):
       if (!playerIdsOf(room, sessionId).includes(message.playerId)) {
         return [errorTo(sessionId, 'notOwner', 'You can only configure your own player slots.')];
       }
-      const result = configureRoster(room.flow.lobby, room.flow.screen, message);
-      if (!result.ok) return [errorTo(sessionId, 'roundRunning', result.reason)];
+      const result = applyCommand(room.flow, message);
+      if (!result.ok) return [commandErrorTo(sessionId, result.reason)];
       room.lastActivityTick = room.serverTick;
       return [];
     }

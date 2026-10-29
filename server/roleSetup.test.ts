@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { commandFailureText } from '../src/flow/commands';
 import { COUNTDOWN_MS } from '../src/flow/flow';
 import { selection } from '../src/flow/roster';
 import type { DevicePress } from '../src/input/controller';
@@ -138,7 +139,9 @@ describe('authoritative role setup', () => {
     });
     expect(
       handleMessage(room, 'host', { type: 'role', playerId: 1, roleId: 'platform' }),
-    ).toMatchObject([{ message: { code: 'roundRunning' } }]);
+    ).toMatchObject([
+      { message: { code: 'roundRunning', message: commandFailureText('rosterLocked') } },
+    ]);
     for (let i = 0; i <= COUNTDOWN_MS / TICK_MS + 1; i++) stepRoom(room);
     expect(room.flow.screen).toBe('playing');
     expect(
