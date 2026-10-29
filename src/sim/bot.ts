@@ -182,6 +182,10 @@ function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | nu
   bot.helping = null;
   // A calendar invite beats everything: off to the meeting room, ticket and all.
   if (inviteFor(state, bot.playerId)) {
+    if (bot.assignmentPolicy === 'role-aware') {
+      const reserved = state.tickets.find((ticket) => ticket.id === bot.ticketId);
+      if (reserved?.location.kind === 'queue') bot.ticketId = null;
+    }
     const room = meetingGoal(state, bot);
     if (room) return room;
   }
@@ -236,7 +240,13 @@ function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | nu
       const queueTile = tilesOf(state.level, QUEUE_TILE[queue]);
       const available = bots
         .filter((candidate) => {
-          if (ticketCarriedBy(state, candidate.playerId) || candidate.helping) return false;
+          if (
+            ticketCarriedBy(state, candidate.playerId) ||
+            candidate.helping ||
+            inviteFor(state, candidate.playerId)
+          ) {
+            return false;
+          }
           return candidate.ticketId === null;
         })
         .flatMap((candidate) => {
@@ -477,7 +487,24 @@ export interface BotRunSummary {
   shippedByDomain: Record<TicketDomain, number>;
   expiredByDomain: Record<TicketDomain, number>;
   ordersByRecipeDomain: Record<string, number>;
+  /** Resolved player-work ticks; counts only contributors reported by the sim. */
   stationWorkTicks: {
+    code: number;
+    test: number;
+    design: number;
+    review: number;
+    repair: number;
+  };
+  /** Station-ticks with resolved work, deduplicated when multiple players share a station. */
+  stationBusyTicks: {
+    code: number;
+    test: number;
+    design: number;
+    review: number;
+    repair: number;
+  };
+  /** Percent of available station-ticks spent working, with the whole round as denominator. */
+  stationUtilization: {
     code: number;
     test: number;
     design: number;
@@ -535,11 +562,27 @@ export function runBots(
     expiredByDomain: { general: 0, frontend: 0, backend: 0, infra: 0, mixed: 0 },
     ordersByRecipeDomain: {},
     stationWorkTicks: { code: 0, test: 0, design: 0, review: 0, repair: 0 },
+    stationBusyTicks: { code: 0, test: 0, design: 0, review: 0, repair: 0 },
+    stationUtilization: { code: 0, test: 0, design: 0, review: 0, repair: 0 },
     travelTicks: 0,
     idleTicks: 0,
     queueWaitTicks: 0,
     handovers: 0,
     maxQueueLength: { feature: 0, bug: 0 },
+  };
+  const stationTile = {
+    code: 'keyboard',
+    test: 'testBench',
+    design: 'whiteboard',
+    review: 'review',
+    repair: 'pipeline',
+  } as const;
+  const stationCounts = {
+    code: countTiles(state.level, stationTile.code),
+    test: countTiles(state.level, stationTile.test),
+    design: countTiles(state.level, stationTile.design),
+    review: countTiles(state.level, stationTile.review),
+    repair: countTiles(state.level, stationTile.repair),
   };
   while (!state.result) {
     const inputs = bots.map((bot) => botInput(state, bot, bots));
@@ -555,18 +598,46 @@ export function runBots(
     const priorPositions = new Map(
       state.players.map((player) => [player.id, { x: player.pos.x, y: player.pos.y }]),
     );
-    for (const input of inputs) {
-      if (input.work) {
-        const { x, y } = targetTile(state, input.playerId);
-        const tile = getTile(state.level, x, y);
-        if (tile === 'keyboard') summary.stationWorkTicks.code++;
-        if (tile === 'testBench') summary.stationWorkTicks.test++;
-        if (tile === 'whiteboard') summary.stationWorkTicks.design++;
-        if (tile === 'review') summary.stationWorkTicks.review++;
-        if (tile === 'pipeline' && isBroken(state, { x, y })) summary.stationWorkTicks.repair++;
+    tick(state, inputs);
+    const workingPlayers = new Set(state.workFeedback.map(({ playerId }) => playerId));
+    const activeStations = {
+      code: new Set<number>(),
+      test: new Set<number>(),
+      design: new Set<number>(),
+      review: new Set<number>(),
+      repair: new Set<number>(),
+    };
+    const recordStation = (task: keyof typeof stationTile, playerId: PlayerId): void => {
+      const { x, y } = targetTile(state, playerId);
+      activeStations[task].add(y * state.level.width + x);
+    };
+    for (const feedback of state.workFeedback) {
+      if (feedback.task === 'code') {
+        summary.stationWorkTicks.code++;
+        recordStation('code', feedback.playerId);
+      }
+      if (feedback.task === 'test') {
+        summary.stationWorkTicks.test++;
+        recordStation('test', feedback.playerId);
+      }
+      if (feedback.task === 'design') {
+        summary.stationWorkTicks.design++;
+        recordStation('design', feedback.playerId);
+      }
+      if (feedback.task === 'review') {
+        summary.stationWorkTicks.review++;
+        recordStation('review', feedback.playerId);
+      }
+      if (feedback.task === 'repair') {
+        summary.stationWorkTicks.repair++;
+        recordStation('repair', feedback.playerId);
       }
     }
-    tick(state, inputs);
+    summary.stationBusyTicks.code += activeStations.code.size;
+    summary.stationBusyTicks.test += activeStations.test.size;
+    summary.stationBusyTicks.design += activeStations.design.size;
+    summary.stationBusyTicks.review += activeStations.review.size;
+    summary.stationBusyTicks.repair += activeStations.repair.size;
     for (const player of state.players) {
       const before = priorPositions.get(player.id);
       if (!before) throw new Error(`Missing prior position for player ${player.id}`);
@@ -574,7 +645,7 @@ export function runBots(
         summary.travelTicks++;
       } else {
         const input = inputs.find((candidate) => candidate.playerId === player.id);
-        if (input && !input.work && !input.interact) summary.idleTicks++;
+        if (input && !workingPlayers.has(player.id) && !input.interact) summary.idleTicks++;
       }
     }
     for (const e of state.events) {
@@ -618,5 +689,20 @@ export function runBots(
     );
   }
   summary.openOrdersAtEnd = state.orders.length;
+  for (const task of ['code', 'test', 'design', 'review', 'repair'] as const) {
+    const capacity = stationCounts[task] * level.durationTicks;
+    summary.stationUtilization[task] =
+      capacity === 0 ? 0 : (100 * summary.stationBusyTicks[task]) / capacity;
+  }
   return { ...summary, result: state.result };
+}
+
+function countTiles(map: LevelMap, tile: Tile): number {
+  let count = 0;
+  for (let y = 0; y < map.height; y++) {
+    for (let x = 0; x < map.width; x++) {
+      if (getTile(map, x, y) === tile) count++;
+    }
+  }
+  return count;
 }
