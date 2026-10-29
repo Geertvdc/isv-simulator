@@ -16,16 +16,16 @@
 
 ## 1. What already exists
 
-| Surface | Current behavior | Consequence |
-| --- | --- | --- |
-| `src/sim/tickets.ts` | Feature, bug, incident, frontend, backend, and fullstack kinds. FE/BE are code-only merge ingredients. | Do not turn existing ingredients into independently shippable tickets or overload kinds with specialties. |
-| `src/sim/interact.ts`, `balance.ts` | Code/test/design take 2.5 seconds at base speed. Designed code gets 1.6x. Pair coding gets 1.9x. Review requires two workers. | Roles must compose with existing mechanics without stacking accidentally. |
-| `src/sim/pipeline.ts` | Builds run unattended for 4 seconds; repairs take 3 seconds of work. | A DevOps character cannot earn an engaging primary role just by standing near a build. |
-| `src/sim/orders.ts` | Shipping matches recipes by step sequence. Expiry removes queued tickets by kind. Pending bugs only store time/title. | Domains must reach matching, expiry, and delayed bugs, not only ticket visuals. |
-| `src/input/lobby.ts`, `flow/flow.ts` | Join order assigns player id; no role selection. Local play can start solo too. | Keep player identity separate from role, and keep solo viable. |
-| `src/net/snapshot.ts` | Snapshots copy game state, but round creation and lobby ownership are separate concerns. | Role choice needs authoritative round setup and reconnect coverage, not just an extra snapshot field. |
-| `src/render/three/Characters.ts`, `People.ts`, `pose.ts` | Shared legless hoodie body, floating gloves, similar faces; hats/colors derived from player id. | A new cast needs new geometry and posing, with preserved carry/throw alignment. |
-| `/models.html`, `src/modelSheet/main.ts` | Existing model review page with idle/carry/work/dash poses. | Extend this rather than build a separate art-review tool. |
+| Surface                                                  | Current behavior                                                                                                              | Consequence                                                                                               |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `src/sim/tickets.ts`                                     | Feature, bug, incident, frontend, backend, and fullstack kinds. FE/BE are code-only merge ingredients.                        | Do not turn existing ingredients into independently shippable tickets or overload kinds with specialties. |
+| `src/sim/interact.ts`, `balance.ts`                      | Code/test/design take 2.5 seconds at base speed. Designed code gets 1.6x. Pair coding gets 1.9x. Review requires two workers. | Roles must compose with existing mechanics without stacking accidentally.                                 |
+| `src/sim/pipeline.ts`                                    | Builds run unattended for 4 seconds; repairs take 3 seconds of work.                                                          | A DevOps character cannot earn an engaging primary role just by standing near a build.                    |
+| `src/sim/orders.ts`                                      | Shipping matches recipes by step sequence. Expiry removes queued tickets by kind. Pending bugs only store time/title.         | Domains must reach matching, expiry, and delayed bugs, not only ticket visuals.                           |
+| `src/input/lobby.ts`, `flow/flow.ts`                     | Join order assigns player id; no role selection. Local play can start solo too.                                               | Keep player identity separate from role, and keep solo viable.                                            |
+| `src/net/snapshot.ts`                                    | Snapshots copy game state, but round creation and lobby ownership are separate concerns.                                      | Role choice needs authoritative round setup and reconnect coverage, not just an extra snapshot field.     |
+| `src/render/three/Characters.ts`, `People.ts`, `pose.ts` | Shared legless hoodie body, floating gloves, similar faces; hats/colors derived from player id.                               | A new cast needs new geometry and posing, with preserved carry/throw alignment.                           |
+| `/models.html`, `src/modelSheet/main.ts`                 | Existing model review page with idle/carry/work/dash poses.                                                                   | Extend this rather than build a separate art-review tool.                                                 |
 
 Phase 17's frontend/backend merge and pairing are implemented, even though the plan index still calls that phase planned. Build on the implementation, not a duplicate version of those mechanics.
 
@@ -35,13 +35,13 @@ Every character can perform every existing action. No role-exclusive stations, i
 
 Start with five roles:
 
-| Role | General code | Frontend code | Backend code | Infra code | Mixed code | Test | Design | Repair |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Full-stack developer / generalist | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| Frontend specialist | 0.85 | 2.00 | 0.85 | 0.85 | 1.00 | 0.90 | 1.00 | 1.00 |
-| Backend specialist | 0.85 | 0.85 | 2.00 | 0.85 | 1.00 | 0.90 | 1.00 | 1.00 |
-| QA engineer | 0.80 | 0.80 | 0.80 | 0.80 | 0.80 | 2.00 | 1.00 | 1.00 |
-| Platform engineer | 0.85 | 0.85 | 0.85 | 2.00 | 1.00 | 0.90 | 1.00 | 1.50 |
+| Role                              | General code | Frontend code | Backend code | Infra code | Mixed code | Test | Design | Repair |
+| --------------------------------- | ------------ | ------------- | ------------ | ---------- | ---------- | ---- | ------ | ------ |
+| Full-stack developer / generalist | 1.00         | 1.00          | 1.00         | 1.00       | 1.00       | 1.00 | 1.00   | 1.00   |
+| Frontend specialist               | 0.85         | 2.00          | 0.85         | 0.85       | 1.00       | 0.90 | 1.00   | 1.00   |
+| Backend specialist                | 0.85         | 0.85          | 2.00         | 0.85       | 1.00       | 0.90 | 1.00   | 1.00   |
+| QA engineer                       | 0.80         | 0.80          | 0.80         | 0.80       | 0.80       | 2.00 | 1.00   | 1.00   |
+| Platform engineer                 | 0.85         | 0.85          | 0.85         | 2.00       | 1.00       | 0.90 | 1.00   | 1.50   |
 
 All values multiply **work speed**, not duration. Thus 2.00x is twice the work speed (half the task time); 1.50x is 50% faster work and about 33% less time. UI copy must use that distinction consistently. The generalist is competent and reliable, not a deliberately bad character. The benchmark results below record the earlier 1.50x coding / 1.60x testing values and are historical, not measurements of this stronger rate set.
 
@@ -94,12 +94,12 @@ Do not balance by making every row's arithmetic average equal 1.00. Duration is 
 
 For a single frontend feature, ignoring travel, queues, bugs, and overlapping other orders:
 
-| Assignment | Code | Test | Unattended build | Total |
-| --- | --- | --- | --- | --- |
-| Generalists | 2.50 s | 2.50 s | 4.00 s | 9.00 s |
-| Frontend specialist hands to QA | 1.25 s | 1.25 s | 4.00 s | 6.50 s |
-| QA does everything | 3.13 s | 1.25 s | 4.00 s | 8.38 s |
-| Frontend specialist does everything | 1.25 s | 2.78 s | 4.00 s | 8.03 s |
+| Assignment                          | Code   | Test   | Unattended build | Total  |
+| ----------------------------------- | ------ | ------ | ---------------- | ------ |
+| Generalists                         | 2.50 s | 2.50 s | 4.00 s           | 9.00 s |
+| Frontend specialist hands to QA     | 1.25 s | 1.25 s | 4.00 s           | 6.50 s |
+| QA does everything                  | 3.13 s | 1.25 s | 4.00 s           | 8.38 s |
+| Frontend specialist does everything | 1.25 s | 2.78 s | 4.00 s           | 8.03 s |
 
 The ideal handover path saves 2.50 seconds versus generalists before extra coordination costs. Extra handover/travel cost above that erases its latency benefit. These are continuous-time estimates; implementation tests use actual 60 Hz completion ticks.
 
@@ -143,13 +143,13 @@ Design a **new compact angular stylized animated office crew**: short grounded l
 
 Within the selected language, use these initial role briefs:
 
-| Role | Large readable shape | Clothing/accessory cue | Motion personality |
-| --- | --- | --- | --- |
-| Generalist | Balanced outline, compact swept hair | Rolled-sleeve overshirt and broad cross-body strap | Relaxed stride, adaptable work pose |
-| Frontend | Asymmetric hair mass, short wide jacket | Geometric color-block panel and window badge | Quick, precise taps and expressive head movement |
-| Backend | Squarer shoulders, close-cropped head outline | Structured vest, high collar, stacked-block badge | Grounded stance and deliberate work rhythm |
-| QA | Broad round hair/earpiece outline, narrow coat | Oversized inspection goggles and check badge | Lean-in inspection, satisfied confirmation nod |
-| Platform | Wide headset arc, sturdy jacket outline | Utility vest and server-stack badge | Brisk purposeful stride and repair crouch |
+| Role       | Large readable shape                           | Clothing/accessory cue                             | Motion personality                               |
+| ---------- | ---------------------------------------------- | -------------------------------------------------- | ------------------------------------------------ |
+| Generalist | Balanced outline, compact swept hair           | Rolled-sleeve overshirt and broad cross-body strap | Relaxed stride, adaptable work pose              |
+| Frontend   | Asymmetric hair mass, short wide jacket        | Geometric color-block panel and window badge       | Quick, precise taps and expressive head movement |
+| Backend    | Squarer shoulders, close-cropped head outline  | Structured vest, high collar, stacked-block badge  | Grounded stance and deliberate work rhythm       |
+| QA         | Broad round hair/earpiece outline, narrow coat | Oversized inspection goggles and check badge       | Lean-in inspection, satisfied confirmation nod   |
+| Platform   | Wide headset arc, sturdy jacket outline        | Utility vest and server-stack badge                | Brisk purposeful stride and repair crouch        |
 
 These are stylized role cues, not demographic stereotypes. Do not tie profession or aptitude to skin tone, gender presentation, body type, or glasses alone. Hair/skin variants are cosmetic and available independently of role.
 
@@ -185,12 +185,12 @@ Bump the protocol for the incompatible setup/state change and cover snapshots, r
 
 ## 8. Implementation slices and approval gates
 
-| Slice | Files/surfaces | Result and gate |
-| --- | --- | --- |
-| 21a: visual investigation | `src/modelSheet/main.ts`, `src/render/three/Characters.ts`, `pose.ts`, `layout.ts`; study helpers only if needed | Three in-engine silhouette/rig studies, including carrying and throwing at gameplay scale. User approves one before production. No gameplay changes. |
-| 21b: deterministic rules and lab | New `src/sim/roles.ts` + colocated tests; `balance.ts`, `state.ts`, `tickets.ts`, `orders.ts`, `interact.ts`, `pipeline.ts`, `levels.ts`, `content.ts`, map-look entry; initial bot/sim role-lab harness | Opt-in role/domain lab, fixed-seed benchmarks, classic all-generalist behavior preserved. No campaign-wide rebalance. |
+| Slice                                  | Files/surfaces                                                                                                                                                                                                                                                                                                                                 | Result and gate                                                                                                                                                                        |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 21a: visual investigation              | `src/modelSheet/main.ts`, `src/render/three/Characters.ts`, `pose.ts`, `layout.ts`; study helpers only if needed                                                                                                                                                                                                                               | Three in-engine silhouette/rig studies, including carrying and throwing at gameplay scale. User approves one before production. No gameplay changes.                                   |
+| 21b: deterministic rules and lab       | New `src/sim/roles.ts` + colocated tests; `balance.ts`, `state.ts`, `tickets.ts`, `orders.ts`, `interact.ts`, `pipeline.ts`, `levels.ts`, `content.ts`, map-look entry; initial bot/sim role-lab harness                                                                                                                                       | Opt-in role/domain lab, fixed-seed benchmarks, classic all-generalist behavior preserved. No campaign-wide rebalance.                                                                  |
 | 21c: playable selection and final cast | `src/input/lobby.ts`, `flow/flow.ts`, `ui/lobby.ts`, `ui/onlineLobby.ts`, `ui/intro.ts`, `ui/playerBadge.ts`, `ui/hud.ts`, `ui/recipes.ts`, relevant CSS; `render/GameScene.ts`, `three/People.ts`, `Characters.ts`, `pose.ts`, `layout.ts`, ticket models/billboards; `net/protocol.ts`, snapshot/prediction consumers, `server/roomLogic.ts` | Production cast in the approved style; local/online role selection and pre-round readiness; domains readable throughout. No role is exposed without its rules, UI, and online support. |
-| 21d: balance and rollout | Extend `scripts/sim.ts`, `src/sim/bot.ts`, benchmark fixtures/tests beyond the 21b lab; explicitly selected level settings, `docs/game/`, approved screenshots | Validate target envelope with humans and bots, tune, then opt in selected campaign levels. Expand only after that evidence. |
+| 21d: balance and rollout               | Extend `scripts/sim.ts`, `src/sim/bot.ts`, benchmark fixtures/tests beyond the 21b lab; explicitly selected level settings, `docs/game/`, approved screenshots                                                                                                                                                                                 | Validate target envelope with humans and bots, tune, then opt in selected campaign levels. Expand only after that evidence.                                                            |
 
 Before each slice, write a short concrete implementation plan and wait for approval as usual. Do not implement all four slices under one approval.
 
@@ -212,14 +212,14 @@ The three alternatives are **Compact angular** (cut overshirt, swept block hair,
 
 Useful reproducible views:
 
-| Review | URL |
-| --- | --- |
-| All three, front/rear | `/models.html?studies&still&action=carry&time=900` |
-| Compact angular, four players | `/models.html?studies&view=office&style=angular&still` |
-| Rounded stop-motion, four players | `/models.html?studies&view=office&style=clay&still` |
-| Workplace cartoon, four players | `/models.html?studies&view=office&style=cartoon&still` |
-| Rear/grayscale example | `/models.html?studies&view=office&style=clay&rear&gray&still` |
-| Throw scrub example | `/models.html?studies&action=throw&still&time=900` |
+| Review                            | URL                                                           |
+| --------------------------------- | ------------------------------------------------------------- |
+| All three, front/rear             | `/models.html?studies&still&action=carry&time=900`            |
+| Compact angular, four players     | `/models.html?studies&view=office&style=angular&still`        |
+| Rounded stop-motion, four players | `/models.html?studies&view=office&style=clay&still`           |
+| Workplace cartoon, four players   | `/models.html?studies&view=office&style=cartoon&still`        |
+| Rear/grayscale example            | `/models.html?studies&view=office&style=clay&rear&gray&still` |
+| Throw scrub example               | `/models.html?studies&action=throw&still&time=900`            |
 
 Capture the comparison set with `npx vite-node scripts/characterStudies.ts --out=/absolute/output/directory` (optional `--base=http://localhost:5173`). These are study evidence, not replacements for approved game documentation images. The script also captures `/?scene=level-monorepo&quality=low` as an unchanged actual-game reference.
 
@@ -275,17 +275,17 @@ Common hand/ticket targets, smoothed-facing alignment, movement, collision, stat
 
 The couch-readability box remains intentionally unchecked. Captures demonstrate geometry and game integration, not human recognition or balance. The first-part cast PR changed no campaign settings, scores, role rates, bots, lobby/readiness/network UI or 21d tuning.
 
-| Review | URL |
-| --- | --- |
-| Five roles, varied hair | `/models.html?cast&still&action=idle&time=900` (swept/cropped back row, long/tied front row) |
-| Every role/hairstyle | `/models.html` (office kit lists all twenty combinations) |
-| All actions, pause/scrub | `/models.html?cast&action=throw` |
-| Rear/grayscale | `/models.html?cast&still&action=idle&rear&gray` |
-| Four copies of a role | `/models.html?cast&role=generalist&still&action=carry` (also `frontend`, `backend`, `qa`, `platform`) |
-| Actual mixed gameplay | `/?scene=cast-mixed&quality=low` |
-| Actual platform/QA gameplay | `/?scene=cast-platform&quality=low` |
-| Actual four generalists | `/?scene=cast-duplicates&quality=low` |
-| Actual sim throw | `/?scene=cast-windup&quality=low`, `/?scene=cast-release&quality=low` |
+| Review                      | URL                                                                                                   |
+| --------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Five roles, varied hair     | `/models.html?cast&still&action=idle&time=900` (swept/cropped back row, long/tied front row)          |
+| Every role/hairstyle        | `/models.html` (office kit lists all twenty combinations)                                             |
+| All actions, pause/scrub    | `/models.html?cast&action=throw`                                                                      |
+| Rear/grayscale              | `/models.html?cast&still&action=idle&rear&gray`                                                       |
+| Four copies of a role       | `/models.html?cast&role=generalist&still&action=carry` (also `frontend`, `backend`, `qa`, `platform`) |
+| Actual mixed gameplay       | `/?scene=cast-mixed&quality=low`                                                                      |
+| Actual platform/QA gameplay | `/?scene=cast-platform&quality=low`                                                                   |
+| Actual four generalists     | `/?scene=cast-duplicates&quality=low`                                                                 |
+| Actual sim throw            | `/?scene=cast-windup&quality=low`, `/?scene=cast-release&quality=low`                                 |
 
 Capture with `npx vite-node scripts/characterCast.ts --base=http://127.0.0.1:5198 --out=/absolute/evidence/directory` (optional `--cdp-port=9361`). The script uses a private headless Chrome profile, waits for real scene completion and includes a narrow review-page capture. It does not replace the approved `docs/game/` screenshot catalog. The model-sheet release remains illustrative and is labeled as such; actual gameplay flight comes from the unchanged sim.
 
@@ -329,14 +329,14 @@ On the same full-length lab after the fixes, the role-aware mixed team shipped 1
 
 The reproducible matrix ran 30 shared fixed seeds under both assignment policies, producing 9,960 run/seed records:
 
-| Fixture | Duration | Compositions |
-| --- | ---: | --- |
-| Balanced role lab | 90 s bounded fixture | Generalist-only solo; all 15, 35, and 70 unordered 2-, 3-, and 4-player compositions |
-| Frontend-skew | 180 s | Generalist, mixed, and specialist candidates |
-| Infra incidents | 180 s | Generalist, mixed, and specialist candidates |
-| Design pairing (`design-sprint`) | 180 s | Generalist, mixed, and specialist candidates |
-| Conveyor/gaps (`monorepo`) | 180 s | Generalist, mixed, and specialist candidates |
-| Meetings/incidents (`the-reorg`) | 180 s | Generalist, mixed, and specialist candidates |
+| Fixture                          |             Duration | Compositions                                                                         |
+| -------------------------------- | -------------------: | ------------------------------------------------------------------------------------ |
+| Balanced role lab                | 90 s bounded fixture | Generalist-only solo; all 15, 35, and 70 unordered 2-, 3-, and 4-player compositions |
+| Frontend-skew                    |                180 s | Generalist, mixed, and specialist candidates                                         |
+| Infra incidents                  |                180 s | Generalist, mixed, and specialist candidates                                         |
+| Design pairing (`design-sprint`) |                180 s | Generalist, mixed, and specialist candidates                                         |
+| Conveyor/gaps (`monorepo`)       |                180 s | Generalist, mixed, and specialist candidates                                         |
+| Meetings/incidents (`the-reorg`) |                180 s | Generalist, mixed, and specialist candidates                                         |
 
 Candidate fixtures use authored domain schedules and, for campaign-derived maps, preserve the source map's duration and other level settings. They are benchmark fixtures, not a campaign opt-in. The balanced lab's shorter duration bounds the exhaustive composition sweep. Comparisons are paired by seed and policy; intervals are 95% normal approximations and seat positions rotate over seeds. A one-seed smoke run reports its interval as unavailable rather than presenting a zero-width confidence interval.
 
@@ -360,14 +360,14 @@ Ordinary merge `6b5d429` integrates repaired parent `df3cb1e` (including main `8
 
 On the combined code, `npm run sim -- --role-bench 10 1 --json=/absolute/path/role-benchmarks-integrated.json` completed **3,320 run/seed records**: the same six fixtures, both policies, solo generalist, all 15/35/70 unordered balanced-lab team compositions, and the same candidate teams on the five other fixtures. Seeds 1–10 are shared within comparisons; composition seats rotate as before. This bounded rerun has less precision than the historical 30-seed sweep. The table shows three-player role-aware mixed teams versus same-policy generalists; intervals are paired 95% normal approximations, exploratory and not adjusted for the many comparisons.
 
-| Fixture | Generalist shipped | Mixed shipped | Paired mixed minus generalist |
-| --- | ---: | ---: | --- |
-| Balanced lab | 7.10 | 7.10 | 0.00 [0.00, 0.00] |
-| Frontend-skew | 24.30 | 24.30 | 0.00 [0.00, 0.00] |
-| Infra incidents | 10.70 | 10.70 | 0.00 [0.00, 0.00] |
-| Design pairing | 22.30 | 22.60 | +0.30 [-0.21, +0.81] |
-| Conveyor/gaps | 19.40 | 18.30 | -1.10 [-3.74, +1.54] |
-| Meetings/incidents | 18.90 | 18.30 | -0.60 [-1.91, +0.71] |
+| Fixture            | Generalist shipped | Mixed shipped | Paired mixed minus generalist |
+| ------------------ | -----------------: | ------------: | ----------------------------- |
+| Balanced lab       |               7.10 |          7.10 | 0.00 [0.00, 0.00]             |
+| Frontend-skew      |              24.30 |         24.30 | 0.00 [0.00, 0.00]             |
+| Infra incidents    |              10.70 |         10.70 | 0.00 [0.00, 0.00]             |
+| Design pairing     |              22.30 |         22.60 | +0.30 [-0.21, +0.81]          |
+| Conveyor/gaps      |              19.40 |         18.30 | -1.10 [-3.74, +1.54]          |
+| Meetings/incidents |              18.90 |         18.30 | -0.60 [-1.91, +0.71]          |
 
 The balanced two-player mixed delta was 0.00 [0.00, 0.00]; four-player mixed was -0.10 [-0.30, +0.10]. Zero-width intervals here mean the ten observed per-seed deltas were identical, not proof of population equivalence. Generalist role-aware minus role-neutral throughput in the three-player meetings fixture was -0.80 [-2.86, +1.26], still a policy/map limitation rather than grounds for role-rate tuning.
 
@@ -390,10 +390,10 @@ The same 30 role-lab seeds (1–30), team compositions, and both assignment poli
 For a focused direct comparison, the 10-seed `design-pairing` fixture (seeds 1–10, role-aware specialist team, same policy and seats) was run with the old and new rates:
 
 | Players | Shipped before → after | Paired shipment change (95% CI) | Score before → after | Expired before → after |
-| --- | ---: | ---: | ---: | ---: |
-| 2 | 15.5 → 15.5 | +0.00 [0.00, 0.00] | 377.5 → 380.9 | 0.0 → 0.0 |
-| 3 | 22.2 → 22.2 | +0.00 [−0.29, +0.29] | 546.8 → 544.8 | 0.0 → 0.0 |
-| 4 | 27.6 → 27.9 | +0.30 [−0.21, +0.81] | 679.0 → 690.3 | 0.0 → 0.0 |
+| ------- | ---------------------: | ------------------------------: | -------------------: | ---------------------: |
+| 2       |            15.5 → 15.5 |              +0.00 [0.00, 0.00] |        377.5 → 380.9 |              0.0 → 0.0 |
+| 3       |            22.2 → 22.2 |            +0.00 [−0.29, +0.29] |        546.8 → 544.8 |              0.0 → 0.0 |
+| 4       |            27.6 → 27.9 |            +0.30 [−0.21, +0.81] |        679.0 → 690.3 |              0.0 → 0.0 |
 
 No shipment interval excludes zero. The design fixture also left orders open, so faster station work does not translate directly into shipped-order throughput when movement, design, demand, and round limits remain. The wider 10-seed matrix used both policies and all 15/35/70 balanced-lab compositions on the same six fixtures, yielding 3,320 matched run/seed records before and after. It is exploratory evidence, not proof of human balance or campaign three-star viability.
 
