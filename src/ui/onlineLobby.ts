@@ -24,7 +24,7 @@ import {
 } from '../flow/online';
 import { NET_MAX_NAME_LENGTH } from '../sim/balance';
 import { ONLINE_TEXT, WINDOW_FILES } from '../sim/content';
-import { el } from './dom';
+import { type Mounted, button, el, mountScreen } from './dom';
 import { deviceLabel } from './lobby';
 import { copyText } from './profile';
 import type { ScreenView } from './screens';
@@ -47,17 +47,8 @@ export interface OnlineLobbyDeps extends OnlineDeps {
 }
 
 /** Can be closed from outside, e.g. by gamepad B. */
-export interface OnlineLobbyView extends ScreenView {
+export interface OnlineLobbyView extends ScreenView, Mounted {
   cancelDialog: () => void;
-}
-
-function button(className: string, text: string, onClick: () => void): HTMLButtonElement {
-  const node = document.createElement('button');
-  node.type = 'button';
-  node.className = `profile-button ${className}`;
-  node.textContent = text;
-  node.addEventListener('click', onClick);
-  return node;
 }
 
 function statusText(online: OnlineState): string {
@@ -92,17 +83,23 @@ function lobbyHint(online: OnlineState): string {
 export function mountOnlineLobby(root: HTMLElement, deps: OnlineLobbyDeps): OnlineLobbyView {
   const screen = el('div', 'screen online-lobby');
   screen.hidden = true;
+  const { scope, unmount } = mountScreen(root, screen);
 
   const codeCard = el('div', 'online-code-card');
   codeCard.dataset.file = WINDOW_FILES.roomCode;
   const code = el('div', 'online-code');
   const copied = el('div', 'online-copied');
-  const copy = button('online-copy', ONLINE_TEXT.copy, () => {
-    const text = code.textContent;
-    void copyText(text, code).then((ok) => {
-      copied.textContent = ok ? ONLINE_TEXT.copied : ONLINE_TEXT.copyFailed;
-    });
-  });
+  const copy = button(
+    scope,
+    ONLINE_TEXT.copy,
+    () => {
+      const text = code.textContent;
+      void copyText(text, code).then((ok) => {
+        copied.textContent = ok ? ONLINE_TEXT.copied : ONLINE_TEXT.copyFailed;
+      });
+    },
+    'online-copy',
+  );
   codeCard.append(el('div', 'profile-label', ONLINE_TEXT.codeLabel), code, copy, copied);
 
   const status = el('div', 'online-status');
@@ -147,7 +144,7 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineLobbyDeps): Onli
     nameValue.textContent = deps.yourName();
     closeName();
   };
-  nameInput.addEventListener('keydown', (event) => {
+  scope.listen(nameInput, 'keydown', (event) => {
     // Typing must not reach the game (E, Esc and Enter mean something there).
     event.stopPropagation();
     if (event.repeat) return;
@@ -163,12 +160,12 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineLobbyDeps): Onli
   nameShow.append(
     el('span', 'profile-label', ONLINE_TEXT.nameLabel),
     nameValue,
-    button('online-name-change', ONLINE_TEXT.changeName, openName),
+    button(scope, ONLINE_TEXT.changeName, openName, 'online-name-change'),
   );
   nameEdit.append(
     nameInput,
-    button('online-name-save', ONLINE_TEXT.saveName, saveName),
-    button('online-name-cancel', ONLINE_TEXT.cancelName, closeName),
+    button(scope, ONLINE_TEXT.saveName, saveName, 'online-name-save'),
+    button(scope, ONLINE_TEXT.cancelName, closeName, 'online-name-cancel'),
     nameError,
   );
   nameEdit.hidden = true;
@@ -179,7 +176,7 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineLobbyDeps): Onli
   const toolbar = el('div', 'online-toolbar');
   toolbar.append(codeCard, status, nameRow);
   const hint = el('div', 'lobby-hint');
-  const leave = button('online-leave', ONLINE_TEXT.leave, deps.onLeave);
+  const leave = button(scope, ONLINE_TEXT.leave, deps.onLeave, 'online-leave');
   const keys = statusBar();
   const content = el('div', 'selection-layout');
   content.append(
@@ -192,13 +189,13 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineLobbyDeps): Onli
     leave,
   );
   screen.append(content, keys);
-  root.append(screen);
 
   /** Redrawn only when the room changed, so the DOM isn't rebuilt every frame. */
   let drawn = '';
   let roles: ReturnType<typeof rolePanel>[] = [];
 
   return {
+    unmount,
     cancelDialog: closeName,
     render: (view) => {
       const online = view?.online ?? null;
@@ -279,18 +276,22 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineLobbyDeps): Onli
 }
 
 /** The strip on top of the online screens other than the lobby. */
-export function mountOnlineBar(root: HTMLElement, deps: OnlineDeps): ScreenView {
+export function mountOnlineBar(root: HTMLElement, deps: OnlineDeps): ScreenView & Mounted {
   const bar = el('div', 'online-bar');
   bar.hidden = true;
   const room = el('span', 'online-bar-room');
   const waiting = el('span', 'online-bar-waiting');
   const away = el('span', 'online-bar-away');
-  const leave = button('online-bar-leave', ONLINE_TEXT.leave, deps.onLeave);
-  bar.append(room, waiting, away, leave);
   const banner = el('div', 'online-banner', ONLINE_TEXT.reconnectingBanner);
   banner.hidden = true;
-  root.append(bar, banner);
+  const { scope, unmount } = mountScreen(root, bar, banner);
+  scope.add(() => {
+    root.classList.remove('online-round', 'with-online-bar');
+  });
+  const leave = button(scope, ONLINE_TEXT.leave, deps.onLeave, 'online-bar-leave');
+  bar.append(room, waiting, away, leave);
   return {
+    unmount,
     render: (view) => {
       const online = view?.online ?? null;
       bar.hidden = !online || showsLobby(online);
