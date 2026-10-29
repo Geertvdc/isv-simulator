@@ -7,14 +7,15 @@
  *   count), creating the profile when missing, and answers the merged profile.
  *
  * User ids are UUID v4s (any case; stored in lower case). Bad ids and bodies
- * get a 400. CORS headers come from Colyseus (any origin, so the Vite dev
- * server on another port can call it).
+ * get a 400. A new profile past the store's cap gets a 507 (existing ones
+ * still update). Body size, per-IP rate limits and CORS origins are checked
+ * before these run (`httpGuard.ts`).
  */
 
 import { createEndpoint } from 'colyseus';
 import { normalizeDisplayName, normalizeUserId } from '../src/flow/identity';
 import { parseLevels } from '../src/flow/save';
-import type { ProfileStore, ProfileUpdate } from './profileStore';
+import { ProfileLimitError, type ProfileStore, type ProfileUpdate } from './profileStore';
 
 /** Most levels one `PUT` may carry; the game has a dozen. */
 export const MAX_LEVELS_PER_UPDATE = 256;
@@ -74,7 +75,12 @@ export function profileEndpoints(
     if (!userId) return badRequest('not a user id');
     const update = parseProfileUpdate(ctx.body as unknown);
     if (!update.ok) return badRequest(update.reason);
-    return Response.json(await store.merge(userId, update.value, now()));
+    try {
+      return Response.json(await store.merge(userId, update.value, now()));
+    } catch (error) {
+      if (!(error instanceof ProfileLimitError)) throw error;
+      return Response.json({ error: 'profile limit reached' }, { status: 507 });
+    }
   });
 
   return { getProfile, putProfile };
