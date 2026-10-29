@@ -3,7 +3,8 @@ import { claimOrphanedPlayer, createLobby, updateLobby } from '../input/lobby';
 import type { DevicePress } from '../input/controller';
 import { createGame } from '../sim/state';
 import { LEVELS, levelById } from '../sim/levels';
-import { COUNTDOWN_MS, createFlow, updateFlow, type FlowContext } from './flow';
+import { COUNTDOWN_MS, createFlow, type FlowContext } from './flow';
+import { updateFlow } from './updateFlow';
 import { createSave } from './save';
 import {
   configureRoster,

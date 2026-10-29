@@ -3,14 +3,8 @@ import type { DevicePress } from '../../input/controller';
 import type { InputFrame } from '../../input/devices';
 import { claimOrphanedPlayer } from '../../input/lobby';
 import type { FlowCommand } from '../../flow/commands';
-import {
-  type Flow,
-  type OnlineError,
-  enterOnline,
-  joinFailed,
-  joinSucceeded,
-  onlineEnded,
-} from '../../flow/flow';
+import { type Flow, type OnlineError, onlineEnded } from '../../flow/flow';
+import { enterOnline, joinFailed, joinSucceeded } from '../../flow/joinFlow';
 import type { Identity } from '../../flow/identity';
 import {
   type OnlineRole,
