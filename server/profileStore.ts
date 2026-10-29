@@ -15,6 +15,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { defaultDisplayName, normalizeDisplayName } from '../src/flow/identity';
 import { type LevelRecord, mergeLevels, parseLevels, recordLevel } from '../src/flow/save';
+import { NET_MAX_PROFILES } from '../src/sim/balance';
 import type { LevelResult } from '../src/sim/orders';
 
 /**
@@ -56,6 +57,14 @@ export interface ProfileStore {
   ): Promise<Profile>;
 }
 
+/** Thrown when creating a profile would go past the store's `maxProfiles`. */
+export class ProfileLimitError extends Error {
+  constructor(readonly maxProfiles: number) {
+    super(`profile limit reached (${maxProfiles})`);
+    this.name = 'ProfileLimitError';
+  }
+}
+
 function newProfile(userId: string, now: string): Profile {
   return {
     userId,
@@ -70,6 +79,9 @@ function newProfile(userId: string, now: string): Profile {
 export class MemoryProfileStore implements ProfileStore {
   protected profiles = new Map<string, Profile>();
   private chain: Promise<unknown> = Promise.resolve();
+
+  /** Past this many profiles, creating one throws `ProfileLimitError`; existing ones still change. */
+  constructor(readonly maxProfiles = NET_MAX_PROFILES) {}
 
   get(userId: string): Promise<Profile | null> {
     return this.run(false, () => {
@@ -116,7 +128,11 @@ export class MemoryProfileStore implements ProfileStore {
   }
 
   private change(userId: string, now: string, apply: (profile: Profile) => void): Profile {
-    const profile = this.profiles.get(userId) ?? newProfile(userId, now);
+    let profile = this.profiles.get(userId);
+    if (!profile) {
+      if (this.profiles.size >= this.maxProfiles) throw new ProfileLimitError(this.maxProfiles);
+      profile = newProfile(userId, now);
+    }
     apply(profile);
     profile.updatedAt = now;
     this.profiles.set(userId, profile);
@@ -180,8 +196,9 @@ export class JsonFileProfileStore extends MemoryProfileStore {
     readonly path: string,
     /** Names the backup of a corrupt file. */
     private readonly clock: () => Date = () => new Date(),
+    maxProfiles = NET_MAX_PROFILES,
   ) {
-    super();
+    super(maxProfiles);
   }
 
   protected override async load(): Promise<void> {

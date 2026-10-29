@@ -7,6 +7,7 @@ import {
   DEFAULT_PROFILE_STORE_PATH,
   JsonFileProfileStore,
   MemoryProfileStore,
+  ProfileLimitError,
   type ProfileStore,
 } from './profileStore';
 
@@ -31,6 +32,29 @@ const stores: [string, () => ProfileStore][] = [
   ['memory', () => new MemoryProfileStore()],
   ['json file', () => new JsonFileProfileStore(path)],
 ];
+
+const cappedStores: [string, (max: number) => ProfileStore][] = [
+  ['memory', (max) => new MemoryProfileStore(max)],
+  ['json file', (max) => new JsonFileProfileStore(path, undefined, max)],
+];
+
+describe.each(cappedStores)('%s store with a profile cap', (_name, make) => {
+  const ID_C = 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e';
+  const result = { score: 10, stars: 1 };
+
+  it('refuses new profiles past the cap and still updates existing ones', async () => {
+    const store = make(2);
+    await store.merge(ID_A, {}, T1);
+    await store.recordResult(ID_B, 'garage', result, T1);
+    await expect(store.merge(ID_C, {}, T2)).rejects.toBeInstanceOf(ProfileLimitError);
+    await expect(store.recordResult(ID_C, 'garage', result, T2)).rejects.toBeInstanceOf(
+      ProfileLimitError,
+    );
+    expect(await store.get(ID_C)).toBeNull();
+    expect((await store.merge(ID_A, { displayName: 'Ada' }, T2)).displayName).toBe('Ada');
+    expect((await store.recordResult(ID_B, 'garage', result, T2)).levels.garage?.plays).toBe(2);
+  });
+});
 
 describe.each(stores)('%s store', (_name, make) => {
   it('has no profile for an unknown user', async () => {

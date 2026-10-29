@@ -168,6 +168,25 @@ describe('profile routes over HTTP', () => {
     expect(await got.json()).toEqual(profile);
   });
 
+  it('refuses a new profile past the cap with a 507, still updating existing ones', async () => {
+    const capped = await startGameServer(0, { store: new MemoryProfileStore(1) });
+    const url = (id: string) => `http://localhost:${capped.port}/profiles/${id}`;
+    const send = (id: string, body: unknown) =>
+      fetch(url(id), {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    try {
+      const first = freshId();
+      expect((await send(first, {})).status).toBe(200);
+      await expectError(send(freshId(), {}), 507, 'profile limit reached');
+      expect((await send(first, { displayName: 'Ada' })).status).toBe(200);
+    } finally {
+      await capped.close();
+    }
+  });
+
   it('merges updates: the best of each level wins, and the name changes only when given', async () => {
     const id = freshId();
     await put(id, JSON.stringify({ displayName: 'Ada', levels: { garage } }));
