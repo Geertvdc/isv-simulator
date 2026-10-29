@@ -1,69 +1,40 @@
 import type { GameFrame } from '../render/GameScene';
-import { tileColor } from '../render/mapLook';
+import { KIND_COLOR, cssHex, orderStepTiles, orderTimeShare, timerColor } from '../render/stepLook';
 import { ORDER_URGENT_TICKS } from '../sim/balance';
 import {
   INCIDENT_BANNER_TEXT,
   MEETING_MISSED_TEXT,
+  ORDER_EXPIRED_STAMP,
   ORDER_KIND_LABELS,
   PAUSE_HINT,
   inviteText,
+  orderNumber,
   PIPELINE_BROKE_TEXT,
   UNTESTED_SHIP_TEXT,
 } from '../sim/content';
 import type { Invite } from '../sim/meetings';
 import { type Order, openIncident, ticksLeft } from '../sim/orders';
 import type { GameState } from '../sim/state';
-import { PART_KINDS, type StepKind, type TicketKind } from '../sim/tickets';
 import { playerCssColor } from '../render/playerColors';
+import { el } from './dom';
 import { formatClock } from './format';
 import { playerBadge } from './playerBadge';
-
-/** Each step shows as the letter of its station on the map, in that station's color. */
-export const STEP_LABEL: Readonly<Record<StepKind, { letter: string; color: string }>> = {
-  design: { letter: 'W', color: cssColor(tileColor('whiteboard')) },
-  code: { letter: 'K', color: cssColor(tileColor('keyboard')) },
-  merge: { letter: 'G', color: cssColor(tileColor('merge')) },
-  review: { letter: 'R', color: cssColor(tileColor('review')) },
-  test: { letter: 'T', color: cssColor(tileColor('testBench')) },
-  pipeline: { letter: 'P', color: cssColor(tileColor('pipeline')) },
-};
+import { type StepTileView, stepRow } from './stepTiles';
 
 /** How long a "+25" or "-10" floats by the score. */
 const POPUP_MS = 1200;
-
-function cssColor(color: number): string {
-  return `#${color.toString(16).padStart(6, '0')}`;
-}
-
-function el(tag: string, className: string, text = ''): HTMLElement {
-  const node = document.createElement(tag);
-  node.className = className;
-  node.textContent = text;
-  return node;
-}
+/** How long an order card whose time ran out stays, greyed out and stamped. */
+const EXPIRED_CARD_MS = 1100;
 
 /**
- * A row of station letters in their colors, like on the order cards. A
- * full-stack recipe codes twice before its merge: a front end (blue mark)
- * and a back end (green mark), so its `code` shows as two chips.
+ * An order card, like an issue-tracker card: the timer bar on top, `#id`,
+ * a kind chip and the title, then its steps as tiles ticked off like CI checks.
  */
-export function stepChips(steps: readonly StepKind[], kind?: TicketKind): HTMLElement {
-  const row = el('div', 'order-steps');
-  for (const step of steps) {
-    const parts = kind === 'fullstack' && step === 'code' ? PART_KINDS : [null];
-    for (const part of parts) {
-      const label = STEP_LABEL[step];
-      const icon = el('span', part ? `order-step order-step-${part}` : 'order-step', label.letter);
-      icon.style.setProperty('--step-color', label.color);
-      row.append(icon);
-    }
-  }
-  return row;
-}
-
 interface OrderCard {
   card: HTMLElement;
   fill: HTMLElement;
+  title: HTMLElement;
+  tiles: StepTileView[];
 }
 
 interface InviteCard {
@@ -138,15 +109,40 @@ export function mountGameHud(root: HTMLElement): GameHud {
     }
   }
 
-  function createCard(order: Order): OrderCard {
+  /** Cards of orders that just ran out, greyed out and stamped until they drop off. */
+  const leaving = new Set<HTMLElement>();
+
+  function createCard(state: GameState, order: Order): OrderCard {
     const card = el('div', `order order-${order.kind}`);
-    card.append(el('div', 'order-kind', ORDER_KIND_LABELS[order.kind]));
-    const steps = stepChips(order.steps, order.kind);
+    card.style.setProperty('--kind-color', cssHex(KIND_COLOR[order.kind]));
     const timer = el('div', 'order-timer');
     const fill = el('div', 'order-timer-fill');
     timer.append(fill);
-    card.append(steps, timer);
-    return { card, fill };
+    const head = el('div', 'order-head');
+    head.append(
+      el('span', 'order-id', orderNumber(order.id)),
+      el('span', 'order-chip', ORDER_KIND_LABELS[order.kind]),
+    );
+    const title = el('div', 'order-title');
+    const { row, views } = stepRow(orderStepTiles(order, state.tickets));
+    card.append(timer, head, title, row);
+    return { card, fill, title, tiles: views };
+  }
+
+  /** The order ran out: grey the card, stamp it, and let it drop off a moment later. */
+  function expireCard(id: number): void {
+    const entry = cards.get(id);
+    if (!entry) return;
+    cards.delete(id);
+    const { card } = entry;
+    card.classList.remove('urgent');
+    card.classList.add('expired');
+    card.append(el('div', 'order-stamp', ORDER_EXPIRED_STAMP));
+    leaving.add(card);
+    setTimeout(() => {
+      card.remove();
+      leaving.delete(card);
+    }, EXPIRED_CARD_MS);
   }
 
   function syncOrders(state: GameState): void {
@@ -159,14 +155,22 @@ export function mountGameHud(root: HTMLElement): GameHud {
     for (const order of state.orders) {
       let entry = cards.get(order.id);
       if (!entry) {
-        entry = createCard(order);
+        entry = createCard(state, order);
         cards.set(order.id, entry);
         orders.append(entry.card);
       }
       const left = ticksLeft(state, order);
-      const share = left / Math.max(1, order.expiresTick - order.createdTick);
+      const share = orderTimeShare(order, state.tick);
       entry.fill.style.width = `${(share * 100).toFixed(1)}%`;
+      entry.fill.style.background = cssHex(timerColor(share));
       entry.card.classList.toggle('urgent', left <= ORDER_URGENT_TICKS);
+      const title = state.tickets.find((t) => t.orderId === order.id)?.title ?? '';
+      if (entry.title.textContent !== title) entry.title.textContent = title;
+      const tiles = orderStepTiles(order, state.tickets);
+      entry.tiles.forEach((view, i) => {
+        const tile = tiles[i];
+        if (tile) view.update(tile);
+      });
     }
   }
 
@@ -183,11 +187,16 @@ export function mountGameHud(root: HTMLElement): GameHud {
       for (const part of parts) part.hidden = frame === null;
       if (!frame) {
         for (const { card } of [...cards.values(), ...inviteCards.values()]) card.remove();
+        for (const card of leaving) card.remove();
         cards.clear();
         inviteCards.clear();
+        leaving.clear();
         return;
       }
       const { state } = frame;
+      for (const event of frame.events) {
+        if (event.type === 'orderExpired') expireCard(event.order.id);
+      }
       syncOrders(state);
       syncInvites(state);
       scoreValue.textContent = String(state.score);
