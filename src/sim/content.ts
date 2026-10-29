@@ -124,6 +124,29 @@ export const COMMIT_TYPES: Readonly<Record<TicketKind, { type: string; scope?: s
   fullstack: { type: 'feat', scope: 'app' },
 };
 
+/**
+ * A ticket's domain as its commit scope, `feat(api): …`, on HUD order cards
+ * and in world card title bars. General work has none and keeps its kind's.
+ */
+export const DOMAIN_SCOPES: Readonly<Record<TicketDomain, string | undefined>> = {
+  general: undefined,
+  frontend: 'ui',
+  backend: 'api',
+  infra: 'infra',
+  mixed: 'app',
+};
+
+/** The commit head for an order or ticket: `feat(ui)`, a hotfix `fix(infra)!`. */
+export function commitHead(
+  kind: TicketKind,
+  domain: TicketDomain,
+): { type: string; scope?: string; breaking: boolean } {
+  const base = COMMIT_TYPES[kind];
+  const breaking = base.type.endsWith('!');
+  const scope = DOMAIN_SCOPES[domain] ?? base.scope;
+  return { type: breaking ? base.type.slice(0, -1) : base.type, scope, breaking };
+}
+
 /** The commit subject after the type: a bug's title without its `Bug: `, which `fix` already says. */
 export function commitSubject(title: string): string {
   return title.replace(/^Bug: /, '');

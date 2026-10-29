@@ -4,9 +4,9 @@ import { ORDER_URGENT_TICKS } from '../sim/balance';
 import {
   INCIDENT_BANNER_TEXT,
   MEETING_MISSED_TEXT,
-  COMMIT_TYPES,
   ORDER_EXPIRED_STAMP,
   PAUSE_HINT,
+  commitHead,
   commitSubject,
   inviteText,
   orderNumber,
@@ -21,7 +21,7 @@ import { el } from './dom';
 import { formatClock } from './format';
 import { playerBadge } from './playerBadge';
 import { type StepTileView, stepRow } from './stepTiles';
-import { domainText, roleText, workRateText } from './roles';
+import { roleText, workRateText } from './roles';
 
 /** How long a "+25" or "-10" floats by the score. */
 const POPUP_MS = 1200;
@@ -124,15 +124,17 @@ export function mountGameHud(root: HTMLElement): GameHud {
     const timer = el('div', 'order-timer');
     const fill = el('div', 'order-timer-fill');
     timer.append(fill);
-    const { type, scope } = COMMIT_TYPES[order.kind];
+    // The domain is the commit scope, `feat(api)`, so the card needs no extra line for it.
+    const { type, scope, breaking } = commitHead(order.kind, order.domain);
     const commit = el('div', 'order-title');
     commit.append(el('span', 'order-type', type));
     if (scope) commit.append(el('span', 'order-scope', `(${scope})`));
+    if (breaking) commit.append(el('span', 'order-type', '!'));
     const title = el('span', 'order-subject');
     commit.append(el('span', 'order-colon', ': '), title);
     const { row, views } = stepRow(orderStepTiles(order, state.tickets));
     const body = el('div', 'order-body');
-    body.append(commit, el('div', 'domain-chip', domainText(order.domain)), row);
+    body.append(commit, row);
     card.append(bar, timer, body);
     return { card, fill, title, tiles: views };
   }

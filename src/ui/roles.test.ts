@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { domainText, roleSkills, roleText, workRateText } from './roles';
 import { ROLE_IDS } from '../sim/roles';
+import { commitHead } from '../sim/content';
 
 describe('role and effective speed labels', () => {
   it('charts every skill on the same baseline scale, not a misleading peak', () => {
@@ -25,6 +26,23 @@ describe('role and effective speed labels', () => {
     expect(roleText('generalist')).toContain('Full-stack developer');
     expect(domainText('mixed')).toContain('Cross-cutting');
     expect(domainText('frontend')).toContain('Frontend');
+  });
+  it('puts the ticket domain in the commit scope, keeping a hotfix breaking', () => {
+    expect(commitHead('feature', 'general')).toEqual({ type: 'feat', breaking: false });
+    expect(commitHead('feature', 'backend')).toEqual({
+      type: 'feat',
+      scope: 'api',
+      breaking: false,
+    });
+    expect(commitHead('bug', 'frontend')).toMatchObject({ type: 'fix', scope: 'ui' });
+    expect(commitHead('incident', 'infra')).toEqual({
+      type: 'fix',
+      scope: 'infra',
+      breaking: true,
+    });
+    expect(commitHead('incident', 'general')).toEqual({ type: 'fix', breaking: true });
+    expect(commitHead('fullstack', 'mixed').scope).toBe('app');
+    expect(commitHead('frontend', 'frontend').scope).toBe('ui');
   });
   it('formats work speed, pair contribution/total, and quorum without invented review speed', () => {
     expect(workRateText({ playerId: 1, task: 'test', rate: 0.9 })).toBe('Test 0.90x');
