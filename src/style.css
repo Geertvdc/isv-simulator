@@ -1640,9 +1640,9 @@ body {
   align-items: center;
   gap: 1.25rem;
   padding: 0.75rem 1.125rem;
-  border-left: 0.25rem solid var(--accent);
+  border: 1px solid var(--window-edge);
   border-radius: 0.375rem;
-  background: rgba(127, 180, 255, 0.08);
+  background: var(--window-bar);
   text-align: left;
 }
 

@@ -185,7 +185,7 @@ export type GlyphShape =
   | { type: 'poly'; points: readonly number[]; fill?: boolean }
   | { type: 'line'; points: readonly number[] };
 
-export type GlyphId = StepKind | 'check' | 'bin' | 'lock' | 'bug';
+export type GlyphId = StepKind | 'inbox' | 'ship' | 'check' | 'bin' | 'lock' | 'bug';
 
 export const GLYPH_SIZE = 24;
 export const GLYPH_STROKE = 2.5;
@@ -233,6 +233,20 @@ export const GLYPHS: Readonly<Record<GlyphId, readonly GlyphShape[]>> = {
     { type: 'poly', points: [8, 10, 4, 17, 8, 16], fill: true },
     { type: 'poly', points: [16, 10, 20, 17, 16, 16], fill: true },
     { type: 'poly', points: [10, 17.5, 12, 22, 14, 17.5], fill: true },
+  ],
+  // An inbox tray with a ticket dropping in.
+  inbox: [
+    { type: 'line', points: [2, 13, 7, 13, 9, 16.5, 15, 16.5, 17, 13, 22, 13] },
+    { type: 'poly', points: [2, 13, 5, 6, 19, 6, 22, 13, 22, 21, 2, 21] },
+    { type: 'line', points: [12, 2, 12, 10] },
+    { type: 'line', points: [9, 7.5, 12, 10.5, 15, 7.5] },
+  ],
+  // A parcel going out to the customer.
+  ship: [
+    { type: 'poly', points: [12, 3, 21, 7.5, 21, 17, 12, 21.5, 3, 17, 3, 7.5] },
+    { type: 'line', points: [3, 7.5, 12, 12, 21, 7.5] },
+    { type: 'line', points: [12, 12, 12, 21.5] },
+    { type: 'line', points: [7.5, 5.2, 16.5, 9.7] },
   ],
   check: [{ type: 'line', points: [5, 12.5, 10, 17.5, 19, 7] }],
   bin: [
