@@ -1,6 +1,6 @@
 # Stations
 
-Everything you interact with stands on a solid tile. You use it from the tile next to it, facing it: the block you face lights up in your color. Order cards and recipes name stations by letter: **W**hiteboard, **K**eyboard, merge (**G**), **R**eview, **T**est bench, **P**ipeline.
+Everything you interact with stands on a solid tile. You use it from the tile next to it, facing it: the block you face lights up in your color. Every station has an icon on its top in its own color, and order cards, ticket cards and recipes show the same icons: keyboard (code), flask (test bench), two heads (review), whiteboard, merge, rocket (pipeline), plus the inbox tray, the bug queue's bug and the ship parcel.
 
 ![The Garage: inbox and bug queue at the back, keyboards on the left, test benches and pipeline on the right, ship hatch at the front](images/levels/garage.webp)
 
