@@ -7,42 +7,16 @@ import {
   isRoundRunning,
   updateFlow,
 } from '../src/flow/flow';
-import { normalizeUserId } from '../src/flow/identity';
-import { type ChapterInfo, type LevelRecord, mergeLevels, recordLevel } from '../src/flow/save';
-import { applyCommand } from '../src/flow/commands';
+import { type ChapterInfo, recordLevel } from '../src/flow/save';
 import { rolesForRoster } from '../src/flow/roster';
 import { createInputBuffer, pushInput, takeInput } from '../src/net/inputBuffer';
-import {
-  type ErrorCode,
-  type HelloMessage,
-  PROTOCOL_VERSION,
-  parseClientMessage,
-} from '../src/net/protocol';
+import { parseClientMessage } from '../src/net/protocol';
 import { createSnapshotLog, isSnapshotTick, recordTick, takeSnapshot } from '../src/net/snapshot';
-import {
-  NET_MAX_MESSAGES_PER_SECOND,
-  NET_MESSAGE_BURST,
-  NET_ROOM_IDLE_MS,
-  NET_SERVER_MAX_CATCHUP_TICKS,
-  NET_SNAPSHOT_EVERY_TICKS,
-  TICKS_PER_SECOND,
-} from '../src/sim/balance';
-import { MAX_PLAYERS } from '../src/sim/level';
+import { NET_ROOM_IDLE_MS, NET_SERVER_MAX_CATCHUP_TICKS } from '../src/sim/balance';
 import type { LevelResult } from '../src/sim/orders';
 import { CHAPTERS, LEVELS } from '../src/sim/levels';
 import { type GameState, type InputCommand, createGame } from '../src/sim/state';
 import { tick } from '../src/sim/tick';
-import {
-  type Member,
-  type Outgoing,
-  type ProfileWrite,
-  type RoomState,
-  TICK_MS,
-  errorTo,
-  hostOf,
-  playerCount,
-  roundStartTo,
-} from './room';
 import {
   allowedPresses,
   configurePlayer,
@@ -53,6 +27,16 @@ import {
   queuePresses,
   takeOverSlot,
 } from './lobby';
+import { refillBudgets, renameMember, spendMessage, updateMember } from './membership';
+import {
+  type Outgoing,
+  type ProfileWrite,
+  type RoomState,
+  TICK_MS,
+  errorTo,
+  hostOf,
+  roundStartTo,
+} from './room';
 
 export {
   type Member,
@@ -66,6 +50,14 @@ export {
   hostOf,
 } from './room';
 export { lobbyMessage, playerIdsOf, roomDeviceId } from './lobby';
+export {
+  type JoinResult,
+  dropMember,
+  joinRoom,
+  leaveRoom,
+  rejoinMember,
+  setMemberProfile,
+} from './membership';
 
 /** Absorbs float error so exactly N ticks of time always runs N ticks. */
 const EPSILON = 1e-6;
@@ -75,94 +67,6 @@ const CHAPTER_INFO: readonly ChapterInfo[] = CHAPTERS.map((c) => ({
   levelIds: c.levels.map((l) => l.id),
   starGate: c.starGate,
 }));
-
-export type JoinResult =
-  { ok: true; out: Outgoing[] } | { ok: false; code: ErrorCode; reason: string };
-
-function welcomeTo(room: RoomState, sessionId: string): Outgoing {
-  return {
-    to: sessionId,
-    message: {
-      type: 'welcome',
-      protocol: PROTOCOL_VERSION,
-      sessionId,
-      joinCode: room.joinCode,
-      serverTick: room.serverTick,
-      ticksPerSecond: TICKS_PER_SECOND,
-      snapshotEveryTicks: NET_SNAPSHOT_EVERY_TICKS,
-    },
-  };
-}
-
-/**
- * Checks a joiner's `hello` (the join options) and adds them. Refused:
- * a bad message, another protocol version, or more players than fit.
- */
-export function joinRoom(room: RoomState, sessionId: string, options: unknown): JoinResult {
-  const parsed = parseClientMessage(options);
-  if (!parsed.ok) return { ok: false, code: 'badMessage', reason: parsed.reason };
-  if (parsed.value.type !== 'hello') {
-    return { ok: false, code: 'badMessage', reason: 'joining needs a hello' };
-  }
-  const hello = parsed.value;
-  if (hello.protocol !== PROTOCOL_VERSION) {
-    return {
-      ok: false,
-      code: 'protocolMismatch',
-      reason: `server speaks protocol ${PROTOCOL_VERSION}, client ${hello.protocol}`,
-    };
-  }
-  if (room.members.some((m) => m.sessionId === sessionId)) {
-    return { ok: false, code: 'badMessage', reason: 'already in the room' };
-  }
-  if (playerCount(room) + hello.localPlayers > MAX_PLAYERS) {
-    return { ok: false, code: 'roomFull', reason: `at most ${MAX_PLAYERS} players per room` };
-  }
-  room.members.push(memberFrom(sessionId, hello));
-  followHost(room);
-  return {
-    ok: true,
-    out: [welcomeTo(room, sessionId), lobbyMessage(room), ...roundStartTo(room, sessionId)],
-  };
-}
-
-function memberFrom(sessionId: string, hello: HelloMessage): Member {
-  return {
-    sessionId,
-    userId: hello.userId,
-    displayName: hello.displayName,
-    localPlayers: hello.localPlayers,
-    profileId: normalizeUserId(hello.userId),
-    levels: {},
-    connected: true,
-    budget: NET_MESSAGE_BURST,
-    dropped: 0,
-  };
-}
-
-/** The room's unlocks follow the host: the save's levels become a copy of theirs. */
-function followHost(room: RoomState): void {
-  room.save.levels = structuredClone(hostOf(room)?.levels ?? {});
-}
-
-/**
- * A member's profile came in from the store (after joining: loading takes a
- * moment). Merged into what they have, so rounds finished in the meantime
- * aren't lost. When it's the host's, the room's unlocks change with it and
- * everyone gets them in a new `lobby` message.
- */
-export function setMemberProfile(
-  room: RoomState,
-  sessionId: string,
-  levels: Readonly<Record<string, LevelRecord>>,
-): Outgoing[] {
-  const member = room.members.find((m) => m.sessionId === sessionId);
-  if (!member) return [];
-  member.levels = mergeLevels(member.levels, levels);
-  if (member !== hostOf(room)) return [];
-  followHost(room);
-  return [lobbyMessage(room)];
-}
 
 /**
  * A round ended: it counts for everyone who was in the room when it started
@@ -192,66 +96,12 @@ export function takeProfileWrites(room: RoomState): ProfileWrite[] {
   return room.profileWrites.splice(0);
 }
 
-/**
- * Someone left for good (on purpose, or their reconnect grace ran out). The
- * host moves to the earliest joined member left. Outside a round their
- * players are dropped and the others renumbered in join order; during a
- * round their players stay and stand still until it ends (`pruneDeparted`
- * runs when the round stops or the next one starts).
- */
-export function leaveRoom(room: RoomState, sessionId: string): Outgoing[] {
-  const before = room.members.length;
-  room.members = room.members.filter((m) => m.sessionId !== sessionId);
-  if (room.members.length === before) return [];
-  followHost(room);
-  room.presses = room.presses.filter((p) => !isFromSession(p.deviceId, sessionId));
-  if (!room.game || room.flow.screen === 'intro') pruneDeparted(room);
-  return room.members.length > 0 ? [lobbyMessage(room)] : [];
-}
-
-/**
- * A member's connection dropped: they stay in the room (with their players,
- * who stand still) while it waits for them to reconnect. Menu authority
- * moves to the next connected member meanwhile (`hostOf`).
- */
-export function dropMember(room: RoomState, sessionId: string): Outgoing[] {
-  const member = room.members.find((m) => m.sessionId === sessionId);
-  if (!member?.connected) return [];
-  member.connected = false;
-  for (const id of playerIdsOf(room, sessionId)) {
-    // Refused outside the lobby and intro, where readiness doesn't count.
-    applyCommand(room.flow, { type: 'ready', playerId: id, ready: false });
-  }
-  room.presses = room.presses.filter((p) => !isFromSession(p.deviceId, sessionId));
-  followHost(room);
-  return [lobbyMessage(room)];
-}
-
-/**
- * A dropped member reconnected (the same session): they get the welcome
- * (with the protocol, which the client checks again), the room and the
- * loaded round (same round id) again, as they may have missed changes;
- * everyone gets the new `lobby`.
- */
-export function rejoinMember(room: RoomState, sessionId: string): Outgoing[] {
-  const member = room.members.find((m) => m.sessionId === sessionId);
-  if (!member) return [];
-  member.connected = true;
-  member.budget = NET_MESSAGE_BURST;
-  followHost(room);
-  return [welcomeTo(room, sessionId), lobbyMessage(room), ...roundStartTo(room, sessionId)];
-}
-
 /** A message from a member: checked first, refused with an `error` when it doesn't parse. */
 export function handleMessage(room: RoomState, sessionId: string, raw: unknown): Outgoing[] {
   const member = room.members.find((m) => m.sessionId === sessionId);
   if (!member?.connected) return [];
   // A flood is dropped before anything else looks at it.
-  if (member.budget < 1) {
-    member.dropped++;
-    return [];
-  }
-  member.budget--;
+  if (!spendMessage(member)) return [];
   const parsed = parseClientMessage(raw);
   if (!parsed.ok) return [errorTo(sessionId, 'badMessage', parsed.reason)];
   const message = parsed.value;
@@ -289,29 +139,8 @@ export function handleMessage(room: RoomState, sessionId: string, raw: unknown):
     case 'hello':
       return updateMember(room, member, message);
     case 'rename':
-      if (member.displayName === message.displayName) return [];
-      member.displayName = message.displayName;
-      return [lobbyMessage(room)];
+      return renameMember(room, member, message.displayName);
   }
-}
-
-/** A `hello` from someone already in the room: a new name or couch player count. */
-function updateMember(room: RoomState, member: Member, hello: HelloMessage): Outgoing[] {
-  if (hello.protocol !== PROTOCOL_VERSION) {
-    return [
-      errorTo(member.sessionId, 'protocolMismatch', `server speaks protocol ${PROTOCOL_VERSION}`),
-    ];
-  }
-  const bound = playerIdsOf(room, member.sessionId).length;
-  if (
-    playerCount(room, member.sessionId) + hello.localPlayers > MAX_PLAYERS ||
-    hello.localPlayers < bound
-  ) {
-    return [errorTo(member.sessionId, 'roomFull', `no room for ${hello.localPlayers} players`)];
-  }
-  member.displayName = hello.displayName;
-  member.localPlayers = hello.localPlayers;
-  return [lobbyMessage(room)];
 }
 
 /** An input that does something (a standing, idle player's inputs don't keep a room open). */
@@ -408,10 +237,7 @@ const resultOf = (game: GameState): LevelResult | null => game.result;
  * every `NET_SNAPSHOT_EVERY_TICKS`.
  */
 export function stepRoom(room: RoomState): Outgoing[] {
-  const refill = NET_MAX_MESSAGES_PER_SECOND / TICKS_PER_SECOND;
-  for (const member of room.members) {
-    member.budget = Math.min(NET_MESSAGE_BURST, member.budget + refill);
-  }
+  refillBudgets(room);
   const ctx = flowContext(room);
   const { presses, changed } = allowedPresses(room, room.presses);
   room.presses = [];
