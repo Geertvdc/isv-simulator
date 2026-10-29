@@ -21,7 +21,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { helloFor, joinRoomByCode } from '../src/net/client';
 import { CHAPTERS } from '../src/sim/levels';
-import { SCENES } from '../src/sim/scenes';
+import { SCENES } from '../src/sim/sceneCatalog';
 
 const args = process.argv.slice(2);
 const arg = (name: string): string | undefined =>

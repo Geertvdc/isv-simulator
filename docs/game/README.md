@@ -158,6 +158,6 @@ npm run dev
 npm run screenshots
 ```
 
-The script (`scripts/screenshots.ts`) drives headless Chrome. Menus are reached with key presses. Every moment of a round is a **scene** in `src/sim/scenes.ts`: it builds the game state for that moment directly (tickets on stations, a broken pipeline, a manager walking into someone), plays a few ticks with scripted buttons and freezes. Open one by hand with `/?scene=<id>`, e.g. `/?scene=throw`. `scenes.test.ts` checks every scene still reaches its moment, so a game change that breaks a screenshot fails the tests.
+The script (`scripts/screenshots.ts`) drives headless Chrome. Menus are reached with key presses. Every moment of a round is a **scene** in `src/sim/sceneCatalog.ts` (built with the blocks in `src/sim/scenes.ts`): it builds the game state for that moment directly (tickets on stations, a broken pipeline, a manager walking into someone), plays a few ticks with scripted buttons and freezes. Open one by hand with `/?scene=<id>`, e.g. `/?scene=throw`. `sceneCatalog.test.ts` checks every scene still reaches its moment, so a game change that breaks a screenshot fails the tests.
 
 Pass `--only=<text>` to retake a subset, e.g. `--only=levels`. To add a picture: add a scene, run the script, link `images/mechanics/<scene id>.webp` (levels go to `images/levels/`).

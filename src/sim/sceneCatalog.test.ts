@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { LEVELS } from './levels';
-import { SCENES, type Scene, runScene, sceneById } from './scenes';
+import { SCENES, sceneById } from './sceneCatalog';
+import { type Scene, runScene } from './scenes';
 
 function scene(id: string): Scene {
   const found = sceneById(id);
