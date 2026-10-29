@@ -379,7 +379,7 @@ export const LEVEL_INTRO_TIPS: Readonly<Record<string, { text: string; picture: 
   },
   'scale-up': {
     picture: 'review',
-    text: 'With two or more of you, some features need a code review: two players work the R station together.',
+    text: 'With two or more of you, some features need a code review: two players work the review station together.',
   },
   'seed-round': {
     picture: 'incident',
@@ -395,11 +395,11 @@ export const LEVEL_INTRO_TIPS: Readonly<Record<string, { text: string; picture: 
   },
   'design-sprint': {
     picture: 'design',
-    text: 'Some features start at the whiteboard (W): design them first and they code faster. Two at one keyboard code faster too.',
+    text: 'Some features start at the whiteboard: design them first and they code faster. Two at one keyboard code faster too.',
   },
   monorepo: {
     picture: 'merge',
-    text: 'Full-stack features come as a front end and a back end. Code both, then put them together on the merge station (G).',
+    text: 'Full-stack features come as a front end and a back end. Code both, then put them together on the merge station.',
   },
   hackathon: {
     picture: 'carousel',
