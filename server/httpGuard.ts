@@ -10,6 +10,10 @@
  *   (`PUT /profiles/:userId`) and failed joins (`POST /matchmake/join|joinById`
  *   and `GET /rooms/:code` that fail; against guessing join codes). Past a
  *   limit: 429 with `Retry-After`.
+ * - **Path shape.** The router matches on the WHATWG-normalized pathname
+ *   (`.`/`..` and `%2e` segments resolved, `\` turned into `/`, ...), so a
+ *   path that normalizes to something else gets a 400:
+ *   otherwise `/./matchmake/create/game` would dodge the limits below.
  * - **CORS origins** (`corsOrigin`, installed on Colyseus' matchmaker
  *   controller): only `allowedOrigins` get their origin back, or any origin
  *   when that's `null`.
@@ -107,13 +111,37 @@ export function clientIp(
 
 export type RequestKind = 'createRoom' | 'joinRoom' | 'lookupRoom' | 'profileWrite' | 'other';
 
-/** Which limit a request falls under. */
+/**
+ * The pathname the router will match `url` against, or `null` when that is not
+ * exactly the raw path: dot segments (also escaped, `%2e`), backslashes,
+ * characters it would escape, fragments, absolute or empty forms. The router
+ * decodes no other escapes (`%2f` stays three characters), so those are fine. Refusing those means the guard and the
+ * router always agree on which route a request is for.
+ */
+export function normalizedPath(url: string): string | null {
+  const raw = url.split('?')[0] ?? '';
+  if (!raw.startsWith('/')) return null;
+  let pathname: string;
+  try {
+    pathname = new URL(url, 'http://localhost').pathname;
+  } catch {
+    return null;
+  }
+  return pathname === raw ? pathname : null;
+}
+
+/** Which limit a request falls under, by the path as the router sees it (case-blind, to be safe). */
 export function classifyRequest(method: string, url: string): RequestKind {
-  const path = url.split('?')[0] ?? '';
+  let path: string;
+  try {
+    path = new URL(url, 'http://localhost').pathname.toLowerCase();
+  } catch {
+    return 'other';
+  }
   if (method === 'POST') {
-    const match = /^\/matchmake\/(\w+)\//.exec(path);
-    if (match?.[1] === 'create' || match?.[1] === 'joinOrCreate') return 'createRoom';
-    if (match?.[1] === 'join' || match?.[1] === 'joinById') return 'joinRoom';
+    const match = /^\/matchmake\/([^/]+)\//.exec(path);
+    if (match?.[1] === 'create' || match?.[1] === 'joinorcreate') return 'createRoom';
+    if (match?.[1] === 'join' || match?.[1] === 'joinbyid') return 'joinRoom';
   }
   if (method === 'GET' && path.startsWith('/rooms/')) return 'lookupRoom';
   if (method === 'PUT' && path.startsWith('/profiles/')) return 'profileWrite';
@@ -163,6 +191,11 @@ export function createHttpGuard(settings: HttpGuardSettings): HttpGuard {
 
   return (req, res) => {
     const method = req.method ?? 'GET';
+    const url = req.url ?? '/';
+    if (normalizedPath(url) === null) {
+      refuse(req, res, 400, 'malformed request path');
+      return false;
+    }
     if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
       const length = req.headers['content-length'];
       if (length === undefined && req.headers['transfer-encoding'] !== undefined) {
@@ -178,7 +211,7 @@ export function createHttpGuard(settings: HttpGuardSettings): HttpGuard {
         return false;
       }
     }
-    const kind = classifyRequest(method, req.url ?? '/');
+    const kind = classifyRequest(method, url);
     if (kind === 'other') return true;
     const ip = clientIp(req.socket.remoteAddress, req.headers['x-forwarded-for'], trustProxyHops);
     const t = now();

@@ -1,5 +1,6 @@
 /** The HTTP guard: its pure parts, then body size, rate limits and CORS over real HTTP. */
 
+import { request } from 'node:http';
 import { afterEach, describe, expect, it } from 'vitest';
 import { PROTOCOL_VERSION } from '../src/net/protocol';
 import { type RunningServer, type GameServerOptions, startGameServer } from './app';
@@ -7,6 +8,7 @@ import {
   classifyRequest,
   clientIp,
   corsOrigin,
+  normalizedPath,
   parseAllowedOrigins,
   parseTrustProxy,
 } from './httpGuard';
@@ -77,6 +79,44 @@ describe('classifyRequest', () => {
     expect(classifyRequest('PUT', '/profiles/some-id')).toBe('profileWrite');
     expect(classifyRequest('GET', '/profiles/some-id')).toBe('other');
     expect(classifyRequest('OPTIONS', '/matchmake/create/game')).toBe('other');
+  });
+
+  it('classifies by the path the router sees, not the raw one', () => {
+    expect(classifyRequest('POST', '/./matchmake/create/game')).toBe('createRoom');
+    expect(classifyRequest('POST', '/x/../matchmake/joinOrCreate/game')).toBe('createRoom');
+    expect(classifyRequest('POST', '/%2e/matchmake/joinById/ABCD')).toBe('joinRoom');
+    expect(classifyRequest('POST', '/MATCHMAKE/CREATE/game')).toBe('createRoom');
+    expect(classifyRequest('GET', '/x/%2E%2E/rooms/ABCD')).toBe('lookupRoom');
+    expect(classifyRequest('PUT', '\\profiles\\some-id')).toBe('profileWrite');
+  });
+});
+
+describe('normalizedPath', () => {
+  it('passes plain paths', () => {
+    expect(normalizedPath('/matchmake/create/game')).toBe('/matchmake/create/game');
+    expect(normalizedPath('/rooms/ABCD?x=%20')).toBe('/rooms/ABCD');
+    expect(normalizedPath('/')).toBe('/');
+    // The router decodes no escapes besides dot segments, so these match as written.
+    expect(normalizedPath('/rooms/%20ab%2Fcd')).toBe('/rooms/%20ab%2Fcd');
+  });
+
+  it('refuses paths the router would read differently', () => {
+    for (const url of [
+      '/./matchmake/create/game',
+      '/x/../matchmake/create/game',
+      '/%2e/matchmake/create/game',
+      '/%2E%2E/rooms/ABCD',
+      '//matchmake/create/game',
+      '/rooms/ABCD/.',
+      '\\rooms\\ABCD',
+      '/rooms/AB CD',
+      '/rooms/ABCD#x',
+      'http://evil.example/matchmake/create/game',
+      '*',
+      '',
+    ]) {
+      expect(normalizedPath(url), url).toBeNull();
+    }
   });
 });
 
@@ -163,6 +203,48 @@ describe('the guard over HTTP', () => {
     expect(refused.status).toBe(429);
     expect(await refused.json()).toEqual({ error: 'too many failed joins' });
     expect((await fetch(`${base}/rooms/${created.roomId}`)).status).toBe(429);
+  });
+
+  /** A raw request, so the path goes out exactly as written (`fetch` would normalize it). */
+  const raw = (method: string, path: string, body?: unknown) =>
+    new Promise<number>((resolve, reject) => {
+      const data = body === undefined ? undefined : JSON.stringify(body);
+      const req = request(
+        `${base}/`,
+        {
+          method,
+          path,
+          headers:
+            data === undefined
+              ? {}
+              : { 'content-type': 'application/json', 'content-length': Buffer.byteLength(data) },
+        },
+        (res) => {
+          res.resume();
+          resolve(res.statusCode ?? 0);
+        },
+      );
+      req.on('error', reject);
+      req.end(data);
+    });
+
+  it('refuses paths that would dodge the limits by normalizing differently', async () => {
+    await start({ limits: { roomCreate: { burst: 1, refillMs: 60_000 } } });
+    expect(await raw('POST', '/matchmake/create/game', hello)).toBe(200);
+    expect(await raw('POST', '/matchmake/create/game', hello)).toBe(429);
+    for (const path of [
+      '/./matchmake/create/game',
+      '/x/../matchmake/create/game',
+      '/%2e/matchmake/create/game',
+      '/x/%2E%2E/matchmake/joinOrCreate/game',
+      '//matchmake/create/game',
+    ]) {
+      expect(await raw('POST', path, hello), path).toBe(400);
+    }
+    for (const path of ['/./rooms/QQQQ', '/x/../rooms/QQQQ', '/%2e/rooms/QQQQ']) {
+      expect(await raw('GET', path), path).toBe(400);
+    }
+    expect(await raw('PUT', `/./profiles/${ID}`, {})).toBe(400);
   });
 
   it('keys the limits on X-Forwarded-For only when a proxy is trusted', async () => {

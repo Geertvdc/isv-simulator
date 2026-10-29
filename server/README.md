@@ -93,7 +93,7 @@ Per client IP (token buckets; numbers in `src/sim/balance.ts`), past which the s
 - failed joins (`joinById` with a code that doesn't work) and failed `GET /rooms/:code` lookups: 10, then one per 6 s (`NET_FAILED_JOIN_*`), so 4-letter codes can't be guessed; while out of attempts every join and lookup is refused;
 - `PUT /profiles/:userId`: 30, then one per second (`NET_PROFILE_WRITE_*`).
 
-Request bodies over 64 KB (`NET_MAX_BODY_BYTES`) get a 413 without being read (over 1 MB the connection is cut); bodies without a `Content-Length` get a 411. The store holds at most 10,000 profiles (`NET_MAX_PROFILES`): a `PUT` that would create one more gets a 507 (`{ "error": "profile limit reached" }`), existing profiles still update, and a round isn't recorded for a new user.
+Request bodies over 64 KB (`NET_MAX_BODY_BYTES`) get a 413 without being read (over 1 MB the connection is cut); bodies without a `Content-Length` get a 411. A path that isn't already in the form the router matches (`.`/`..` or `%2e` segments, `\`, unescaped spaces, a fragment) gets a 400, so the limits can't be dodged with `/./matchmake/create/game` and the like. The store holds at most 10,000 profiles (`NET_MAX_PROFILES`): a `PUT` that would create one more gets a 507 (`{ "error": "profile limit reached" }`), existing profiles still update, and a round isn't recorded for a new user.
 
 The client IP is the socket's address. Behind a reverse proxy that is the proxy for everyone, so set `TRUST_PROXY` there (and only there: otherwise anyone could pick their own IP with the header).
 
