@@ -298,6 +298,8 @@ export const NET_PROFILE_WRITE_BURST = 30;
 export const NET_PROFILE_WRITE_REFILL_MS = 1000;
 /** Largest request body the server reads (a full profile update is about 20 KB); bigger gets a 413. */
 export const NET_MAX_BODY_BYTES = 64 * 1024;
+/** A refused body up to this size is drained (so the client sees the 413); a bigger one cuts the connection. */
+export const NET_MAX_DRAIN_BYTES = 1024 * 1024;
 /** Most profiles the server stores; new ones past this are refused, existing ones still update. */
 export const NET_MAX_PROFILES = 10_000;
 /** In the online lobby, a second Esc within this long leaves the room. */
