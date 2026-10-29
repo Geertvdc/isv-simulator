@@ -28,14 +28,14 @@ Step 2:
 
 Step 3:
 
-- [ ] HUD order cards and world ticket cards share one layout: timer bar on top, one tile per step with its station icon and live state
-- [ ] Cards read as issue-tracker cards (`#id`, kind chip, CI-check step states, `closed: wontfix` when expired)
-- [ ] One shared step-look definition; a tested helper gives each step's display state
-- [ ] Screenshots retaken where the look changed
+- [x] HUD order cards and world ticket cards share one layout: timer bar on top, one tile per step with its station icon and live state
+- [x] Cards read as issue-tracker cards (`#id`, kind chip, CI-check step states, `closed: wontfix` when expired)
+- [x] One shared step-look definition; a tested helper gives each step's display state
+- [x] Screenshots retaken where the look changed
 
 All steps:
 
-- [ ] `npm run check` and `npm run build` pass
+- [x] `npm run check` and `npm run build` pass
 
 ## Out of scope
 
