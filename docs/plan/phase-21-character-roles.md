@@ -1,6 +1,6 @@
 # Phase 21 proposal: character roles, ticket domains, and a new cast
 
-**Status:** design proposal, not approved for implementation. Numbers below are starting hypotheses, not measured balance results. Implement one approved subphase at a time.
+**Status:** 21a visual investigation approved and implemented for review; body/face/motion selection still awaits the user. 21b–21d are not approved for implementation. Numbers below are starting hypotheses, not measured balance results. Implement one approved subphase at a time.
 
 **Goal:** a team of generalists is dependable and can earn three stars; a well-coordinated specialist team has a higher ceiling because it assigns work and hands tickets over well. Mixed teams should be a useful middle ground. Replace the current character silhouette, not just its hats.
 
@@ -10,7 +10,7 @@
 - Specialists should theoretically outperform generalists when they stay on their strengths and coordinate perfectly. Their opportunity cost is inflexibility, travel, queues, and handovers.
 - The original 25% coding / 150% testing example was illustrative, not a required stat line.
 - Redesign the cast with new bodies, faces, outfits, and animation personalities. Do not retain the current hats or use new hats to distinguish roles. The current silhouette is not a constraint.
-- This phase is planning only until approved. Character art direction needs a visual approval checkpoint before production.
+- Only the 21a study scope is approved. Character art direction needs a visual approval checkpoint before production.
 
 ## 1. What already exists
 
@@ -191,6 +191,36 @@ Bump the protocol for the incompatible setup/state change and cover snapshots, r
 | 21d: balance and rollout | `scripts/sim.ts`, `src/sim/bot.ts`, benchmark fixtures/tests, explicitly selected level settings, `docs/game/`, approved screenshots | Validate target envelope with humans and bots, tune, then opt in selected campaign levels. Expand only after that evidence. |
 
 Before each slice, write a short concrete implementation plan and wait for approval as usual. Do not implement all four slices under one approval.
+
+### 21a study review
+
+Open `/models.html?studies` with `npm run dev`. The existing office-kit page remains at `/models.html`, and the playable cast is unchanged. The studies are dev-only, not included in the production game bundle.
+
+The three alternatives are **Compact angular** (cut overshirt, swept block hair, short stride), **Rounded stop-motion** (pear jacket, scalloped curls, soft waddle), and **Workplace cartoon** (broad shoulders, narrow waist, quiff, exaggerated stride). They are competing visual languages, not three approved roles or a final cast.
+
+- [x] Three procedural, hat-free studies with new bodies/faces, attached jointed arms, split legs and grounded shoes.
+- [x] Idle, walk, work, carry, dash, throw wind-up/release, and shove pose loops; pause and scrub the loop for inspection.
+- [x] Enlarged front/rear comparisons, four copies of each study in player colors, and grayscale/rear toggles.
+- [x] Isolated Monorepo office comparisons use the actual map geometry, gameplay camera fit, lighting, materials and low-quality renderer, without changing simulation or production characters.
+- [x] Tests cover shoulder/elbow/wrist attachment under translated/rotated roots, bounded arm extension, grounded feet, study head bounds, actual folder-tab/flap clearance against head/jacket triangles, hand clearance against the head, 101 wind-up samples per style, and owned-geometry disposal.
+- [x] `npm run check` and `npm run build` pass; desktop and narrow-window study captures and an unchanged real-game reference were inspected.
+- [x] Independent critic review is clean (two rounds). A final stronger actual-folder-envelope check exposed an early cartoon-jacket intersection; a small rearward torso adjustment fixed it, then full validation and the second critic review passed.
+- [ ] User chooses a language at gameplay scale. Human two-second couch readability is **not yet verified**.
+
+Useful reproducible views:
+
+| Review | URL |
+| --- | --- |
+| All three, front/rear | `/models.html?studies&still&action=carry&time=900` |
+| Compact angular, four players | `/models.html?studies&view=office&style=angular&still` |
+| Rounded stop-motion, four players | `/models.html?studies&view=office&style=clay&still` |
+| Workplace cartoon, four players | `/models.html?studies&view=office&style=cartoon&still` |
+| Rear/grayscale example | `/models.html?studies&view=office&style=clay&rear&gray&still` |
+| Throw scrub example | `/models.html?studies&action=throw&still&time=900` |
+
+Capture the comparison set with `npx vite-node scripts/characterStudies.ts --out=/absolute/output/directory` (optional `--base=http://localhost:5173`). These are study evidence, not replacements for approved game documentation images. The script also captures `/?scene=level-monorepo&quality=low` as an unchanged actual-game reference.
+
+The shared study rig keeps `carryPoint` and the existing hand targets unchanged. Its torso bends out of the ticket arc and its rubber-hose arms extend for wind-up; these are investigation choices, not a production rig decision. The released-ticket path is illustrative, explicitly labeled, and does not change the sim's throw. No rates, domains, role selection, online behavior, final cast, or campaign tuning are implemented here.
 
 ## Tests and completion criteria
 
