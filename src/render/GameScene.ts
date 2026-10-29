@@ -2,34 +2,22 @@ import Phaser from 'phaser';
 import { buildInputCommands } from '../input/commands';
 import type { DevicePress } from '../input/controller';
 import { type InputFrame, InputDevices } from '../input/devices';
-import { claimOrphanedPlayer } from '../input/lobby';
-import { applyCommand, commandFailureText, type FlowCommand } from '../flow/commands';
+import type { FlowCommand } from '../flow/commands';
 import { rolesForRoster } from '../flow/roster';
 import {
   type Flow,
-  type FlowContext,
   type FlowEffect,
-  type FlowUpdate,
-  type Screen,
-  cancelJoinCode,
-  countdownNumber,
-  createFlow,
-  editJoinCode,
   finishDemoRound,
-  finishRound,
   isRoundRunning,
   onlineEnded,
-  resultsReady,
-  submitJoinCode,
-  updateFlow,
 } from '../flow/flow';
-import { type OnlineState, onlineNowMs } from '../flow/online';
+import { onlineNowMs } from '../flow/online';
 import { type HintId, startHints, updateHints } from '../flow/hints';
-import { type ChapterInfo, type SaveData, type StorageLike, writeSave } from '../flow/save';
-import { DEMO_BOTS, DEMO_KIOSK_IDLE_MS, SCREEN_FADE_MS } from '../sim/balance';
+import { type SaveData, type StorageLike, writeSave } from '../flow/save';
+import { DEMO_BOTS, SCREEN_FADE_MS } from '../sim/balance';
 import { type LevelMap, type Tile, getTile } from '../sim/level';
 import { type Bot, botInput, createBot } from '../sim/bot';
-import { CHAPTERS, DEMO_LEVEL_IDS, LEVELS, levelById, type Level } from '../sim/levels';
+import { LEVELS, levelById, type Level } from '../sim/levels';
 import type { GameEvent } from '../sim/orders';
 import { type Scene, sceneDone, sceneInputs, sceneState } from '../sim/scenes';
 import { type GameState, createGame } from '../sim/state';
@@ -40,6 +28,8 @@ import { drawsMap, menuViewOf } from './menuView';
 import type { RoundRenderer, RoundRendererFactory } from './RoundRenderer';
 import type { RoundView } from './roundView';
 import { AudioController } from './scene/AudioController';
+import { LEVEL_IDS, chapterIdOf } from './scene/campaign';
+import { FlowController, type JoinCodeInput } from './scene/FlowController';
 import { NET_STATS_EVENT, type OnlineOptions, OnlineSession } from './scene/OnlineSession';
 
 export interface TileHover {
@@ -67,26 +57,7 @@ export interface GameFrame {
  */
 export const GAME_FRAME_EVENT = 'game-frame';
 
-/** What the menus show: the flow plus what it is read with. */
-export interface FlowView {
-  flow: Flow;
-  save: SaveData;
-  levelIds: readonly string[];
-  chapters: readonly ChapterInfo[];
-  unlockAll: boolean;
-  /** On the results screen: presses count now. */
-  resultsReady: boolean;
-  /** During the countdown: the number showing (3, 2, 1). */
-  countdown: number | null;
-  /**
-   * In an online room: the session. `flow` is then the room's flow from the
-   * server (or this browser's own `online` screen while connecting) and
-   * `save.levels` the room's unlocks.
-   */
-  online: OnlineState | null;
-  /** Why the last flow command was refused (by the room's server, online), or `null`. */
-  commandError: string | null;
-}
+export type { FlowView, JoinCodeInput } from './scene/FlowController';
 
 /** Emitted on `game.events` with a `FlowView` whenever the screens change. */
 export const FLOW_EVENT = 'flow';
@@ -105,10 +76,6 @@ export const DIALOG_EVENT = 'dialog';
 
 /** Emitted on `game.events` by the scene: a back button was pressed while a dialog is open. */
 export const DIALOG_CANCEL_EVENT = 'dialog-cancel';
-
-/** What the join-code screen's text box did. */
-export type JoinCodeInput =
-  { type: 'text'; text: string } | { type: 'submit' } | { type: 'cancel' };
 
 /** Emitted on `game.events` by the UI with a `JoinCodeInput`. */
 export const JOIN_CODE_EVENT = 'join-code';
@@ -163,21 +130,6 @@ interface SceneData {
   startRound?: boolean;
 }
 
-const LEVEL_IDS: readonly string[] = LEVELS.map((l) => l.id);
-const DEMO_LEVELS: readonly number[] = DEMO_LEVEL_IDS.map((id) => LEVEL_IDS.indexOf(id)).filter(
-  (i) => i >= 0,
-);
-const CHAPTER_INFO: readonly ChapterInfo[] = CHAPTERS.map((c) => ({
-  levelIds: c.levels.map((l) => l.id),
-  starGate: c.starGate,
-}));
-
-/** The id of the chapter holding level `index`, if any. */
-function chapterIdOf(index: number): string | null {
-  const id = LEVEL_IDS[index];
-  return CHAPTERS.find((c) => c.levels.some((l) => l.id === id))?.id ?? null;
-}
-
 /** The first round's seed; every restart moves on to the next one. */
 const FIRST_SEED = 1;
 /** The level's look, with `?walls=` and `?floor=` overriding it to preview others. */
@@ -205,8 +157,8 @@ export class GameScene extends Phaser.Scene {
   private devices: InputDevices | null = null;
   /** Music and sound effects; kept across scene restarts so the music plays on. */
   private readonly audio: AudioController;
-  /** The screens; kept across scene restarts. */
-  private readonly flow: Flow = createFlow();
+  /** The screens and flow commands; kept across scene restarts. */
+  private readonly flows: FlowController;
   /** The level whose map is loaded. */
   private mapLevelIndex = 0;
   /** The round on screen, or `null` in menus outside a round. */
@@ -218,10 +170,6 @@ export class GameScene extends Phaser.Scene {
   private hovered: TileHover | null = null;
   private debugVisible = false;
   private seed = FIRST_SEED;
-  /** What the last `FLOW_EVENT` said about the results taking presses. */
-  private shownResultsReady = false;
-  /** The countdown number the last `FLOW_EVENT` showed. */
-  private shownCountdown: number | null = null;
   /** Ticks the scene from `?scene=` has run, and whether it froze. */
   private sceneTicks = 0;
   /** When the scene's map started fading in. */
@@ -231,8 +179,6 @@ export class GameScene extends Phaser.Scene {
   private dialogOpen = false;
   /** The online room, kept across scene restarts. */
   private readonly session: OnlineSession;
-  /** A refused local flow command, shown until it works or the screen changes. */
-  private localCommandError: { screen: Screen; text: string } | null = null;
   /** The boot-time checks (a rejoin ticket, the page-hide hook) ran; not again on scene restarts. */
   private booted = false;
 
@@ -240,6 +186,26 @@ export class GameScene extends Phaser.Scene {
     super('GameScene');
     const id = options.scene?.levelId;
     if (id) this.mapLevelIndex = Math.max(0, LEVEL_IDS.indexOf(id));
+    const session = (): OnlineSession => this.session;
+    this.flows = new FlowController(
+      {
+        save: options.save,
+        unlockAll: options.unlockAll,
+        scene: options.scene !== null,
+        kiosk: options.kiosk,
+        practiceLevelId: options.practiceLevel?.id ?? null,
+      },
+      {
+        get state() {
+          return session().state;
+        },
+        sendCommand: (command) => session().sendCommand(command),
+      },
+      (view) => {
+        this.menuRenderer.syncMenu(menuViewOf(view));
+        this.game.events.emit(FLOW_EVENT, view);
+      },
+    );
     this.session = new OnlineSession(options.online, {
       flow: this.flow,
       save: options.save,
@@ -253,12 +219,11 @@ export class GameScene extends Phaser.Scene {
       },
     });
     this.audio = new AudioController(options.save, options.storage, chapterIdOf);
-    // A kiosk starts as if left alone for a while: straight into the demo.
-    if (options.kiosk) this.flow.lastPressMs = -DEMO_KIOSK_IDLE_MS;
-    if (options.practiceLevel) {
-      this.flow.screen = 'lobby';
-      this.flow.awake = true;
-    }
+  }
+
+  /** The screens; kept across scene restarts. */
+  private get flow(): Flow {
+    return this.flows.flow;
   }
 
   preload(): void {
@@ -306,7 +271,7 @@ export class GameScene extends Phaser.Scene {
     });
     this.game.events.off(COMMAND_EVENT);
     this.game.events.on(COMMAND_EVENT, (command: FlowCommand) => {
-      this.dispatchCommand(command);
+      this.flows.dispatch(command, this.time.now);
     });
     this.cameras.main.fadeIn(SCREEN_FADE_MS);
     this.applySettings();
@@ -348,28 +313,11 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const { players } = this.flow.lobby;
-    const before = players.map((p) => p.deviceId);
-    claimOrphanedPlayer(players, frame.presses, new Set(frame.readings.keys()));
-    const claimed = new Set(
-      players.filter((p, i) => p.deviceId !== before[i]).map((p) => p.deviceId),
-    );
-
-    const ctx = this.flowContext(time);
-    const update = updateFlow(
-      this.flow,
-      this.menuPresses(frame.presses.filter((p) => !claimed.has(p.deviceId))),
-      ctx,
-    );
+    const presses = this.flows.claimDevices(frame);
+    const update = this.flows.update(this.menuPresses(presses), time);
     if (this.runEffects(update.effects)) return;
-    const ready = resultsReady(this.flow, time);
-    const countdown = countdownNumber(this.flow, time);
     const dirty = this.session.takeDirty();
-    if (
-      update.changed ||
-      dirty ||
-      ready !== this.shownResultsReady ||
-      countdown !== this.shownCountdown
-    ) {
+    if (update.changed || dirty || this.flows.shownChanged(this.flow, time)) {
       this.emitFlow(time);
     }
 
@@ -389,7 +337,7 @@ export class GameScene extends Phaser.Scene {
           finishDemoRound(this.flow, result, time);
           this.emitFlow(time);
         } else if (result) {
-          this.runEffects(finishRound(this.flow, result, ctx).effects);
+          this.runEffects(this.flows.finishRound(result, time).effects);
           this.emitFlow(time);
           this.audio.countStars(this.flow.results?.stars ?? 0);
         }
@@ -465,61 +413,8 @@ export class GameScene extends Phaser.Scene {
     writeSave(this.options.storage, this.options.save);
   }
 
-  private flowContext(nowMs: number): FlowContext {
-    return {
-      save: this.options.save,
-      levelIds: this.options.practiceLevel ? [this.options.practiceLevel.id] : LEVEL_IDS,
-      chapters: CHAPTER_INFO,
-      unlockAll: this.options.unlockAll,
-      nowMs,
-      // A scene is a picture: no demo.
-      demo:
-        this.options.scene || this.options.practiceLevel
-          ? undefined
-          : { kiosk: this.options.kiosk, levels: DEMO_LEVELS },
-      practice: !!this.options.practiceLevel,
-    };
-  }
-
-  /**
-   * Runs a flow command from the UI: online the room's server applies it (and
-   * answers a refusal with an `error`, kept as `setupError`); offline it's
-   * applied here. Either way a refusal reaches the screens as
-   * `FlowView.commandError`, never as an exception.
-   */
-  private dispatchCommand(command: FlowCommand): void {
-    if (this.session.sendCommand(command)) return;
-    const result = applyCommand(this.flow, command);
-    this.localCommandError = result.ok
-      ? null
-      : { screen: this.flow.screen, text: commandFailureText(result.reason) };
-    this.emitFlow(this.time.now);
-  }
-
   private emitFlow(nowMs: number): void {
-    // Online, the screens show the room: its flow, its clock and its unlocks.
-    const online = this.flow.screen === 'online' ? this.session.state : null;
-    const flow = online?.flow ?? this.flow;
-    const now = online ? onlineNowMs(online) : nowMs;
-    this.shownResultsReady = resultsReady(flow, now);
-    this.shownCountdown = countdownNumber(flow, now);
-    const view: FlowView = {
-      flow,
-      save: online ? { ...this.options.save, levels: online.levels } : this.options.save,
-      levelIds: this.options.practiceLevel ? [this.options.practiceLevel.id] : LEVEL_IDS,
-      chapters: CHAPTER_INFO,
-      unlockAll: online ? false : this.options.unlockAll,
-      resultsReady: this.shownResultsReady,
-      countdown: this.shownCountdown,
-      online,
-      commandError: online
-        ? (online.setupError ?? null)
-        : this.localCommandError?.screen === flow.screen
-          ? this.localCommandError.text
-          : null,
-    };
-    this.menuRenderer.syncMenu(menuViewOf(view));
-    this.game.events.emit(FLOW_EVENT, view);
+    this.flows.emit(nowMs);
   }
 
   // ------------------------------------------------------------ online
@@ -547,14 +442,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const flow = online.flow;
-    const roomNow = onlineNowMs(online);
-    const ready = flow ? resultsReady(flow, roomNow) : false;
-    const countdown = flow ? countdownNumber(flow, roomNow) : null;
-    if (
-      session.takeDirty() ||
-      ready !== this.shownResultsReady ||
-      countdown !== this.shownCountdown
-    ) {
+    if (session.takeDirty() || this.flows.shownChanged(flow, onlineNowMs(online))) {
       this.emitFlow(nowMs);
     }
 
@@ -588,14 +476,7 @@ export class GameScene extends Phaser.Scene {
 
   /** The join-code text box: typing, Enter and Esc. */
   private joinCodeInput(input: JoinCodeInput): void {
-    let update: FlowUpdate;
-    if (input.type === 'text') {
-      update = { changed: editJoinCode(this.flow, input.text), effects: [] };
-    } else if (input.type === 'submit') {
-      update = submitJoinCode(this.flow);
-    } else {
-      update = cancelJoinCode(this.flow);
-    }
+    const update = this.flows.joinCode(input);
     this.runEffects(update.effects);
     // Always redrawn: the text box must show the code as the flow kept it.
     this.emitFlow(this.time.now);
