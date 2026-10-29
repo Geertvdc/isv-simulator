@@ -98,10 +98,7 @@ import {
   NET_PING_FAST_COUNT,
   NET_PING_FAST_INTERVAL_MS,
   NET_PING_INTERVAL_MS,
-  RESULTS_STAR_DELAY_MS,
-  RESULTS_STAR_INTERVAL_MS,
   SCREEN_FADE_MS,
-  SFX_VOLUME_MAX,
 } from '../sim/balance';
 import { type LevelMap, type Tile, getTile } from '../sim/level';
 import { type Bot, botInput, createBot } from '../sim/bot';
@@ -111,13 +108,11 @@ import { type Scene, sceneDone, sceneInputs, sceneState } from '../sim/scenes';
 import { type GameState, createGame } from '../sim/state';
 import { GameLoop } from './GameLoop';
 import { DEFAULT_LOOK, FLOOR_THEMES, LEVEL_LOOKS, type MapLook, WALL_THEMES } from './mapLook';
-import { MusicPlayer } from './MusicPlayer';
-import { musicCue } from './music';
 import type { MenuRenderer, MenuRendererFactory } from './MenuRenderer';
 import { drawsMap, menuViewOf } from './menuView';
 import type { RoundRenderer, RoundRendererFactory } from './RoundRenderer';
-import { SoundPlayer } from './SoundPlayer';
 import { type RoundView, frameView, predictedView } from './roundView';
+import { AudioController } from './scene/AudioController';
 
 export interface TileHover {
   x: number;
@@ -372,8 +367,8 @@ export class GameScene extends Phaser.Scene {
    * presses.
    */
   private devices: InputDevices | null = null;
-  /** The music; kept across scene restarts so it plays on. */
-  private music: MusicPlayer | null = null;
+  /** Music and sound effects; kept across scene restarts so the music plays on. */
+  private readonly audio: AudioController;
   /** The screens; kept across scene restarts. */
   private readonly flow: Flow = createFlow();
   /** The level whose map is loaded. */
@@ -384,7 +379,6 @@ export class GameScene extends Phaser.Scene {
   private bots: Bot[] = [];
   /** First-level hints still showing in this round. */
   private hints: HintId[] = [];
-  private sounds!: SoundPlayer;
   private hovered: TileHover | null = null;
   private debugVisible = false;
   private seed = FIRST_SEED;
@@ -452,6 +446,7 @@ export class GameScene extends Phaser.Scene {
     if (id) this.mapLevelIndex = Math.max(0, LEVEL_IDS.indexOf(id));
     this.netHudOn = options.online?.netHud ?? false;
     this.prediction = createPrediction(options.online?.predict ?? true);
+    this.audio = new AudioController(options.save, options.storage, chapterIdOf);
     // A kiosk starts as if left alone for a while: straight into the demo.
     if (options.kiosk) this.flow.lastPressMs = -DEMO_KIOSK_IDLE_MS;
     if (options.practiceLevel) {
@@ -461,8 +456,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload(): void {
-    SoundPlayer.preload(this);
-    MusicPlayer.preload(this);
+    AudioController.preload(this);
   }
 
   create(data: SceneData = {}): void {
@@ -483,19 +477,7 @@ export class GameScene extends Phaser.Scene {
       menuRenderer.destroy();
     });
     this.devices ??= new InputDevices(window);
-    if (!this.music) {
-      this.music = new MusicPlayer(this.game);
-      // Phaser pauses sound whenever the window loses focus (e.g. after Tab or a click
-      // in the address bar) and waits for a click to bring it back. Only pause while
-      // the page is actually hidden, which also stops the game loop.
-      this.game.sound.pauseOnBlur = false;
-      this.game.events.on(Phaser.Core.Events.HIDDEN, () => {
-        this.game.sound.pauseAll();
-      });
-      this.game.events.on(Phaser.Core.Events.VISIBLE, () => {
-        this.game.sound.resumeAll();
-      });
-    }
+    this.audio.attach(this);
     this.game.events.off(TOGGLE_SOUND_EVENT);
     this.game.events.on(TOGGLE_SOUND_EVENT, () => {
       this.toggleSound();
@@ -520,7 +502,6 @@ export class GameScene extends Phaser.Scene {
     this.game.events.on(COMMAND_EVENT, (command: FlowCommand) => {
       this.dispatchCommand(command);
     });
-    this.sounds = new SoundPlayer(this);
     this.cameras.main.fadeIn(SCREEN_FADE_MS);
     this.applySettings();
 
@@ -605,7 +586,7 @@ export class GameScene extends Phaser.Scene {
         } else if (result) {
           this.runEffects(finishRound(this.flow, result, ctx).effects);
           this.emitFlow(time);
-          this.countStars(this.flow.results?.stars ?? 0);
+          this.audio.countStars(this.flow.results?.stars ?? 0);
         }
       }
       // Paused or done: nothing new happened, so nothing to react to.
@@ -647,7 +628,7 @@ export class GameScene extends Phaser.Scene {
       hintsVisible: screen === 'countdown' || screen === 'playing',
       timeMs: time,
     });
-    this.sounds.play(state, events, time);
+    this.audio.play(state, events, time);
   }
 
   /** This frame's presses for the menus: none while a dialog is open (back closes it). */
@@ -663,22 +644,7 @@ export class GameScene extends Phaser.Scene {
 
   /** The music for `flow` (this browser's, or the online room's) and the round on screen. */
   private updateMusic(deltaMs: number, flow: Flow, state: GameState | null): void {
-    if (!this.music) return;
-    const cue = musicCue(flow, {
-      chapterId: chapterIdOf(flow.levelIndex),
-      ticksLeft: state ? state.settings.durationTicks - state.tick : null,
-    });
-    this.netDebug.music = cue.track;
-    this.music.update(cue, deltaMs);
-  }
-
-  /** A chime for each star as the results screen fills them in. */
-  private countStars(stars: number): void {
-    for (let i = 0; i < stars; i++) {
-      this.time.delayedCall(RESULTS_STAR_DELAY_MS + i * RESULTS_STAR_INTERVAL_MS, () => {
-        this.sounds.sound('ship');
-      });
-    }
+    this.netDebug.music = this.audio.updateMusic(deltaMs, flow, state);
   }
 
   /** Drops the hints the last ticks followed; saves once all were. */
@@ -978,7 +944,7 @@ export class GameScene extends Phaser.Scene {
     // A page that came back (reload) on the results didn't see the round end:
     // no chimes, and the server's profile has it already.
     if (!round.sawPlaying) return;
-    this.countStars(results.stars);
+    this.audio.countStars(results.stars);
     // Someone who joined while it ran only watched: not their round.
     if (!this.options.storage || !round.counted) return;
     recordLevel(this.options.save.levels, round.levelId, {
@@ -1281,19 +1247,15 @@ export class GameScene extends Phaser.Scene {
 
   /** Turns all sound and music off or back on, and remembers it. */
   private toggleSound(): void {
-    const { settings } = this.options.save;
-    settings.muted = !settings.muted;
-    writeSave(this.options.storage, this.options.save);
+    this.audio.toggleMute();
     this.applySettings();
     this.emitFlow(this.time.now);
   }
 
   /** Sound and music volume, mute, screen shake and graphics from the save, applied right away. */
   private applySettings(): void {
-    const { sfxVolume, musicVolume, screenShake, graphics, muted } = this.options.save.settings;
-    this.game.sound.mute = muted;
-    this.sounds.volume = sfxVolume / SFX_VOLUME_MAX;
-    if (this.music) this.music.volume = musicVolume / SFX_VOLUME_MAX;
+    const { screenShake, graphics } = this.options.save.settings;
+    this.audio.applySettings();
     this.roundRenderer.setShake(screenShake);
     this.roundRenderer.setGraphics(graphics);
     this.menuRenderer.setGraphics(graphics);
