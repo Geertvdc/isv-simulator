@@ -1,8 +1,10 @@
 /**
  * The save: progress per level and the settings, versioned, under one
- * `localStorage` key. Storage can be missing or throw (private windows,
- * blocked site data), so every access is guarded and the game plays fine
- * without it. Only progress and settings are saved, never a round.
+ * storage key. Storage is injected as a `StorageLike` (the browser passes
+ * `localStorage`, tests a fake), so this stays pure. It can be missing or
+ * throw (private windows, blocked site data), so every access is guarded and
+ * the game plays fine without it. Only progress and settings are saved,
+ * never a round.
  */
 
 import {

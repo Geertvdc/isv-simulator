@@ -1,6 +1,7 @@
 /**
  * Who this browser is online: a random user id and a display name, each
- * under its own `localStorage` key. There is no login: knowing an id is
+ * under its own key in the injected `StorageLike` (the browser passes
+ * `localStorage`, tests a fake). There is no login: knowing an id is
  * being that user, so the id can be copied to another device (or pasted
  * from one) to take the progress along. Storage can be missing or throw, so
  * every access is guarded; without storage the id lasts for the session.

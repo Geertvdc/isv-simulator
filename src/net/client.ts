@@ -175,6 +175,8 @@ function lagRunner(options: ConnectOptions): (fn: () => void) => void {
     return (fn) => {
       fn();
     };
+  // Math.random is fine here: client.ts is the browser-only adapter and this
+  // seeds the `?lag` debug simulator, which never feeds the deterministic sim.
   return createLagRunner(options.lag, Math.floor(Math.random() * 2 ** 31), {
     now: () => performance.now(),
     setTimer: (fn, ms) => setTimeout(fn, ms),
