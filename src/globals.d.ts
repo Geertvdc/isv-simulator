@@ -1,4 +1,5 @@
-import type { NetDebug, SceneHandle } from './render/GameScene';
+import type { SceneHandle } from './render/GameScene';
+import type { NetDebug } from './render/scene/OnlineSession';
 
 declare global {
   interface Window {
