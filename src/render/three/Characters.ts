@@ -1,16 +1,19 @@
 import * as THREE from 'three';
 import type { PlayerId } from '../../sim/state';
-import { type PlayerShape, playerColor, playerShape } from '../playerColors';
+import type { RoleId } from '../../sim/roles';
+import {
+  type DeveloperAppearance,
+  type DeveloperRig,
+  createDeveloperRig,
+  poseDeveloperRig,
+} from './DeveloperRig';
 import { type KitMaterials, ModelBuilder, tint } from './kit';
 import { PALETTE } from './look';
 import type { Pose } from './pose';
 
 /**
- * The people in the office, Overcooked style: a bean body, a big head as
- * wide as the body and two floating hands, no legs. Developers wear a
- * hoodie in their player color and their player's hat shape, so they tell
- * apart by color and by shape. The manager is bigger, in a suit, with a
- * clipboard and a coffee.
+ * Production developers use the compact angular role rig. The manager
+ * and background people retain the original diorama bodies and behavior.
  *
  * Built with the kit (vertex colors, one shared material). Each character
  * is a few meshes moved by a `Pose` every frame.
@@ -28,18 +31,13 @@ const HEAD_RADIUS = 0.25;
 /** The head leans forward a little, so the face shows to a camera looking down. */
 const HEAD_TILT = 0.15;
 export const HAND_RADIUS = 0.09;
-/** Hats are this much bigger than the head would suggest: they must read from the couch. */
-const HAT_SCALE = 1.35;
 const SKIN = [0xf2c6a0, 0xc68b59, 0xe8b48a, 0x8d5a3b] as const;
 const HAIR = [0x3b2a20, 0x14110f, 0xb5651d, 0x2a1d14] as const;
 const DENIM = 0x34425e;
 const GLOVE = 0xfdfdf6;
 
-/** Top of a developer's tallest hat over the floor, as drawn; `layout.HAT_TOP` must match (tested). */
-export const MODELED_HAT_TOP =
-  (NECK + HEAD_RADIUS * 1.7 + 0.31 * HAT_SCALE + 0.045 * HAT_SCALE) * CHARACTER_SCALE;
-
 export interface Character {
+  rig?: DeveloperRig;
   root: THREE.Group;
   body: THREE.Group;
   head: THREE.Group;
@@ -53,6 +51,10 @@ export interface Character {
 
 /** Moves a character's parts into `pose`. */
 export function applyPose(c: Character, pose: Pose): void {
+  if (c.rig) {
+    poseDeveloperRig(c.rig, pose);
+    return;
+  }
   c.body.position.y = pose.bob;
   c.body.rotation.set(pose.lean, 0, pose.roll);
   const k = c.scale;
@@ -64,20 +66,29 @@ export function applyPose(c: Character, pose: Pose): void {
   c.rightHand.position.set(pose.rightHand.x, pose.rightHand.y + pose.bob, pose.rightHand.z);
 }
 
-/** A developer for player `id`: a hoodie in their color and their hat. */
-export function createDeveloper(id: PlayerId, materials: KitMaterials): Character {
-  const i = (id - 1) % SKIN.length;
-  return createPerson(
-    {
-      color: playerColor(id),
-      skin: SKIN[i] ?? PALETTE.skin,
-      hair: HAIR[i] ?? HAIR[0],
-      hat: playerShape(id),
-      hands: GLOVE,
-      scale: CHARACTER_SCALE,
-    },
-    materials,
-  );
+export function createDeveloper(
+  id: PlayerId,
+  materials: KitMaterials,
+  roleId: RoleId = 'generalist',
+  appearance?: DeveloperAppearance,
+): Character {
+  const rig = createDeveloperRig(roleId, id, materials, appearance);
+  return {
+    rig,
+    root: rig.root,
+    body: rig.torso,
+    head: rig.head,
+    leftHand: rig.arms[0].hand,
+    rightHand: rig.arms[1].hand,
+    scale: 1,
+    geometries: rig.geometries,
+  };
+}
+
+/** Only owned geometries are released; kit materials belong to the scene. */
+export function disposeCharacter(c: Character): void {
+  c.root.removeFromParent();
+  for (const geometry of c.geometries) geometry.dispose();
 }
 
 /** Muted, darker hoodie colors for people in the background, so they never look like players. */
@@ -98,7 +109,6 @@ export function createExtra(seed: number, materials: KitMaterials): Character {
       color: EXTRA_COLORS[n % EXTRA_COLORS.length] ?? EXTRA_COLORS[0],
       skin,
       hair: HAIR[(n >> 4) % HAIR.length] ?? HAIR[0],
-      hat: null,
       hands: skin,
       scale: EXTRA_SCALE,
     },
@@ -110,7 +120,6 @@ interface PersonLook {
   color: number;
   skin: number;
   hair: number;
-  hat: PlayerShape | null;
   hands: number;
   scale: number;
 }
@@ -147,66 +156,10 @@ function createPerson(look: PersonLook, materials: KitMaterials): Character {
     .sphere(0.035, 0xf0908a, { at: [0.15, r * 0.78, r * 0.75] }, [1, 0.6, 0.5])
     .sphere(0.05, tint(skin, -0.1), { at: [-r, r * 0.85, 0] }, [0.5, 1, 0.8])
     .sphere(0.05, tint(skin, -0.1), { at: [r, r * 0.85, 0] }, [0.5, 1, 0.8]);
-  if (look.hat) hat(head, look.hat, color);
   const headGeometry = head.build().body;
 
   const handGeometry = glove(look.hands);
   return assemble(torso, headGeometry, handGeometry, materials, look.scale);
-}
-
-/** The player's hat, sitting on top of the head, big enough to tell apart. */
-function hat(b: ModelBuilder, shape: PlayerShape, color: number): void {
-  const k = HAT_SCALE;
-  const top = HEAD_RADIUS * 1.7;
-  const white = PALETTE.white;
-  switch (shape) {
-    case 'circle':
-      // A white bobble beanie with a band in the player's color.
-      b.sphere(HEAD_RADIUS * 1.07, white, { at: [0, HEAD_RADIUS * 1.35, -0.03] }, [1, 0.62, 1]);
-      b.torus(HEAD_RADIUS * 0.98, 0.035, color, {
-        at: [0, HEAD_RADIUS * 1.3, -0.03],
-        rot: [Math.PI / 2 + 0.15, 0, 0],
-      });
-      b.sphere(0.07 * k, white, { at: [0, top + 0.1, -0.04] });
-      return;
-    case 'triangle':
-      // A party hat in the player's color with a white band and bobble.
-      b.cone(0.13 * k, 0.3 * k, color, { at: [0, top + 0.15 * k, -0.02], rot: [-0.15, 0, 0] });
-      b.torus(0.12 * k, 0.025 * k, white, {
-        at: [0, top + 0.02, -0.02],
-        rot: [Math.PI / 2 - 0.15, 0, 0],
-      });
-      b.sphere(0.045 * k, white, { at: [0, top + 0.31 * k, -0.07] });
-      return;
-    case 'square':
-      // A white mortarboard with a tassel in the player's color.
-      b.cylinder(HEAD_RADIUS * 0.9, HEAD_RADIUS * 0.95, 0.1, white, { at: [0, top - 0.01, -0.02] });
-      b.box(
-        0.34 * k,
-        0.04,
-        0.34 * k,
-        white,
-        {
-          at: [0, top + 0.06, -0.02],
-          rot: [0, Math.PI / 4, 0],
-        },
-        0.01,
-      );
-      b.box(0.025, 0.14, 0.025, color, { at: [0.16 * k, top + 0.0, 0.05] }, 0);
-      b.sphere(0.03, color, { at: [0.16 * k, top - 0.08, 0.05] });
-      return;
-    case 'diamond': {
-      // A headband in the player's color with a big white diamond on top.
-      b.torus(HEAD_RADIUS * 1.0, 0.035, color, {
-        at: [0, HEAD_RADIUS * 1.3, -0.02],
-        rot: [Math.PI / 2 + 0.15, 0, 0],
-      });
-      const gem = new THREE.OctahedronGeometry(0.11 * k, 0);
-      gem.scale(0.8, 1.25, 0.8);
-      b.add(gem, white, { at: [0, top + 0.12 * k, -0.02] });
-      return;
-    }
-  }
 }
 
 /** A round glove. */

@@ -1,6 +1,6 @@
 import type { PlayerId } from '../sim/state';
 
-/** Placeholder player colors until the art pass: player `n` gets `PLAYER_COLORS[n - 1]`. */
+/** Owner colors, independent of role: player `n` gets `PLAYER_COLORS[n - 1]`. */
 export const PLAYER_COLORS: readonly number[] = [0xff6b6b, 0x4fc3f7, 0xffd166, 0x9ccc65];
 
 export function playerColor(id: PlayerId): number {
@@ -12,7 +12,7 @@ export function playerCssColor(id: PlayerId): string {
   return `#${playerColor(id).toString(16).padStart(6, '0')}`;
 }
 
-/** Each player's hat, so players don't tell apart by color alone: player `n` gets `PLAYER_SHAPES[n - 1]`. */
+/** Owner shapes on badges and floor markers, independent of character role. */
 export const PLAYER_SHAPES = ['circle', 'triangle', 'square', 'diamond'] as const;
 
 export type PlayerShape = (typeof PLAYER_SHAPES)[number];

@@ -19,8 +19,8 @@ export const WALL_HEIGHT = 1.15;
 export const FRONT_WALL_HEIGHT = 0.2;
 /** Counters and stations: about hip height on a developer. */
 export const STATION_HEIGHT = 0.55;
-/** The top of the tallest hat: overlays over a head start above it (matches `Characters`). */
-export const HAT_TOP = 1.78;
+/** Conservative animated head/hair/headset envelope; overlays start above it. */
+export const HEAD_TOP = 1.54;
 /** How far the level's slab reaches below the floor (the diorama's front face). */
 export const SLAB_DEPTH = 0.45;
 
@@ -54,7 +54,7 @@ export function blockHeight(map: LevelMap, x: number, y: number): number {
   return STATION_HEIGHT;
 }
 
-/** Room over the walls for hats and thrown tickets at the back of the room. */
+/** Room over the walls for people and thrown tickets at the back of the room. */
 const BOX_HEADROOM = 0.25;
 
 /** The world box the camera keeps in view: the slab, the floor and everything standing on it. */

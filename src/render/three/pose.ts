@@ -4,8 +4,8 @@
  * animation can be tested without WebGL. Positions are in the character's
  * own space: feet at the origin, facing +z, in world units.
  *
- * Overcooked-style characters have no legs or arms to rig: a bean body,
- * a head and two floating hands. Everything here moves those.
+ * The production rig attaches limbs to these common hand and gait targets.
+ * Background people and the manager retain their original body posing.
  */
 
 import { carryPoint } from './layout';
@@ -40,6 +40,9 @@ export interface Vec3 {
 }
 
 export interface Pose {
+  walk: number;
+  stride: number;
+  windUp: number;
   /** Lift of the whole body (a walk bounce). */
   bob: number;
   /** Lean forward (+) or back (−) around x, radians. */
@@ -137,17 +140,7 @@ export function playerPose(input: PoseInput, timeMs: number): Pose {
   let leftHand: Vec3 = { x: -HAND_REST.x, y: HAND_REST.y, z: HAND_REST.z + swing };
   let rightHand: Vec3 = { x: HAND_REST.x, y: HAND_REST.y, z: HAND_REST.z - swing };
 
-  const windUp = Math.min(1, input.windUp);
-  if (input.carrying) {
-    // Holding the ticket by its sides where `carryPoint` puts it: out front, or over
-    // the shoulder in a throw wind-up.
-    const hold = carryPoint(windUp);
-    // `applyPose` adds the walk bob to hands; the ticket doesn't bob, so take it off again.
-    const y = hold.height + 0.03 - bob;
-    leftHand = { x: hold.side - CARRY_HALF_GAP, y, z: hold.reach };
-    rightHand = { x: hold.side + CARRY_HALF_GAP, y, z: hold.reach };
-  }
-
+  const windUp = Math.max(0, Math.min(1, input.windUp));
   if (input.working) {
     // Hammering away: hands tap in turn, head down.
     const tap = Math.sin(t * Math.PI * 2 * TYPE_HZ);
@@ -180,7 +173,14 @@ export function playerPose(input: PoseInput, timeMs: number): Pose {
     lean -= 0.15 * k;
   }
 
-  return { bob, lean, roll, squash, nod, leftHand, rightHand };
+  if (input.carrying) {
+    // Keep wrists on the ticket after the final body bob is known (dash removes it).
+    const hold = carryPoint(windUp);
+    leftHand = { x: hold.side - CARRY_HALF_GAP, y: hold.height + 0.03 - bob, z: hold.reach };
+    rightHand = { x: hold.side + CARRY_HALF_GAP, y: hold.height + 0.03 - bob, z: hold.reach };
+  }
+
+  return { bob, lean, roll, squash, nod, leftHand, rightHand, walk, stride: stepPhase, windUp };
 }
 
 /** Turns `from` toward `to` (radians) by at most `maxStep`, the short way round. */

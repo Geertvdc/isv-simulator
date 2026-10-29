@@ -14,9 +14,17 @@ import { ticketCarriedBy, ticketOnTile } from '../../sim/tickets';
 import { playerColor } from '../playerColors';
 import { type Vec3, gridToWorld } from '../projection';
 import type { RoundView } from '../roundView';
-import { type Character, applyPose, createDeveloper, createManager } from './Characters';
+import {
+  type Character,
+  applyPose,
+  createDeveloper,
+  createManager,
+  disposeCharacter,
+} from './Characters';
+import type { RoleId } from '../../sim/roles';
 import type { KitMaterials } from './kit';
 import { facingYaw } from './layout';
+import { playerMarker } from './playerMarker';
 import {
   type FacingHold,
   type Gait,
@@ -54,6 +62,7 @@ interface Person {
   shovedAtMs: number | null;
   ring: THREE.Mesh | null;
   materials: THREE.Material[];
+  geometries: THREE.BufferGeometry[];
 }
 
 /**
@@ -104,8 +113,12 @@ export class People {
       let person = this.players.get(player.id);
       const simYaw = facingYaw(player.facing);
       if (!person) {
-        person = this.addDeveloper(player.id, simYaw);
+        person = this.addDeveloper(player.id, player.roleId, simYaw);
         this.players.set(player.id, person);
+      } else if (person.character.rig?.roleId !== player.roleId) {
+        disposeCharacter(person.character);
+        person.character = createDeveloper(player.id, this.materials, player.roleId);
+        this.world.add(person.character.root);
       }
       const moving = noteMotion(person.motion, pos, timeMs) && !over;
       const speed = moving ? Math.hypot(player.vel.x, player.vel.y) : 0;
@@ -194,16 +207,20 @@ export class People {
     if (person.ring) person.ring.position.set(at.x, at.y + RING.lift, at.z);
   }
 
-  private addDeveloper(id: PlayerId, yaw: number): Person {
+  private addDeveloper(id: PlayerId, roleId: RoleId, yaw: number): Person {
     const ringMaterial = new THREE.MeshBasicMaterial({
       color: playerColor(id),
       transparent: true,
       opacity: 0.9,
     });
     const ring = new THREE.Mesh(this.ringGeometry, ringMaterial);
+    const markerGeometry = playerMarker(id);
+    const markerMaterial = new THREE.MeshBasicMaterial({ vertexColors: true });
+    ring.add(new THREE.Mesh(markerGeometry, markerMaterial));
     this.world.add(ring);
-    const person = this.addPerson(createDeveloper(id, this.materials), ring, id, yaw);
-    person.materials.push(ringMaterial);
+    const person = this.addPerson(createDeveloper(id, this.materials, roleId), ring, id, yaw);
+    person.materials.push(ringMaterial, markerMaterial);
+    person.geometries.push(markerGeometry);
     return person;
   }
 
@@ -228,16 +245,17 @@ export class People {
       shovedAtMs: null,
       ring,
       materials: [],
+      geometries: [],
     };
   }
 
   private drop<K>(people: Map<K, Person>, seen: Set<K>): void {
     for (const [key, person] of people) {
       if (seen.has(key)) continue;
-      this.world.remove(person.character.root);
+      disposeCharacter(person.character);
       if (person.ring) this.world.remove(person.ring);
-      for (const g of person.character.geometries) g.dispose();
       for (const m of person.materials) m.dispose();
+      for (const g of person.geometries) g.dispose();
       people.delete(key);
     }
   }
