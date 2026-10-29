@@ -1,6 +1,6 @@
 # Phase 21 proposal: character roles, ticket domains, and a new cast
 
-**Status:** 21a visual investigation and 21b rules/lab are complete. The user accepted the revised gender-neutral production cast ("Approve the revised cast and continue"), passing the 21c visual gate. The separately approved selection/readiness/feedback implementation is now playable locally and online; its verification is recorded below. 21d balance/rollout still requires a separate plan and approval. Hats remain optional, non-default accessories, not a blanket prohibition. Numbers below are starting hypotheses, not measured balance results.
+**Status:** 21a visual investigation and 21b rules/lab are complete. The user accepted the revised gender-neutral production cast ("Approve the revised cast and continue"), passing the 21c visual gate. The separately approved selection/readiness/feedback implementation is now playable locally and online; its verification is recorded below. The 21d benchmark, policy-diagnosis, and evidence-only tuning slice is approved and recorded below; campaign rollout remains explicitly held for separate approval and human couch trials. Hats remain optional, non-default accessories, not a blanket prohibition. Numbers below are starting hypotheses unless identified as measured results.
 
 **Goal:** a team of generalists is dependable and can earn three stars; a well-coordinated specialist team has a higher ceiling because it assigns work and hands tickets over well. Mixed teams should be a useful middle ground. Replace the current character silhouette, not just its hats.
 
@@ -247,7 +247,7 @@ Verification completed: `npm run check` (80 test files, 1,108 tests) and `npm ru
 
 ## Decisions still requiring approval
 
-The user approved the 21b rules/lab scope and its proposed role matrix as hypotheses to measure, not as proven balance. The user then chose **"Approve 21c with the cast approval checkpoint"**: the cast PR stops for visual acceptance before the separate selection/readiness/feedback PR begins. Campaign opt-in and 21d balance/rollout still require approval.
+The user approved the 21b rules/lab scope and its proposed role matrix as hypotheses to measure, not as proven balance. The user then chose **"Approve 21c with the cast approval checkpoint"**: the cast PR stops for visual acceptance before the separate selection/readiness/feedback PR begins. The user has separately approved 21d benchmarks and evidence-justified tuning only; campaign opt-in and rollout remain held pending human validation and separate approval.
 
 Do not treat production implementation or screenshots as final art acceptance, verified couch readability, campaign rollout, or measured balance.
 
@@ -307,8 +307,41 @@ In-round player badges show role labels/icons; orders and tickets show domain la
 
 Development entry: `/?lab=lab-roles&quality=low` opens a playable local lab without save progression or campaign migration (dev builds only). `/?scene=roles-work&quality=low` freezes actual sim work: a designed matching pair contributes 2.28x each / 4.56x total, QA tests at 1.60x and platform repairs at 1.25x.
 
-With Vite pointing to a running local server, reproduce scoped browser evidence with `npx vite-node scripts/verifyRoles.ts --base=http://127.0.0.1:5217 --out=/absolute/evidence/directory --cdp-port=9371`. It uses private Chrome profiles and closes its browsers. It does not retake the full docs catalog. No role stats, scoring, bot policy, domain schedules or campaign opt-ins changed; the noisy 21b results and the three-player role-aware policy regression remain open for separately approved 21d investigation.
+With Vite pointing to a running local server, reproduce scoped browser evidence with `npx vite-node scripts/verifyRoles.ts --base=http://127.0.0.1:5217 --out=/absolute/evidence/directory --cdp-port=9371`. It uses private Chrome profiles and closes its browsers. It does not retake the full docs catalog. The 21c selection/feedback slice changed no role stats, scoring, bot policy, domain schedules or campaign opt-ins; the separately approved 21d policy diagnosis and benchmark evidence follow.
 
 Reproduce the compact four-player layout evidence with `npx vite-node scripts/verifyRoleLayout.ts --base=http://127.0.0.1:5217 --out=/absolute/evidence/directory`. The user-directed compact revision was checked directly after the three-round critic gauntlet; the earlier critic review does not cover the revised layout.
 
 The existing online and prediction verifiers now confirm each owned slot before starting/restarting; the round-start screenshot flow readies both keyboards and requires a real countdown before capture. `npm run verify:online` passes 13/13 checks (drop/reload, host succession, next-round join and grace expiry), and `npm run verify:prediction` passes 16/16 (lagged input, reconciliation, carry/pause and restarted countdown). The online reload check explicitly waits for a new document rather than accidentally accepting the old pre-unload debug handle. The scoped `screens/round-start` capture passes and its intro/countdown/hints/pause images were inspected and updated. Physical gamepads and multiple humans remain untested.
+
+### 21d: benchmark results and tuning decision
+
+The approved 21d slice corrects the role-aware bot policy and measures balance; it does not roll domains into campaign play. The policy regression was reproduced before changing role rates: on the original 180-second, 30-seed, three-player role lab, role-aware mixed teams waited 7,567 aggregate player-ticks behind non-head queue tickets, shipped 11.4 orders versus 13.9 for role-aware generalists, and scored 66.5 fewer points (paired 95% normal interval [-112.5, -20.5]). A bot could reserve a later ticket in a queue and wait for its head, consuming a worker; assignment also compared work in ticks against travel in seconds. Role-aware dispatch now reserves queue heads only, releases stale non-head reservations, and compares role-adjusted work and walking distance in simulation ticks. Neutral assignment remains unchanged.
+
+On the same full-length lab after the fixes, the role-aware mixed team shipped 14.5 orders versus 13.9 for generalists (paired Δ +0.63 orders, 95% normal interval [+0.07, +1.20]); score Δ was +14.3 [−9.6, +38.2], and measured non-head queue wait was zero. This removes the diagnosed bot regression; it does not establish a general balance advantage.
+
+The reproducible matrix ran 30 shared fixed seeds under both assignment policies, producing 9,960 run/seed records:
+
+| Fixture | Duration | Compositions |
+| --- | ---: | --- |
+| Balanced role lab | 90 s bounded fixture | Generalist-only solo; all 15, 35, and 70 unordered 2-, 3-, and 4-player compositions |
+| Frontend-skew | 180 s | Generalist, mixed, and specialist candidates |
+| Infra incidents | 180 s | Generalist, mixed, and specialist candidates |
+| Design pairing (`design-sprint`) | 180 s | Generalist, mixed, and specialist candidates |
+| Conveyor/gaps (`monorepo`) | 180 s | Generalist, mixed, and specialist candidates |
+| Meetings/incidents (`the-reorg`) | 180 s | Generalist, mixed, and specialist candidates |
+
+Candidate fixtures use authored domain schedules and, for campaign-derived maps, preserve the source map's duration and other level settings. They are benchmark fixtures, not a campaign opt-in. The balanced lab's shorter duration bounds the exhaustive composition sweep. Comparisons are paired by seed and policy; intervals are 95% normal approximations and seat positions rotate over seeds. A one-seed smoke run reports its interval as unavailable rather than presenting a zero-width confidence interval.
+
+The balanced sweep found only small, inconsistent throughput effects. Against same-policy generalists, role-aware mixed-team shipped deltas were +0.03 [−0.03, +0.10] at two players, +0.10 [−0.01, +0.21] at three, and +0.03 [−0.11, +0.18] at four. Candidate maps varied: design-pairing showed a small three-player mixed gain (+0.33 to +0.37 shipped orders), while meetings/disruptions often favored generalists. These results do not support the proposed general 10–20% specialization throughput hypothesis. Orders created, shipped, expired, and left open are reported together so capped or sparse demand is visible; incident expiries and repair opportunities were especially sparse, with zero repair work in the infra-only fixture and too little repair activity elsewhere to justify tuning.
+
+Benchmark work ticks are counted from `GameState.workFeedback`, so they include only actual resolved contributors (including both paired coders or review-quorum workers), not every bot holding a work input. Manual station utilization is active station-ticks divided by the number of matching work-station tiles times the full round duration; simultaneous contributors on one station count as one busy station-tick. Pipeline repair utilization covers repair work only; unattended build occupancy is excluded. Travel counts player-ticks with movement; idle counts stationary ticks without resolved work or interaction, including unsuccessful work attempts. The raw per-seed JSON retains full summaries, including recipe/domain order counts; text output summarizes station work/utilization, travel/idle, queue waits, handovers, max queues, order totals, per-domain shipments/expiries, incident expiries, meetings, score, and stars.
+
+The no-travel frontend-feature timing check remains theoretical: generalist code/test/build 9.00 s; frontend hands off to QA 7.23 s; QA does both 8.69 s; frontend does both 8.44 s. These estimates omit travel, queues and handovers and are not whole-round measurements. No role rates, scoring, deadlines, order schedules, star thresholds, or campaign opt-ins were changed: measured evidence does not justify tuning rates, and the sparse repair data cannot establish a platform repair-rate target. No bot result proves human couch balance or three-star campaign viability.
+
+Reproduce the matrix with `npm run sim -- --role-bench 30 1 --json=/absolute/path/role-benchmarks.json`; reproduce the full-length three-player diagnosis with `npm run sim -- --role-lab --players=3 30 1`. The per-seed JSON is retained as a session evidence artifact rather than committed to the repository.
+
+- [x] Diagnose and regression-test queue-head starvation and travel-unit mismatch before making any role-rate decision.
+- [x] Run the bounded fixed-seed matrix with both policies, explicit compositions, candidate workload fixtures, paired intervals, and per-seed output.
+- [x] Record actual resolved station work, player travel/idle, queue waits, handovers, order demand/expiry, and domain/recipe outcomes.
+- [x] Preserve role rates, classic seeded behavior, score, deadlines, star thresholds, campaign schedules, and campaign opt-in.
+- [ ] Human couch trials and campaign rollout reviewed and separately approved; campaign rollout remains held.
