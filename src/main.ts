@@ -22,7 +22,7 @@ import {
   ONLINE_LEAVE_EVENT,
   ONLINE_RENAME_EVENT,
   PROFILE_ACTION_EVENT,
-  ROSTER_EVENT,
+  COMMAND_EVENT,
   TILE_HOVER_EVENT,
   TOGGLE_SOUND_EVENT,
   type TicketStore,
@@ -42,7 +42,7 @@ import { mountProfile } from './ui/profile';
 import { mountSoundToggle } from './ui/soundToggle';
 import { mountCredits, mountPause, mountResults, mountSettings, mountTitle } from './ui/screens';
 import './style.css';
-import type { RosterCommand } from './flow/roster';
+import type { FlowCommand } from './flow/commands';
 import { levelById } from './sim/levels';
 
 function getElement(id: string): HTMLElement {
@@ -164,8 +164,8 @@ game.events.on(TILE_HOVER_EVENT, hud.setHover);
 const gameHud = mountGameHud(ui);
 game.events.on(GAME_FRAME_EVENT, gameHud.render);
 
-const roster = (command: RosterCommand): void => {
-  game.events.emit(ROSTER_EVENT, command);
+const roster = (command: FlowCommand): void => {
+  game.events.emit(COMMAND_EVENT, command);
 };
 const lobby = mountLobby(ui, roster);
 const levelSelect = mountLevelSelect(ui);
