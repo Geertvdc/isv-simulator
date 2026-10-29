@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { TICKET_TITLES } from './content';
 import { levelById } from './levels';
-import { createOrder, expireOrders, matchingOrders, updateOrders, shipTicket } from './orders';
+import { createOrder, expireOrders, orderOf, updateOrders, shipTicket } from './orders';
 import * as rng from './rng';
 import { type TicketDomain, TICKET_DOMAINS } from './roles';
 import { createGame } from './state';
@@ -141,8 +141,8 @@ describe('ticket domains', () => {
       (ticket) => ticket.domain === 'backend',
     );
     if (!frontendTicket || !backendTicket) throw new Error('Missing domain-specific tickets');
-    expect(matchingOrders(state, frontendTicket)).toEqual([frontend]);
-    expect(matchingOrders(state, backendTicket)).toEqual([backend]);
+    expect(orderOf(state, frontendTicket)).toBe(frontend);
+    expect(orderOf(state, backendTicket)).toBe(backend);
 
     frontend.expiresTick = state.tick;
     expireOrders(state);
