@@ -16,7 +16,7 @@ Every order on the bar at the top has a ticket waiting in a queue. The card show
 | **Incident (hotfix)**   | Bright red, "INCIDENT!" | K → P         | Bug queue, first in line | 30 to 35 s | 20 + up to 10 speed bonus | −30      |
 
 - The **speed bonus** is 10 points when shipped right away, going down to 0 as the timer runs out.
-- When an order runs out its penalty is taken and one waiting ticket of that kind leaves its queue.
+- When an order runs out its penalty is taken and its tickets still waiting in a queue leave it. Its tickets already out in the office turn **expired** (greyed out): they can't be worked, built, merged or shipped any more, only carried, thrown and binned.
 - More players means features come faster (1.7× for two, 2.3× for three, 2.8× for four), more can be open at once, and the star targets go up by the same factor.
 - Ticket titles ("Center a div", "Add AI to it", "Upgrade to YAML 2") are flavour only. Add your own in `src/sim/content.ts`.
 
