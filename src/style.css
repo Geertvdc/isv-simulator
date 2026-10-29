@@ -310,6 +310,24 @@ body {
   }
 }
 
+/* Someone tried to ship past the incident: the banner shakes its head. */
+.hud-incident.nope {
+  animation:
+    incident-flash 0.8s steps(2, jump-none) infinite,
+    incident-nope 0.4s ease-out;
+}
+
+@keyframes incident-nope {
+  20%,
+  60% {
+    transform: translateX(-0.5rem) scale(1.08);
+  }
+  40%,
+  80% {
+    transform: translateX(0.5rem) scale(1.08);
+  }
+}
+
 .order-steps {
   display: flex;
   gap: 0.3125rem;
@@ -2143,5 +2161,8 @@ body {
   .title-press::after,
   .menu-item.selected .menu-label::after {
     animation: none;
+  }
+  .hud-incident.nope {
+    animation: incident-flash 0.8s steps(2, jump-none) infinite;
   }
 }
