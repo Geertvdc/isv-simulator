@@ -14,6 +14,7 @@ import {
   roleWorkRate,
   type RoleId,
   type TicketDomain,
+  type WorkTask,
 } from '../sim/roles';
 import type { WorkFeedback } from '../sim/state';
 import { rolePreviews } from '../render/three/RolePreview';
@@ -35,6 +36,30 @@ export function workRateText(work: WorkFeedback): string {
 
 export type RosterDispatch = (command: RosterCommand) => void;
 
+export interface SkillBar {
+  label: string;
+  rate: number;
+  percent: number;
+}
+
+/** Every chart shares a scale: 1.00x is the baseline, 1.60x fills the track. */
+export function roleSkills(role: RoleId): SkillBar[] {
+  const skills: { label: string; task: WorkTask; domain: TicketDomain }[] = [
+    ...TICKET_DOMAINS.map((domain) => ({
+      label: `${TICKET_DOMAIN_LABELS[domain]} code`,
+      task: 'code' as const,
+      domain,
+    })),
+    { label: 'Testing', task: 'test', domain: 'general' },
+    { label: 'Design', task: 'design', domain: 'general' },
+    { label: 'Repair', task: 'repair', domain: 'general' },
+  ];
+  return skills.map(({ label, task, domain }) => {
+    const rate = roleWorkRate(role, task, domain);
+    return { label, rate, percent: (rate / 1.6) * 100 };
+  });
+}
+
 /** Role UI is read-only except for commands; a device's arrow/confirm keys use the same path. */
 export function rolePanel(
   root: HTMLElement,
@@ -49,13 +74,19 @@ export function rolePanel(
   canvas.setAttribute('aria-hidden', 'true');
   const name = el('div', 'role-name');
   const description = el('p', 'role-description');
-  const summary = el('div', 'role-rates');
+  const identity = el('div', 'role-identity');
+  identity.append(canvas, name);
+  const chart = el('div', 'role-skills');
+  chart.setAttribute('aria-label', 'Base work speeds; 1.00x is standard');
   const controls = el('div', 'role-controls');
   const previous = document.createElement('button');
   const next = document.createElement('button');
   const ready = document.createElement('button');
-  previous.textContent = '◀ Role';
-  next.textContent = 'Role ▶';
+  previous.textContent = '◀';
+  next.textContent = '▶';
+  previous.setAttribute('aria-label', 'Previous role');
+  next.setAttribute('aria-label', 'Next role');
+  const position = el('span', 'role-position');
   let current: { lobby: Lobby; id: number } | null = null;
   const cycle = (step: number): void => {
     if (!current) return;
@@ -78,20 +109,15 @@ export function rolePanel(
         ready: !selection(current.lobby, current.id).ready,
       });
   };
-  controls.append(previous, next, ready);
-  const details = document.createElement('details');
-  details.className = 'role-details';
-  details.append(el('summary', '', 'All work speeds'));
-  for (const control of [previous, next, ready, details]) {
+  controls.append(previous, position, next, ready);
+  for (const control of [previous, next, ready]) {
     for (const event of ['keydown', 'keyup']) {
       control.addEventListener(event, (e) => {
         if (e instanceof KeyboardEvent && (e.key === 'Enter' || e.key === ' ')) e.stopPropagation();
       });
     }
   }
-  const matrix = el('div', 'role-matrix');
-  details.append(matrix);
-  panel.append(canvas, name, description, summary, controls, details);
+  panel.append(identity, description, chart, controls);
   root.append(panel);
   let shownRole: RoleId | null = null;
   return {
@@ -113,21 +139,27 @@ export function rolePanel(
       ready.textContent = choice.ready ? '✓ Ready · undo' : 'Confirm ready';
       ready.setAttribute('aria-pressed', String(choice.ready));
       panel.classList.toggle('is-ready', confirmation && choice.ready);
+      panel.classList.toggle('with-confirmation', confirmation);
       if (shownRole === choice.roleId) return;
       shownRole = choice.roleId;
       const role = choice.roleId;
-      const best = Math.max(...TICKET_DOMAINS.map((d) => roleWorkRate(role, 'code', d)));
-      summary.textContent = `Code ${best.toFixed(2)}x peak · Test ${roleWorkRate(role, 'test', 'general').toFixed(2)}x`;
-      matrix.replaceChildren(
-        ...[
-          ...TICKET_DOMAINS.map(
-            (domain) =>
-              `${domainText(domain)} code: ${roleWorkRate(role, 'code', domain).toFixed(2)}x`,
-          ),
-          `Test: ${roleWorkRate(role, 'test', 'general').toFixed(2)}x · Design: 1.00x`,
-          `Repair: ${roleWorkRate(role, 'repair', 'general').toFixed(2)}x · Review: quorum unchanged`,
-          'Work speed, not duration. Builds run unattended. Design and pairing apply during work.',
-        ].map((text) => el('div', '', text)),
+      position.textContent = `${ROLE_IDS.indexOf(role) + 1} / ${ROLE_IDS.length}`;
+      chart.replaceChildren(
+        ...roleSkills(role).map(({ label, rate, percent }) => {
+          const row = el('div', 'skill-row');
+          const track = el('span', 'skill-track');
+          const fill = el('span', 'skill-fill');
+          fill.style.width = `${percent}%`;
+          track.setAttribute('aria-hidden', 'true');
+          track.append(fill);
+          row.dataset.strength = rate > 1 ? 'strong' : rate < 1 ? 'weak' : 'standard';
+          row.append(
+            el('span', 'skill-label', label),
+            track,
+            el('span', 'skill-value', `${rate.toFixed(2)}x`),
+          );
+          return row;
+        }),
       );
     },
   };

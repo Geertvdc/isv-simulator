@@ -16,6 +16,7 @@ import {
   GAME_FRAME_EVENT,
   GameScene,
   NET_STATS_EVENT,
+  INTRO_GUIDE_EVENT,
   JOIN_CODE_EVENT,
   type JoinCodeInput,
   ONLINE_LEAVE_EVENT,
@@ -169,6 +170,7 @@ const roster = (command: RosterCommand): void => {
 const lobby = mountLobby(ui, roster);
 const levelSelect = mountLevelSelect(ui);
 const intro = mountIntro(ui, roster);
+game.events.on(INTRO_GUIDE_EVENT, intro.toggleGuide);
 const countdown = mountCountdown(ui);
 const demo = mountDemo(ui);
 const screens = {

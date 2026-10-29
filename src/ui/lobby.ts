@@ -40,7 +40,7 @@ export function mountLobby(root: HTMLElement, dispatch: RosterDispatch): LobbyVi
 
   const title = document.createElement('h1');
   title.className = 'lobby-title';
-  title.textContent = 'Press Enter or gamepad A to join';
+  title.textContent = 'Choose your crew';
 
   const slots = document.createElement('div');
   slots.className = 'lobby-slots';
@@ -65,8 +65,11 @@ export function mountLobby(root: HTMLElement, dispatch: RosterDispatch): LobbyVi
   const back = statusBar(LOBBY_BACK_HINT);
 
   const content = document.createElement('div');
-  content.className = 'selection-scroll';
-  content.append(title, slots, hint);
+  content.className = 'selection-layout';
+  const legend = document.createElement('div');
+  legend.className = 'skill-legend';
+  legend.textContent = '1.00x = standard work speed · Review and builds unchanged';
+  content.append(title, slots, legend, hint);
   panel.append(content, back);
   root.append(panel);
 
@@ -84,7 +87,9 @@ export function mountLobby(root: HTMLElement, dispatch: RosterDispatch): LobbyVi
         el.slot.dataset.file = playerFile(id);
         el.device.textContent = player ? deviceLabel(player.deviceId) : 'Enter or gamepad A';
       });
-      hint.textContent = lobby ? `${startHint(lobby) ?? ''} · Left / right: choose role` : '';
+      hint.textContent = lobby?.players.length
+        ? `${startHint(lobby) ?? ''} · Left / right: role`
+        : 'Enter or gamepad A to join · Left / right: choose role';
     },
   };
 }

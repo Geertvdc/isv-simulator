@@ -16,6 +16,9 @@ describe('authored workload, not adapted to the roster', () => {
     expect(text).toContain('two coding parts');
     expect(text).toContain('Incidents: Infrastructure');
     expect(text).toContain('30s');
+    expect(lab.summary.join(' ')).toContain('two coding parts (FE + BE)');
+    expect(lab.summary.join(' ')).toContain('Infrastructure from 30s');
+    expect(classic.summary.join(' ')).toContain('General-domain');
     expect(coverageHint(lab, ['qa'])).toContain('slower coding');
     expect(coverageHint(lab, ['generalist'])).toContain('specialisation is optional');
   });

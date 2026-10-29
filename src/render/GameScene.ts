@@ -191,6 +191,7 @@ export const ONLINE_LEAVE_EVENT = 'online-leave';
 /** This browser picked a new display name (the identity already has it): tell the room. */
 export const ONLINE_RENAME_EVENT = 'online-rename';
 export const ROSTER_EVENT = 'roster';
+export const INTRO_GUIDE_EVENT = 'intro-guide';
 
 /** How the scene reaches the game server; `null` where online play is off (`?scene=`). */
 export interface OnlineOptions {
@@ -652,9 +653,13 @@ export class GameScene extends Phaser.Scene {
 
   /** This frame's presses for the menus: none while a dialog is open (back closes it). */
   private menuPresses(presses: readonly DevicePress[]): readonly DevicePress[] {
-    if (!this.dialogOpen) return presses;
-    if (presses.some((p) => p.dash || p.menu)) this.game.events.emit(DIALOG_CANCEL_EVENT);
-    return [];
+    if (this.dialogOpen) {
+      if (presses.some((p) => p.dash || p.menu)) this.game.events.emit(DIALOG_CANCEL_EVENT);
+      return [];
+    }
+    if ((this.online?.flow ?? this.flow).screen === 'intro' && presses.some((p) => p.nav.y !== 0))
+      this.game.events.emit(INTRO_GUIDE_EVENT);
+    return presses;
   }
 
   /** The music for `flow` (this browser's, or the online room's) and the round on screen. */

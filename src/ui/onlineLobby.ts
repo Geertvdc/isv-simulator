@@ -177,16 +177,19 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineLobbyDeps): Onli
   nameRow.append(nameShow, nameEdit);
 
   const members = el('div', 'online-members');
+  const slots = el('div', 'online-slots');
+  const toolbar = el('div', 'online-toolbar');
+  toolbar.append(codeCard, status, nameRow);
   const hint = el('div', 'lobby-hint');
   const leave = button('online-leave', ONLINE_TEXT.leave, deps.onLeave);
   const keys = statusBar();
-  const content = el('div', 'selection-scroll');
+  const content = el('div', 'selection-layout');
   content.append(
     el('h1', 'screen-title online-title', ONLINE_TEXT.lobbyTitle),
-    codeCard,
-    status,
-    nameRow,
+    toolbar,
     members,
+    slots,
+    el('div', 'skill-legend', '1.00x = standard work speed · Review and builds unchanged'),
     hint,
     leave,
   );
@@ -234,6 +237,7 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineLobbyDeps): Onli
       drawn = key;
       for (const role of roles) role.render(null, 0, false, false);
       roles = [];
+      slots.replaceChildren();
       members.replaceChildren(
         ...list.map(({ member, isYou, players }) => {
           const row = el('div', 'online-member');
@@ -252,10 +256,11 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineLobbyDeps): Onli
             const chip = el('div', 'online-player');
             chip.style.setProperty('--player-color', playerCssColor(player.playerId));
             chip.append(
-              playerBadge(player.playerId),
-              el('span', 'online-player-name', `Player ${player.playerId}`),
-              el('span', 'online-player-device', deviceLabel(player.deviceId)),
+              el('div', 'online-player-owner', `${member.displayName}${isYou ? ' · you' : ''}`),
             );
+            const who = el('div', 'online-player-name', `Player ${player.playerId}`);
+            who.prepend(playerBadge(player.playerId));
+            chip.append(who, el('span', 'online-player-device', deviceLabel(player.deviceId)));
             const role = rolePanel(chip, deps.roster);
             role.render(
               online.flow?.lobby ?? null,
@@ -264,12 +269,17 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineLobbyDeps): Onli
               false,
             );
             roles.push(role);
-            chips.append(chip);
+            slots.append(chip);
           }
           row.append(name, chips);
           return row;
         }),
       );
+      for (let i = slots.children.length; i < 4; i++) {
+        const empty = el('div', 'online-empty-slot', 'Enter or gamepad A to join');
+        empty.prepend(el('div', 'online-player-name', 'Open seat'));
+        slots.append(empty);
+      }
     },
   };
 }
