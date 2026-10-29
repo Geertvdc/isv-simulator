@@ -15,7 +15,7 @@ An Overcooked-style couch co-op game about shipping software. 2 to 4 players sha
 
 ## How a round works
 
-1. **Orders** appear along the top. Each order card shows its kind and the stations its ticket must visit, in order, as colored letters (K, R, T, P). The bar under it is the time left; the card flashes in the last 10 seconds.
+1. **Orders** appear along the top. Each order card shows its kind and the stations its ticket must visit, in order, as tiles with each station's icon in its color, ticking off as the ticket gets worked. The line under its title bar is the time left; it flashes in the last 10 seconds.
 2. A **ticket** for every order waits in a queue: features in the blue **inbox**, bugs and hotfixes in the red **bug queue**. Pick one up.
 3. Carry it to each **station** in order and work it there. Keyboards and test benches need someone holding work; the pipeline builds by itself; a review needs two players at once.
 4. When every step is done, put it on a **ship** hatch. Points pop up next to the score.

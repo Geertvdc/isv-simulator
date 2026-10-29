@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { CONVEYOR_TICKS, TICKS_PER_SECOND } from '../../sim/balance';
 import { type LevelMap, type Tile, conveyorAt, getTile, isWorkSurface } from '../../sim/level';
-import type { MapLook } from '../mapLook';
+import { type MapLook, tileColor } from '../mapLook';
+import { GLYPHS, GLYPH_SIZE, GLYPH_STROKE, type GlyphId, cssHex } from '../stepLook';
 import { type WallPiece, levelSalt, tileHash, wallDeco, wallPiece } from '../mapShape';
 import { VIEW3D_PITCH, type Vec3, gridToWorld } from '../projection';
 import { type KitMaterials, type Model, ModelBuilder, kitMaterials } from './kit';
@@ -25,17 +26,17 @@ import {
   wallModel,
 } from './models';
 
-/** Letters on the station tops, matching the order cards in the HUD. */
-const STATION_LETTERS: Partial<Record<Tile, string>> = {
-  inbox: 'I',
-  bugQueue: 'B',
-  keyboard: 'K',
-  testBench: 'T',
-  review: 'R',
-  pipeline: 'P',
-  ship: 'S',
-  whiteboard: 'W',
-  merge: 'G',
+/** Station glyphs on the station tops, the same tiles as the step tiles on the order cards. */
+const STATION_GLYPHS: Partial<Record<Tile, { glyph: GlyphId; color: number }>> = {
+  inbox: { glyph: 'inbox', color: tileColor('inbox') },
+  bugQueue: { glyph: 'bug', color: tileColor('bugQueue') },
+  keyboard: { glyph: 'code', color: tileColor('keyboard') },
+  testBench: { glyph: 'test', color: tileColor('testBench') },
+  review: { glyph: 'review', color: tileColor('review') },
+  pipeline: { glyph: 'pipeline', color: tileColor('pipeline') },
+  ship: { glyph: 'ship', color: tileColor('ship') },
+  whiteboard: { glyph: 'design', color: tileColor('whiteboard') },
+  merge: { glyph: 'merge', color: tileColor('merge') },
 };
 /** Each floor tile's brightness wobbles by up to this much, so the floor doesn't look printed. */
 const FLOOR_WOBBLE = 0.06;
@@ -222,13 +223,13 @@ export function buildMap(map: LevelMap, look: MapLook): MapView {
         const h = heroPlacement(yaw, station.heroAt);
         place(`hero:${tile}`, () => hero, { at: gridToWorld(x + h.dx, y + h.dz), yaw: h.yaw });
       }
-      const letter = STATION_LETTERS[tile];
-      if (letter) {
+      const badge = STATION_GLYPHS[tile];
+      if (badge) {
         const b = heroPlacement(yaw, BADGE_AT);
         // Its bottom edge on the top, leaning back to face the camera.
         const lift = (BADGE_SIZE / 2) * Math.sin(VIEW3D_PITCH);
         const at = gridToWorld(x + b.dx, y + b.dz, STATION_HEIGHT + lift);
-        root.add(letterBadge(badgeGeometry, badges, letter, at));
+        root.add(glyphBadge(badgeGeometry, badges, badge.glyph, badge.color, at));
       }
     }
   }
@@ -366,50 +367,74 @@ function instances(
   return out;
 }
 
-/** Where the letter badge lies on a station's top: the front left corner, in the station's space. */
+/** Where the glyph badge lies on a station's top: the front left corner, in the station's space. */
 const BADGE_AT: [number, number] = [-0.32, 0.36];
-const BADGE_SIZE = 0.3;
+const BADGE_SIZE = 0.32;
+/** The step tiles' background and the shadow line around them. */
+const BADGE_FILL = '#222a3f';
+const BADGE_OUTLINE = '#1a1d24';
 
 /**
- * A round badge with the station's letter standing on its top, square on to
- * the camera like a sign, matching the HUD's order cards. One material per
- * letter, shared.
+ * A rounded tile with the station's glyph in its color standing on its top,
+ * square on to the camera like a sign, the same as the step tiles on the
+ * order cards. One material per glyph, shared.
  */
-function letterBadge(
+function glyphBadge(
   geometry: THREE.BufferGeometry,
   materials: Map<string, THREE.MeshBasicMaterial>,
-  text: string,
+  glyph: GlyphId,
+  color: number,
   at: Vec3,
 ): THREE.Mesh {
-  let material = materials.get(text);
+  let material = materials.get(glyph);
   if (!material) {
-    material = new THREE.MeshBasicMaterial({ map: letterTexture(text), transparent: true });
-    materials.set(text, material);
+    material = new THREE.MeshBasicMaterial({ map: glyphTexture(glyph, color), transparent: true });
+    materials.set(glyph, material);
   }
   const mesh = new THREE.Mesh(geometry, material);
   put(mesh, at);
   return mesh;
 }
 
-function letterTexture(text: string): THREE.Texture {
-  const size = 64;
+function glyphTexture(glyph: GlyphId, color: number): THREE.Texture {
+  const size = 96;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    ctx.fillStyle = '#fdfdf6';
+    const stroke = cssHex(color);
     ctx.beginPath();
-    ctx.arc(size / 2, size / 2, size / 2 - 3, 0, Math.PI * 2);
+    ctx.roundRect(4, 4, size - 8, size - 8, 16);
+    ctx.fillStyle = BADGE_FILL;
     ctx.fill();
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = '#1a1d24';
+    ctx.lineWidth = 10;
+    ctx.strokeStyle = BADGE_OUTLINE;
     ctx.stroke();
-    ctx.font = `bold ${size * 0.55}px system-ui, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#1a1d24';
-    ctx.fillText(text, size / 2, size / 2 + 2);
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = stroke;
+    ctx.stroke();
+    const inner = size * 0.64;
+    ctx.translate((size - inner) / 2, (size - inner) / 2);
+    ctx.scale(inner / GLYPH_SIZE, inner / GLYPH_SIZE);
+    ctx.lineWidth = GLYPH_STROKE;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = stroke;
+    ctx.fillStyle = stroke;
+    for (const shape of GLYPHS[glyph]) {
+      ctx.beginPath();
+      if (shape.type === 'rect') ctx.roundRect(shape.x, shape.y, shape.w, shape.h, 1.5);
+      else if (shape.type === 'circle') ctx.arc(shape.cx, shape.cy, shape.r, 0, Math.PI * 2);
+      else {
+        ctx.moveTo(shape.points[0] ?? 0, shape.points[1] ?? 0);
+        for (let i = 2; i + 1 < shape.points.length; i += 2)
+          ctx.lineTo(shape.points[i] ?? 0, shape.points[i + 1] ?? 0);
+        if (shape.type === 'poly') ctx.closePath();
+      }
+      if (shape.type !== 'line' && shape.fill) ctx.fill();
+      else ctx.stroke();
+    }
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;

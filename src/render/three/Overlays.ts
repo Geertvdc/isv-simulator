@@ -5,21 +5,27 @@ import {
   DOMAIN_ICONS,
   HINT_TEXTS,
   MEETING_ROOM_TEXT,
-  ORDER_KIND_LABELS,
   TICKET_DOMAIN_LABELS,
+  TICKET_EXPIRED_STAMP,
+  orderNumber,
   pairingText,
 } from '../../sim/content';
 import { type LevelMap, getTile } from '../../sim/level';
+import { orderOf, shipBlockedBy } from '../../sim/orders';
 import { pipelineWarning } from '../../sim/pipeline';
 import type { GameState } from '../../sim/state';
-import { type QueueKind, queuedTickets } from '../../sim/tickets';
+import { type QueueKind, type Ticket, isPart, isShippable, queuedTickets } from '../../sim/tickets';
 import { firstGroup } from '../mapShape';
 import { pipelinePulse } from '../effects';
 import { type Vec3, gridToWorld } from '../projection';
 import type { RoundView } from '../roundView';
+import { KIND_COLOR, STAMP_COLOR, cssHex, orderTimeShare, ticketStepTiles } from '../stepLook';
 import {
   HINT_TILES,
   PAIRING_COLOR,
+  TICKET_CARD_HEIGHT,
+  TICKET_CARD_ID,
+  type TicketCardLook,
   createHintMarker,
   drawBadge,
   drawInvite,
@@ -27,6 +33,8 @@ import {
   drawTicketCard,
   hintLabelOrigin,
   isPaired,
+  ticketCardTop,
+  ticketCardWidth,
 } from '../billboards';
 import { HEAD_TOP, blockHeight, placeTicket, queueAnchor } from './layout';
 
@@ -51,7 +59,7 @@ const HEAD_CARD_HEIGHT = HEAD_TOP + 0.05;
 /** The invite is drawn around its middle, so it sits higher to clear the head and hat. */
 const HEAD_INVITE_HEIGHT = HEAD_TOP + 0.4;
 /** Over a carrier, the invite goes over the card and its title: this many overlay pixels up. */
-const INVITE_OVER_CARD = 78;
+const INVITE_OVER_CARD = 88;
 /** Popups start over the head and its card. */
 export const POPUP_HEIGHT = HEAD_TOP + 0.6;
 const HINT_LIFT = 0.15;
@@ -63,6 +71,12 @@ const POPUP_RISE = 48;
 const POPUP_MS = 1000;
 /** Text stays crisp when overlays scale up on big screens. */
 const TEXT_RESOLUTION = 2;
+/** The order number and the stamp on world cards, in the HUD's monospace. */
+const MONO_FONT = 'ui-monospace, Menlo, Consolas, monospace';
+const EXPIRED_ID_COLOR = '#2a2e38';
+const STAMP_ANGLE = -12;
+/** A card's timer bar is redrawn in this many steps over the order's time. */
+const TIMER_STEPS = 60;
 
 const TEXT_STYLE = {
   fontFamily: 'system-ui, sans-serif',
@@ -75,6 +89,10 @@ interface CardSprite {
   g: Phaser.GameObjects.Graphics;
   title: Phaser.GameObjects.Text;
   domain: Phaser.GameObjects.Text;
+  /** The order number on the card, `#12`. */
+  id: Phaser.GameObjects.Text;
+  /** `wontfix` across a card whose order ran out. */
+  stamp: Phaser.GameObjects.Text;
   drawn: string;
 }
 
@@ -192,12 +210,27 @@ export class Overlays {
             .setWordWrapWidth(90)
             .setAlign('center'),
           domain: this.text(
-            `${ORDER_KIND_LABELS[ticket.kind]} · ${DOMAIN_ICONS[ticket.domain]} ${TICKET_DOMAIN_LABELS[ticket.domain]}`,
+            `${DOMAIN_ICONS[ticket.domain]} ${TICKET_DOMAIN_LABELS[ticket.domain]}`,
             10,
             '#ffffff',
           )
             .setOrigin(0.5, 1)
             .setBackgroundColor('rgba(10, 15, 25, 0.85)'),
+          id: this.text(
+            ticket.orderId > 0 ? orderNumber(ticket.orderId) : '',
+            7,
+            cssHex(KIND_COLOR[ticket.kind]),
+          )
+            .setFontFamily(MONO_FONT)
+            .setStroke('#000000', 0)
+            .setOrigin(0, 0.5),
+          stamp: this.text(TICKET_EXPIRED_STAMP, 10, cssHex(STAMP_COLOR))
+            .setFontFamily(MONO_FONT)
+            .setStroke('#000000', 0)
+            .setBackgroundColor('rgba(20, 6, 8, 0.85)')
+            .setPadding(3, 1, 3, 1)
+            .setOrigin(0.5, 0.5)
+            .setAngle(STAMP_ANGLE),
           drawn: '',
         };
         this.cards.set(ticket.id, card);
@@ -205,10 +238,20 @@ export class Overlays {
       const tile = loc.kind === 'tile' ? getTile(state.level, loc.x, loc.y) : null;
       const progress = stationWorkStep(ticket, tile)?.progress ?? 0;
       const bar = progress > 0 && progress < 1 ? progress : null;
-      const key = `${ticket.steps.map((s) => s.progress >= 1).join()}|${bar ?? ''}`;
+      const order = orderOf(state, ticket);
+      const look: TicketCardLook = {
+        kind: ticket.kind,
+        steps: ticketStepTiles(ticket),
+        expired: ticket.expired,
+        timer: order ? orderTimeShare(order, state.tick) : null,
+        blocked:
+          !ticket.expired && !isPart(ticket) && isShippable(ticket) && shipBlockedBy(state, ticket),
+      };
+      const timerStep = look.timer === null ? '' : Math.round(look.timer * TIMER_STEPS);
+      const key = `${look.steps.map((s) => s.state).join()}|${bar ?? ''}|${look.expired}|${timerStep}|${look.blocked}`;
       if (key !== card.drawn) {
         card.drawn = key;
-        drawTicketCard(card.g, ticket, bar);
+        drawTicketCard(card.g, look, bar);
       }
 
       const carrier = loc.kind === 'player' ? view.renderPos(loc.playerId) : undefined;
@@ -217,6 +260,19 @@ export class Overlays {
         : { ...placed.pos, y: placed.pos.y + CARD_LIFT };
       const p = project(at);
       place(card.g, p);
+      const scale = p.scale * OVERLAY_SCALE;
+      const left = -ticketCardWidth(look) / 2;
+      place(card.id, {
+        ...p,
+        x: p.x + (left + TICKET_CARD_ID.x) * scale,
+        y: p.y + TICKET_CARD_ID.y * scale,
+      });
+      card.id.setColor(idColor(ticket));
+      card.stamp.setVisible(ticket.expired);
+      if (ticket.expired) {
+        place(card.stamp, { ...p, y: p.y - (TICKET_CARD_HEIGHT / 2) * scale });
+        card.stamp.setAngle(STAMP_ANGLE);
+      }
       // Over a carried card its title; over a keyboard two players code at, that they're pairing.
       const paired = isPaired(state, ticket);
       const actualRate = state.workFeedback.find(
@@ -228,7 +284,7 @@ export class Overlays {
         // A dark backing so the pairing label reads over the station.
         .setBackgroundColor(paired ? 'rgba(0, 0, 0, 0.65)' : '')
         .setVisible(placed.carried || paired);
-      const lift = (bar === null ? 26 : 40) * p.scale * OVERLAY_SCALE;
+      const lift = (ticketCardTop(bar !== null) + 2) * scale;
       place(card.domain, { ...p, y: p.y - lift });
       if (placed.carried || paired)
         place(card.title, { ...p, y: p.y - lift - 15 * p.scale * OVERLAY_SCALE });
@@ -238,6 +294,8 @@ export class Overlays {
       card.g.destroy();
       card.title.destroy();
       card.domain.destroy();
+      card.id.destroy();
+      card.stamp.destroy();
       this.cards.delete(id);
     }
   }
@@ -361,6 +419,12 @@ export class Overlays {
       .text(0, 0, text, { ...TEXT_STYLE, fontSize: `${size}px`, color, strokeThickness: 3 })
       .setResolution(TEXT_RESOLUTION);
   }
+}
+
+/** A card's `#id`: its kind's syntax color, white on a hotfix's red bar, dim once expired. */
+function idColor(ticket: Pick<Ticket, 'kind' | 'expired'>): string {
+  if (ticket.expired) return EXPIRED_ID_COLOR;
+  return ticket.kind === 'incident' ? '#ffffff' : cssHex(KIND_COLOR[ticket.kind]);
 }
 
 /** Puts an overlay at `p`, scaled for its distance; `depth` overrides the nearer-on-top order. */

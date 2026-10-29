@@ -9,6 +9,7 @@ import {
   MEETING_DONE_TEXT,
   MERGED_TEXT,
   PIPELINE_FIXED_TEXT,
+  SHIP_BLOCKED_TEXT,
   SHOVE_TEXTS,
   TICKET_LOST_TEXT,
   BACKLOG_TEXT,
@@ -60,10 +61,11 @@ export function effectsFor(state: GameState, events: readonly GameEvent[]): Effe
         break;
       case 'ticketLost': {
         popup({ x: event.x, y: event.y }, TICKET_LOST_TEXT, POPUP_LOST_COLOR);
-        // And where it went: back on top of its queue.
-        const queue = firstGroup(state.level, QUEUE_TILE[event.queue]);
-        const at = queue[0];
-        if (at) popup(at, BACKLOG_TEXT, POPUP_INFO_COLOR);
+        // And where it went: back on top of its queue (an expired one is just gone).
+        if (event.queue !== null) {
+          const at = firstGroup(state.level, QUEUE_TILE[event.queue])[0];
+          if (at) popup(at, BACKLOG_TEXT, POPUP_INFO_COLOR);
+        }
         shake(SHAKE_SHOVE);
         break;
       }
@@ -73,6 +75,12 @@ export function effectsFor(state: GameState, events: readonly GameEvent[]): Effe
       case 'orderExpired':
         shake(SHAKE_ORDER_EXPIRED);
         break;
+      case 'shipBlocked': {
+        const player = getPlayer(state, event.playerId);
+        if (player) popup(player.pos, SHIP_BLOCKED_TEXT, POPUP_LOST_COLOR);
+        shake(SHAKE_SHOVE);
+        break;
+      }
       // Production is down: everybody should notice.
       case 'orderCreated':
         if (event.order.kind === 'incident') shake(SHAKE_PIPELINE_BROKE);

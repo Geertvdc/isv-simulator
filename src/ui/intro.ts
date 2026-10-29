@@ -20,11 +20,11 @@ import { rolePanel, type RosterDispatch } from './roles';
 import { playerBadge } from './playerBadge';
 import { playerCssColor } from '../render/playerColors';
 import { el } from './dom';
-import { stepChips } from './game';
 import { introPicture } from './introPicture';
 import { levelRecipes } from './recipes';
 import type { ScreenView } from './screens';
 import { statusBar } from './statusBar';
+import { stepChips } from './stepTiles';
 
 /** Where level `levelId` sits: its chapter and level number, counted from 1. */
 function placeOf(levelId: string): { chapter: number; level: number } | null {

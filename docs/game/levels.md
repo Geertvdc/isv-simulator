@@ -32,7 +32,7 @@ _Two founders and a dream._
 
 ![The Garage](images/levels/garage.webp)
 
-One inbox, one bug queue, two keyboards, two test benches, one pipeline everybody shares and a single ship hatch. Orders come faster here than in the other Garage levels (every 15 s, up to 4 open), so it isn't a walk in the park. The first time you play it, hints point at the inbox, a keyboard and the ship hatch.
+One inbox, one bug queue, two keyboards, two test benches, one pipeline everybody shares, a bin for tickets whose order ran out and a single ship hatch. Orders come faster here than in the other Garage levels (every 15 s, up to 4 open), so it isn't a walk in the park. The first time you play it, hints point at the inbox, a keyboard and the ship hatch.
 
 - **New here:** The basics: pick up, code, test, build, ship.
 - **Extras:** —
@@ -45,7 +45,7 @@ One inbox, one bug queue, two keyboards, two test benches, one pipeline everybod
 #..1......2..#
 #....CCCC....#
 #............#
-#..3......4.P#
+X..3......4.P#
 #............#
 #C..........C#
 ######S#######

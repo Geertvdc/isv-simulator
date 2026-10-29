@@ -1,6 +1,6 @@
 # Stations
 
-Everything you interact with stands on a solid tile. You use it from the tile next to it, facing it: the block you face lights up in your color. Order cards and recipes name stations by letter: **W**hiteboard, **K**eyboard, merge (**G**), **R**eview, **T**est bench, **P**ipeline.
+Everything you interact with stands on a solid tile. You use it from the tile next to it, facing it: the block you face lights up in your color. Every station has an icon on its top in its own color, and order cards, ticket cards and recipes show the same icons: keyboard (code), flask (test bench), two heads (review), whiteboard, merge, rocket (pipeline), plus the inbox tray, the bug queue's bug and the ship parcel.
 
 ![The Garage: inbox and bug queue at the back, keyboards on the left, test benches and pipeline on the right, ship hatch at the front](images/levels/garage.webp)
 
@@ -13,7 +13,7 @@ Everything you interact with stands on a solid tile. You use it from the tile ne
 | Test bench   | `T`             | Yellow desk with ✓/✗ screens  | The **test** step. Hold work, about 2.5 s. Tests are optional, but skipping them makes bugs much more likely.   |
 | Pipeline     | `P`             | Orange build machine          | The **pipeline** step. Builds on its own in 4 s, nobody needed. Collect the build in time or it breaks.         |
 | Ship hatch   | `S`             | Green crate with a parcel     | Put a finished ticket here to ship it and complete its order.                                                   |
-| Bin          | `X`             | Grey trash can                | Throws the carried ticket away for good. Its order stays open.                                                  |
+| Bin          | `X`             | Grey trash can                | Throws the carried ticket away for good. Its order stays open. Where expired tickets go.                        |
 | Counter      | `C`             | Plain wooden counter top      | Somewhere to put a ticket down and pick it up later. Counter walls split some offices in two.                   |
 | Whiteboard   | `W`             | White board on a stand        | The **design** step some features start with (Big Tech). Hold work, about 2.5 s. Designed features code faster. |
 | Merge        | `G`             | Raspberry desk                | git merge: put a coded front end and a coded back end here and they become one full-stack ticket.               |
@@ -54,6 +54,6 @@ A broken pipeline builds nothing and takes no tickets. Take the ticket out, then
 
 ## Ship
 
-Put a ticket with every required step done on a ship hatch. It completes the matching order with the least time left, and points pop up. A ticket whose order already ran out still ships, for nothing.
+Put a ticket with every required step done on a ship hatch. It completes its own order (the one it came in with), and points pop up. A ticket whose order already ran out is greyed out and won't ship: put it in the bin.
 
 ![Shipping: points pop up](images/mechanics/ship.webp)
