@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { PIPELINE_FAIL_TICKS, REPAIR_TICKS, TICKS_PER_SECOND } from './balance';
 import { type Bot, botInput, createBot, findPath, runBots } from './bot';
 import { getTile, parseLevelMap } from './level';
-import { DOWN_THE_HALL, GARAGE, levelWithMap } from './levels';
+import { DOWN_THE_HALL, GARAGE, levelById, levelWithMap } from './levels';
 import { TICKET_STEPS, type Ticket } from './tickets';
 import { createOrder } from './orders';
 import { type GameState, type PlayerId, createGame } from './state';
 import { pipelineAt } from './pipeline';
-import { COL, addTicket, give, idle, newTestGame } from './testing';
+import { COL, addTicket, give, idle, newTestGame, standAt } from './testing';
 import { tick } from './tick';
 
 describe('findPath', () => {
@@ -56,6 +56,61 @@ describe('bot run on the garage', () => {
   it('is deterministic per seed', () => {
     expect(runBots(GARAGE, 3, 2)).toEqual(runBots(GARAGE, 3, 2));
   });
+
+  it('accounts for created, shipped, expired, and remaining orders in benchmark metrics', () => {
+    const run = runBots(GARAGE, 9, 2);
+    const createdByRecipe = Object.entries(run.ordersByRecipeDomain)
+      .filter(([key]) => key.startsWith('created:'))
+      .reduce((total, [, count]) => total + count, 0);
+
+    expect(createdByRecipe).toBe(run.ordersCreated);
+    expect(run.ordersCreated).toBe(run.shipped + run.expired + run.openOrdersAtEnd);
+  });
+
+  it('reports resolved station work and utilization within available station capacity', () => {
+    const run = runBots(GARAGE, 5, 2);
+    const stationTypes = {
+      code: 'keyboard',
+      test: 'testBench',
+      design: 'whiteboard',
+      review: 'review',
+      repair: 'pipeline',
+    } as const;
+    for (const task of ['code', 'test', 'design', 'review', 'repair'] as const) {
+      let stationCount = 0;
+      for (let y = 0; y < GARAGE.map.height; y++) {
+        for (let x = 0; x < GARAGE.map.width; x++) {
+          if (getTile(GARAGE.map, x, y) === stationTypes[task]) stationCount++;
+        }
+      }
+      const capacity = stationCount * GARAGE.durationTicks;
+      expect(run.stationWorkTicks[task]).toBeGreaterThanOrEqual(run.stationBusyTicks[task]);
+      expect(run.stationBusyTicks[task]).toBeLessThanOrEqual(capacity);
+      expect(run.stationUtilization[task]).toBeCloseTo(
+        capacity === 0 ? 0 : (100 * run.stationBusyTicks[task]) / capacity,
+      );
+    }
+  });
+
+  it('does not strand the three-player mixed role-aware team behind queue heads', () => {
+    const level = levelById('lab-roles');
+    if (!level) throw new Error('Missing role lab');
+    const run = runBots(level, 1, 3, {
+      roles: ['generalist', 'frontend', 'qa'],
+      assignmentPolicy: 'role-aware',
+    });
+
+    expect(run.queueWaitTicks).toBe(0);
+  });
+
+  it('accepts explicit role compositions and a role-aware task assignment policy', () => {
+    const options = {
+      roles: ['frontend', 'qa'] as const,
+      assignmentPolicy: 'role-aware' as const,
+    };
+    expect(runBots(GARAGE, 13, 2, options)).toEqual(runBots(GARAGE, 13, 2, options));
+    expect(() => runBots(GARAGE, 13, 2, { roles: ['qa'] })).toThrow(/Expected 2 role ids/);
+  });
 });
 
 // Every level's 1-star bot runs live in campaign.test.ts.
@@ -101,6 +156,128 @@ describe('bot and new mechanics', () => {
     }
     const carried = state.tickets.find((t) => t.location.kind === 'player');
     expect(carried?.kind).toBe('incident');
+  });
+
+  it('assigns a queued domain to the available bot with the shortest role-adjusted work', () => {
+    const state = newTestGame();
+    createOrder(state, 'feature', 'Frontend work', undefined, 'frontend');
+    const queued = state.tickets[0];
+    if (!queued) throw new Error('Missing queued feature ticket');
+    const generalist = state.players.find((player) => player.id === 1);
+    const frontend = state.players.find((player) => player.id === 2);
+    if (!generalist || !frontend) throw new Error('Missing bot players');
+    generalist.roleId = 'backend';
+    frontend.roleId = 'frontend';
+    const bots = [createBot(1, false, 'role-aware'), createBot(2, false, 'role-aware')];
+    const inputs = bots.map((bot) => botInput(state, bot, bots));
+    expect(bots[0]?.ticketId).toBeNull();
+    expect(bots[1]?.ticketId).toBe(queued.id);
+    expect(inputs[0]?.interact).toBe(false);
+  });
+
+  it('does not let an unassigned role-aware bot take a reserved queue ticket', () => {
+    const state = newTestGame();
+    const reserved = createOrder(state, 'feature', 'Reserved work', undefined, 'frontend');
+    const queued = state.tickets.find(
+      (ticket) => ticket.kind === 'feature' && ticket.domain === reserved.domain,
+    );
+    if (!queued) throw new Error('Missing reserved feature ticket');
+    const assigned = createBot(1, false, 'role-aware');
+    const unassigned = createBot(2, false, 'role-aware');
+    assigned.ticketId = queued.id;
+
+    const command = botInput(state, unassigned, [assigned, unassigned]);
+
+    expect(unassigned.ticketId).toBeNull();
+    expect(command.interact).toBe(false);
+  });
+
+  it('compares walking distance and role work in the same tick units', () => {
+    const state = newTestGame();
+    const order = createOrder(state, 'feature', 'Work', undefined, 'frontend');
+    const farBot = createBot(1, false, 'role-aware');
+    const nearBot = createBot(2, false, 'role-aware');
+    const farPlayer = state.players.find((player) => player.id === 1);
+    const nearPlayer = state.players.find((player) => player.id === 2);
+    if (!farPlayer || !nearPlayer) throw new Error('Missing bot players');
+    farPlayer.roleId = 'frontend';
+    nearPlayer.roleId = 'generalist';
+    const bots = [farBot, nearBot];
+    standAt(state, 1, 11);
+    standAt(state, 2, 2);
+
+    botInput(state, farBot, bots);
+    botInput(state, nearBot, bots);
+
+    expect(farBot.ticketId).toBeNull();
+    expect(nearBot.ticketId).toBe(order.id);
+  });
+
+  it('breaks equal assignment costs by player id, independent of bot list order', () => {
+    const state = newTestGame();
+    const order = createOrder(state, 'feature', 'Work');
+    const higherId = createBot(2, false, 'role-aware');
+    const lowerId = createBot(1, false, 'role-aware');
+    const bots = [higherId, lowerId];
+    standAt(state, 1, 2);
+    standAt(state, 2, 2);
+
+    botInput(state, higherId, bots);
+    botInput(state, lowerId, bots);
+
+    expect(higherId.ticketId).toBeNull();
+    expect(lowerId.ticketId).toBe(order.id);
+  });
+
+  it('does not reserve a later queued ticket while the queue head is being fetched', () => {
+    const state = newTestGame();
+    createOrder(state, 'feature', 'Frontend work', undefined, 'frontend');
+    createOrder(state, 'feature', 'Backend work', undefined, 'backend');
+    const frontendTicket = state.tickets.find((ticket) => ticket.domain === 'frontend');
+    const backendTicket = state.tickets.find((ticket) => ticket.domain === 'backend');
+    const frontendPlayer = state.players.find((player) => player.id === 1);
+    const backendPlayer = state.players.find((player) => player.id === 2);
+    if (!frontendTicket || !backendTicket || !frontendPlayer || !backendPlayer) {
+      throw new Error('Missing queued tickets or players');
+    }
+    frontendPlayer.roleId = 'frontend';
+    backendPlayer.roleId = 'backend';
+    const frontendBot = createBot(1, false, 'role-aware');
+    const backendBot = createBot(2, false, 'role-aware');
+
+    botInput(state, frontendBot, [frontendBot, backendBot]);
+    const backendCommand = botInput(state, backendBot, [frontendBot, backendBot]);
+
+    expect(frontendBot.ticketId).toBe(frontendTicket.id);
+    expect(backendBot.ticketId).toBeNull();
+    expect(backendCommand.interact).toBe(false);
+    expect(backendTicket.location.kind).toBe('queue');
+  });
+
+  it('does not reserve queue work for an invited bot and releases existing reservations', () => {
+    const state = newTestGame();
+    const order = createOrder(state, 'feature', 'Work');
+    const ticket = state.tickets.find((candidate) => candidate.id === order.id);
+    if (!ticket) throw new Error('Missing queued feature ticket');
+    state.invites.push({
+      id: 1,
+      playerId: 1,
+      title: 'Planning meeting',
+      createdTick: 0,
+      expiresTick: 100,
+      attendedTicks: 0,
+      attendTicks: 30,
+    });
+    const invited = createBot(1, false, 'role-aware');
+    const available = createBot(2, false, 'role-aware');
+    invited.ticketId = ticket.id;
+    const bots = [invited, available];
+
+    botInput(state, invited, bots);
+
+    expect(invited.ticketId).toBeNull();
+    botInput(state, available, bots);
+    expect(available.ticketId).toBe(ticket.id);
   });
 
   it('parks a finished feature on a counter during an incident and ships it after', () => {
@@ -230,6 +407,7 @@ describe('bots and full-stack features', () => {
       const t: Ticket = {
         id: state.nextTicketId++,
         kind: 'frontend',
+        domain: 'frontend',
         title: 'Checkout',
         steps: [{ kind: 'code', progress: 1 }],
         location: playerId === null ? { kind: 'tile', x: 4, y: 1 } : { kind: 'player', playerId },

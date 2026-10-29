@@ -25,5 +25,6 @@ The game docs, with screenshots of every screen, station, event and level: [`doc
 
 ## Working on it
 
+- Dev-only playable role lab: `/?lab=lab-roles&quality=low`. It opens local role selection and the authored lab forecast without touching campaign progress. `/?scene=roles-work&quality=low` shows real simulated effective work rates. No campaign domain rollout or balance tuning is enabled by these entries.
 - Architecture rules and conventions: [`AGENTS.md`](AGENTS.md)
 - Roadmap, one phase at a time: [`docs/plan/`](docs/plan/README.md)

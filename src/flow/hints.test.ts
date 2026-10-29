@@ -10,6 +10,7 @@ const shipped: GameEvent = {
   order: {
     id: 1,
     kind: 'feature',
+    domain: 'general',
     steps: ['code', 'test', 'pipeline'],
     createdTick: 0,
     expiresTick: 1000,

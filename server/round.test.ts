@@ -150,7 +150,8 @@ describe('an online round', () => {
       };
       const from1 = startPos(1);
       const from2 = startPos(2);
-      ada.menu({ interact: true }); // past the intro card: the countdown
+      ada.menu({ interact: true });
+      grace.menu({ interact: true }); // both owned slots confirm before countdown
 
       // Ada walks up the screen, Grace down; each machine only sends its own player.
       ada.walk(1, { x: 0, y: -1 });

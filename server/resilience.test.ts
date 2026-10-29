@@ -213,6 +213,7 @@ async function roundWithTwo(
   a.send({ type: 'menu', presses: [press({ interact: true })] });
   await b.waitFor('roundStart');
   a.send({ type: 'menu', presses: [press({ interact: true })] });
+  b.send({ type: 'menu', presses: [press({ interact: true })] });
   await b.waitFor('snapshot', (m) => m.flow.screen === 'playing');
   return { a, b, code: joinCode };
 }

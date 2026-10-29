@@ -11,6 +11,7 @@ import type { Invite } from './meetings';
 import type { GameEvent, LevelResult, Order, PendingBug } from './orders';
 import { type Pipeline, createPipelines } from './pipeline';
 import { type RngState, createRng } from './rng';
+import { isRoleId, type RoleId, type TicketDomain, type WorkTask } from './roles';
 import type { Ticket } from './tickets';
 
 /** A direction or velocity in grid units. */
@@ -21,8 +22,19 @@ export interface Vec {
 
 export type PlayerId = number;
 
+/** Resolved contributors from the last tick, never inferred from proximity or held input. */
+export interface WorkFeedback {
+  playerId: PlayerId;
+  task: WorkTask;
+  rate: number;
+  /** Total station output for a pair; rate is this player's contribution to it. */
+  teamRate?: number;
+  ticketId?: number;
+}
+
 export interface Player {
   id: PlayerId;
+  roleId: RoleId;
   /** Grid units; tile centers sit on integers. */
   pos: Vec;
   /** Tiles per second. */
@@ -76,6 +88,7 @@ export interface GameState {
   belts: Belt[];
   /** Keyboards two or more players coded at together last tick (pair programming), for drawing. */
   pairing: GridPoint[];
+  workFeedback: WorkFeedback[];
   nextTicketId: number;
   orders: Order[];
   nextOrderId: number;
@@ -95,15 +108,21 @@ export interface GameState {
   result: LevelResult | null;
   /** What happened during the last tick, for render and UI to react to. */
   events: GameEvent[];
+  /** Current seeded domain batch; empty on classic levels. */
+  domainBatch: TicketDomain[];
+  domainBatchIndex: number;
+  /** Consecutive generated domain orders since each domain last appeared. */
+  domainDrought: Record<TicketDomain, number>;
 }
 
 /** Players start facing the camera. */
 const START_FACING: Vec = { x: 0, y: 1 };
 
 /** A player standing still at `pos`, facing the camera. */
-export function newPlayer(id: PlayerId, pos: Vec): Player {
+export function newPlayer(id: PlayerId, pos: Vec, roleId: RoleId = 'generalist'): Player {
   return {
     id,
+    roleId,
     pos: { x: pos.x, y: pos.y },
     vel: { x: 0, y: 0 },
     facing: { ...START_FACING },
@@ -116,15 +135,25 @@ export function newPlayer(id: PlayerId, pos: Vec): Player {
 }
 
 /** A new game with each player standing on their own spawn: player `n` on spawn `n`. */
-export function createGame(level: Level, seed: number, playerIds: readonly PlayerId[]): GameState {
+export function createGame(
+  level: Level,
+  seed: number,
+  playerIds: readonly PlayerId[],
+  roleByPlayer: Partial<Record<PlayerId, RoleId>> = {},
+): GameState {
   const { map } = level;
   if (playerIds.length === 0) throw new Error('A game needs at least one player');
   if (new Set(playerIds).size !== playerIds.length) throw new Error('Duplicate player ids');
   const players = playerIds.map((id): Player => {
     const spawn = Number.isInteger(id) ? map.spawns[id - 1] : undefined;
     if (!spawn) throw new Error(`Level has no spawn for player ${id}`);
-    return newPlayer(id, spawn);
+    const roleId = roleByPlayer[id] ?? 'generalist';
+    if (!isRoleId(roleId)) throw new Error(`Unknown role '${String(roleId)}' for player ${id}`);
+    return newPlayer(id, spawn, roleId);
   });
+  for (const id of Object.keys(roleByPlayer).map(Number)) {
+    if (!playerIds.includes(id)) throw new Error(`Role specified for unknown player ${id}`);
+  }
   return {
     seed,
     rngState: createRng(seed),
@@ -138,6 +167,7 @@ export function createGame(level: Level, seed: number, playerIds: readonly Playe
     pipelines: createPipelines(map),
     belts: createBelts(map),
     pairing: [],
+    workFeedback: [],
     nextTicketId: 1,
     orders: [],
     nextOrderId: 1,
@@ -150,6 +180,15 @@ export function createGame(level: Level, seed: number, playerIds: readonly Playe
     score: 0,
     result: null,
     events: [],
+    domainBatch: [],
+    domainBatchIndex: 0,
+    domainDrought: {
+      general: 0,
+      frontend: 0,
+      backend: 0,
+      infra: 0,
+      mixed: 0,
+    },
   };
 }
 

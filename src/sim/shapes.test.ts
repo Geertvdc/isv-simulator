@@ -39,6 +39,7 @@ function newTicket(state: GameState, done = 0): Ticket {
   const ticket: Ticket = {
     id: state.nextTicketId++,
     kind: 'feature',
+    domain: 'general',
     title: 'Over the gap',
     steps: TICKET_STEPS.feature.map((kind, i) => ({ kind, progress: i < done ? 1 : 0 })),
     location: { kind: 'queue', queue: 'feature' },

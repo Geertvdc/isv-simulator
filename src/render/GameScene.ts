@@ -3,6 +3,7 @@ import { buildInputCommands } from '../input/commands';
 import type { DevicePress } from '../input/controller';
 import { type InputFrame, InputDevices } from '../input/devices';
 import { claimOrphanedPlayer } from '../input/lobby';
+import { configureRoster, rolesForRoster, type RosterCommand } from '../flow/roster';
 import {
   type Flow,
   type FlowContext,
@@ -102,7 +103,7 @@ import {
 } from '../sim/balance';
 import { type LevelMap, type Tile, getTile } from '../sim/level';
 import { type Bot, botInput, createBot } from '../sim/bot';
-import { CHAPTERS, DEMO_LEVEL_IDS, LEVELS, levelById } from '../sim/levels';
+import { CHAPTERS, DEMO_LEVEL_IDS, LEVELS, levelById, type Level } from '../sim/levels';
 import type { GameEvent } from '../sim/orders';
 import { type Scene, sceneDone, sceneInputs, sceneState } from '../sim/scenes';
 import { type GameState, createGame } from '../sim/state';
@@ -189,6 +190,8 @@ export const JOIN_CODE_EVENT = 'join-code';
 export const ONLINE_LEAVE_EVENT = 'online-leave';
 /** This browser picked a new display name (the identity already has it): tell the room. */
 export const ONLINE_RENAME_EVENT = 'online-rename';
+export const ROSTER_EVENT = 'roster';
+export const INTRO_GUIDE_EVENT = 'intro-guide';
 
 /** How the scene reaches the game server; `null` where online play is off (`?scene=`). */
 export interface OnlineOptions {
@@ -301,6 +304,7 @@ export interface GameSceneOptions {
   scene: Scene | null;
   /** `?demo`: a kiosk for a booth. Starts in the demo, and every menu goes back to it when left alone. */
   kiosk: boolean;
+  practiceLevel?: Level;
   online: OnlineOptions | null;
   /** Draws the level and rounds: `createThreeRoundRenderer`, passed in by `main.ts`. */
   roundRenderer: RoundRendererFactory;
@@ -443,6 +447,10 @@ export class GameScene extends Phaser.Scene {
     this.prediction = createPrediction(options.online?.predict ?? true);
     // A kiosk starts as if left alone for a while: straight into the demo.
     if (options.kiosk) this.flow.lastPressMs = -DEMO_KIOSK_IDLE_MS;
+    if (options.practiceLevel) {
+      this.flow.screen = 'lobby';
+      this.flow.awake = true;
+    }
   }
 
   preload(): void {
@@ -454,7 +462,7 @@ export class GameScene extends Phaser.Scene {
     this.mapLevelIndex = data.levelIndex ?? this.mapLevelIndex;
     // A scene may be on a lab level, outside the campaign.
     const sceneLevel = this.options.scene ? levelById(this.options.scene.levelId) : undefined;
-    const level = sceneLevel ?? LEVELS[this.mapLevelIndex];
+    const level = sceneLevel ?? this.options.practiceLevel ?? LEVELS[this.mapLevelIndex];
     if (!level) throw new Error(`No level ${this.mapLevelIndex}`);
     this.map = level.map;
     // Restarts reuse this object; the old sprites went with the old scene.
@@ -501,6 +509,18 @@ export class GameScene extends Phaser.Scene {
     this.game.events.on(ONLINE_RENAME_EVENT, (displayName: string) => {
       this.connection?.send({ type: 'rename', displayName });
     });
+    this.game.events.off(ROSTER_EVENT);
+    this.game.events.on(ROSTER_EVENT, (command: RosterCommand) => {
+      if (this.online) {
+        this.online.setupError = null;
+        this.onlineDirty = true;
+        this.connection?.send(command);
+      } else {
+        const result = configureRoster(this.flow.lobby, this.flow.screen, command);
+        if (!result.ok) throw new Error(result.reason);
+        this.emitFlow(this.time.now);
+      }
+    });
     this.sounds = new SoundPlayer(this);
     this.cameras.main.fadeIn(SCREEN_FADE_MS);
     this.applySettings();
@@ -543,12 +563,18 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const { players } = this.flow.lobby;
-    if (this.flow.lobby.started) {
-      claimOrphanedPlayer(players, frame.presses, new Set(frame.readings.keys()));
-    }
+    const before = players.map((p) => p.deviceId);
+    claimOrphanedPlayer(players, frame.presses, new Set(frame.readings.keys()));
+    const claimed = new Set(
+      players.filter((p, i) => p.deviceId !== before[i]).map((p) => p.deviceId),
+    );
 
     const ctx = this.flowContext(time);
-    const update = updateFlow(this.flow, this.menuPresses(frame.presses), ctx);
+    const update = updateFlow(
+      this.flow,
+      this.menuPresses(frame.presses.filter((p) => !claimed.has(p.deviceId))),
+      ctx,
+    );
     if (this.runEffects(update.effects)) return;
     const ready = resultsReady(this.flow, time);
     const countdown = countdownNumber(this.flow, time);
@@ -627,9 +653,13 @@ export class GameScene extends Phaser.Scene {
 
   /** This frame's presses for the menus: none while a dialog is open (back closes it). */
   private menuPresses(presses: readonly DevicePress[]): readonly DevicePress[] {
-    if (!this.dialogOpen) return presses;
-    if (presses.some((p) => p.dash || p.menu)) this.game.events.emit(DIALOG_CANCEL_EVENT);
-    return [];
+    if (this.dialogOpen) {
+      if (presses.some((p) => p.dash || p.menu)) this.game.events.emit(DIALOG_CANCEL_EVENT);
+      return [];
+    }
+    if ((this.online?.flow ?? this.flow).screen === 'intro' && presses.some((p) => p.nav.y !== 0))
+      this.game.events.emit(INTRO_GUIDE_EVENT);
+    return presses;
   }
 
   /** The music for `flow` (this browser's, or the online room's) and the round on screen. */
@@ -665,12 +695,16 @@ export class GameScene extends Phaser.Scene {
   private flowContext(nowMs: number): FlowContext {
     return {
       save: this.options.save,
-      levelIds: LEVEL_IDS,
+      levelIds: this.options.practiceLevel ? [this.options.practiceLevel.id] : LEVEL_IDS,
       chapters: CHAPTER_INFO,
       unlockAll: this.options.unlockAll,
       nowMs,
       // A scene is a picture: no demo.
-      demo: this.options.scene ? undefined : { kiosk: this.options.kiosk, levels: DEMO_LEVELS },
+      demo:
+        this.options.scene || this.options.practiceLevel
+          ? undefined
+          : { kiosk: this.options.kiosk, levels: DEMO_LEVELS },
+      practice: !!this.options.practiceLevel,
     };
   }
 
@@ -684,7 +718,7 @@ export class GameScene extends Phaser.Scene {
     const view: FlowView = {
       flow,
       save: online ? { ...this.options.save, levels: online.levels } : this.options.save,
-      levelIds: LEVEL_IDS,
+      levelIds: this.options.practiceLevel ? [this.options.practiceLevel.id] : LEVEL_IDS,
       chapters: CHAPTER_INFO,
       unlockAll: online ? false : this.options.unlockAll,
       resultsReady: this.shownResultsReady,
@@ -714,9 +748,17 @@ export class GameScene extends Phaser.Scene {
       this.emitFlow(nowMs);
       return;
     }
+    const bindings = localBindings(online);
+    const before = bindings.map((p) => p.deviceId);
+    claimOrphanedPlayer(bindings, frame.presses, new Set(frame.readings.keys()));
+    const claimed = bindings.filter((p, i) => p.deviceId !== before[i]);
+    for (const p of claimed)
+      this.connection?.send({ type: 'takeover', playerId: p.playerId, deviceId: p.deviceId });
     const { send, leave, changed } = onlineMenuPresses(
       online,
-      this.menuPresses(frame.presses),
+      this.menuPresses(
+        frame.presses.filter((p) => !claimed.some((b) => b.deviceId === p.deviceId)),
+      ),
       nowMs,
     );
     if (leave) {
@@ -725,6 +767,7 @@ export class GameScene extends Phaser.Scene {
     }
     if (changed) this.onlineDirty = true;
     if (send.length > 0) {
+      online.setupError = null;
       this.connection?.send({ type: 'menu', presses: send.slice(0, NET_MAX_PRESSES_PER_MESSAGE) });
     }
     if (this.restartForOnlineRound()) return;
@@ -1168,6 +1211,9 @@ export class GameScene extends Phaser.Scene {
   private runEffects(effects: readonly FlowEffect[]): boolean {
     for (const effect of effects) {
       switch (effect.type) {
+        case 'lockRoster':
+          this.startRound();
+          break;
         case 'startLevel':
           this.seed++;
           if (effect.levelIndex === this.mapLevelIndex) {
@@ -1231,14 +1277,16 @@ export class GameScene extends Phaser.Scene {
 
   /** A fresh round of the loaded level with everyone in the lobby, or bots in the demo. */
   private startRound(): void {
-    const level = LEVELS[this.mapLevelIndex];
+    const level = this.options.practiceLevel ?? LEVELS[this.mapLevelIndex];
     if (!level) return;
     const demo = this.flow.screen === 'demo';
     const ids = demo
       ? Array.from({ length: DEMO_BOTS }, (_, i) => i + 1)
       : this.flow.lobby.players.map((p) => p.playerId);
     this.bots = demo ? ids.map((id) => createBot(id)) : [];
-    this.loop = new GameLoop(createGame(level, this.seed, ids));
+    this.loop = new GameLoop(
+      createGame(level, this.seed, ids, demo ? {} : rolesForRoster(this.flow.lobby)),
+    );
     this.hints = demo ? [] : startHints(level.id, this.options.save);
   }
 

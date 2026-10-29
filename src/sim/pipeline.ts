@@ -93,10 +93,10 @@ export function updatePipelines(state: GameState): void {
  * One tick of repair work on the pipeline at (x, y): only while it's broken
  * and empty. Returns whether any progress was made.
  */
-export function repairPipeline(state: GameState, x: number, y: number): boolean {
+export function repairPipeline(state: GameState, x: number, y: number, rate = 1): boolean {
   const pipeline = pipelineAt(state, x, y);
   if (!pipeline?.broken || ticketOnTile(state, x, y)) return false;
-  pipeline.repair += 1 / REPAIR_TICKS;
+  pipeline.repair += rate / REPAIR_TICKS;
   if (pipeline.repair >= 1 - 1e-9) {
     pipeline.broken = false;
     pipeline.repair = 0;

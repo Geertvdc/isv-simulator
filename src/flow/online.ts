@@ -51,6 +51,7 @@ export interface OnlineState {
   leaveArmedAtMs: number | null;
   /** Why the server said it is closing the room, if it did. */
   closing: 'idle' | 'shutdown' | null;
+  setupError?: string | null;
 }
 
 export function createOnline(role: OnlineRole): OnlineState {
@@ -149,8 +150,10 @@ export function applyServerMessage(state: OnlineState, message: ServerMessage): 
       state.closing = message.reason;
       return true;
     case 'pong':
-    case 'error':
       return false;
+    case 'error':
+      state.setupError = message.message;
+      return true;
   }
 }
 
@@ -201,7 +204,7 @@ export function leaveArmed(state: OnlineState, nowMs: number): boolean {
 }
 
 /** Screens only the host's devices drive online (the server ignores everyone else's presses). */
-export const HOST_SCREENS: readonly Screen[] = ['levelSelect', 'intro', 'paused', 'results'];
+export const HOST_SCREENS: readonly Screen[] = ['levelSelect', 'paused', 'results'];
 
 /** This browser waits for the host: the room is on a screen only the host drives. */
 export function hostIsChoosing(state: OnlineState): boolean {

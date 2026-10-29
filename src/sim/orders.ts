@@ -24,6 +24,7 @@ import { INCIDENT_TITLES, TICKET_TITLES, bugTitle } from './content';
 import type { Invite } from './meetings';
 import * as rng from './rng';
 import type { GameState, PlayerId } from './state';
+import type { TicketDomain } from './roles';
 import {
   DESIGNED_FEATURE_STEPS,
   PART_KINDS,
@@ -42,6 +43,7 @@ import {
 export interface Order {
   id: number;
   kind: TicketKind;
+  domain: TicketDomain;
   /** The steps a ticket must have to complete this order. */
   steps: StepKind[];
   createdTick: number;
@@ -53,6 +55,7 @@ export interface PendingBug {
   /** Tick at which it lands in the bug queue. */
   tick: number;
   title: string;
+  domain: TicketDomain;
 }
 
 export interface LevelResult {
@@ -182,11 +185,14 @@ export function createOrder(
   kind: TicketKind,
   title: string,
   steps: readonly StepKind[] = TICKET_STEPS[kind],
+  domain?: TicketDomain,
 ): Order {
+  const orderDomain = kind === 'fullstack' ? 'mixed' : (domain ?? defaultOrderDomain(kind));
   const limit = timeLimit(state, kind, steps);
   const order: Order = {
     id: state.nextOrderId++,
     kind,
+    domain: orderDomain,
     steps: [...steps],
     createdTick: state.tick,
     expiresTick: state.tick + limit,
@@ -194,12 +200,20 @@ export function createOrder(
   state.orders.push(order);
   if (kind === 'fullstack') {
     // It arrives as its two parts, to be coded apart and merged.
-    for (const part of PART_KINDS) enqueueTicket(state, part, title, order.id);
+    for (const part of PART_KINDS) {
+      enqueueTicket(state, part, title, order.id, TICKET_STEPS[part], part);
+    }
   } else {
-    enqueueTicket(state, kind, title, order.id, steps);
+    enqueueTicket(state, kind, title, order.id, steps, orderDomain);
   }
   state.events.push({ type: 'orderCreated', order });
   return order;
+}
+
+function defaultOrderDomain(kind: TicketKind): TicketDomain {
+  if (kind === 'frontend') return 'frontend';
+  if (kind === 'backend') return 'backend';
+  return 'general';
 }
 
 /**
@@ -229,7 +243,11 @@ export function shipTicket(state: GameState, playerId: PlayerId, ticket: Ticket)
   const [roll, s] = rng.next(state.rngState);
   state.rngState = s;
   if (roll < bugChance(ticket)) {
-    state.pendingBugs.push({ tick: state.tick + BUG_DELAY_TICKS, title: bugTitle(ticket.title) });
+    state.pendingBugs.push({
+      tick: state.tick + BUG_DELAY_TICKS,
+      title: bugTitle(ticket.title),
+      domain: ticket.domain,
+    });
   }
   return true;
 }
@@ -263,7 +281,7 @@ export function updateOrders(state: GameState): void {
   const due = state.pendingBugs.filter((b) => state.tick >= b.tick);
   if (due.length > 0) {
     state.pendingBugs = state.pendingBugs.filter((b) => state.tick < b.tick);
-    for (const bug of due) createOrder(state, 'bug', bug.title);
+    for (const bug of due) createOrder(state, 'bug', bug.title, TICKET_STEPS.bug, bug.domain);
   }
 
   updateIncidents(state);
@@ -280,7 +298,7 @@ export function updateOrders(state: GameState): void {
     const [jitter, s2] = rng.int(s1, -orderSchedule.jitterTicks, orderSchedule.jitterTicks);
     state.rngState = s2;
     if (isFullstackNext(state)) createOrder(state, 'fullstack', title);
-    else createOrder(state, 'feature', title, featureSteps(state));
+    else createOrder(state, 'feature', title, featureSteps(state), nextDomain(state));
     state.nextOrderTick = state.tick + orderSchedule.intervalTicks + jitter;
   }
 }
@@ -300,8 +318,63 @@ function updateIncidents(state: GameState): void {
   const [title, s1] = rng.pick(state.rngState, INCIDENT_TITLES);
   const [jitter, s2] = rng.int(s1, -schedule.jitterTicks, schedule.jitterTicks);
   state.rngState = s2;
-  createOrder(state, 'incident', title);
+  createOrder(state, 'incident', title, TICKET_STEPS.incident, schedule.domain ?? 'general');
   state.nextIncidentTick = state.tick + schedule.intervalTicks + jitter;
+}
+
+/** Chooses one domain from a seeded, exact-count batch; classic levels use no extra RNG. */
+function nextDomain(state: GameState): TicketDomain {
+  const schedule = state.settings.domainSchedule;
+  if (!schedule) return 'general';
+  if (state.domainBatchIndex >= state.domainBatch.length) buildDomainBatch(state, schedule);
+  const domain = state.domainBatch[state.domainBatchIndex];
+  if (!domain) throw new Error('Domain schedule produced an empty batch');
+  state.domainBatchIndex++;
+  for (const [candidate, count] of Object.entries(schedule.counts) as [TicketDomain, number][]) {
+    if (count === 0) continue;
+    state.domainDrought[candidate] = domain === candidate ? 0 : state.domainDrought[candidate] + 1;
+    if (state.domainDrought[candidate] > schedule.maxDrought) {
+      throw new Error(`Domain schedule exceeded the ${candidate} drought limit`);
+    }
+  }
+  return domain;
+}
+
+function buildDomainBatch(
+  state: GameState,
+  schedule: NonNullable<GameState['settings']['domainSchedule']>,
+): void {
+  const entries = Object.entries(schedule.counts) as [TicketDomain, number][];
+  if (
+    !Number.isInteger(schedule.maxDrought) ||
+    schedule.maxDrought < 0 ||
+    entries.some(([, count]) => !Number.isInteger(count) || count < 0) ||
+    !entries.some(([, count]) => count > 0)
+  ) {
+    throw new Error('Domain schedule needs non-negative integer counts and a positive batch size');
+  }
+  const counts = new Map(entries.filter(([, count]) => count > 0));
+  for (let attempt = 0; attempt < 128; attempt++) {
+    const batch = [...counts].flatMap(([domain, count]) => Array<TicketDomain>(count).fill(domain));
+    for (let i = batch.length - 1; i > 0; i--) {
+      const [index, nextState] = rng.int(state.rngState, 0, i);
+      state.rngState = nextState;
+      [batch[i], batch[index]] = [batch[index] as TicketDomain, batch[i] as TicketDomain];
+    }
+    const drought = { ...state.domainDrought };
+    let valid = true;
+    for (const domain of batch) {
+      for (const [candidate] of counts) {
+        drought[candidate] = domain === candidate ? 0 : drought[candidate] + 1;
+        if (drought[candidate] > schedule.maxDrought) valid = false;
+      }
+    }
+    if (!valid) continue;
+    state.domainBatch = batch;
+    state.domainBatchIndex = 0;
+    return;
+  }
+  throw new Error('Domain counts cannot satisfy the configured maximum drought');
 }
 
 /**

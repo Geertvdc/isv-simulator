@@ -28,6 +28,7 @@ import {
 } from './balance';
 import { CHAPTER_NAMES, LEVEL_NAMES } from './content';
 import { type LevelMap, parseLevelMap } from './level';
+import type { TicketDomain } from './roles';
 
 /** When feature orders appear and how long they last. Bugs come from shipping instead. */
 export interface OrderSchedule {
@@ -55,6 +56,15 @@ export interface IncidentSchedule {
   jitterTicks: number;
   /** Ticks an incident order lasts. */
   timeLimitTicks: number;
+  /** Work area for the hotfix; defaults to general on existing levels. */
+  domain?: TicketDomain;
+}
+
+/** Counts per shuffled batch of domain-enabled feature orders and its drought bound. */
+export interface DomainSchedule {
+  counts: Readonly<Record<TicketDomain, number>>;
+  /** Maximum consecutive feature orders without each configured domain. */
+  maxDrought: number;
 }
 
 /** When calendar invites go out. Players have one invite at most. */
@@ -88,6 +98,8 @@ export interface LevelSettings {
   fullstackShare?: number;
   /** Whether two players at one keyboard code faster (pair programming). */
   pairing?: boolean;
+  /** Omit to keep classic order matching and generation unchanged. */
+  domainSchedule?: DomainSchedule;
 }
 
 export interface Level extends LevelSettings {
@@ -375,6 +387,25 @@ export const LAB_LEVELS: readonly Level[] = [
     fullstackShare: 0.3,
     pairing: true,
   }),
+  level('lab-roles', labDevMap, {
+    ...GARAGE_SETTINGS,
+    orderSchedule: { ...GARAGE_SETTINGS.orderSchedule, intervalTicks: 16 * SECOND },
+    starThresholds: [60, 120, 180],
+    designShare: 0.2,
+    fullstackShare: 0.25,
+    pairing: true,
+    incidents: {
+      firstTick: 30 * SECOND,
+      intervalTicks: 60 * SECOND,
+      jitterTicks: 10 * SECOND,
+      timeLimitTicks: 35 * SECOND,
+      domain: 'infra',
+    },
+    domainSchedule: {
+      counts: { general: 2, frontend: 2, backend: 2, infra: 2, mixed: 2 },
+      maxDrought: 8,
+    },
+  }),
 ];
 
 /** Order rate multiplier for a number of players. */
@@ -407,6 +438,10 @@ export function settingsForPlayers(level: LevelSettings, playerCount: number): L
     designShare: level.designShare ?? 0,
     fullstackShare: level.fullstackShare ?? 0,
     pairing: level.pairing ?? false,
+    domainSchedule: level.domainSchedule && {
+      counts: { ...level.domainSchedule.counts },
+      maxDrought: level.domainSchedule.maxDrought,
+    },
     incidents: level.incidents,
     meetings: level.meetings && {
       ...level.meetings,

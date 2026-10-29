@@ -64,6 +64,7 @@ function ticket(
   const t: Ticket = {
     id: state.nextTicketId++,
     kind,
+    domain: kind === 'frontend' ? 'frontend' : kind === 'backend' ? 'backend' : 'general',
     title: 'Checkout',
     steps: steps.map((k, i) => ({ kind: k, progress: i < done ? 1 : 0 })),
     location: { kind: 'queue', queue: 'feature' },

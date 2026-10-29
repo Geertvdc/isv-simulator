@@ -23,6 +23,7 @@ import {
   getPlayer,
 } from './state';
 import { tick } from './tick';
+import type { RoleId, TicketDomain } from './roles';
 import {
   DESIGNED_FEATURE_STEPS,
   REVIEWED_FEATURE_STEPS,
@@ -35,6 +36,8 @@ export interface Scene {
   id: string;
   levelId: string;
   players: number;
+  /** Explicit review-fixture setup, using the same validated creation path as rounds. */
+  roleByPlayer?: Partial<Record<PlayerId, RoleId>>;
   /** Puts everything in place on a quiet game. */
   setup(state: GameState): void;
   /** Buttons for this tick; players without a command stand still. */
@@ -106,14 +109,15 @@ export function openOrder(
     review = false,
     design = false,
     left = 0.8,
-  }: { review?: boolean; design?: boolean; left?: number } = {},
+    domain,
+  }: { review?: boolean; design?: boolean; left?: number; domain?: TicketDomain } = {},
 ): Ticket {
   const steps = review
     ? REVIEWED_FEATURE_STEPS
     : design
       ? DESIGNED_FEATURE_STEPS
       : TICKET_STEPS[kind];
-  const order = createOrder(state, kind, title, steps);
+  const order = createOrder(state, kind, title, steps, domain);
   const limit = order.expiresTick - order.createdTick;
   order.createdTick = state.tick - Math.round(limit * (1 - left));
   order.expiresTick = order.createdTick + limit;
@@ -192,7 +196,7 @@ export function sceneState(scene: Scene): GameState {
   const level = levelById(scene.levelId);
   if (!level) throw new Error(`Scene ${scene.id}: no level ${scene.levelId}`);
   const ids = Array.from({ length: scene.players }, (_, i) => i + 1);
-  const state = createGame(level, 1, ids);
+  const state = createGame(level, 1, ids, scene.roleByPlayer);
   state.nextOrderTick = Number.MAX_SAFE_INTEGER;
   state.nextIncidentTick = null;
   state.nextMeetingTick = null;
@@ -255,10 +259,79 @@ function levelScene(level: Level): Scene {
 const has = (type: GameEvent['type']) => (_: GameState, events: readonly GameEvent[]) =>
   events.some((e) => e.type === type);
 
+/** Actual gameplay cast review, including HUD, tickets and the unmodified sim throw. */
+function castScene(
+  id: string,
+  roles: readonly [RoleId, RoleId, RoleId, RoleId],
+  moment: 'carry' | 'windup' | 'release' = 'carry',
+): Scene {
+  return {
+    id,
+    levelId: 'monorepo',
+    players: 4,
+    roleByPlayer: { 1: roles[0], 2: roles[1], 3: roles[2], 4: roles[3] },
+    setup(state) {
+      stand(state, 1, { x: 4, y: 7 }, { x: 0, y: 1 });
+      stand(state, 2, { x: 11, y: 7 }, { x: 0, y: 1 });
+      stand(state, 3, { x: 2, y: 4 }, { x: 0, y: 1 });
+      stand(state, 4, { x: 13, y: 4 }, { x: 0, y: 1 });
+      give(workOn(openOrder(state, 'feature', 'Center a div'), 1), 1);
+      give(workOn(openOrder(state, 'feature', 'Deploy before lunch'), 1), 2);
+      if (moment !== 'carry') {
+        stand(state, 1, { x: 6, y: 6 }, { x: 1, y: 0 });
+      }
+    },
+    input: moment === 'carry' ? undefined : (state) => [command(state, 1, { interact: true })],
+    ...(moment === 'release'
+      ? {
+          until: (state: GameState) =>
+            state.tickets.some((t) => t.location.kind === 'flying' && t.location.pos.x > 8),
+        }
+      : { ticks: moment === 'windup' ? 12 : 1 }),
+  };
+}
+
 // ---- Every scene ----
 
 export const SCENES: readonly Scene[] = [
   ...LEVELS.map(levelScene),
+  castScene('cast-mixed', ['generalist', 'frontend', 'backend', 'qa']),
+  castScene('cast-platform', ['platform', 'qa', 'frontend', 'backend']),
+  castScene('cast-duplicates', ['generalist', 'generalist', 'generalist', 'generalist']),
+  castScene('cast-windup', ['platform', 'qa', 'frontend', 'backend'], 'windup'),
+  castScene('cast-release', ['platform', 'qa', 'frontend', 'backend'], 'release'),
+  {
+    id: 'roles-work',
+    levelId: 'lab-roles',
+    players: 4,
+    roleByPlayer: { 1: 'frontend', 2: 'frontend', 3: 'qa', 4: 'platform' },
+    setup(state) {
+      const keyboard = tileAt(state, 'keyboard', 2);
+      putOn(
+        workOn(
+          openOrder(state, 'feature', 'Center a div', { design: true, domain: 'frontend' }),
+          1,
+          0.1,
+        ),
+        keyboard,
+      );
+      standBeside(state, 1, keyboard, 'above');
+      standBeside(state, 2, keyboard, 'below');
+      const test = tileAt(state, 'testBench');
+      putOn(
+        workOn(openOrder(state, 'feature', 'Verify the API', { domain: 'backend' }), 1, 0.1),
+        test,
+      );
+      standBeside(state, 3, test, 'left');
+      const at = tileAt(state, 'pipeline');
+      const pipeline = pipelineAt(state, at.x, at.y);
+      if (!pipeline) throw new Error('Missing role review pipeline');
+      pipeline.broken = true;
+      standBeside(state, 4, at, 'left');
+    },
+    input: holdWork(1, 2, 3, 4),
+    ticks: 15,
+  },
 
   {
     // The order bar with one of everything, an incident open and an invite out.

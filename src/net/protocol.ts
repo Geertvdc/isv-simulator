@@ -16,12 +16,14 @@ import {
 import { type LevelMap, MAX_PLAYERS } from '../sim/level';
 import type { InputCommand, Vec } from '../sim/state';
 import type { Snapshot } from './snapshot';
+import { isRoleId } from '../sim/roles';
+import type { RosterCommand } from '../flow/roster';
 
 /** The Colyseus room type clients create and join: `client.create(GAME_ROOM, hello)`. */
 export const GAME_ROOM = 'game';
 
 /** Bumped on every incompatible change; the server refuses other versions. */
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 // ---------------------------------------------------------------- client → server
 
@@ -70,7 +72,13 @@ export interface RenameMessage {
 }
 
 export type ClientMessage =
-  HelloMessage | InputsMessage | PingMessage | MenuMessage | RenameMessage;
+  | HelloMessage
+  | InputsMessage
+  | PingMessage
+  | MenuMessage
+  | RenameMessage
+  | RosterCommand
+  | { type: 'takeover'; playerId: number; deviceId: string };
 
 // ---------------------------------------------------------------- server → client
 
@@ -147,7 +155,13 @@ export interface ClosingMessage {
 }
 
 export type ErrorCode =
-  'badMessage' | 'protocolMismatch' | 'wrongCode' | 'roomFull' | 'roundRunning' | 'notHost';
+  | 'badMessage'
+  | 'protocolMismatch'
+  | 'wrongCode'
+  | 'roomFull'
+  | 'roundRunning'
+  | 'notHost'
+  | 'notOwner';
 
 export interface ErrorMessage {
   type: 'error';
@@ -284,6 +298,25 @@ function parsePress(v: unknown, i: number): DevicePress {
 function parse(raw: unknown): ClientMessage {
   const m = record(raw, 'message');
   switch (m.type) {
+    case 'role': {
+      if (!isRoleId(m.roleId)) fail('Unknown roleId');
+      return {
+        type: 'role',
+        playerId: int(m.playerId, 'playerId', 1, MAX_PLAYERS),
+        roleId: m.roleId,
+      };
+    }
+    case 'ready':
+      return {
+        type: 'ready',
+        playerId: int(m.playerId, 'playerId', 1, MAX_PLAYERS),
+        ready: bool(m.ready, 'ready'),
+      };
+    case 'takeover': {
+      const deviceId = id(m.deviceId, 'deviceId');
+      if (!/^pad-\d+$/.test(deviceId)) fail('takeover requires a gamepad device');
+      return { type: 'takeover', playerId: int(m.playerId, 'playerId', 1, MAX_PLAYERS), deviceId };
+    }
     case 'hello':
       return parseHello(m);
     case 'inputs':

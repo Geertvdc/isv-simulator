@@ -41,4 +41,18 @@ describe('scenes', () => {
   it('the results scene ends the round', () => {
     expect(runScene(scene('results')).state.result).not.toBeNull();
   });
+
+  it('cast evidence uses explicit roles, four separated floor positions, and actual throw states', () => {
+    const mixed = runScene(scene('cast-mixed')).state;
+    expect(mixed.players.map((p) => p.roleId)).toEqual(['generalist', 'frontend', 'backend', 'qa']);
+    const duplicates = runScene(scene('cast-duplicates')).state;
+    expect(duplicates.players.map((p) => p.roleId)).toEqual(Array<string>(4).fill('generalist'));
+    expect(new Set(duplicates.players.map((p) => `${p.pos.x},${p.pos.y}`)).size).toBe(4);
+    // Review fixtures keep all four bodies forward of the conveyor rather than behind it.
+    expect(duplicates.players.every((p) => p.pos.y >= 4)).toBe(true);
+    expect(runScene(scene('cast-windup')).state.players.some((p) => p.throwCharge > 0)).toBe(true);
+    expect(
+      runScene(scene('cast-release')).state.tickets.some((t) => t.location.kind === 'flying'),
+    ).toBe(true);
+  });
 });

@@ -17,6 +17,7 @@ function ticket(
   return {
     id,
     kind,
+    domain: 'general',
     title: 'Dark mode',
     steps: steps.map(([k, progress]) => ({ kind: k, progress })),
     location: { kind: 'queue', queue: 'feature' },

@@ -2,11 +2,10 @@ import type { DeviceId } from '../input/controller';
 import { isGamepadDevice } from '../input/gamepad';
 import { KEY_SCHEMES, LEFT_KEYS, RIGHT_KEYS } from '../input/keyboard';
 import type { Lobby } from '../input/lobby';
-import { playerCssColor } from '../render/playerColors';
-import { playerBadge } from './playerBadge';
 import { statusBar } from './statusBar';
-import { LOBBY_BACK_HINT, playerFile } from '../sim/content';
+import { LOBBY_BACK_HINT } from '../sim/content';
 import { MAX_PLAYERS } from '../sim/level';
+import { rolePanel, seatWindow, type RosterDispatch } from './roles';
 
 export interface LobbyView {
   /** Shows the lobby, or hides it for `null` (the game has started). */
@@ -32,29 +31,25 @@ export function startHint(lobby: Lobby): string | null {
   return `Player 1: press ${button}${keyboardsFull ? ' or Enter' : ''} to start`;
 }
 
-export function mountLobby(root: HTMLElement): LobbyView {
+export function mountLobby(root: HTMLElement, dispatch: RosterDispatch): LobbyView {
   const panel = document.createElement('div');
   panel.className = 'screen lobby';
   panel.hidden = true;
 
   const title = document.createElement('h1');
   title.className = 'lobby-title';
-  title.textContent = 'Press Enter or gamepad A to join';
+  title.textContent = 'Choose your crew';
 
   const slots = document.createElement('div');
   slots.className = 'lobby-slots';
   const slotEls = Array.from({ length: MAX_PLAYERS }, () => {
     const slot = document.createElement('div');
     slot.className = 'lobby-slot';
-    const name = document.createElement('div');
-    name.className = 'lobby-slot-name';
-    const label = document.createElement('span');
-    const device = document.createElement('div');
-    device.className = 'lobby-slot-device';
-    name.append(playerBadge(slots.children.length + 1), label);
-    slot.append(name, device);
+    // The title bar, `player-1.ts`, names the seat; one line under it says who plays it.
+    const device = seatWindow(slot, slots.children.length + 1);
     slots.append(slot);
-    return { slot, name: label, device };
+    const role = rolePanel(slot, dispatch);
+    return { slot, device, role };
   });
 
   const hint = document.createElement('div');
@@ -62,23 +57,28 @@ export function mountLobby(root: HTMLElement): LobbyView {
 
   const back = statusBar(LOBBY_BACK_HINT);
 
-  panel.append(title, slots, hint, back);
+  const content = document.createElement('div');
+  content.className = 'selection-layout';
+  const legend = document.createElement('div');
+  legend.className = 'skill-legend';
+  legend.textContent = '1.00x = standard work speed · Review and builds unchanged';
+  content.append(title, slots, legend, hint);
+  panel.append(content, back);
   root.append(panel);
 
   return {
     render: (lobby) => {
       panel.hidden = lobby === null;
-      if (!lobby) return;
       slotEls.forEach((el, i) => {
-        const player = lobby.players[i];
-        const id = i + 1;
+        const player = lobby?.players[i];
+        el.role.render(player ? lobby : null, i + 1, true, false);
+        if (!lobby) return;
         el.slot.classList.toggle('joined', player !== undefined);
-        el.slot.style.setProperty('--player-color', playerCssColor(id));
-        el.name.textContent = `Player ${id}`;
-        el.slot.dataset.file = playerFile(id);
         el.device.textContent = player ? deviceLabel(player.deviceId) : 'Enter or gamepad A';
       });
-      hint.textContent = startHint(lobby) ?? '';
+      hint.textContent = lobby?.players.length
+        ? `${startHint(lobby) ?? ''} · Left / right: role`
+        : 'Enter or gamepad A to join · Left / right: choose role';
     },
   };
 }

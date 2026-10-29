@@ -413,10 +413,11 @@ async function main(): Promise<void> {
   await guest.key('Enter');
   await host.waitFor(`document.querySelectorAll('.online-player').length === 2`, 'two players');
   await host.key('KeyE');
-  await sleep(800);
+  await host.waitFor(`!document.querySelector('.level-select').hidden`, 'level select');
   await host.key('Enter');
-  await sleep(800);
-  await host.key('Enter');
+  await guest.waitFor(`window.isvNet?.screen === 'intro'`, 'team confirmation');
+  await host.key('KeyE');
+  await guest.key('KeyE');
   await host.waitFor(`window.isvNet?.screen === 'playing'`, 'the round', 10_000);
   await guest.waitFor(`window.isvNet?.screen === 'playing'`, 'the round', 10_000);
   // The guest steps out of the course (down, toward the bottom right).
@@ -605,6 +606,9 @@ async function main(): Promise<void> {
   await host.waitFor(`window.isvNet?.screen === 'paused'`, 'the pause');
   await host.key('ArrowDown');
   await host.key('Enter'); // Restart
+  await guest.waitFor(`window.isvNet?.screen === 'intro'`, 'restart team confirmation');
+  await host.key('KeyE');
+  await guest.key('KeyE');
   await host.waitFor(`window.isvNet?.screen === 'countdown'`, 'the countdown', 10_000);
   await sleep(300);
   await startRecording(host);

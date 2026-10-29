@@ -151,11 +151,17 @@ async function walks(driver: Page, watcher: Page, id: number, key: string): Prom
   return moved > 0.5 ? true : `moved only ${moved.toFixed(2)} tiles`;
 }
 
-/** Presses Enter on `driver` until `watcher` plays a round (results → next round, intro card). */
+/** The host advances results, then both owned players confirm the next intro. */
 async function startNextRound(driver: Page, watcher: Page): Promise<boolean> {
   for (let i = 0; i < 12; i++) {
     const d = await drawn(watcher);
     if (d?.screen === 'playing') return true;
+    if (d?.screen === 'intro') {
+      await driver.key('KeyE');
+      await watcher.key('KeyE');
+      await watcher.waitFor(`window.isvNet?.screen === 'playing'`, 'the ready next round', 8000);
+      return true;
+    }
     if (d?.screen !== 'countdown') await driver.key('Enter');
     await sleep(800);
   }
@@ -244,8 +250,9 @@ async function main(): Promise<void> {
     );
     check('the guest level select says the host picks', true);
     await host.key('Enter'); // Garage: intro card
-    await sleep(800);
-    await host.key('Enter'); // countdown
+    await guest.waitFor(`window.isvNet?.screen === 'intro'`, 'team confirmation');
+    await host.key('KeyE');
+    await guest.key('KeyE');
     await host.waitFor(`window.isvNet?.screen === 'playing'`, 'the round', 8000);
     await guest.waitFor(`window.isvNet?.screen === 'playing'`, 'the round', 8000);
     const walked = await walks(guest, host, 2, 'KeyS');
@@ -291,9 +298,10 @@ async function main(): Promise<void> {
       `sessionStorage.getItem('isv-simulator.rejoin')`,
     );
     if (!ticket) return 'no rejoin ticket in sessionStorage';
+    await guest.eval(`window.isvVerificationReload = true`);
     await guest.send('Page.reload');
     await guest.waitFor(
-      `window.isvNet?.screen === 'playing' && window.isvNet.state?.players.length === 2`,
+      `!window.isvVerificationReload && window.isvNet?.screen === 'playing' && window.isvNet.state?.players.length === 2`,
       'the round after the reload',
       15_000,
     );

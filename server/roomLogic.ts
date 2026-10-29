@@ -28,6 +28,7 @@ import {
 } from '../src/flow/save';
 import type { DevicePress } from '../src/input/controller';
 import { createLobby } from '../src/input/lobby';
+import { configureRoster, rolesForRoster, selection } from '../src/flow/roster';
 import { type InputBuffer, createInputBuffer, pushInput, takeInput } from '../src/net/inputBuffer';
 import {
   type ErrorCode,
@@ -390,7 +391,7 @@ export function leaveRoom(room: RoomState, sessionId: string): Outgoing[] {
   if (room.members.length === before) return [];
   followHost(room);
   room.presses = room.presses.filter((p) => !isFromSession(p.deviceId, sessionId));
-  if (!room.game) pruneDeparted(room);
+  if (!room.game || room.flow.screen === 'intro') pruneDeparted(room);
   return room.members.length > 0 ? [lobbyMessage(room)] : [];
 }
 
@@ -405,9 +406,15 @@ function pruneDeparted(room: RoomState): void {
     room.members.some((m) => isFromSession(p.deviceId, m.sessionId)),
   );
   if (kept.length !== lobby.players.length) {
+    const choices = kept.map((p) => selection(lobby, p.playerId));
     lobby.players = kept.map((p, i) => ({ ...p, playerId: i + 1 }));
+    lobby.selections = Object.fromEntries(choices.map((choice, i) => [i + 1, choice]));
   }
-  if (lobby.started && lobby.players.length === 0 && !room.game) {
+  if (lobby.started && lobby.players.length === 0 && (!room.game || room.flow.screen === 'intro')) {
+    room.game = null;
+    room.buffers = [];
+    room.log = createSnapshotLog();
+    room.participants = [];
     room.flow.lobby = createLobby();
     room.flow.screen = 'lobby';
     room.flow.menuIndex = 0;
@@ -424,6 +431,15 @@ export function dropMember(room: RoomState, sessionId: string): Outgoing[] {
   const member = room.members.find((m) => m.sessionId === sessionId);
   if (!member?.connected) return [];
   member.connected = false;
+  for (const id of playerIdsOf(room, sessionId)) {
+    if (room.flow.screen === 'intro' || room.flow.screen === 'lobby') {
+      configureRoster(room.flow.lobby, room.flow.screen, {
+        type: 'ready',
+        playerId: id,
+        ready: false,
+      });
+    }
+  }
   room.presses = room.presses.filter((p) => !isFromSession(p.deviceId, sessionId));
   followHost(room);
   return [lobbyMessage(room)];
@@ -447,7 +463,7 @@ export function rejoinMember(room: RoomState, sessionId: string): Outgoing[] {
 /** A message from a member: checked first, refused with an `error` when it doesn't parse. */
 export function handleMessage(room: RoomState, sessionId: string, raw: unknown): Outgoing[] {
   const member = room.members.find((m) => m.sessionId === sessionId);
-  if (!member) return [];
+  if (!member?.connected) return [];
   // A flood is dropped before anything else looks at it.
   if (member.budget < 1) {
     member.dropped++;
@@ -458,6 +474,37 @@ export function handleMessage(room: RoomState, sessionId: string, raw: unknown):
   if (!parsed.ok) return [errorTo(sessionId, 'badMessage', parsed.reason)];
   const message = parsed.value;
   switch (message.type) {
+    case 'role':
+    case 'ready': {
+      if (!playerIdsOf(room, sessionId).includes(message.playerId)) {
+        return [errorTo(sessionId, 'notOwner', 'You can only configure your own player slots.')];
+      }
+      const result = configureRoster(room.flow.lobby, room.flow.screen, message);
+      if (!result.ok) return [errorTo(sessionId, 'roundRunning', result.reason)];
+      room.lastActivityTick = room.serverTick;
+      return [];
+    }
+    case 'takeover': {
+      const binding = room.flow.lobby.players.find((p) => p.playerId === message.playerId);
+      if (!binding || !isFromSession(binding.deviceId, sessionId)) {
+        return [errorTo(sessionId, 'notOwner', 'You can only reclaim your own controller slot.')];
+      }
+      const deviceId = roomDeviceId(sessionId, message.deviceId);
+      if (
+        !binding.deviceId.startsWith(`${sessionId}:pad-`) ||
+        room.flow.lobby.players.some((p) => p.deviceId === deviceId)
+      ) {
+        return [
+          errorTo(
+            sessionId,
+            'badMessage',
+            'Controller is already bound or the slot is not a gamepad.',
+          ),
+        ];
+      }
+      binding.deviceId = deviceId;
+      return [];
+    }
     case 'ping':
       return [
         {
@@ -548,6 +595,18 @@ function allowedPresses(
 ): { presses: DevicePress[]; changed: boolean } {
   const screen = room.flow.screen;
   if (screen === 'lobby') return lobbyPresses(room, presses);
+  if (screen === 'intro') {
+    const host = hostOf(room);
+    const bound = new Set(room.flow.lobby.players.map((p) => p.deviceId));
+    return {
+      presses: presses.filter(
+        (p) =>
+          bound.has(p.deviceId) &&
+          (!(p.dash || p.menu) || (host && isFromSession(p.deviceId, host.sessionId))),
+      ),
+      changed: false,
+    };
+  }
   let changed = false;
   let rest = presses;
   if (screen === 'levelSelect' || screen === 'results') {
@@ -628,6 +687,8 @@ function flowContext(room: RoomState): FlowContext {
     nowMs: room.serverTick * TICK_MS,
     // Online the host starts the game, whoever joined first.
     canStart: (deviceId) => host !== undefined && isFromSession(deviceId, host),
+    participates: (deviceId) =>
+      room.members.some((m) => m.connected && isFromSession(deviceId, m.sessionId)),
   };
 }
 
@@ -635,6 +696,19 @@ function runEffects(room: RoomState, effects: readonly FlowEffect[]): Outgoing[]
   const out: Outgoing[] = [];
   for (const effect of effects) {
     switch (effect.type) {
+      case 'lockRoster': {
+        const previous = room.game;
+        const level = LEVELS[room.flow.levelIndex];
+        if (!previous || !level) throw new Error('Cannot lock a roster without a prepared round');
+        pruneDeparted(room);
+        const ids = room.flow.lobby.players.map((p) => p.playerId);
+        room.game = createGame(level, previous.seed, ids, rolesForRoster(room.flow.lobby));
+        if (room.roundTicks !== null) room.game.settings.durationTicks = room.roundTicks;
+        room.buffers = ids.map((id) => createInputBuffer(id));
+        room.log = createSnapshotLog();
+        out.push(...roundStartTo(room, null));
+        break;
+      }
       case 'startLevel': {
         // The round before (if any) is over: those who left during it go now.
         room.game = null;
@@ -645,7 +719,7 @@ function runEffects(room: RoomState, effects: readonly FlowEffect[]): Outgoing[]
           stopRound(room);
           break;
         }
-        room.game = createGame(level, room.seed++, ids);
+        room.game = createGame(level, room.seed++, ids, rolesForRoster(room.flow.lobby));
         if (room.roundTicks !== null) room.game.settings.durationTicks = room.roundTicks;
         room.buffers = ids.map((id) => createInputBuffer(id));
         room.log = createSnapshotLog();

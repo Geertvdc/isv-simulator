@@ -35,6 +35,7 @@ import {
   recordResult,
 } from './save';
 import { mapCursor } from './worldMap';
+import { resetReadiness, rosterPresses, selection } from './roster';
 
 export type Screen =
   | 'title'
@@ -214,11 +215,16 @@ export interface FlowContext {
   nowMs: number;
   /** Who may start the game from the lobby; player 1 when left out. */
   canStart?: (deviceId: DeviceId) => boolean;
+  /** Connected owned slots online; disconnected players cannot block confirmation. */
+  participates?: (deviceId: DeviceId) => boolean;
+  /** Dev-only local lab skips the campaign map, without saving progression. */
+  practice?: boolean;
   /** Demo mode; left out for none (an online room). */
   demo?: DemoOptions;
 }
 
 export type FlowEffect =
+  | { type: 'lockRoster' }
   /** Start a fresh round of this level, dropping any round in progress. */
   | { type: 'startLevel'; levelIndex: number }
   /** Carry on with the paused round; real time spent paused must not count. */
@@ -341,6 +347,7 @@ function quitToTitle(flow: Flow, item: MenuItem = 'play'): void {
 /** To the lobby, keeping everyone who joined, so players can join or leave. */
 function changePlayers(flow: Flow): void {
   flow.lobby.started = false;
+  resetReadiness(flow.lobby);
   goTo(flow, 'lobby');
 }
 
@@ -363,6 +370,10 @@ export function updateFlow(
   if (flow.screen === 'joinCode') return updateJoinCodeScreen(flow, presses);
   // Online, the server's flow drives the screens; this one waits for the room to end.
   if (flow.screen === 'online') return update;
+  if (ctx.practice && flow.screen === 'levelSelect') {
+    changePlayers(flow);
+    return { changed: true, effects: [{ type: 'stopRound' }] };
+  }
   // Nobody can do anything during the countdown, not even pause: it only waits.
   if (flow.screen === 'countdown') {
     if (ctx.nowMs - flow.countdownStartMs < COUNTDOWN_MS) return update;
@@ -371,6 +382,22 @@ export function updateFlow(
   }
   const joined = new Set(flow.lobby.players.map((p) => p.deviceId));
   const own = flow.lobby.started ? presses.filter((p) => joined.has(p.deviceId)) : presses;
+  if (flow.screen === 'intro') {
+    if (own.some(isBack)) {
+      back(flow, update);
+      return { ...update, changed: true };
+    }
+    const changed = rosterPresses(flow.lobby, 'intro', own);
+    const participants = flow.lobby.players.filter((p) => ctx.participates?.(p.deviceId) ?? true);
+    if (
+      participants.length > 0 &&
+      participants.every((p) => selection(flow.lobby, p.playerId).ready)
+    ) {
+      startCountdown(flow, ctx);
+      return { changed: true, effects: [{ type: 'lockRoster' }] };
+    }
+    return { changed, effects: [] };
+  }
   if (own.length === 0) return update;
 
   if (flow.screen === 'title' && !flow.awake) {
@@ -452,8 +479,16 @@ function updateLobbyScreen(
     return { changed: true, effects: [] };
   }
   const changed = updateLobby(flow.lobby, presses, ctx.canStart);
-  if (flow.lobby.started) goTo(flow, 'levelSelect');
-  return { changed, effects: [] };
+  const roleChanged = rosterPresses(flow.lobby, 'lobby', presses);
+  if (flow.lobby.started) {
+    if (ctx.practice) {
+      const update: FlowUpdate = { changed: true, effects: [] };
+      startLevel(flow, 0, update);
+      return update;
+    }
+    goTo(flow, 'levelSelect');
+  }
+  return { changed: changed || roleChanged, effects: [] };
 }
 
 /** Moves a cursor or changes a setting. Returns whether anything changed. */
@@ -550,18 +585,12 @@ function closeSettings(flow: Flow): void {
 
 /**
  * A fresh round of `levelIndex`. A level picked from the menus first shows
- * its intro card; Restart and Retry go straight to the countdown.
+ * its team confirmation card, including Restart and Retry.
  */
-function startLevel(
-  flow: Flow,
-  levelIndex: number,
-  ctx: FlowContext,
-  update: FlowUpdate,
-  intro: boolean,
-): void {
+function startLevel(flow: Flow, levelIndex: number, update: FlowUpdate): void {
   flow.levelIndex = levelIndex;
-  if (intro) goTo(flow, 'intro');
-  else startCountdown(flow, ctx);
+  resetReadiness(flow.lobby);
+  goTo(flow, 'intro');
   update.effects.push({ type: 'startLevel', levelIndex });
 }
 
@@ -573,12 +602,8 @@ function startCountdown(flow: Flow, ctx: FlowContext): void {
 function confirm(flow: Flow, ctx: FlowContext, update: FlowUpdate): void {
   if (flow.screen === 'levelSelect') {
     if (isUnlocked(ctx.save, ctx.levelIds, flow.levelIndex, ctx.unlockAll, ctx.chapters)) {
-      startLevel(flow, flow.levelIndex, ctx, update, true);
+      startLevel(flow, flow.levelIndex, update);
     }
-    return;
-  }
-  if (flow.screen === 'intro') {
-    startCountdown(flow, ctx);
     return;
   }
   const item = menuItems(flow)[flow.menuIndex];
@@ -608,10 +633,10 @@ function confirm(flow: Flow, ctx: FlowContext, update: FlowUpdate): void {
       return;
     case 'restart':
     case 'retry':
-      startLevel(flow, flow.levelIndex, ctx, update, false);
+      startLevel(flow, flow.levelIndex, update);
       return;
     case 'next':
-      startLevel(flow, flow.levelIndex + 1, ctx, update, true);
+      startLevel(flow, flow.levelIndex + 1, update);
       return;
     case 'levelSelect':
       update.effects.push({ type: 'stopRound' });

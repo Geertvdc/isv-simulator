@@ -4,7 +4,7 @@ import type { PlayerId } from '../sim/state';
 const OUTLINE = '#1a1d24';
 const SIZE = 20;
 
-/** Player `id`'s hat shape on their color, as a small inline SVG, for the menus and HUD. */
+/** Player `id`'s owner shape and color, independent of their role or hairstyle. */
 export function playerBadge(id: PlayerId): SVGSVGElement {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', `${-SIZE / 2} ${-SIZE / 2} ${SIZE} ${SIZE}`);

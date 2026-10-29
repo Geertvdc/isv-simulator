@@ -1,6 +1,57 @@
 /** Text content. Add jokes freely. */
 
 import type { StepKind, TicketKind } from './tickets';
+import type { RoleId, TicketDomain } from './roles';
+
+export const ROLE_LABELS: Readonly<Record<RoleId, string>> = {
+  generalist: 'Full-stack developer',
+  frontend: 'Frontend specialist',
+  backend: 'Backend specialist',
+  qa: 'QA engineer',
+  platform: 'Platform engineer',
+};
+
+export const ROLE_DESCRIPTIONS: Readonly<Record<RoleId, string>> = {
+  generalist: 'Reliable at every task, with no weak assignment.',
+  frontend: 'Fast at frontend code; slower at other coding domains and testing.',
+  backend: 'Fast at backend code; slower at other coding domains and testing.',
+  qa: 'Fast at testing; slower at coding across every domain.',
+  platform: 'Fast at infrastructure code and repair; slower at other coding domains and testing.',
+};
+
+export const TICKET_DOMAIN_LABELS: Readonly<Record<TicketDomain, string>> = {
+  general: 'General',
+  frontend: 'Frontend',
+  backend: 'Backend',
+  infra: 'Infrastructure',
+  mixed: 'Cross-cutting',
+};
+
+export const ROLE_ICONS: Readonly<Record<RoleId, string>> = {
+  generalist: '✳',
+  frontend: '▣',
+  backend: '▤',
+  qa: '✓',
+  platform: '⚙',
+};
+export const DOMAIN_ICONS: Readonly<Record<TicketDomain, string>> = {
+  general: '◇',
+  frontend: '▣',
+  backend: '▤',
+  infra: '⚙',
+  mixed: '◆',
+};
+export const ROLE_SELECTION_HINT =
+  'Left / right: choose your role · Confirm: ready · Everyone readies before countdown';
+export const WORK_TASK_LABELS = {
+  code: 'Code',
+  test: 'Test',
+  design: 'Design',
+  repair: 'Repair',
+  review: 'Review',
+  pipeline: 'Build',
+  merge: 'Merge',
+} as const;
 
 /** Flavour titles for tickets; they don't change how a ticket plays. */
 export const TICKET_TITLES: readonly string[] = [
@@ -62,16 +113,39 @@ export function pairingText(speedup: number): string {
 
 /**
  * An order card's title reads as a conventional commit, `feat: Make it pop`:
- * the type (and scope) says the kind of ticket. A hotfix is breaking news.
+ * the type says the kind of ticket, the scope its domain. A hotfix is breaking news.
  */
-export const COMMIT_TYPES: Readonly<Record<TicketKind, { type: string; scope?: string }>> = {
+export const COMMIT_TYPES: Readonly<Record<TicketKind, { type: string }>> = {
   feature: { type: 'feat' },
   bug: { type: 'fix' },
   incident: { type: 'fix!' },
-  frontend: { type: 'feat', scope: 'ui' },
-  backend: { type: 'feat', scope: 'api' },
-  fullstack: { type: 'feat', scope: 'app' },
+  frontend: { type: 'feat' },
+  backend: { type: 'feat' },
+  fullstack: { type: 'feat' },
 };
+
+/**
+ * A ticket's domain as its commit scope, `feat(api): …`, on HUD order cards
+ * and in world card title bars. General work has none.
+ */
+export const DOMAIN_SCOPES: Readonly<Record<TicketDomain, string | undefined>> = {
+  general: undefined,
+  frontend: 'ui',
+  backend: 'api',
+  infra: 'infra',
+  mixed: 'app',
+};
+
+/** The commit head for an order or ticket: `feat(ui)`, a hotfix `fix(infra)!`. */
+export function commitHead(
+  kind: TicketKind,
+  domain: TicketDomain,
+): { type: string; scope?: string; breaking: boolean } {
+  const base = COMMIT_TYPES[kind];
+  const breaking = base.type.endsWith('!');
+  const scope = DOMAIN_SCOPES[domain];
+  return { type: breaking ? base.type.slice(0, -1) : base.type, scope, breaking };
+}
 
 /** The commit subject after the type: a bug's title without its `Bug: `, which `fix` already says. */
 export function commitSubject(title: string): string {
@@ -423,6 +497,8 @@ export const INTRO_CONTROLS: readonly { action: string; keys: string }[] = [
 export const INTRO_ORDERS_TITLE = 'Orders';
 /** Names of the recipes on the intro card, by ticket kind. */
 export const INTRO_RECIPE_NAMES = {
+  designed: 'Feature with design',
+  fullstack: 'Full-stack (two parts)',
   feature: 'Feature',
   reviewed: 'Feature with review',
   bug: 'Bug fix',

@@ -131,6 +131,7 @@ const VIRTUAL_KEYS: Readonly<Record<string, number>> = {
   ArrowRight: 39,
   ArrowDown: 40,
   KeyE: 69,
+  ShiftRight: 16,
 };
 
 async function launch(): Promise<{ chrome: ChildProcess; page: Page; profile: string }> {
@@ -370,8 +371,10 @@ const SHOTS: Record<string, Shot> = {
     await page.key('Enter');
     await sleep(500);
     await page.shot('screens/intro-garage');
-    await page.key('Enter');
+    await page.key('KeyE');
+    await page.key('ShiftRight', 'Shift');
     // Each number pops in and fades; catch one at full strength and hold it there for the picture.
+    let countdown = false;
     for (let i = 0; i < 40; i++) {
       const held = await page.eval<boolean>(`(() => {
         const e = document.querySelector('.countdown.count');
@@ -379,9 +382,13 @@ const SHOTS: Record<string, Shot> = {
         e.style.animationPlayState = 'paused';
         return true;
       })()`);
-      if (held) break;
+      if (held) {
+        countdown = true;
+        break;
+      }
       await sleep(20);
     }
+    if (!countdown) throw new Error('Both players must ready before the countdown capture');
     await page.shot('screens/countdown');
     await page.eval(
       `document.querySelector('.countdown')?.style.removeProperty('animation-play-state')`,
@@ -404,6 +411,9 @@ const SHOTS: Record<string, Shot> = {
     for (const [id, chapter, row] of intros) {
       await toLevelSelect(page);
       await openIntro(page, chapter, row);
+      await page.key('ArrowUp');
+      if (!(await page.eval<boolean>(`!document.querySelector('.intro-guide').hidden`)))
+        throw new Error('Level guide did not open');
       await page.shot(`screens/intro-${id}`);
     }
   },

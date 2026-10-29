@@ -5,18 +5,24 @@ import {
   PLAYER_RADIUS,
   THROW_HOLD_TICKS,
 } from '../../sim/balance';
-import { stationWorkStep } from '../../sim/interact';
-import { getTile } from '../../sim/level';
 import type { GameEvent } from '../../sim/orders';
 import { isDashing } from '../../sim/movement';
-import { type GameState, type Player, type PlayerId, targetTile } from '../../sim/state';
-import { ticketCarriedBy, ticketOnTile } from '../../sim/tickets';
+import { type GameState, type Player, type PlayerId } from '../../sim/state';
+import { ticketCarriedBy } from '../../sim/tickets';
 import { playerColor } from '../playerColors';
 import { type Vec3, gridToWorld } from '../projection';
 import type { RoundView } from '../roundView';
-import { type Character, applyPose, createDeveloper, createManager } from './Characters';
+import {
+  type Character,
+  applyPose,
+  createDeveloper,
+  createManager,
+  disposeCharacter,
+} from './Characters';
+import type { RoleId } from '../../sim/roles';
 import type { KitMaterials } from './kit';
 import { facingYaw } from './layout';
+import { playerMarker } from './playerMarker';
 import {
   type FacingHold,
   type Gait,
@@ -54,6 +60,7 @@ interface Person {
   shovedAtMs: number | null;
   ring: THREE.Mesh | null;
   materials: THREE.Material[];
+  geometries: THREE.BufferGeometry[];
 }
 
 /**
@@ -104,8 +111,12 @@ export class People {
       let person = this.players.get(player.id);
       const simYaw = facingYaw(player.facing);
       if (!person) {
-        person = this.addDeveloper(player.id, simYaw);
+        person = this.addDeveloper(player.id, player.roleId, simYaw);
         this.players.set(player.id, person);
+      } else if (person.character.rig?.roleId !== player.roleId) {
+        disposeCharacter(person.character);
+        person.character = createDeveloper(player.id, this.materials, player.roleId);
+        this.world.add(person.character.root);
       }
       const moving = noteMotion(person.motion, pos, timeMs) && !over;
       const speed = moving ? Math.hypot(player.vel.x, player.vel.y) : 0;
@@ -168,11 +179,7 @@ export class People {
   ): PoseInput {
     const carrying = ticketCarriedBy(state, player.id) !== undefined;
     stepGait(person.gait, speed, PLAYER_MAX_SPEED, dt);
-    // The step on the station they face: its progress tells whether they work it.
-    const target = targetTile(state, player.id);
-    const onTarget = carrying ? undefined : ticketOnTile(state, target.x, target.y);
-    const step = onTarget && stationWorkStep(onTarget, getTile(state.level, target.x, target.y));
-    const sample = onTarget && step ? { ticketId: onTarget.id, progress: step.progress } : null;
+    const sample = workSample(state, player.id);
     return {
       speed: person.gait.speed,
       fullSpeed: PLAYER_MAX_SPEED,
@@ -194,16 +201,20 @@ export class People {
     if (person.ring) person.ring.position.set(at.x, at.y + RING.lift, at.z);
   }
 
-  private addDeveloper(id: PlayerId, yaw: number): Person {
+  private addDeveloper(id: PlayerId, roleId: RoleId, yaw: number): Person {
     const ringMaterial = new THREE.MeshBasicMaterial({
       color: playerColor(id),
       transparent: true,
       opacity: 0.9,
     });
     const ring = new THREE.Mesh(this.ringGeometry, ringMaterial);
+    const markerGeometry = playerMarker(id);
+    const markerMaterial = new THREE.MeshBasicMaterial({ vertexColors: true });
+    ring.add(new THREE.Mesh(markerGeometry, markerMaterial));
     this.world.add(ring);
-    const person = this.addPerson(createDeveloper(id, this.materials), ring, id, yaw);
-    person.materials.push(ringMaterial);
+    const person = this.addPerson(createDeveloper(id, this.materials, roleId), ring, id, yaw);
+    person.materials.push(ringMaterial, markerMaterial);
+    person.geometries.push(markerGeometry);
     return person;
   }
 
@@ -228,16 +239,17 @@ export class People {
       shovedAtMs: null,
       ring,
       materials: [],
+      geometries: [],
     };
   }
 
   private drop<K>(people: Map<K, Person>, seen: Set<K>): void {
     for (const [key, person] of people) {
       if (seen.has(key)) continue;
-      this.world.remove(person.character.root);
+      disposeCharacter(person.character);
       if (person.ring) this.world.remove(person.ring);
-      for (const g of person.character.geometries) g.dispose();
       for (const m of person.materials) m.dispose();
+      for (const g of person.geometries) g.dispose();
       people.delete(key);
     }
   }
@@ -266,14 +278,21 @@ export function createWorkMemory(): WorkMemory {
   return { ticketId: null, progress: 0, workedAtMs: -Infinity };
 }
 
+/** Only resolved contributors animate, including pipeline repair without a ticket. */
+export function workSample(
+  state: GameState,
+  playerId: PlayerId,
+): { ticketId: number; progress: number } | null {
+  const contribution = state.workFeedback.find((work) => work.playerId === playerId);
+  return contribution ? { ticketId: contribution.ticketId ?? -1, progress: state.tick } : null;
+}
+
 /** Faster than this and they're walking past, not working. */
 const WORK_MAX_SPEED = 0.5;
 
 /**
- * Whether a player looks like they're working: standing at a station whose
- * step on the same ticket moved since last frame (shown a moment longer,
- * so a tick without progress doesn't flicker). The sim doesn't say who
- * works a station, so two players at one station both look busy.
+ * Hold a resolved work sample a moment longer so a frame between sim
+ * snapshots does not flicker.
  */
 export function noteWork(
   memory: WorkMemory,

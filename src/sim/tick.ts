@@ -1,5 +1,12 @@
 import { updateConveyors } from './conveyor';
-import { finishCoding, finishReviews, interact, newTickWork, work } from './interact';
+import {
+  finishCoding,
+  finishManualWork,
+  finishReviews,
+  interact,
+  newTickWork,
+  work,
+} from './interact';
 import { updateManagers } from './manager';
 import { expireInvites, updateMeetings } from './meetings';
 import { movePlayer } from './movement';
@@ -18,6 +25,7 @@ import type { GameState, InputCommand } from './state';
  */
 export function tick(state: GameState, inputs: readonly InputCommand[]): void {
   state.events = [];
+  state.workFeedback = [];
   if (state.result) return;
 
   for (const player of state.players) {
@@ -43,6 +51,7 @@ export function tick(state: GameState, inputs: readonly InputCommand[]): void {
   }
   finishReviews(state, tickWork);
   finishCoding(state, tickWork);
+  finishManualWork(state, tickWork);
   updateFlights(state);
   updateConveyors(state);
 

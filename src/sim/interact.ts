@@ -6,14 +6,16 @@
 import {
   DESIGNED_CODE_FACTOR,
   DESIGN_RATE,
-  PAIR_RATE,
+  PAIR_WORKER_FACTOR,
   REVIEWERS_NEEDED,
   REVIEW_RATE,
   WORK_RATE,
 } from './balance';
 import { type Tile, getTile } from './level';
 import { shipTicket } from './orders';
-import { isBroken, isBuilding, repairPipeline } from './pipeline';
+import { isBroken, isBuilding, pipelineAt, repairPipeline } from './pipeline';
+import { roleWorkRate } from './roles';
+import type { RoleId } from './roles';
 import { type GameState, type PlayerId, getPlayer, targetTile } from './state';
 import {
   type StepKind,
@@ -166,16 +168,32 @@ function standingTile(state: GameState, playerId: PlayerId): [number, number] {
 
 /** Who worked where during one tick. Tiles are keyed as `y * width + x`. */
 export interface TickWork {
-  /** Tiles already worked this tick, so two players at one station don't stack. */
-  worked: Set<number>;
   /** Players holding work at each review station with a ticket to review. */
   reviewers: Map<number, PlayerId[]>;
   /** On levels with pairing: players coding at each keyboard this tick. */
-  coders: Map<number, PlayerId[]>;
+  coders: Map<number, WorkContribution[]>;
+  /** Active workers at hand-operated stations, resolved without player-order bias. */
+  handWork: Map<number, WorkContribution[]>;
+  /** Active repairers at an empty broken pipeline. */
+  repairs: Map<number, RepairContribution[]>;
+}
+
+interface WorkContribution {
+  playerId: PlayerId;
+  ticket: Ticket;
+  step: TicketStep;
+  rate: number;
+}
+
+interface RepairContribution {
+  playerId: PlayerId;
+  x: number;
+  y: number;
+  rate: number;
 }
 
 export function newTickWork(): TickWork {
-  return { worked: new Set(), reviewers: new Map(), coders: new Map() };
+  return { reviewers: new Map(), coders: new Map(), handWork: new Map(), repairs: new Map() };
 }
 
 /**
@@ -188,28 +206,23 @@ export function work(state: GameState, playerId: PlayerId, tickWork: TickWork): 
   const { x, y } = targetTile(state, playerId);
   const tile = getTile(state.level, x, y);
   const key = y * state.level.width + x;
-  const { worked, reviewers } = tickWork;
+  const player = getPlayer(state, playerId);
+  if (!player) return false;
+  const { reviewers } = tickWork;
   if (tile === 'review') {
     const ticket = ticketOnTile(state, x, y);
     if (!ticket || !stationWorkStep(ticket, tile)) return false;
-    reviewers.set(key, [...(reviewers.get(key) ?? []), playerId]);
+    addUnique(reviewers, key, playerId);
     return true;
   }
-  if (tile === 'keyboard' && state.settings.pairing) {
-    // Only a keyboard with something to code signs anyone up.
-    const ticket = ticketOnTile(state, x, y);
-    if (!ticket || !stationWorkStep(ticket, tile)) return false;
-    // Pairing: everyone at the keyboard signs up. The first one codes right away (like
-    // alone); `finishCoding` adds the pair's extra once a second one joined.
-    const coders = tickWork.coders.get(key) ?? [];
-    tickWork.coders.set(key, [...coders, playerId]);
-    if (coders.length > 0) return true;
-  } else if (worked.has(key)) {
-    return false;
-  }
   if (tile === 'pipeline') {
-    if (!repairPipeline(state, x, y)) return false;
-    worked.add(key);
+    if (!pipelineAt(state, x, y)?.broken || ticketOnTile(state, x, y)) return false;
+    addContribution(tickWork.repairs, key, {
+      playerId,
+      x,
+      y,
+      rate: roleWorkRate(player.roleId, 'repair', 'general'),
+    });
     return true;
   }
   if (tile === null || !WORKED_BY_HAND.has(tile)) return false;
@@ -217,37 +230,139 @@ export function work(state: GameState, playerId: PlayerId, tickWork: TickWork): 
   const ticket = ticketOnTile(state, x, y);
   const step = ticket && stationWorkStep(ticket, tile);
   if (!step) return false;
-  advanceStep(step, handRate(ticket, tile));
-  worked.add(key);
+  const contribution = {
+    playerId,
+    ticket,
+    step,
+    rate: handRate(ticket, tile, player.roleId),
+  };
+  if (tile === 'keyboard' && state.settings.pairing) {
+    addContribution(tickWork.coders, key, contribution);
+  } else {
+    addContribution(tickWork.handWork, key, contribution);
+  }
   return true;
 }
 
 /** How fast `tile` works its step on `ticket` by hand: coding goes faster once it's been designed. */
-function handRate(ticket: Ticket, tile: Tile): number {
+function handRate(ticket: Ticket, tile: Tile, roleId: RoleId): number {
   const rate = HAND_RATE[tile] ?? WORK_RATE;
-  if (tile !== 'keyboard') return rate;
+  const step = stationStep(tile);
+  const roleRate = step ? roleWorkRate(roleId, step, ticket.domain) : 1;
+  if (tile !== 'keyboard') return rate * roleRate;
   const designed = ticket.steps.some((s) => s.kind === 'design' && s.progress >= 1);
-  return designed ? rate * DESIGNED_CODE_FACTOR : rate;
+  return rate * roleRate * (designed ? DESIGNED_CODE_FACTOR : 1);
 }
 
-/**
- * On levels with pairing, advances each keyboard someone coded at this tick:
- * at `PAIR_RATE` with two or more players, else at the normal rate.
- */
+/** Advances one captured ticket group per keyboard, pairing only when that ticket remains there. */
 export function finishCoding(state: GameState, tickWork: TickWork): void {
   const { width } = state.level;
   state.pairing = [];
-  for (const [key, players] of tickWork.coders) {
-    if (players.length < 2) continue;
+  for (const [key, contributors] of tickWork.coders) {
     const x = key % width;
     const y = Math.floor(key / width);
-    const ticket = ticketOnTile(state, x, y);
-    const step = ticket && stationWorkStep(ticket, 'keyboard');
-    if (!ticket || !step) continue;
-    const solo = handRate(ticket, 'keyboard');
-    advanceStep(step, solo * (PAIR_RATE / WORK_RATE) - solo);
-    state.pairing.push({ x, y });
+    const currentTicket = ticketOnTile(state, x, y);
+    const candidates = groupContributions(contributors).flatMap((group) => {
+      const [worker, partner] = strongest(group);
+      if (
+        !worker ||
+        !state.tickets.includes(worker.ticket) ||
+        !worker.ticket.steps.includes(worker.step)
+      ) {
+        return [];
+      }
+      const paired =
+        state.settings.pairing && currentTicket === worker.ticket && partner !== undefined;
+      return [
+        {
+          worker,
+          partner,
+          paired,
+          rate: paired ? PAIR_WORKER_FACTOR * (worker.rate + partner.rate) : worker.rate,
+        },
+      ];
+    });
+    const selected = candidates.sort(
+      (a, b) =>
+        b.rate - a.rate ||
+        a.worker.playerId - b.worker.playerId ||
+        a.worker.ticket.id - b.worker.ticket.id,
+    )[0];
+    if (!selected) continue;
+    advanceStep(selected.worker.step, selected.rate);
+    const workers =
+      selected.paired && selected.partner ? [selected.worker, selected.partner] : [selected.worker];
+    for (const worker of workers) {
+      state.workFeedback.push({
+        playerId: worker.playerId,
+        task: 'code',
+        ticketId: worker.ticket.id,
+        rate: (worker.rate / WORK_RATE) * (selected.paired ? PAIR_WORKER_FACTOR : 1),
+        ...(selected.paired ? { teamRate: selected.rate / WORK_RATE } : {}),
+      });
+    }
+    if (selected.paired) state.pairing.push({ x, y });
   }
+}
+
+/** Resolves one strongest worker per ordinary station and one strongest repairer per pipeline. */
+export function finishManualWork(state: GameState, tickWork: TickWork): void {
+  for (const contributors of tickWork.handWork.values()) {
+    const worker = strongest(contributors).find(
+      (candidate) =>
+        state.tickets.includes(candidate.ticket) && candidate.ticket.steps.includes(candidate.step),
+    );
+    if (worker) {
+      advanceStep(worker.step, worker.rate);
+      state.workFeedback.push({
+        playerId: worker.playerId,
+        task: worker.step.kind,
+        ticketId: worker.ticket.id,
+        rate: worker.rate / (worker.step.kind === 'design' ? DESIGN_RATE : WORK_RATE),
+      });
+    }
+  }
+  for (const contributors of tickWork.repairs.values()) {
+    const [repairer] = strongest(contributors);
+    if (repairer) {
+      repairPipeline(state, repairer.x, repairer.y, repairer.rate);
+      state.workFeedback.push({ playerId: repairer.playerId, task: 'repair', rate: repairer.rate });
+    }
+  }
+}
+
+function groupContributions(contributors: readonly WorkContribution[]): WorkContribution[][] {
+  const grouped = new Map<Ticket, Map<TicketStep, WorkContribution[]>>();
+  for (const contributor of contributors) {
+    const steps = grouped.get(contributor.ticket) ?? new Map<TicketStep, WorkContribution[]>();
+    const workers = steps.get(contributor.step) ?? [];
+    workers.push(contributor);
+    steps.set(contributor.step, workers);
+    grouped.set(contributor.ticket, steps);
+  }
+  return [...grouped.values()].flatMap((steps) => [...steps.values()]);
+}
+
+function strongest<T extends { playerId: PlayerId; rate: number }>(
+  contributors: readonly T[],
+): T[] {
+  return [...contributors].sort((a, b) => b.rate - a.rate || a.playerId - b.playerId);
+}
+
+function addContribution<T extends { playerId: PlayerId }>(
+  map: Map<number, T[]>,
+  key: number,
+  contribution: T,
+): void {
+  const contributors = map.get(key) ?? [];
+  if (!contributors.some((entry) => entry.playerId === contribution.playerId)) {
+    map.set(key, [...contributors, contribution]);
+  }
+}
+
+function addUnique(map: Map<number, PlayerId[]>, key: number, playerId: PlayerId): void {
+  const players = map.get(key) ?? [];
+  if (!players.includes(playerId)) map.set(key, [...players, playerId]);
 }
 
 /** Advances every review that `REVIEWERS_NEEDED` players worked on this tick; more don't speed it up. */
@@ -259,6 +374,10 @@ export function finishReviews(state: GameState, tickWork: TickWork): void {
     const y = Math.floor(key / width);
     const ticket = ticketOnTile(state, x, y);
     const step = ticket && stationWorkStep(ticket, 'review');
-    if (step) advanceStep(step, REVIEW_RATE);
+    if (step) {
+      advanceStep(step, REVIEW_RATE);
+      for (const playerId of players)
+        state.workFeedback.push({ playerId, task: 'review', ticketId: ticket.id, rate: 1 });
+    }
   }
 }

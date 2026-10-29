@@ -448,6 +448,28 @@ describe('limits', () => {
 });
 
 describe('drawing', () => {
+  it('preserves authoritative roles through countdown, prediction, reconciliation and spectators', () => {
+    const state = newGame([1, 2]);
+    const one = state.players[0];
+    const two = state.players[1];
+    if (!one || !two) throw new Error('Missing prediction players');
+    one.roleId = 'frontend';
+    two.roleId = 'qa';
+    const p = createPrediction(true);
+    resetPrediction(p, state.level);
+    reconcile(p, snapshotOf(state, 0, [], 10), [1]);
+    expect(predictedPlayer(p, 1, 0)?.roleId).toBe('frontend');
+    recordInputs(p, [command(1, 10)]);
+    advancePrediction(p, 12);
+    expect(predictedPlayer(p, 1, 0.5)?.roleId).toBe('frontend');
+    one.roleId = 'platform';
+    reconcile(p, snapshotOf(state, 13), [1]);
+    expect(predictedPlayer(p, 1, 0)?.roleId).toBe('platform');
+    reconcile(p, snapshotOf(state, 14), []);
+    expect(predictedPlayer(p, 1, 0)).toBeNull();
+    expect(state.players.map((player) => player.roleId)).toEqual(['platform', 'qa']);
+  });
+
   it('draws between the last two predicted ticks, plus the gliding correction', () => {
     const state = newGame();
     const p = createPrediction(true);
