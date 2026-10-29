@@ -1,6 +1,6 @@
 # Phase 21 proposal: character roles, ticket domains, and a new cast
 
-**Status:** 21a visual investigation complete; the user selected the compact angular foundation. 21b simulation rules and the opt-in lab are approved and implemented; 21c–21d remain unapproved. Hats are optional, non-default accessories for the future cast. Numbers below are starting hypotheses, not measured balance results. Implement one approved subphase at a time.
+**Status:** 21a visual investigation and 21b rules/lab are complete. The user approved 21c with a cast-approval checkpoint: production compact-angular cast first, selection/feedback only after visual acceptance. The production cast is implemented and awaiting that human visual gate; selection/feedback and 21d rollout are not implemented. Hats remain optional, non-default accessories, not a blanket prohibition. Numbers below are starting hypotheses, not measured balance results.
 
 **Goal:** a team of generalists is dependable and can earn three stars; a well-coordinated specialist team has a higher ceiling because it assigns work and hands tickets over well. Mixed teams should be a useful middle ground. Replace the current character silhouette, not just its hats.
 
@@ -240,13 +240,47 @@ Verification completed: `npm run check` (80 test files, 1,108 tests) and `npm ru
 - [ ] No extra RNG rolls occur on non-domain levels; authored domain batches meet configured counts and drought limits.
 - [ ] Solo, 2/3/4-player, duplicates, generalist-only, mixed, and specialist compositions remain playable; measured specialist gains come from assignment rather than privileged scoring.
 - [ ] Local and online setup, readiness invalidation, countdown lock, ownership validation, reconnect, controller takeover, retries, and spectators are tested.
-- [ ] Model/pose tests cover attachment points, arm reach, head/accessory bounds, and carried-ticket clearance; geometry is disposed correctly on replacement/destruction.
+- [x] Model/pose tests cover attachment points, arm reach, head/accessory bounds, and carried-ticket clearance; geometry is disposed correctly on replacement/destruction.
 - [ ] Approved art direction is legible at real gameplay scale, including four same-role characters, grayscale, rear views, and every action.
 - [ ] `npm run check` and `npm run build` pass for implementation slices; manual local/online checks and couch balance trials are completed.
 - [ ] Directly affected game documentation and screenshots are updated after the art and rules settle.
 
 ## Decisions still requiring approval
 
-The user approved the 21b rules/lab scope and its proposed role matrix as hypotheses to measure, not as proven balance. Campaign opt-in, the pre-round readiness flow, final cast, and the remaining 21c/21d implementation details still require their own approval gates.
+The user approved the 21b rules/lab scope and its proposed role matrix as hypotheses to measure, not as proven balance. The user then chose **"Approve 21c with the cast approval checkpoint"**: the cast PR stops for visual acceptance before the separate selection/readiness/feedback PR begins. Campaign opt-in and 21d balance/rollout still require approval.
 
-The compact angular foundation is selected; individual production characters and their final body/face/animation details remain for the separately approved 21c slice. Do not treat the study choice or 21b approval as approval to implement later slices, final cast acceptance, campaign rollout, or measured balance.
+Do not treat production implementation or screenshots as final art acceptance, verified couch readability, campaign rollout, or measured balance.
+
+### 21c first part: production cast review
+
+Each of the five roles has **male and female characters**, as subsequently requested by the user. Both variants keep the role's outfit and shared rig: rolled-sleeve/strap generalist, asymmetric cropped frontend jacket, square-collared backend vest, narrow QA coat with inspection glasses, and platform utility jacket with headset. Role-specific hair cuts, softer/squarer faces, tied hair and optional facial hair distinguish the variants without changing work/movement behavior. Skin/hair color and male/female presentation are person cosmetics, independent of role. Normal four-player casts alternate male/female appearances by owner; the dev review can show either or both for every role. No appearance-selection UI or extra sim/network field is added here. This first set uses hair, clothes, facial hair and accessories rather than default hats; occasional future hats remain permitted.
+
+`DeveloperRig.ts` owns only production geometry and the common attached-limb rig; no study geometry or model-sheet imports enter the game. `Characters.ts` retains the manager/extras' original body behavior. `People.ts` selects from authoritative `roleId` state, including interpolated/spectator views, and replaces/disposes owned geometry when a role changes in the viewed state. This is rendering support, not a mid-round role-selection feature. Player color, floor-tab number and owner shape stay independent of outfit/badge identity. Normal rounds default to the new generalist.
+
+Common hand/ticket targets, smoothed-facing alignment, movement, collision, station reach, gait frequency and sim throw rules remain shared. The torso ducks left and back around the unchanged folder arc. The new dash/carry regression test also verifies wrists after dash removes walk bob. Overlays use an animated head/hair/headset envelope rather than the obsolete tallest-hat assumption.
+
+- [x] Five production role models, each with independent male/female variants; normal game uses the new generalist without adding a selection path.
+- [x] All seven actions, attached arm joints, split grounded legs, common carry/throw alignment.
+- [x] Tests cover both male/female variants of every role, translated/rotated roots, arm segment reach, feet, animated head/accessory bounds, and all 101 wind-up samples against the actual folder/tab/flap envelope while still, walking, dashing and shoved.
+- [x] Tests cover independent owner colors/cosmetics, unique role geometry, stable same-role sync, replacement/removal disposal, and smoothed-facing ticket/wrist alignment. Renderer sync leaves state unchanged.
+- [x] Enlarged front/rear, grayscale, all-action and duplicate-role model comparisons; real four-player gameplay scenes show HUD/stations, carried tickets, actual wind-up and actual flight.
+- [x] `npm run check` (81 files, 1,148 tests) and `npm run build` pass.
+- [x] Independent critic completed (two rounds), with no outstanding substantive defects. Round one's fixture-readability concern led to moving the back pair clear of the conveyor. Round two reviewed male/female code and lineup/rear evidence; final corrected gameplay captures were inspected by the implementing agent after capture completed, not independently re-reviewed.
+- [ ] User accepts the production cast at actual gameplay scale.
+- [ ] Human two-second couch readability, rear/grayscale recognition and four-identical-role play verified.
+
+The two human boxes are intentionally unchecked. Captures demonstrate geometry and game integration, not human recognition or balance. No campaign settings, scores, role rates, bots, lobby/readiness/network UI or 21d tuning changed.
+
+| Review | URL |
+| --- | --- |
+| Five roles, male/female | `/models.html?cast&still&action=idle&time=900` (male back row, female front row) |
+| Male or female comparison | `/models.html?cast&presentation=male&still&action=idle`, `/models.html?cast&presentation=female&still&action=idle` |
+| All actions, pause/scrub | `/models.html?cast&action=throw` |
+| Rear/grayscale | `/models.html?cast&still&action=idle&rear&gray` |
+| Four copies of a role | `/models.html?cast&role=generalist&still&action=carry` (also `frontend`, `backend`, `qa`, `platform`) |
+| Actual mixed gameplay | `/?scene=cast-mixed&quality=low` |
+| Actual platform/QA gameplay | `/?scene=cast-platform&quality=low` |
+| Actual four generalists | `/?scene=cast-duplicates&quality=low` |
+| Actual sim throw | `/?scene=cast-windup&quality=low`, `/?scene=cast-release&quality=low` |
+
+Capture with `npx vite-node scripts/characterCast.ts --base=http://localhost:5197 --out=/absolute/evidence/directory` (optional `--cdp-port=9361`). The script uses a private headless Chrome profile, waits for real scene completion and includes a narrow review-page capture. It does not replace the approved `docs/game/` screenshot catalog. The model-sheet release remains illustrative and is labeled as such; actual gameplay flight comes from the unchanged sim.

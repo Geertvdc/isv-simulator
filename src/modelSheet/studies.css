@@ -91,6 +91,10 @@ body.study-page {
   margin-top: 4px;
   color: #c5d1e8;
 }
+.cast-name {
+  width: min(170px, 17vw);
+  font-weight: bold;
+}
 @media (max-width: 760px) {
   .study-controls {
     padding: 10px 12px;

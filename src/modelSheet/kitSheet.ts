@@ -20,6 +20,9 @@ import {
 import { VIEW3D_PITCH } from '../render/projection';
 import { STATION_HEIGHT } from '../render/three/layout';
 import { FLOOR_THEMES, WALL_THEMES } from '../render/mapLook';
+import { ROLE_IDS } from '../sim/roles';
+import { ROLE_LABELS } from '../sim/content';
+import { DEVELOPER_PRESENTATIONS, developerAppearance } from '../render/three/DeveloperRig';
 
 const SPACING = 2.2;
 const COLUMNS = 7;
@@ -35,6 +38,16 @@ const POSES: [string, Partial<PoseInput>][] = [
 ];
 
 const people: Entry[] = [
+  ...ROLE_IDS.flatMap((role) =>
+    DEVELOPER_PRESENTATIONS.map((presentation): Entry => [
+      `${ROLE_LABELS[role]} ${presentation}`,
+      () => {
+        const c = createDeveloper(1, materials, role, { ...developerAppearance(1), presentation });
+        applyPose(c, playerPose(IDLE, 0));
+        return c.root;
+      },
+    ]),
+  ),
   ...POSES.map(([pose, input], i): Entry => [
     `player ${i + 1} ${pose}`,
     () => {

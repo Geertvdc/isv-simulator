@@ -1,5 +1,5 @@
 import type { PoseInput } from '../render/three/pose';
-import { studyTicketTarget } from '../render/three/CharacterStudies';
+import { carryPoint } from '../render/three/layout';
 
 export const STUDY_ACTIONS = ['idle', 'walk', 'work', 'carry', 'dash', 'throw', 'shove'] as const;
 export type StudyAction = (typeof STUDY_ACTIONS)[number];
@@ -27,8 +27,9 @@ export function studyFrame(
     phase: 0,
     stride: (timeMs / 1000) * Math.PI * 4.4,
   };
+  const hold = carryPoint(windUp);
   let ticket: { x: number; y: number; z: number } | null = input.carrying
-    ? studyTicketTarget(windUp)
+    ? { x: hold.side, y: hold.height, z: hold.reach }
     : null;
   if (releasing) {
     const progress = (loop - 1600) / 1000;
