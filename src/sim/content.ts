@@ -1,6 +1,6 @@
 /** Text content. Add jokes freely. */
 
-import type { TicketKind } from './tickets';
+import type { StepKind, TicketKind } from './tickets';
 
 /** Flavour titles for tickets; they don't change how a ticket plays. */
 export const TICKET_TITLES: readonly string[] = [
@@ -60,15 +60,44 @@ export function pairingText(speedup: number): string {
   return `Pairing ×${Math.round(speedup * 10) / 10}`;
 }
 
-/** What each kind of order (and ticket) is called on its card. */
+/** The label chip on each kind of order (and ticket) card, like an issue tracker's. */
 export const ORDER_KIND_LABELS: Readonly<Record<TicketKind, string>> = {
-  feature: 'Feature',
-  bug: 'Bug',
-  incident: 'Incident!',
-  frontend: 'Front end',
-  backend: 'Back end',
-  fullstack: 'Full-stack',
+  feature: 'feature',
+  bug: 'bug',
+  incident: 'hotfix',
+  frontend: 'frontend',
+  backend: 'backend',
+  fullstack: 'full-stack',
 };
+
+/** An order's number on its cards, in the HUD and on its tickets. */
+export function orderNumber(orderId: number): string {
+  return `#${orderId}`;
+}
+
+/** Stamped on an order card whose time ran out, before it drops off. */
+export const ORDER_EXPIRED_STAMP = 'closed: wontfix';
+/** Stamped on a ticket card in the office whose order ran out. */
+export const TICKET_EXPIRED_STAMP = 'wontfix';
+
+/** What each step tile is, for screen readers and hover. */
+export const STEP_NAMES: Readonly<Record<StepKind, string>> = {
+  design: 'Design at the whiteboard',
+  code: 'Code at a keyboard',
+  review: 'Review, two at the review desk',
+  test: 'Test at the test bench',
+  merge: 'Merge front end and back end',
+  pipeline: 'Build in the pipeline',
+};
+
+/** How each step's state reads, like a CI check. */
+export const STEP_STATE_NAMES = {
+  todo: 'queued',
+  current: 'next up',
+  done: 'passed',
+  skipped: 'skipped: bugs ahead',
+  expired: 'cancelled',
+} as const;
 
 /** Over a merge station when a front end and a back end come together. */
 export const MERGED_TEXT = 'Merged!';

@@ -145,7 +145,7 @@ export function isFinished(ticket: Ticket): boolean {
  * stays skipped: you test in its phase or not at all. Nothing is workable on
  * an expired ticket.
  */
-export function workableSteps(ticket: Ticket): TicketStep[] {
+export function workableSteps(ticket: Pick<Ticket, 'steps' | 'expired'>): TicketStep[] {
   if (ticket.expired) return [];
   let lastWorked = 0;
   ticket.steps.forEach((s, i) => {
