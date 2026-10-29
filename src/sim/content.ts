@@ -1,6 +1,6 @@
 /** Text content. Add jokes freely. */
 
-import type { TicketKind } from './tickets';
+import type { StepKind, TicketKind } from './tickets';
 import type { RoleId, TicketDomain } from './roles';
 
 export const ROLE_LABELS: Readonly<Record<RoleId, string>> = {
@@ -88,7 +88,10 @@ export const INCIDENT_TITLES: readonly string[] = [
 ];
 
 /** Over the order bar while an incident is open. */
-export const INCIDENT_BANNER_TEXT = 'INCIDENT! New features on hold until the hotfix ships';
+export const INCIDENT_BANNER_TEXT = 'INCIDENT! Nothing ships until the hotfix does';
+
+/** Pops up over a player trying to ship anything but the hotfix during an incident. */
+export const SHIP_BLOCKED_TEXT = 'Hotfix first!';
 
 /** Shown next to the points when a ticket ships with tests skipped. */
 export const UNTESTED_SHIP_TEXT = 'YOLO!';
@@ -108,15 +111,52 @@ export function pairingText(speedup: number): string {
   return `Pairing ×${Math.round(speedup * 10) / 10}`;
 }
 
-/** What each kind of order (and ticket) is called on its card. */
-export const ORDER_KIND_LABELS: Readonly<Record<TicketKind, string>> = {
-  feature: 'Feature',
-  bug: 'Bug',
-  incident: 'Incident!',
-  frontend: 'Front end',
-  backend: 'Back end',
-  fullstack: 'Full-stack',
+/**
+ * An order card's title reads as a conventional commit, `feat: Make it pop`:
+ * the type (and scope) says the kind of ticket. A hotfix is breaking news.
+ */
+export const COMMIT_TYPES: Readonly<Record<TicketKind, { type: string; scope?: string }>> = {
+  feature: { type: 'feat' },
+  bug: { type: 'fix' },
+  incident: { type: 'fix!' },
+  frontend: { type: 'feat', scope: 'ui' },
+  backend: { type: 'feat', scope: 'api' },
+  fullstack: { type: 'feat', scope: 'app' },
 };
+
+/** The commit subject after the type: a bug's title without its `Bug: `, which `fix` already says. */
+export function commitSubject(title: string): string {
+  return title.replace(/^Bug: /, '');
+}
+
+/** An order's number on its cards, in the HUD and on its tickets. */
+export function orderNumber(orderId: number): string {
+  return `#${orderId}`;
+}
+
+/** Stamped on an order card whose time ran out, before it drops off. */
+export const ORDER_EXPIRED_STAMP = 'closed: wontfix';
+/** Stamped on a ticket card in the office whose order ran out. */
+export const TICKET_EXPIRED_STAMP = 'wontfix';
+
+/** What each step tile is, for screen readers and hover. */
+export const STEP_NAMES: Readonly<Record<StepKind, string>> = {
+  design: 'Design at the whiteboard',
+  code: 'Code at a keyboard',
+  review: 'Review, two at the review desk',
+  test: 'Test at the test bench',
+  merge: 'Merge front end and back end',
+  pipeline: 'Build in the pipeline',
+};
+
+/** How each step's state reads, like a CI check. */
+export const STEP_STATE_NAMES = {
+  todo: 'queued',
+  current: 'next up',
+  done: 'passed',
+  skipped: 'skipped: bugs ahead',
+  expired: 'cancelled',
+} as const;
 
 /** Over a merge station when a front end and a back end come together. */
 export const MERGED_TEXT = 'Merged!';
@@ -390,11 +430,11 @@ export const LEVEL_INTRO_TIPS: Readonly<Record<string, { text: string; picture: 
   },
   'scale-up': {
     picture: 'review',
-    text: 'With two or more of you, some features need a code review: two players work the R station together.',
+    text: 'With two or more of you, some features need a code review: two players work the review station together.',
   },
   'seed-round': {
     picture: 'incident',
-    text: 'Production incident! The red hotfix jumps the bug queue: code it, build it, ship it. No new features until it ships.',
+    text: 'Production incident! The red hotfix jumps the bug queue: code it, build it, ship it. Nothing else ships and no new features come in until it does.',
   },
   'middle-management': {
     picture: 'manager',
@@ -406,11 +446,11 @@ export const LEVEL_INTRO_TIPS: Readonly<Record<string, { text: string; picture: 
   },
   'design-sprint': {
     picture: 'design',
-    text: 'Some features start at the whiteboard (W): design them first and they code faster. Two at one keyboard code faster too.',
+    text: 'Some features start at the whiteboard: design them first and they code faster. Two at one keyboard code faster too.',
   },
   monorepo: {
     picture: 'merge',
-    text: 'Full-stack features come as a front end and a back end. Code both, then put them together on the merge station (G).',
+    text: 'Full-stack features come as a front end and a back end. Code both, then put them together on the merge station.',
   },
   hackathon: {
     picture: 'carousel',

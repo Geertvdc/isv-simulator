@@ -121,7 +121,8 @@ describe('parseLevelMap', () => {
     // Room to stand below every desk.
     for (const x of [1, 3, 9, 11]) expect(getTile(map, x, 2)).toBe('floor');
     expect(getTile(map, 12, 7)).toBe('floor');
-    expect(map.tiles).not.toContain('bin');
+    expect(getTile(map, 0, 6)).toBe('bin');
+    expect(getTile(map, 1, 6)).toBe('floor');
   });
 });
 

@@ -5,9 +5,13 @@
 
 import { tileColor } from '../render/mapLook';
 import { playerCssColor } from '../render/playerColors';
+import { GLYPH_SIZE, GLYPH_STROKE, type GlyphId } from '../render/stepLook';
 import type { IntroPicture } from '../sim/content';
+import { glyphMarkup } from './stepTiles';
 
 const OUTLINE = '#1a1d24';
+/** The step tiles' background, `--window-bar`. */
+const TILE_FILL = '#222a3f';
 const css = (color: number): string => `#${color.toString(16).padStart(6, '0')}`;
 
 /** A developer: a capsule with its feet at (x, y). */
@@ -15,16 +19,23 @@ function dev(x: number, y: number, color: string): string {
   return `<rect x="${x - 9}" y="${y - 30}" width="18" height="30" rx="9" fill="${color}" stroke="${OUTLINE}" stroke-width="2"/>`;
 }
 
-/** A station block with its letter. */
-function block(
+/** A plain block: a counter, no station. */
+function block(x: number, y: number, tile: Parameters<typeof tileColor>[0]): string {
+  return `<rect x="${x - 14}" y="${y - 14}" width="28" height="28" rx="4" fill="${css(tileColor(tile))}" stroke="${OUTLINE}" stroke-width="2"/>`;
+}
+
+/** A station as the step tile on the order cards: its glyph in its color on a dark tile. */
+function station(
   x: number,
   y: number,
   tile: Parameters<typeof tileColor>[0],
-  letter: string,
+  glyph: GlyphId,
 ): string {
+  const color = css(tileColor(tile));
+  const g = 20;
   return (
-    `<rect x="${x - 14}" y="${y - 14}" width="28" height="28" rx="4" fill="${css(tileColor(tile))}" stroke="${OUTLINE}" stroke-width="2"/>` +
-    `<text x="${x}" y="${y + 6}" text-anchor="middle" font-size="16" font-weight="800" fill="${OUTLINE}">${letter}</text>`
+    `<rect x="${x - 15}" y="${y - 15}" width="30" height="30" rx="5" fill="${TILE_FILL}" stroke="${color}" stroke-width="2"/>` +
+    `<g transform="translate(${x - g / 2} ${y - g / 2}) scale(${g / GLYPH_SIZE})" color="${color}" fill="none" stroke="currentColor" stroke-width="${GLYPH_STROKE}" stroke-linecap="round" stroke-linejoin="round">${glyphMarkup(glyph)}</g>`
   );
 }
 
@@ -41,21 +52,21 @@ const PICTURES: Readonly<Record<IntroPicture, () => string>> = {
   // Inbox → keyboard → test bench → pipeline → ship.
   basics: () =>
     [
-      block(20, 45, 'inbox', 'I'),
+      station(20, 45, 'inbox', 'inbox'),
       arrow(36, 54, 45),
-      block(70, 45, 'keyboard', 'K'),
+      station(70, 45, 'keyboard', 'code'),
       arrow(86, 104, 45),
-      block(120, 45, 'testBench', 'T'),
+      station(120, 45, 'testBench', 'test'),
       arrow(136, 154, 45),
-      block(170, 45, 'pipeline', 'P'),
+      station(170, 45, 'pipeline', 'pipeline'),
       arrow(186, 204, 45),
-      block(220, 45, 'ship', 'S'),
+      station(220, 45, 'ship', 'ship'),
     ].join(''),
   // One developer throws a ticket over a counter wall to another.
   throw: () =>
     [
       dev(40, 75, playerCssColor(1)),
-      block(120, 61, 'counter', ''),
+      block(120, 61, 'counter'),
       dev(200, 75, playerCssColor(2)),
       `<path d="M 52 40 Q 120 -10 188 40" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="6 5"/>`,
       ticket(120, 16),
@@ -64,7 +75,7 @@ const PICTURES: Readonly<Record<IntroPicture, () => string>> = {
   review: () =>
     [
       dev(80, 80, playerCssColor(1)),
-      block(120, 45, 'review', 'R'),
+      station(120, 45, 'review', 'review'),
       dev(160, 80, playerCssColor(2)),
     ].join(''),
   // A red hotfix ticket and an alarm.
@@ -107,9 +118,9 @@ const PICTURES: Readonly<Record<IntroPicture, () => string>> = {
   // Whiteboard first, then the keyboard codes it faster.
   design: () =>
     [
-      block(40, 45, 'whiteboard', 'W'),
+      station(40, 45, 'whiteboard', 'design'),
       arrow(60, 96, 45),
-      block(120, 45, 'keyboard', 'K'),
+      station(120, 45, 'keyboard', 'code'),
       `<text x="120" y="22" text-anchor="middle" font-size="12" font-weight="800" fill="currentColor">faster</text>`,
       arrow(140, 176, 45),
       ticket(200, 45),
@@ -119,7 +130,7 @@ const PICTURES: Readonly<Record<IntroPicture, () => string>> = {
     [
       ticket(30, 45, '#7ab8f0'),
       arrow(44, 100, 45),
-      block(120, 45, 'merge', 'G'),
+      station(120, 45, 'merge', 'merge'),
       arrow(196, 140, 45),
       ticket(210, 45, '#6cbf7a'),
       `<text x="30" y="76" text-anchor="middle" font-size="11" font-weight="800" fill="currentColor">FE</text>`,
@@ -132,7 +143,7 @@ const PICTURES: Readonly<Record<IntroPicture, () => string>> = {
       `<path d="M 60 45 l 6 -5 v 10 Z M 100 45 l 6 -5 v 10 Z M 140 45 l 6 -5 v 10 Z" transform="rotate(180 103 45)" fill="${OUTLINE}" opacity="0.5"/>`,
       ticket(50, 34),
       ticket(120, 34),
-      block(210, 45, 'counter', ''),
+      block(210, 45, 'counter'),
     ].join(''),
 };
 
