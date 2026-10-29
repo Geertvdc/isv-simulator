@@ -4,17 +4,10 @@ import { COUNTDOWN_MS } from '../src/flow/flow';
 import { selection } from '../src/flow/roster';
 import type { DevicePress } from '../src/input/controller';
 import { parseClientMessage, PROTOCOL_VERSION } from '../src/net/protocol';
-import {
-  createRoomState,
-  dropMember,
-  handleMessage,
-  joinRoom,
-  leaveRoom,
-  rejoinMember,
-  stepRoom,
-  TICK_MS,
-  type RoomState,
-} from './roomLogic';
+import { dropMember, joinRoom, leaveRoom, rejoinMember } from './membership';
+import { type RoomState, TICK_MS, createRoomState } from './room';
+import { handleMessage } from './roomLogic';
+import { stepRoom } from './round';
 
 function join(room: RoomState, sessionId: string): void {
   expect(

@@ -17,23 +17,11 @@ import {
   TICKS_PER_SECOND,
 } from '../src/sim/balance';
 import { MAX_PLAYERS } from '../src/sim/level';
-import {
-  type Outgoing,
-  type RoomState,
-  TICK_MS,
-  advanceRoom,
-  createRoomState,
-  dropMember,
-  handleMessage,
-  hostOf,
-  joinRoom,
-  leaveRoom,
-  playerIdsOf,
-  rejoinMember,
-  setMemberProfile,
-  stepRoom,
-  takeProfileWrites,
-} from './roomLogic';
+import { playerIdsOf } from './lobby';
+import { dropMember, joinRoom, leaveRoom, rejoinMember, setMemberProfile } from './membership';
+import { type Outgoing, type RoomState, TICK_MS, createRoomState, hostOf } from './room';
+import { handleMessage } from './roomLogic';
+import { advanceRoom, stepRoom, takeProfileWrites } from './round';
 
 function hello(localPlayers = 1, name = 'Ada'): HelloMessage {
   return {
