@@ -95,6 +95,11 @@ export class ModelBuilder {
     return this.add(new THREE.SphereGeometry(r, 8, 6), color, place, 'glow');
   }
 
+  /** Two LEDs mirrored across x = 0: the one at -`x` first, then the one at `x`. */
+  ledPair(r: number, color: number, [x, y, z]: readonly [number, number, number]): this {
+    return this.led(r, color, { at: [-x, y, z] }).led(r, color, { at: [x, y, z] });
+  }
+
   /** A see-through box (a glass pane), drawn with the glass material. */
   pane(w: number, h: number, d: number, color: number, place: Place = {}): this {
     return this.add(new THREE.BoxGeometry(w, h, d), color, place, 'glass');

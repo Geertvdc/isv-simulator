@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ModelBuilder } from '../../kit';
+import { ModelBuilder, type Place } from '../../kit';
 import { COLOR } from '../../palette';
 import { STOREY } from '../cityPlan';
 
@@ -126,6 +126,24 @@ export function prism(w: number, d: number, h: number): THREE.BufferGeometry {
 }
 
 /**
+ * One window pane: with chance `share` lit and glowing on `glow`, else dark
+ * glass on `b`. Draws `rng` exactly once.
+ */
+export function windowPane(
+  b: ModelBuilder,
+  glow: ModelBuilder,
+  geometry: THREE.BufferGeometry,
+  place: Place,
+  rng: () => number,
+  share: number,
+  lit: number = C.lit,
+  pane: number = C.pane,
+): void {
+  if (rng() < share) glow.add(geometry, lit, place, 'glow');
+  else b.add(geometry, pane, place);
+}
+
+/**
  * Windows in rows (one per storey) on the front and both sides of a box
  * `w` × `d` whose storeys start at `base`. Some panes are lit.
  */
@@ -160,8 +178,7 @@ export function windowGrid(
         const u = -side.len / 2 + 0.05 + step * (c + 0.5);
         const geometry = new THREE.PlaneGeometry(size, STOREY * 0.5);
         const place = { at: side.at(u, y), rot: [0, side.yaw, 0] as [number, number, number] };
-        if (rng() < share) b.add(geometry, lit, place, 'glow');
-        else b.add(geometry, pane, place);
+        windowPane(b, b, geometry, place, rng, share, lit, pane);
       }
     }
   }
