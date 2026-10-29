@@ -59,6 +59,7 @@ function ticket(
   kind: TicketKind,
   done: number,
   steps = TICKET_STEPS[kind],
+  orderId = 0,
 ): Ticket {
   const t: Ticket = {
     id: state.nextTicketId++,
@@ -66,6 +67,8 @@ function ticket(
     title: 'Checkout',
     steps: steps.map((k, i) => ({ kind: k, progress: i < done ? 1 : 0 })),
     location: { kind: 'queue', queue: 'feature' },
+    orderId,
+    expired: false,
   };
   state.tickets.push(t);
   return t;
@@ -164,6 +167,28 @@ describe('merging a front end and a back end', () => {
     expect(state.orders).not.toContain(order);
   });
 
+  it('gives the merged ticket the order its parts came in with', () => {
+    const state = newGame();
+    const front = ticket(state, 'frontend', 1, TICKET_STEPS.frontend, 7);
+    const back = ticket(state, 'backend', 1, TICKET_STEPS.backend, 7);
+    front.location = { kind: 'tile', x: 4, y: 1 };
+    back.location = { kind: 'player', playerId: 1 };
+    place(state, 1, { x: 4, y: 2 }, { x: 0, y: -1 });
+    interact(state, 1);
+    expect(ticketOnTile(state, 4, 1)).toMatchObject({ kind: 'fullstack', orderId: 7 });
+  });
+
+  it('refuses to merge an expired part', () => {
+    const state = newGame();
+    const front = ticket(state, 'frontend', 1);
+    front.location = { kind: 'tile', x: 4, y: 1 };
+    const back = ticket(state, 'backend', 1);
+    back.expired = true;
+    expect(canPutDown(state, back, 4, 1)).toBe(false);
+    front.location = { kind: 'queue', queue: 'feature' };
+    expect(canPutDown(state, back, 4, 1)).toBe(false);
+  });
+
   it('keeps the merge when a merged ticket is lost, and loses the work after it', () => {
     const state = newGame();
     const t = ticket(state, 'fullstack', 3);
@@ -254,18 +279,21 @@ describe('full-stack orders running out', () => {
     expect(queuedTickets(state, 'feature')).toEqual([]);
   });
 
-  it('take a merged ticket that fell back into the queue instead of two parts', () => {
+  it("take a merged ticket of theirs that fell back into the queue, and no one else's", () => {
     const state = newGame();
     const order = createOrder(state, 'fullstack', 'Checkout');
-    const merged = ticket(state, 'fullstack', 2);
+    const other = createOrder(state, 'fullstack', 'Login');
+    other.expiresTick = order.expiresTick + 1000;
+    // Its parts were merged: only the merged ticket is left, and it fell back into the queue.
+    state.tickets = state.tickets.filter((t) => t.orderId !== order.id);
+    const merged = ticket(state, 'fullstack', 2, TICKET_STEPS.fullstack, order.id);
     loseTicket(state, merged, { x: 0, y: 0 });
     state.tick = order.expiresTick;
     expireOrders(state);
-    expect(
-      queuedTickets(state, 'feature')
-        .map((t) => t.kind)
-        .sort(),
-    ).toEqual(['backend', 'frontend']);
+    expect(state.tickets).not.toContain(merged);
+    const left = queuedTickets(state, 'feature');
+    expect(left.map((t) => t.kind).sort()).toEqual(['backend', 'frontend']);
+    expect(left.every((t) => t.orderId === other.id)).toBe(true);
   });
 });
 

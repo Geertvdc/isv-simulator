@@ -61,10 +61,11 @@ export function effectsFor(state: GameState, events: readonly GameEvent[]): Effe
         break;
       case 'ticketLost': {
         popup({ x: event.x, y: event.y }, TICKET_LOST_TEXT, POPUP_LOST_COLOR);
-        // And where it went: back on top of its queue.
-        const queue = firstGroup(state.level, QUEUE_TILE[event.queue]);
-        const at = queue[0];
-        if (at) popup(at, BACKLOG_TEXT, POPUP_INFO_COLOR);
+        // And where it went: back on top of its queue (an expired one is just gone).
+        if (event.queue !== null) {
+          const at = firstGroup(state.level, QUEUE_TILE[event.queue])[0];
+          if (at) popup(at, BACKLOG_TEXT, POPUP_INFO_COLOR);
+        }
         shake(SHAKE_SHOVE);
         break;
       }

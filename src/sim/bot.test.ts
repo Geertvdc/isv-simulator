@@ -110,7 +110,10 @@ describe('bot and new mechanics', () => {
     feature.expiresTick = incident.expiresTick = 100_000;
     // Just the finished feature: no queued tickets to distract the bot.
     state.tickets = [];
-    const ticket = addTicket(state, COL.floor, { done: TICKET_STEPS.feature.length });
+    const ticket = addTicket(state, COL.floor, {
+      done: TICKET_STEPS.feature.length,
+      orderId: feature.id,
+    });
     give(1, ticket);
     const bot = createBot(1);
     const play = (seconds: number): void => {
@@ -134,6 +137,38 @@ describe('bot and new mechanics', () => {
     }
     expect(shipped).toBe(true);
     expect(state.orders).not.toContain(feature);
+  });
+
+  it('bins an expired ticket it carries instead of shipping it', () => {
+    const state = newTestGame();
+    const order = createOrder(state, 'feature', 'Late');
+    state.tickets = [];
+    const ticket = addTicket(state, COL.floor, {
+      done: TICKET_STEPS.feature.length,
+      orderId: order.id,
+    });
+    ticket.expired = true;
+    give(1, ticket);
+    const same = createOrder(state, 'feature', 'Same steps');
+    same.expiresTick = 100_000;
+    state.tickets = state.tickets.filter((t) => t === ticket);
+    const bot = createBot(1);
+    for (let i = 0; i < 10 * TICKS_PER_SECOND && state.tickets.includes(ticket); i++) {
+      tick(state, [botInput(state, bot, [bot])]);
+    }
+    expect(state.tickets).not.toContain(ticket);
+    expect(state.orders).toContain(same);
+  });
+
+  it('fetches an expired ticket off a counter and bins it', () => {
+    const state = newTestGame();
+    const ticket = addTicket(state, COL.counter, { done: 1 });
+    ticket.expired = true;
+    const bot = createBot(1);
+    for (let i = 0; i < 10 * TICKS_PER_SECOND && state.tickets.includes(ticket); i++) {
+      tick(state, [botInput(state, bot, [bot])]);
+    }
+    expect(state.tickets).not.toContain(ticket);
   });
 });
 
@@ -198,6 +233,8 @@ describe('bots and full-stack features', () => {
         title: 'Checkout',
         steps: [{ kind: 'code', progress: 1 }],
         location: playerId === null ? { kind: 'tile', x: 4, y: 1 } : { kind: 'player', playerId },
+        orderId: 0,
+        expired: false,
       };
       state.tickets.push(t);
       return t;
