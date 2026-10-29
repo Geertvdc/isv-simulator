@@ -7,7 +7,7 @@ import { REJOIN_KEY } from './net/rejoin';
 import { createProfileApi, serverUrl, syncLevels } from './net/profileApi';
 import { SCREEN_FADE_MS } from './sim/balance';
 import { NO_WEBGL_TEXT } from './sim/content';
-import { sceneById } from './sim/scenes';
+import { sceneById } from './sim/sceneCatalog';
 import {
   DIALOG_CANCEL_EVENT,
   DIALOG_EVENT,

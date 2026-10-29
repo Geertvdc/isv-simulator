@@ -8,7 +8,8 @@ import { ROLE_IDS } from '../../sim/roles';
 import { levelById } from '../../sim/levels';
 import { createGame } from '../../sim/state';
 import { frameView } from '../roundView';
-import { runScene, sceneById } from '../../sim/scenes';
+import { sceneById } from '../../sim/sceneCatalog';
+import { runScene } from '../../sim/scenes';
 import { THROW_HOLD_TICKS } from '../../sim/balance';
 
 describe('noteWork', () => {
