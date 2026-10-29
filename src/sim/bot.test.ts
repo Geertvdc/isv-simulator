@@ -3,11 +3,11 @@ import { PIPELINE_FAIL_TICKS, REPAIR_TICKS, TICKS_PER_SECOND } from './balance';
 import { type Bot, botInput, createBot, findPath, runBots } from './bot';
 import { getTile, parseLevelMap } from './level';
 import { DOWN_THE_HALL, GARAGE, levelWithMap } from './levels';
-import type { Ticket } from './tickets';
+import { TICKET_STEPS, type Ticket } from './tickets';
 import { createOrder } from './orders';
 import { type GameState, type PlayerId, createGame } from './state';
 import { pipelineAt } from './pipeline';
-import { COL, addTicket, idle, newTestGame } from './testing';
+import { COL, addTicket, give, idle, newTestGame } from './testing';
 import { tick } from './tick';
 
 describe('findPath', () => {
@@ -101,6 +101,39 @@ describe('bot and new mechanics', () => {
     }
     const carried = state.tickets.find((t) => t.location.kind === 'player');
     expect(carried?.kind).toBe('incident');
+  });
+
+  it('parks a finished feature on a counter during an incident and ships it after', () => {
+    const state = newTestGame();
+    const feature = createOrder(state, 'feature', 'Feature');
+    const incident = createOrder(state, 'incident', 'Prod is down');
+    feature.expiresTick = incident.expiresTick = 100_000;
+    // Just the finished feature: no queued tickets to distract the bot.
+    state.tickets = [];
+    const ticket = addTicket(state, COL.floor, { done: TICKET_STEPS.feature.length });
+    give(1, ticket);
+    const bot = createBot(1);
+    const play = (seconds: number): void => {
+      for (let i = 0; i < seconds * TICKS_PER_SECOND; i++) {
+        tick(state, [botInput(state, bot, [bot])]);
+      }
+    };
+
+    play(10);
+    expect(state.events.some((e) => e.type === 'shipBlocked')).toBe(false);
+    expect(ticket.location.kind).toBe('tile');
+    const at = ticket.location.kind === 'tile' ? ticket.location : null;
+    expect(getTile(state.level, at?.x ?? -1, at?.y ?? -1)).toBe('counter');
+    expect(state.orders).toContain(feature);
+
+    state.orders = state.orders.filter((o) => o !== incident);
+    let shipped = false;
+    for (let i = 0; i < 15 * TICKS_PER_SECOND && !shipped; i++) {
+      tick(state, [botInput(state, bot, [bot])]);
+      shipped = state.events.some((e) => e.type === 'orderShipped');
+    }
+    expect(shipped).toBe(true);
+    expect(state.orders).not.toContain(feature);
   });
 });
 

@@ -17,7 +17,7 @@ import { REVIEWERS_NEEDED } from './balance';
 import { canPutDown, isAtItsStation } from './interact';
 import { type GridPoint, type LevelMap, type Tile, getTile, isSolid } from './level';
 import type { Level } from './levels';
-import { type LevelResult, matchingOrders } from './orders';
+import { type LevelResult, matchingOrders, shipBlockedBy } from './orders';
 import { managerTiles } from './manager';
 import { inviteFor } from './meetings';
 import { NEIGHBOURS, pathTo, searchPath } from './path';
@@ -39,6 +39,7 @@ import {
   type TicketKind,
   currentStep,
   isPart,
+  isShippable,
   queuedTickets,
   ticketCarriedBy,
   ticketOnTile,
@@ -182,6 +183,11 @@ function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | nu
       bot.ticketId = null;
       return chooseGoal(state, bot, bots);
     }
+    // A finished ticket parked for the incident waits there until shipping opens again.
+    if (kind === 'counter' && isParkedForIncident(state, own)) {
+      bot.ticketId = null;
+      return chooseGoal(state, bot, bots);
+    }
     if (!isAtItsStation(own, kind) || isBroken(state, tile)) return { tile, action: 'interact' };
     if (kind === 'pipeline') return reviewHelpGoal(state, bot, bots) ?? { tile, action: 'wait' };
     return { tile, action: 'work' };
@@ -190,7 +196,10 @@ function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | nu
 
   const help = reviewHelpGoal(state, bot, bots);
   if (help) return help;
-  const merged = mergedGoal(state, bot, bots) ?? parkedPartGoal(state, bot, bots);
+  const merged =
+    mergedGoal(state, bot, bots) ??
+    parkedPartGoal(state, bot, bots) ??
+    parkedFinishedGoal(state, bot, bots);
   if (merged) return merged;
   for (const queue of ['bug', 'feature'] as const satisfies readonly TicketKind[]) {
     if (queuedTickets(state, queue).length === 0) continue;
@@ -215,6 +224,46 @@ function mergedGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | nu
 /** Whether a belt hands tickets to `tile`: parking there would stop the belt. */
 function beltEndsAt(map: LevelMap, tile: GridPoint): boolean {
   return map.conveyors.some((c) => c.x + c.dir.x === tile.x && c.y + c.dir.y === tile.y);
+}
+
+/** The nearest empty counter no belt feeds and no other bot is about to use. */
+function freeCounterGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | null {
+  const counter = nearest(
+    state,
+    bot.playerId,
+    tilesOf(state.level, 'counter').filter(
+      (t) =>
+        !ticketOnTile(state, t.x, t.y) &&
+        !beltEndsAt(state.level, t) &&
+        !bots.some((b) => b !== bot && samePoint(b.dropTarget, t)),
+    ),
+  );
+  if (!counter) return null;
+  bot.dropTarget = counter;
+  return { tile: counter, action: 'interact' };
+}
+
+/** A finished ticket that can't ship yet because an incident is open. */
+function isParkedForIncident(state: GameState, ticket: Ticket): boolean {
+  return !isPart(ticket) && isShippable(ticket) && shipBlockedBy(state, ticket);
+}
+
+/** The nearest finished ticket parked on a counter that may ship again and no other bot is fetching. */
+function parkedFinishedGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | null {
+  const parked = tilesOf(state.level, 'counter').filter((t) => {
+    const ticket = ticketOnTile(state, t.x, t.y);
+    return (
+      ticket &&
+      !isPart(ticket) &&
+      isShippable(ticket) &&
+      !shipBlockedBy(state, ticket) &&
+      !bots.some((b) => b !== bot && b.ticketId === ticket.id)
+    );
+  });
+  const tile = nearest(state, bot.playerId, parked);
+  if (!tile) return null;
+  bot.ticketId = ticketOnTile(state, tile.x, tile.y)?.id ?? null;
+  return { tile, action: 'interact' };
 }
 
 /** The nearest coded part parked on a counter that a merge station would take now. */
@@ -275,6 +324,8 @@ function carryGoal(state: GameState, bot: Bot, bots: readonly Bot[], ticket: Tic
     return counter ? { tile: counter, action: 'interact' } : null;
   }
   if (!step) {
+    // Only the hotfix ships during an incident: park the rest on a counter, or hold on.
+    if (shipBlockedBy(state, ticket)) return freeCounterGoal(state, bot, bots);
     // Without a bin, a ticket whose order expired still ships, for nothing.
     const hasBin = state.level.tiles.includes('bin');
     const where = matchingOrders(state, ticket).length > 0 || !hasBin ? 'ship' : 'bin';
