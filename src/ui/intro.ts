@@ -17,7 +17,7 @@ import { coverageHint, workloadForecast } from '../flow/workload';
 import { selection } from '../flow/roster';
 import { localBindings } from '../flow/online';
 import { rolePanel, seatWindow, type RosterDispatch } from './roles';
-import { el } from './dom';
+import { type Mounted, el, keepActivationKeys, mountScreen } from './dom';
 import { introPicture } from './introPicture';
 import { levelRecipes } from './recipes';
 import type { ScreenView } from './screens';
@@ -36,9 +36,10 @@ function placeOf(levelId: string): { chapter: number; level: number } | null {
 export function mountIntro(
   root: HTMLElement,
   dispatch: RosterDispatch,
-): ScreenView & { toggleGuide: () => void } {
+): ScreenView & Mounted & { toggleGuide: () => void } {
   const screen = el('div', 'screen intro-screen');
   screen.hidden = true;
+  const { scope, unmount } = mountScreen(root, screen);
   const card = el('div', 'intro-card');
   const header = el('div', 'intro-header');
   const title = el('h1', 'intro-name');
@@ -73,23 +74,19 @@ export function mountIntro(
     '1.00x = standard work speed · Review and builds unchanged',
   );
   body.append(header, card, team, guide, legend, coverage, setupError);
-  guideButton.onclick = () => {
+  scope.listen(guideButton, 'click', () => {
     readingGuide = !readingGuide;
     guide.hidden = !readingGuide;
     team.hidden = readingGuide;
     legend.hidden = readingGuide;
     guideButton.textContent = readingGuide ? 'Back to team' : 'Level guide';
     guideButton.setAttribute('aria-expanded', String(readingGuide));
-  };
-  for (const event of ['keydown', 'keyup'])
-    guideButton.addEventListener(event, (e) => {
-      if (e instanceof KeyboardEvent && (e.key === 'Enter' || e.key === ' ')) e.stopPropagation();
-    });
+  });
+  keepActivationKeys(scope, guideButton);
   screen.append(
     body,
     statusBar('Left/right: role · Up/down: guide · E / RShift / A: ready · Esc / B: back'),
   );
-  root.append(screen);
   /** The level and player count the card shows, so it is only built once per intro. */
   let shown = '';
 
@@ -151,6 +148,7 @@ export function mountIntro(
   }
 
   return {
+    unmount,
     toggleGuide: () => {
       if (!screen.hidden) guideButton.click();
     },
@@ -211,12 +209,15 @@ export function mountIntro(
 }
 
 /** "3, 2, 1" over the map during the countdown, then "Ship it!" as the round starts. */
-export function mountCountdown(root: HTMLElement): ScreenView {
+export function mountCountdown(root: HTMLElement): ScreenView & Mounted {
   const overlay = el('div', 'countdown');
   overlay.hidden = true;
-  root.append(overlay);
+  const { scope, unmount } = mountScreen(root, overlay);
   let last: string | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  scope.add(() => {
+    clearTimeout(timer);
+  });
 
   function show(text: string, className: string): void {
     clearTimeout(timer);
@@ -229,6 +230,7 @@ export function mountCountdown(root: HTMLElement): ScreenView {
   }
 
   return {
+    unmount,
     render: (view) => {
       const screen = view?.flow.screen;
       const number = view?.countdown ?? null;
