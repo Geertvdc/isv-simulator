@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { tint } from '../../kit';
 import { COLOR } from '../../palette';
 import { type CityPiece, STOREY, styleOf } from '../cityPlan';
-import { C, choose, COWORK_ACCENT, frac, type Parts, windowGrid } from './shared';
+import { C, choose, COWORK_ACCENT, frac, type Parts, windowGrid, windowPane } from './shared';
 
 /** Startup park: the warehouse, coworking blocks, the kiosk and the park. */
 
@@ -39,8 +39,7 @@ export function warehouse(p: CityPiece, { body: b, glow }: Parts, rng: () => num
       const x = -p.w * 0.12 - winW / 2 + (winW / cols) * (c + 0.5);
       const y = 0.48 - winH / 2 + (winH / rows) * (r + 0.5);
       const g = new THREE.PlaneGeometry(winW / cols - 0.035, winH / rows - 0.035);
-      if (rng() < 0.6) glow.add(g, COLOR.windowGlow, { at: [x, y, z + 0.02] }, 'glow');
-      else b.add(g, C.pane, { at: [x, y, z + 0.02] });
+      windowPane(b, glow, g, { at: [x, y, z + 0.02] }, rng, 0.6, COLOR.windowGlow);
     }
   }
   // Loading door.
@@ -54,18 +53,16 @@ export function warehouse(p: CityPiece, { body: b, glow }: Parts, rng: () => num
   b.box(0.05, 0.3, 0.05, C.steel, { at: [0.4, wallH + 0.02, z - 0.1] }, 0);
   const neon = 0xff4fa8;
   const cyan = 0x3fe0ff;
-  glow.add(
-    new THREE.BoxGeometry(0.035, 0.2, 0.02),
-    neon,
-    { at: [-0.42, signY, z - 0.01], rot: [0, 0, -0.5] },
-    'glow',
-  );
-  glow.add(
-    new THREE.BoxGeometry(0.035, 0.2, 0.02),
-    neon,
-    { at: [-0.42, signY - 0.0, z - 0.01], rot: [0, 0, 0.5] },
-    'glow',
-  );
+  const neonStroke = (x: number, tilt: number): void => {
+    glow.add(
+      new THREE.BoxGeometry(0.035, 0.2, 0.02),
+      neon,
+      { at: [x, signY, z - 0.01], rot: [0, 0, tilt] },
+      'glow',
+    );
+  };
+  neonStroke(-0.42, -0.5);
+  neonStroke(-0.42, 0.5);
   for (let i = 0; i < 3; i++)
     glow.add(
       new THREE.BoxGeometry(0.16, 0.035, 0.02),
@@ -73,18 +70,8 @@ export function warehouse(p: CityPiece, { body: b, glow }: Parts, rng: () => num
       { at: [-0.16 + i * 0.2, signY, z - 0.01] },
       'glow',
     );
-  glow.add(
-    new THREE.BoxGeometry(0.035, 0.2, 0.02),
-    neon,
-    { at: [0.44, signY, z - 0.01], rot: [0, 0, 0.5] },
-    'glow',
-  );
-  glow.add(
-    new THREE.BoxGeometry(0.035, 0.2, 0.02),
-    neon,
-    { at: [0.44, signY, z - 0.01], rot: [0, 0, -0.5] },
-    'glow',
-  );
+  neonStroke(0.44, 0.5);
+  neonStroke(0.44, -0.5);
   // A chimney stack.
   b.cylinder(
     0.1,

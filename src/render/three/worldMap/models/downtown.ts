@@ -11,6 +11,7 @@ import {
   type Parts,
   type PieceBuilders,
   windowGrid,
+  windowPane,
 } from './shared';
 
 /** Scale-up downtown: office blocks, the crane, lamps and cars. */
@@ -36,8 +37,7 @@ export function office(p: CityPiece, { body: b, glow, blink }: Parts, rng: () =>
         [p.d - 0.06, [-p.w / 2 - 0.006, y, 0], -Math.PI / 2],
       ] as const) {
         const g = new THREE.PlaneGeometry(w, STOREY * 0.42);
-        if (rng() < 0.25) glow.add(g, C.lit, { at: [...at], rot: [0, yaw, 0] }, 'glow');
-        else b.add(g, C.paneDark, { at: [...at], rot: [0, yaw, 0] });
+        windowPane(b, glow, g, { at: [...at], rot: [0, yaw, 0] }, rng, 0.25, C.lit, C.paneDark);
       }
     }
   } else {
@@ -334,8 +334,6 @@ export function carModel(
       10,
     );
   }
-  glow.led(0.03, COLOR.headlight, { at: [-w * 0.3, 0.16, l / 2] });
-  glow.led(0.03, COLOR.headlight, { at: [w * 0.3, 0.16, l / 2] });
-  glow.led(0.025, COLOR.tailLight, { at: [-w * 0.32, 0.17, -l / 2] });
-  glow.led(0.025, COLOR.tailLight, { at: [w * 0.32, 0.17, -l / 2] });
+  glow.ledPair(0.03, COLOR.headlight, [w * 0.3, 0.16, l / 2]);
+  glow.ledPair(0.025, COLOR.tailLight, [w * 0.32, 0.17, -l / 2]);
 }

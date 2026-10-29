@@ -47,10 +47,8 @@ export const car = looks([2, 3], 3, (b, v) => {
     b.cylinder(0.24, 0.24, 0.18, INK, { at: [x, 0.24, z], rot: [0, 0, Math.PI / 2] }, 16);
     b.cylinder(0.12, 0.12, 0.19, STEEL, { at: [x, 0.24, z], rot: [0, 0, Math.PI / 2] }, 12);
   }
-  b.led(0.07, COLOR.headlight, { at: [-0.5, 0.48, 1.3] });
-  b.led(0.07, COLOR.headlight, { at: [0.5, 0.48, 1.3] });
-  b.led(0.06, COLOR.tailLight, { at: [-0.55, 0.5, -1.3] });
-  b.led(0.06, COLOR.tailLight, { at: [0.55, 0.5, -1.3] });
+  b.ledPair(0.07, COLOR.headlight, [0.5, 0.48, 1.3]);
+  b.ledPair(0.06, COLOR.tailLight, [0.55, 0.5, -1.3]);
 });
 
 export const bike = looks([1, 1], 4, (b, v) => {

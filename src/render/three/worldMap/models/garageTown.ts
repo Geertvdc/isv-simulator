@@ -2,7 +2,17 @@ import * as THREE from 'three';
 import { tint } from '../../kit';
 import { COLOR } from '../../palette';
 import { type CityPiece, styleOf } from '../cityPlan';
-import { C, choose, DOORS, frac, HOUSE_ROOFS, HOUSE_WALLS, type Parts, prism } from './shared';
+import {
+  C,
+  choose,
+  DOORS,
+  frac,
+  HOUSE_ROOFS,
+  HOUSE_WALLS,
+  type Parts,
+  prism,
+  windowPane,
+} from './shared';
 
 /** Garage town: houses, the founders' garage and what stands round them. */
 
@@ -108,8 +118,7 @@ export function house(p: CityPiece, { body: b, glow }: Parts, rng: () => number)
     const wide = style === 3 ? 0.5 : 0.34;
     b.box(wide, 0.28, 0.03, style === 3 ? C.ink : C.white, { at: [winX, 0.42, z + 0.01] }, 0.01);
     const pane = new THREE.PlaneGeometry(wide - 0.08, 0.2);
-    if (rng() < 0.35) glow.add(pane, COLOR.windowGlow, { at: [winX, 0.42, z + 0.03] }, 'glow');
-    else b.add(pane, C.pane, { at: [winX, 0.42, z + 0.03] });
+    windowPane(b, glow, pane, { at: [winX, 0.42, z + 0.03] }, rng, 0.35, COLOR.windowGlow);
   }
   // A chimney, a dish on the wall, a bush by the door: each on or off.
   if (style !== 3 && style !== 4 && rng() < 0.7)
