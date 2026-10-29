@@ -118,7 +118,7 @@ const caption = document.createElement('p');
 caption.className = 'study-caption';
 const variantCaption = selected
   ? 'Four independent owners, with the same role.'
-  : 'All roles: short hair back row, long hair front row. Each role supports every hairstyle.';
+  : 'All roles: swept/cropped hair back row, long/tied hair front row. Each role supports every hairstyle.';
 caption.textContent = `${variantCaption} Reverse for rear views. Outfits/badges identify role; color/shape/number identify owner. Enlarged review, not couch-distance proof. Model-sheet throw release is illustrative.`;
 document.body.append(caption);
 const stage = new Stage(parent);

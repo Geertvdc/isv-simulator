@@ -265,7 +265,7 @@ Common hand/ticket targets, smoothed-facing alignment, movement, collision, stat
 - [x] Tests cover independent owner colors/cosmetics, unique role geometry, stable same-role sync, replacement/removal disposal, and smoothed-facing ticket/wrist alignment. Renderer sync leaves state unchanged.
 - [x] Enlarged front/rear, grayscale, all-action and duplicate-role model comparisons; real four-player gameplay scenes show HUD/stations, carried tickets, actual wind-up and actual flight.
 - [x] `npm run check` (81 files, 1,179 tests) and `npm run build` pass after the gender-neutral revision.
-- [ ] Independent critic confirms the revised cast. Two earlier rounds reviewed rig correctness and improved gameplay-fixture readability; the previous binary variants are superseded.
+- [x] Independent critic completed three bounded rounds, including revised code and real gameplay/rear/grayscale evidence in the final round. No substantive defects remain; final round's non-blocking caption mismatch was corrected to describe swept/cropped and long/tied rows accurately. Two earlier rounds reviewed rig correctness and improved gameplay-fixture readability; the previous binary variants are superseded.
 - [ ] User accepts the production cast at actual gameplay scale.
 - [ ] Human two-second couch readability, rear/grayscale recognition and four-identical-role play verified.
 
@@ -273,7 +273,7 @@ The two human boxes are intentionally unchecked. Captures demonstrate geometry a
 
 | Review | URL |
 | --- | --- |
-| Five roles, varied hair | `/models.html?cast&still&action=idle&time=900` (short hair back row, long hair front row) |
+| Five roles, varied hair | `/models.html?cast&still&action=idle&time=900` (swept/cropped back row, long/tied front row) |
 | Every role/hairstyle | `/models.html` (office kit lists all twenty combinations) |
 | All actions, pause/scrub | `/models.html?cast&action=throw` |
 | Rear/grayscale | `/models.html?cast&still&action=idle&rear&gray` |
