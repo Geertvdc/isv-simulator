@@ -1003,7 +1003,7 @@ export class GameScene extends Phaser.Scene {
         : null;
     this.game.events.emit(NET_STATS_EVENT, stats);
     if (import.meta.env.DEV) {
-      (window as unknown as { isvNet?: NetDebug }).isvNet = this.netDebug;
+      window.isvNet = this.netDebug;
     }
   }
 
@@ -1325,7 +1325,7 @@ export class GameScene extends Phaser.Scene {
     this.flow.screen = 'playing';
     this.loop = new GameLoop(sceneState(scene));
     this.sceneStartMs = this.time.now;
-    (window as unknown as { isvScene?: SceneHandle }).isvScene = this.sceneHandle;
+    window.isvScene = this.sceneHandle;
   }
 
   /** Plays the scene's ticks in real time, so effects show as in a round, then freezes. */
