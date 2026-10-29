@@ -1,6 +1,6 @@
 # Phase 21 proposal: character roles, ticket domains, and a new cast
 
-**Status:** 21a visual investigation approved and implemented for review; body/face/motion selection still awaits the user. 21b–21d are not approved for implementation. Numbers below are starting hypotheses, not measured balance results. Implement one approved subphase at a time.
+**Status:** 21a visual investigation complete; the user selected the compact angular foundation. Hats are optional, non-default accessories for the future cast. 21b–21d are not approved for implementation. Numbers below are starting hypotheses, not measured balance results. Implement one approved subphase at a time.
 
 **Goal:** a team of generalists is dependable and can earn three stars; a well-coordinated specialist team has a higher ceiling because it assigns work and hands tickets over well. Mixed teams should be a useful middle ground. Replace the current character silhouette, not just its hats.
 
@@ -9,8 +9,8 @@
 - Generalists and specialists coexist in the same game, not separate casual/expert modes.
 - Specialists should theoretically outperform generalists when they stay on their strengths and coordinate perfectly. Their opportunity cost is inflexibility, travel, queues, and handovers.
 - The original 25% coding / 150% testing example was illustrative, not a required stat line.
-- Redesign the cast with new bodies, faces, outfits, and animation personalities. Do not retain the current hats or use new hats to distinguish roles. The current silhouette is not a constraint.
-- Only the 21a study scope is approved. Character art direction needs a visual approval checkpoint before production.
+- Redesign the cast with new bodies, faces, outfits, and animation personalities, using the selected compact angular foundation. Differentiate roles through clothing, hair, facial hair, glasses, headphones, and occasional hats. Hats are optional accessories, not the default or the primary identity system. The current silhouette is not a constraint.
+- The 21a study scope and compact angular foundation are approved. Final cast production remains in 21c and requires that subphase's approval.
 
 ## 1. What already exists
 
@@ -133,11 +133,11 @@ Reviewed `Characters.ts`, `pose.ts`, the model-sheet source, and the checked-in 
 
 The big hats occupy much of the readable silhouette. Faces and torso details become small at the gameplay camera; the cast reads primarily as the same pawn in different colors. Hair, cheeks, hoodie strings, and facial details cannot carry role recognition at that scale. Floating white hands and a legless rounded body reinforce the toy-pawn effect. Existing color rings and obvious carried tickets are useful and should survive.
 
-### Proposed brief, not an approved final style
+### Selected foundation and future cast brief
 
-Design a **new, hat-free stylized animated office crew**: short grounded legs with visible shoes, connected simplified arms, expressive faces, and distinct upper-body outlines. Preserve the cheerful handmade office diorama; do not make realistic humans, tiny detailed avatars, or a terminal-themed costume pasted onto the same bean. None of the current beanies, party hats, graduation caps, or diamond headbands carry over.
+Design a **new compact angular stylized animated office crew**: short grounded legs with visible shoes, connected simplified arms, expressive faces, and distinct upper-body outlines. Preserve the cheerful handmade office diorama; do not make realistic humans, tiny detailed avatars, or a terminal-themed costume pasted onto the same bean. Hats may appear on some characters, like glasses, facial hair, or headphones, but must not be the default or replace body/outfit/hair variation as the identity system.
 
-Build three low-detail, hat-free geometry studies on `/models.html` before detailed production: a compact angular crew, a rounder stop-motion-like crew, and an exaggerated workplace-cartoon crew. Compare all under the real gameplay camera and lighting, not just portrait turntables. Select one body/face/motion language with the user; do not silently lock in this text proposal. Then create five distinct production characters, one per initial role, rather than one base person with five accessories.
+21a built three low-detail, hat-free geometry studies on `/models.html`: a compact angular crew, a rounder stop-motion-like crew, and an exaggerated workplace-cartoon crew. They were compared under the real gameplay camera and lighting, not just portrait turntables. The user selected compact angular: "I like the compact angular crew. and you can do variations on the clothing, hair, accessories etc to create the different classes". The user also clarified: "it is possible for some characters to have a hat but it shouldn't be the default. a hat is an accessory like glasses, facial hair, headphones, you name it". Keep the hat-free studies as historical comparison evidence; this is not a production hat ban. In the separately approved production slice, develop the five role characters from that foundation using these variations, not hats as the default distinction.
 
 Within the selected language, use these initial role briefs:
 
@@ -196,7 +196,7 @@ Before each slice, write a short concrete implementation plan and wait for appro
 
 Open `/models.html?studies` with `npm run dev`. The existing office-kit page remains at `/models.html`, and the playable cast is unchanged. The studies are dev-only, not included in the production game bundle.
 
-The three alternatives are **Compact angular** (cut overshirt, swept block hair, short stride), **Rounded stop-motion** (pear jacket, scalloped curls, soft waddle), and **Workplace cartoon** (broad shoulders, narrow waist, quiff, exaggerated stride). They are competing visual languages, not three approved roles or a final cast.
+The three alternatives are **Compact angular** (cut overshirt, swept block hair, short stride), **Rounded stop-motion** (pear jacket, scalloped curls, soft waddle), and **Workplace cartoon** (broad shoulders, narrow waist, quiff, exaggerated stride). The user selected **Compact angular** as the foundation. The other studies remain comparison evidence, not approved roles or a final cast.
 
 - [x] Three procedural, hat-free studies with new bodies/faces, attached jointed arms, split legs and grounded shoes.
 - [x] Idle, walk, work, carry, dash, throw wind-up/release, and shove pose loops; pause and scrub the loop for inspection.
@@ -205,7 +205,8 @@ The three alternatives are **Compact angular** (cut overshirt, swept block hair,
 - [x] Tests cover shoulder/elbow/wrist attachment under translated/rotated roots, bounded arm extension, grounded feet, study head bounds, actual folder-tab/flap clearance against head/jacket triangles, hand clearance against the head, 101 wind-up samples per style, and owned-geometry disposal.
 - [x] `npm run check` and `npm run build` pass; desktop and narrow-window study captures and an unchanged real-game reference were inspected.
 - [x] Independent critic review is clean (two rounds). A final stronger actual-folder-envelope check exposed an early cartoon-jacket intersection; a small rearward torso adjustment fixed it, then full validation and the second critic review passed.
-- [ ] User chooses a language at gameplay scale. Human two-second couch readability is **not yet verified**.
+- [x] User chooses the compact angular language as the foundation, with clothing, hair, and accessory variations for the future roles.
+- [ ] Human two-second couch readability is **not yet verified**.
 
 Useful reproducible views:
 
@@ -238,6 +239,6 @@ The shared study rig keeps `carryPoint` and the existing hand targets unchanged.
 
 ## Decisions still requiring approval
 
-The roster and matrix, exact pilot levels/domain mixes, and pre-round readiness flow are recommendations. The user has approved the underlying generalist/specialist philosophy and a full, hat-free cast redesign, not those specific implementation choices.
+The roster and matrix, exact pilot levels/domain mixes, and pre-round readiness flow are recommendations. The user has approved the underlying generalist/specialist philosophy, a full cast redesign, and the compact angular foundation with varied clothing, hair, and accessories, including optional, non-default hats, not those specific implementation choices.
 
-The final body/face/animation language remains deliberately open until the visual studies. Do not treat this proposal as approved art or measured balance.
+The compact angular foundation is selected; individual production characters and their final body/face/animation details remain for the separately approved 21c slice. 21b approval is still pending. Do not treat the study choice as approval to implement later slices, final cast acceptance, or measured balance.
