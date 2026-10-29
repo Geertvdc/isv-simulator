@@ -24,6 +24,8 @@ The game started as a Theme Hospital-style management sim and pivoted to Overcoo
 | 17 Dev mechanics (planned)                   | Design at the whiteboard, front end + back end merge, pair programming                |
 | 18 Big Tech chapter (planned)                | Four new levels built on 16 and 17; see [the overview](phase-15-18-overview.md)       |
 | 19 World map (done, in review)               | 3D Overcooked-style level select and title, startup to enterprise; stacked PRs        |
+| 20 Polish (done)                             | Smooth diagonals, varied road, software-look menus, varied set dressing               |
+| 21 Tickets (in progress)                     | Incident blocks shipping, no zombie tickets, issue-tracker style ticket cards         |
 
 ## How to feed a phase to Claude Code
 
