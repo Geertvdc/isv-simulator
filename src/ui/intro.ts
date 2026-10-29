@@ -205,7 +205,7 @@ export function mountIntro(
             lobby.players.map((p) => selection(lobby, p.playerId).roleId),
           )
         : '';
-      setupError.textContent = view.online?.setupError ?? '';
+      setupError.textContent = view.commandError ?? '';
     },
   };
 }

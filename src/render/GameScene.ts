@@ -3,13 +3,15 @@ import { buildInputCommands } from '../input/commands';
 import type { DevicePress } from '../input/controller';
 import { type InputFrame, InputDevices } from '../input/devices';
 import { claimOrphanedPlayer } from '../input/lobby';
-import { configureRoster, rolesForRoster, type RosterCommand } from '../flow/roster';
+import { applyCommand, commandFailureText, type FlowCommand } from '../flow/commands';
+import { rolesForRoster } from '../flow/roster';
 import {
   type Flow,
   type FlowContext,
   type FlowEffect,
   type FlowUpdate,
   type OnlineError,
+  type Screen,
   cancelJoinCode,
   countdownNumber,
   createFlow,
@@ -159,6 +161,8 @@ export interface FlowView {
    * `save.levels` the room's unlocks.
    */
   online: OnlineState | null;
+  /** Why the last flow command was refused (by the room's server, online), or `null`. */
+  commandError: string | null;
 }
 
 /** Emitted on `game.events` with a `FlowView` whenever the screens change. */
@@ -190,7 +194,8 @@ export const JOIN_CODE_EVENT = 'join-code';
 export const ONLINE_LEAVE_EVENT = 'online-leave';
 /** This browser picked a new display name (the identity already has it): tell the room. */
 export const ONLINE_RENAME_EVENT = 'online-rename';
-export const ROSTER_EVENT = 'roster';
+/** Emitted on `game.events` by the UI with a `FlowCommand` (roles, readiness). */
+export const COMMAND_EVENT = 'flow-command';
 export const INTRO_GUIDE_EVENT = 'intro-guide';
 
 /** How the scene reaches the game server; `null` where online play is off (`?scene=`). */
@@ -404,6 +409,8 @@ export class GameScene extends Phaser.Scene {
   private onlineAttempt = 0;
   /** A network callback changed what the screens show. */
   private onlineDirty = false;
+  /** A refused local flow command, shown until it works or the screen changes. */
+  private localCommandError: { screen: Screen; text: string } | null = null;
   /** The online round on screen (from `roundStart` on), kept across scene restarts. */
   private onlineRound: OnlineRound | null = null;
   /** An online round was dropped: the scene restarts for a clean map. */
@@ -509,17 +516,9 @@ export class GameScene extends Phaser.Scene {
     this.game.events.on(ONLINE_RENAME_EVENT, (displayName: string) => {
       this.connection?.send({ type: 'rename', displayName });
     });
-    this.game.events.off(ROSTER_EVENT);
-    this.game.events.on(ROSTER_EVENT, (command: RosterCommand) => {
-      if (this.online) {
-        this.online.setupError = null;
-        this.onlineDirty = true;
-        this.connection?.send(command);
-      } else {
-        const result = configureRoster(this.flow.lobby, this.flow.screen, command);
-        if (!result.ok) throw new Error(result.reason);
-        this.emitFlow(this.time.now);
-      }
+    this.game.events.off(COMMAND_EVENT);
+    this.game.events.on(COMMAND_EVENT, (command: FlowCommand) => {
+      this.dispatchCommand(command);
     });
     this.sounds = new SoundPlayer(this);
     this.cameras.main.fadeIn(SCREEN_FADE_MS);
@@ -708,6 +707,26 @@ export class GameScene extends Phaser.Scene {
     };
   }
 
+  /**
+   * Runs a flow command from the UI: online the room's server applies it (and
+   * answers a refusal with an `error`, kept as `setupError`); offline it's
+   * applied here. Either way a refusal reaches the screens as
+   * `FlowView.commandError`, never as an exception.
+   */
+  private dispatchCommand(command: FlowCommand): void {
+    if (this.online) {
+      this.online.setupError = null;
+      this.onlineDirty = true;
+      this.connection?.send(command);
+      return;
+    }
+    const result = applyCommand(this.flow, command);
+    this.localCommandError = result.ok
+      ? null
+      : { screen: this.flow.screen, text: commandFailureText(result.reason) };
+    this.emitFlow(this.time.now);
+  }
+
   private emitFlow(nowMs: number): void {
     // Online, the screens show the room: its flow, its clock and its unlocks.
     const online = this.flow.screen === 'online' ? this.online : null;
@@ -724,6 +743,11 @@ export class GameScene extends Phaser.Scene {
       resultsReady: this.shownResultsReady,
       countdown: this.shownCountdown,
       online,
+      commandError: online
+        ? (online.setupError ?? null)
+        : this.localCommandError?.screen === flow.screen
+          ? this.localCommandError.text
+          : null,
     };
     this.menuRenderer.syncMenu(menuViewOf(view));
     this.game.events.emit(FLOW_EVENT, view);
