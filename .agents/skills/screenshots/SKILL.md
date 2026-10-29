@@ -7,7 +7,7 @@ description: Retake the docs screenshots (every level, mechanic and screen), che
 
 `scripts/screenshots.ts` (`npm run screenshots`) drives headless Chrome over a running dev server and writes `.webp` files to `docs/game/images/{levels,mechanics,screens}/`.
 
-Shots are scenes from `src/sim/scenes.ts` (built game states, not playthroughs) plus menu screens. A new level gets a `levels/<id>` shot automatically; a new mechanic needs a scene in `scenes.ts` first.
+Shots are scenes from `src/sim/sceneCatalog.ts` (built game states, not playthroughs) plus menu screens. A new level gets a `levels/<id>` shot automatically; a new mechanic needs a scene in `sceneCatalog.ts` first.
 
 ## 1. Servers
 
