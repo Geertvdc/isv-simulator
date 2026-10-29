@@ -130,7 +130,7 @@ describe('ticket domains', () => {
     }).toThrow(/cannot satisfy/);
   });
 
-  it('matches and expires only tickets from the same domain on an opted-in level', () => {
+  it('preserves order ownership and domains when queued tickets expire', () => {
     const state = labGame();
     const frontend = createOrder(state, 'feature', 'Frontend work', undefined, 'frontend');
     const backend = createOrder(state, 'feature', 'Backend work', undefined, 'backend');
@@ -148,6 +148,30 @@ describe('ticket domains', () => {
     expireOrders(state);
     expect(state.orders).toEqual([backend]);
     expect(state.tickets).toEqual([backendTicket]);
+  });
+
+  it('ships only the owned order and keeps carried expired work out of other orders', () => {
+    const state = labGame();
+    const frontend = createOrder(state, 'feature', 'Frontend work', undefined, 'frontend');
+    const backend = createOrder(state, 'feature', 'Backend work', undefined, 'backend');
+    const frontendTicket = state.tickets.find((ticket) => ticket.orderId === frontend.id);
+    const backendTicket = state.tickets.find((ticket) => ticket.orderId === backend.id);
+    if (!frontendTicket || !backendTicket) throw new Error('Missing owned domain tickets');
+    for (const ticket of [frontendTicket, backendTicket]) {
+      ticket.steps.forEach((step) => (step.progress = 1));
+    }
+    frontendTicket.location = { kind: 'player', playerId: 1 };
+    frontend.expiresTick = state.tick;
+    expireOrders(state);
+    expect(frontendTicket.expired).toBe(true);
+    expect(frontendTicket.domain).toBe('frontend');
+    expect(shipTicket(state, 1, frontendTicket)).toBe(false);
+    expect(state.orders).toEqual([backend]);
+    frontendTicket.location = { kind: 'tile', x: 2, y: 1 };
+    backendTicket.location = { kind: 'player', playerId: 1 };
+    expect(shipTicket(state, 1, backendTicket)).toBe(true);
+    expect(state.orders).toEqual([]);
+    expect(state.tickets).toEqual([frontendTicket]);
   });
 
   it('keeps merge ingredients, merged tickets, and delayed bugs in their work domains', () => {
