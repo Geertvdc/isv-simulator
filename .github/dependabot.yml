@@ -1,0 +1,93 @@
+# Dependabot: weekly, grouped updates so we get a handful of PRs, not dozens.
+# Docs: https://docs.github.com/code-security/dependabot/working-with-dependabot/dependabot-options-reference
+#
+# A dependency lands in the first group it matches, so the specific major
+# groups come before the catch-all minor-and-patch group.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Amsterdam
+    # Skip brand new releases for a few days: bad or compromised versions are
+    # usually yanked by then.
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+    open-pull-requests-limit: 5
+    labels: [dependencies, javascript]
+    commit-message:
+      prefix: deps
+      prefix-development: deps-dev
+      include: scope
+    ignore:
+      # Stay on the Node LTS that CI and the Dockerfile use; bump by hand.
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
+    groups:
+      security:
+        applies-to: security-updates
+        patterns: ['*']
+      three:
+        update-types: [major]
+        patterns: [three, '@types/three', postprocessing, n8ao]
+      colyseus:
+        update-types: [major]
+        patterns: [colyseus, '@colyseus/*']
+      lint:
+        update-types: [major]
+        patterns:
+          - eslint
+          - '@eslint/*'
+          - typescript-eslint
+          - eslint-config-prettier
+          - globals
+          - prettier
+      vite:
+        update-types: [major]
+        patterns: [vite, vitest, vite-node]
+      minor-and-patch:
+        update-types: [minor, patch]
+        patterns: ['*']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Amsterdam
+    cooldown:
+      default-days: 3
+    open-pull-requests-limit: 5
+    labels: [dependencies, github_actions]
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Amsterdam
+    cooldown:
+      default-days: 3
+    open-pull-requests-limit: 5
+    labels: [dependencies, docker]
+    commit-message:
+      prefix: docker
+    ignore:
+      # Stay on Node 22 LTS (matches CI); bump the major by hand.
+      - dependency-name: node
+        update-types: [version-update:semver-major]
+    groups:
+      docker:
+        patterns: ['*']
