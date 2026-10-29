@@ -1,7 +1,8 @@
 import type { Settings } from '../flow/save';
 import { SOUND_TOGGLE_TITLE } from '../sim/content';
+import { type Mounted, mountScreen } from './dom';
 
-export interface SoundToggle {
+export interface SoundToggle extends Mounted {
   /** Shows the speaker for the current settings. */
   render: (settings: Settings) => void;
 }
@@ -13,12 +14,13 @@ export function mountSoundToggle(root: HTMLElement, onToggle: () => void): Sound
   button.className = 'sound-toggle';
   // Not focusable: Enter and Space are game keys and must never click it.
   button.tabIndex = -1;
-  button.addEventListener('click', () => {
+  const { scope, unmount } = mountScreen(root, button);
+  scope.listen(button, 'click', () => {
     onToggle();
   });
-  root.append(button);
 
   return {
+    unmount,
     render: (settings) => {
       button.textContent = settings.muted ? '🔇' : '🔊';
       const label = settings.muted ? SOUND_TOGGLE_TITLE.unmute : SOUND_TOGGLE_TITLE.mute;
