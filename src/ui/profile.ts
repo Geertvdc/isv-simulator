@@ -13,7 +13,7 @@ import { type MenuItem, type ProfileAction, menuItems } from '../flow/flow';
 import { type Identity, normalizeUserId } from '../flow/identity';
 import type { FlowView } from '../render/GameScene';
 import { MENU_HINT, MENU_LABELS, PROFILE_TEXT, WINDOW_FILES } from '../sim/content';
-import { el } from './dom';
+import { type Mounted, button, el, mountScreen } from './dom';
 import { createMenu } from './menu';
 import type { ScreenView } from './screens';
 import { statusBar } from './statusBar';
@@ -30,7 +30,7 @@ export interface ProfileDeps {
   onDialog: (open: boolean) => void;
 }
 
-export interface ProfileScreen extends ScreenView {
+export interface ProfileScreen extends ScreenView, Mounted {
   /** Runs a line the flow picked on this screen. */
   act: (action: ProfileAction) => void;
   /** Closes the dialog without changing anything (a gamepad's back button). */
@@ -65,19 +65,10 @@ export async function copyText(text: string, selectable: HTMLElement): Promise<b
   }
 }
 
-function button(text: string, onClick: () => void): HTMLButtonElement {
-  const node = document.createElement('button');
-  node.type = 'button';
-  node.className = 'profile-button';
-  node.textContent = text;
-  node.addEventListener('click', onClick);
-  return node;
-}
-
 export function mountProfile(root: HTMLElement, deps: ProfileDeps): ProfileScreen {
   const screen = el('div', 'screen profile-screen');
   screen.hidden = true;
-  root.append(screen);
+  const { scope, unmount } = mountScreen(root, screen);
 
   const card = el('div', 'profile-card');
   card.dataset.file = WINDOW_FILES.profile;
@@ -117,10 +108,10 @@ export function mountProfile(root: HTMLElement, deps: ProfileDeps): ProfileScree
   const dialogHint = el('div', 'profile-dialog-hint');
   const buttons = el('div', 'profile-dialog-buttons');
   buttons.append(
-    button(PROFILE_TEXT.ok, () => {
+    button(scope, PROFILE_TEXT.ok, () => {
       submit();
     }),
-    button(PROFILE_TEXT.cancel, () => {
+    button(scope, PROFILE_TEXT.cancel, () => {
       close();
     }),
   );
@@ -203,7 +194,7 @@ export function mountProfile(root: HTMLElement, deps: ProfileDeps): ProfileScree
   };
 
   // Keys typed here are for the text box, never for the game.
-  dialog.addEventListener('keydown', (e) => {
+  scope.listen(dialog, 'keydown', (e) => {
     e.stopPropagation();
     if (e.key === 'Tab') e.preventDefault();
     if (e.repeat) return;
@@ -216,11 +207,12 @@ export function mountProfile(root: HTMLElement, deps: ProfileDeps): ProfileScree
     }
   });
   // The last complaint goes away once someone types again.
-  input.addEventListener('input', () => {
+  scope.listen(input, 'input', () => {
     error.textContent = '';
   });
 
   return {
+    unmount,
     render: (view) => {
       const wasHidden = screen.hidden;
       screen.hidden = view === null;
