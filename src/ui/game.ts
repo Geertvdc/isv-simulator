@@ -4,9 +4,10 @@ import { ORDER_URGENT_TICKS } from '../sim/balance';
 import {
   INCIDENT_BANNER_TEXT,
   MEETING_MISSED_TEXT,
+  COMMIT_TYPES,
   ORDER_EXPIRED_STAMP,
-  ORDER_KIND_LABELS,
   PAUSE_HINT,
+  commitSubject,
   inviteText,
   orderNumber,
   PIPELINE_BROKE_TEXT,
@@ -27,8 +28,9 @@ const POPUP_MS = 1200;
 const EXPIRED_CARD_MS = 1100;
 
 /**
- * An order card, like an issue-tracker card: the timer bar on top, `#id`,
- * a kind chip and the title, then its steps as tiles ticked off like CI checks.
+ * An order card is a little editor window like the menus: `#id` in its title
+ * bar, the timer as a progress line under it, the title as a commit message
+ * (`feat: …`, `fix: …`), then its steps ticked off like CI checks.
  */
 interface OrderCard {
   card: HTMLElement;
@@ -115,17 +117,21 @@ export function mountGameHud(root: HTMLElement): GameHud {
   function createCard(state: GameState, order: Order): OrderCard {
     const card = el('div', `order order-${order.kind}`);
     card.style.setProperty('--kind-color', cssHex(KIND_COLOR[order.kind]));
+    const bar = el('div', 'order-bar');
+    bar.append(el('span', 'order-id', orderNumber(order.id)));
     const timer = el('div', 'order-timer');
     const fill = el('div', 'order-timer-fill');
     timer.append(fill);
-    const head = el('div', 'order-head');
-    head.append(
-      el('span', 'order-id', orderNumber(order.id)),
-      el('span', 'order-chip', ORDER_KIND_LABELS[order.kind]),
-    );
-    const title = el('div', 'order-title');
+    const { type, scope } = COMMIT_TYPES[order.kind];
+    const commit = el('div', 'order-title');
+    commit.append(el('span', 'order-type', type));
+    if (scope) commit.append(el('span', 'order-scope', `(${scope})`));
+    const title = el('span', 'order-subject');
+    commit.append(el('span', 'order-colon', ': '), title);
     const { row, views } = stepRow(orderStepTiles(order, state.tickets));
-    card.append(timer, head, title, row);
+    const body = el('div', 'order-body');
+    body.append(commit, row);
+    card.append(bar, timer, body);
     return { card, fill, title, tiles: views };
   }
 
@@ -164,7 +170,7 @@ export function mountGameHud(root: HTMLElement): GameHud {
       entry.fill.style.width = `${(share * 100).toFixed(1)}%`;
       entry.fill.style.background = cssHex(timerColor(share));
       entry.card.classList.toggle('urgent', left <= ORDER_URGENT_TICKS);
-      const title = state.tickets.find((t) => t.orderId === order.id)?.title ?? '';
+      const title = commitSubject(state.tickets.find((t) => t.orderId === order.id)?.title ?? '');
       if (entry.title.textContent !== title) entry.title.textContent = title;
       const tiles = orderStepTiles(order, state.tickets);
       entry.tiles.forEach((view, i) => {

@@ -60,15 +60,23 @@ export function pairingText(speedup: number): string {
   return `Pairing ×${Math.round(speedup * 10) / 10}`;
 }
 
-/** The label chip on each kind of order (and ticket) card, like an issue tracker's. */
-export const ORDER_KIND_LABELS: Readonly<Record<TicketKind, string>> = {
-  feature: 'feature',
-  bug: 'bug',
-  incident: 'hotfix',
-  frontend: 'frontend',
-  backend: 'backend',
-  fullstack: 'full-stack',
+/**
+ * An order card's title reads as a conventional commit, `feat: Make it pop`:
+ * the type (and scope) says the kind of ticket. A hotfix is breaking news.
+ */
+export const COMMIT_TYPES: Readonly<Record<TicketKind, { type: string; scope?: string }>> = {
+  feature: { type: 'feat' },
+  bug: { type: 'fix' },
+  incident: { type: 'fix!' },
+  frontend: { type: 'feat', scope: 'ui' },
+  backend: { type: 'feat', scope: 'api' },
+  fullstack: { type: 'feat', scope: 'app' },
 };
+
+/** The commit subject after the type: a bug's title without its `Bug: `, which `fix` already says. */
+export function commitSubject(title: string): string {
+  return title.replace(/^Bug: /, '');
+}
 
 /** An order's number on its cards, in the HUD and on its tickets. */
 export function orderNumber(orderId: number): string {
