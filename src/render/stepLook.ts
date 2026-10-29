@@ -44,14 +44,17 @@ export function stepColor(kind: StepKind): number {
   return tileColor(STEP_STATION[kind]);
 }
 
-/** The edge mark on a card for each kind of ticket. */
+/**
+ * Each kind of ticket in a syntax color: the commit type on the HUD card and
+ * the order number on the world card.
+ */
 export const KIND_COLOR: Readonly<Record<TicketKind, number>> = {
-  feature: 0x7fb4ff,
-  bug: 0xff8a80,
-  incident: 0xff3b2f,
-  frontend: 0x7ab8f0,
-  backend: 0x6cbf7a,
-  fullstack: 0xd68cff,
+  feature: 0xd68cff,
+  bug: 0xffad66,
+  incident: 0xff5a4f,
+  frontend: 0x7fb4ff,
+  backend: 0x9ee37d,
+  fullstack: 0x5fe6ff,
 };
 
 /** The two marks a full-stack recipe's code tiles carry. */

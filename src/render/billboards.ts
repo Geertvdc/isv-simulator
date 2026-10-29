@@ -11,7 +11,6 @@ import {
   GLYPH_SIZE,
   GLYPH_STROKE,
   type GlyphId,
-  KIND_COLOR,
   LOCK_COLOR,
   PART_COLOR,
   SKIP_COLOR,
@@ -28,31 +27,40 @@ import {
  */
 
 /**
- * A ticket card in the world: a small issue-tracker card like the HUD's.
- * The order's timer along the top, its `#id` (a text the overlays put at
- * `TICKET_CARD_ID`), and a tile per step with its station glyph.
+ * A ticket card in the world: a tiny editor window like the HUD's order
+ * cards. Three dots and the order's `#id` (a text the overlays put at
+ * `TICKET_CARD_ID`) in its title bar, the order's timer as a line under the
+ * bar, and a tile per step with its station glyph.
  */
-const CARD_MIN_WIDTH = 44;
+const CARD_MIN_WIDTH = 46;
 export const TICKET_CARD_HEIGHT = 34;
-const CARD_STRIPE = 3;
 const CARD_PAD = 5;
 const CARD_COLOR = 0x181e2e;
 const CARD_EDGE = 0x34405f;
-const TIMER_HEIGHT = 3;
+const CARD_BAR = 9;
+const BAR_COLOR = 0x222a3f;
+/** A hotfix's window is an error panel. */
+const INCIDENT_BAR_COLOR = 0x8a1c17;
+const WINDOW_DOTS = [0xff5f57, 0xfebc2e, 0x28c840] as const;
+const DOT_RADIUS = 1.6;
+const DOT_SPACING = 4.5;
+const TIMER_HEIGHT = 2;
 const TIMER_BACK = 0x2c3550;
 const TILE = 12;
 const TILE_GAP = 3;
-/** The next step stands out: bigger and outlined. */
+/** The next step stands out: bigger, with the menus' cyan selection edge. */
 const TILE_CURRENT = 15;
-const TILE_TOP = 18;
+const TILE_TOP = 16.5;
 const TILE_COLOR = 0x222a3f;
+const SELECT_COLOR = 0x26375e;
+const ACCENT_COLOR = 0x5fe6ff;
 const GLYPH_SHARE = 0.72;
 /** A ticket whose order ran out: grey all over, with the bin as its next step. */
 const EXPIRED_CARD_COLOR = 0x3b3f4a;
 const EXPIRED_EDGE = 0x6b707c;
 const EXPIRED_GLYPH = 0x8a8f99;
-/** Where the order number sits on a card: left of its header row, around its middle. */
-export const TICKET_CARD_ID = { x: CARD_STRIPE + 4, y: -TICKET_CARD_HEIGHT + 11 };
+/** Where the order number sits on a card: in its title bar, right of the dots. */
+export const TICKET_CARD_ID = { x: 3 + 3 * DOT_SPACING + 1, y: -TICKET_CARD_HEIGHT + CARD_BAR / 2 };
 
 /** What a world ticket card shows. */
 export interface TicketCardLook {
@@ -69,7 +77,7 @@ export interface TicketCardLook {
 export function ticketCardWidth(look: Pick<TicketCardLook, 'steps' | 'expired'>): number {
   const count = look.steps.length + (look.expired ? 1 : 0);
   const tiles = count * TILE + (count - 1) * TILE_GAP + (TILE_CURRENT - TILE);
-  return Math.max(CARD_MIN_WIDTH, CARD_STRIPE + tiles + 2 * CARD_PAD);
+  return Math.max(CARD_MIN_WIDTH, tiles + 2 * CARD_PAD);
 }
 
 const BAR_WIDTH = 44;
@@ -101,25 +109,27 @@ export function drawTicketCard(
   g.fillStyle(expired ? EXPIRED_CARD_COLOR : CARD_COLOR);
   g.lineStyle(1, expired ? EXPIRED_EDGE : CARD_EDGE);
   g.fillRoundedRect(left, top, width, TICKET_CARD_HEIGHT, 3);
-  g.strokeRoundedRect(left, top, width, TICKET_CARD_HEIGHT, 3);
-  // The kind's color down the left edge, like the HUD card.
-  g.fillStyle(expired ? EXPIRED_EDGE : KIND_COLOR[look.kind]);
-  g.fillRoundedRect(left, top, CARD_STRIPE, TICKET_CARD_HEIGHT, { tl: 3, bl: 3, tr: 0, br: 0 });
-
-  const inner = left + CARD_STRIPE + 2;
-  const innerWidth = width - CARD_STRIPE - 4;
+  // The title bar, with the window's three dots.
+  const incident = look.kind === 'incident' && !expired;
+  g.fillStyle(expired ? EXPIRED_EDGE : incident ? INCIDENT_BAR_COLOR : BAR_COLOR);
+  g.fillRoundedRect(left, top, width, CARD_BAR, { tl: 3, tr: 3, bl: 0, br: 0 });
+  WINDOW_DOTS.forEach((dot, i) => {
+    g.fillStyle(expired ? EXPIRED_GLYPH : dot);
+    g.fillCircle(left + 3 + DOT_SPACING * i + DOT_RADIUS, top + CARD_BAR / 2, DOT_RADIUS);
+  });
   if (look.timer !== null && !expired) {
     g.fillStyle(TIMER_BACK);
-    g.fillRect(inner, top + 2, innerWidth, TIMER_HEIGHT);
+    g.fillRect(left, top + CARD_BAR, width, TIMER_HEIGHT);
     g.fillStyle(timerColor(look.timer));
-    g.fillRect(inner, top + 2, innerWidth * look.timer, TIMER_HEIGHT);
+    g.fillRect(left, top + CARD_BAR, width * look.timer, TIMER_HEIGHT);
   }
+  g.lineStyle(1, expired ? EXPIRED_EDGE : incident ? STAMP_COLOR : CARD_EDGE);
+  g.strokeRoundedRect(left, top, width, TICKET_CARD_HEIGHT, 3);
 
   const count = look.steps.length + (expired ? 1 : 0);
   const row = count * TILE + (count - 1) * TILE_GAP;
   const cy = top + TILE_TOP + TILE / 2;
-  const centerOf = (i: number) =>
-    left + CARD_STRIPE + (width - CARD_STRIPE - row) / 2 + i * (TILE + TILE_GAP) + TILE / 2;
+  const centerOf = (i: number) => left + (width - row) / 2 + i * (TILE + TILE_GAP) + TILE / 2;
   look.steps.forEach((tile, i) => {
     drawStepTile(g, tile, centerOf(i), cy, expired);
   });
@@ -161,7 +171,7 @@ function drawStepTile(
       drawGlyph(g, 'check', cx, cy, glyph, expired ? EXPIRED_CARD_COLOR : CARD_COLOR);
       break;
     case 'current':
-      drawTileBox(g, cx, cy, TILE_CURRENT, CARD_COLOR, color, 1.5);
+      drawTileBox(g, cx, cy, TILE_CURRENT, SELECT_COLOR, ACCENT_COLOR, 1.5);
       drawGlyph(g, tile.kind, cx, cy, TILE_CURRENT * GLYPH_SHARE, color);
       break;
     case 'skipped':

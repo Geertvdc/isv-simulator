@@ -13,12 +13,12 @@ import { type LevelMap, getTile } from '../../sim/level';
 import { orderOf, shipBlockedBy } from '../../sim/orders';
 import { pipelineWarning } from '../../sim/pipeline';
 import type { GameState } from '../../sim/state';
-import { type QueueKind, isPart, isShippable, queuedTickets } from '../../sim/tickets';
+import { type QueueKind, type Ticket, isPart, isShippable, queuedTickets } from '../../sim/tickets';
 import { firstGroup } from '../mapShape';
 import { pipelinePulse } from '../effects';
 import { type Vec3, gridToWorld } from '../projection';
 import type { RoundView } from '../roundView';
-import { STAMP_COLOR, cssHex, orderTimeShare, ticketStepTiles } from '../stepLook';
+import { KIND_COLOR, STAMP_COLOR, cssHex, orderTimeShare, ticketStepTiles } from '../stepLook';
 import {
   HINT_TILES,
   PAIRING_COLOR,
@@ -72,7 +72,7 @@ const POPUP_MS = 1000;
 const TEXT_RESOLUTION = 2;
 /** The order number and the stamp on world cards, in the HUD's monospace. */
 const MONO_FONT = 'ui-monospace, Menlo, Consolas, monospace';
-const ID_COLOR = '#8f9cba';
+const EXPIRED_ID_COLOR = '#2a2e38';
 const STAMP_ANGLE = -12;
 /** A card's timer bar is redrawn in this many steps over the order's time. */
 const TIMER_STEPS = 60;
@@ -207,7 +207,11 @@ export class Overlays {
             .setOrigin(0.5, 1)
             .setWordWrapWidth(90)
             .setAlign('center'),
-          id: this.text(ticket.orderId > 0 ? orderNumber(ticket.orderId) : '', 8, ID_COLOR)
+          id: this.text(
+            ticket.orderId > 0 ? orderNumber(ticket.orderId) : '',
+            7,
+            cssHex(KIND_COLOR[ticket.kind]),
+          )
             .setFontFamily(MONO_FONT)
             .setStroke('#000000', 0)
             .setOrigin(0, 0.5),
@@ -254,6 +258,7 @@ export class Overlays {
         x: p.x + (left + TICKET_CARD_ID.x) * scale,
         y: p.y + TICKET_CARD_ID.y * scale,
       });
+      card.id.setColor(idColor(ticket));
       card.stamp.setVisible(ticket.expired);
       if (ticket.expired) {
         place(card.stamp, { ...p, y: p.y - (TICKET_CARD_HEIGHT / 2) * scale });
@@ -399,6 +404,12 @@ export class Overlays {
       .text(0, 0, text, { ...TEXT_STYLE, fontSize: `${size}px`, color, strokeThickness: 3 })
       .setResolution(TEXT_RESOLUTION);
   }
+}
+
+/** A card's `#id`: its kind's syntax color, white on a hotfix's red bar, dim once expired. */
+function idColor(ticket: Pick<Ticket, 'kind' | 'expired'>): string {
+  if (ticket.expired) return EXPIRED_ID_COLOR;
+  return ticket.kind === 'incident' ? '#ffffff' : cssHex(KIND_COLOR[ticket.kind]);
 }
 
 /** Puts an overlay at `p`, scaled for its distance; `depth` overrides the nearer-on-top order. */
