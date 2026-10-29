@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CHAPTER_STAR_GATES, TICKS_PER_SECOND } from './balance';
-import { type Bot, botInput, createBot, runBots } from './bot';
+import { type Bot, botInput, createBot } from './bot';
+import { runBots } from './botRun';
 import { CHAPTER_BLURBS, CHAPTER_NAMES, LEVEL_BLURBS, LEVEL_NAMES } from './content';
 import { CHAPTERS, LEVELS, type Level } from './levels';
 import { type GameState, createGame } from './state';
