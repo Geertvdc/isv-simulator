@@ -2,11 +2,10 @@ import Phaser from 'phaser';
 import type { HintId } from '../../flow/hints';
 import { stationWorkStep } from '../../sim/interact';
 import {
-  DOMAIN_ICONS,
   HINT_TEXTS,
   MEETING_ROOM_TEXT,
-  TICKET_DOMAIN_LABELS,
   TICKET_EXPIRED_STAMP,
+  commitHead,
   orderNumber,
   pairingText,
 } from '../../sim/content';
@@ -23,6 +22,7 @@ import { KIND_COLOR, STAMP_COLOR, cssHex, orderTimeShare, ticketStepTiles } from
 import {
   HINT_TILES,
   PAIRING_COLOR,
+  TICKET_CARD_BAR_FONT,
   TICKET_CARD_HEIGHT,
   TICKET_CARD_ID,
   type TicketCardLook,
@@ -74,6 +74,8 @@ const TEXT_RESOLUTION = 2;
 /** The order number and the stamp on world cards, in the HUD's monospace. */
 const MONO_FONT = 'ui-monospace, Menlo, Consolas, monospace';
 const EXPIRED_ID_COLOR = '#2a2e38';
+/** The domain scope in a card's title bar, like the HUD's `(scope)`: `--code-text`. */
+const SCOPE_COLOR = '#c6cfe2';
 const STAMP_ANGLE = -12;
 /** A card's timer bar is redrawn in this many steps over the order's time. */
 const TIMER_STEPS = 60;
@@ -88,9 +90,10 @@ const TEXT_STYLE = {
 interface CardSprite {
   g: Phaser.GameObjects.Graphics;
   title: Phaser.GameObjects.Text;
-  domain: Phaser.GameObjects.Text;
   /** The order number on the card, `#12`. */
   id: Phaser.GameObjects.Text;
+  /** The ticket's domain as its commit scope at the right of the title bar, `api`; empty for general work. */
+  scope: Phaser.GameObjects.Text;
   /** `wontfix` across a card whose order ran out. */
   stamp: Phaser.GameObjects.Text;
   drawn: string;
@@ -209,21 +212,23 @@ export class Overlays {
             .setOrigin(0.5, 1)
             .setWordWrapWidth(90)
             .setAlign('center'),
-          domain: this.text(
-            `${DOMAIN_ICONS[ticket.domain]} ${TICKET_DOMAIN_LABELS[ticket.domain]}`,
-            10,
-            '#ffffff',
-          )
-            .setOrigin(0.5, 1)
-            .setBackgroundColor('rgba(10, 15, 25, 0.85)'),
           id: this.text(
             ticket.orderId > 0 ? orderNumber(ticket.orderId) : '',
-            7,
+            TICKET_CARD_BAR_FONT,
             cssHex(KIND_COLOR[ticket.kind]),
           )
             .setFontFamily(MONO_FONT)
             .setStroke('#000000', 0)
             .setOrigin(0, 0.5),
+          scope: this.text(
+            commitHead(ticket.kind, ticket.domain).scope ?? '',
+            TICKET_CARD_BAR_FONT,
+            SCOPE_COLOR,
+          )
+            .setFontFamily(MONO_FONT)
+            .setFontStyle('normal')
+            .setStroke('#000000', 0)
+            .setOrigin(1, 0.5),
           stamp: this.text(TICKET_EXPIRED_STAMP, 10, cssHex(STAMP_COLOR))
             .setFontFamily(MONO_FONT)
             .setStroke('#000000', 0)
@@ -246,6 +251,7 @@ export class Overlays {
         timer: order ? orderTimeShare(order, state.tick) : null,
         blocked:
           !ticket.expired && !isPart(ticket) && isShippable(ticket) && shipBlockedBy(state, ticket),
+        barChars: card.id.text.length + card.scope.text.length,
       };
       const timerStep = look.timer === null ? '' : Math.round(look.timer * TIMER_STEPS);
       const key = `${look.steps.map((s) => s.state).join()}|${bar ?? ''}|${look.expired}|${timerStep}|${look.blocked}`;
@@ -268,6 +274,12 @@ export class Overlays {
         y: p.y + TICKET_CARD_ID.y * scale,
       });
       card.id.setColor(idColor(ticket));
+      place(card.scope, {
+        ...p,
+        x: p.x - (left + TICKET_CARD_ID.x) * scale,
+        y: p.y + TICKET_CARD_ID.y * scale,
+      });
+      card.scope.setColor(ticket.expired ? EXPIRED_ID_COLOR : SCOPE_COLOR);
       card.stamp.setVisible(ticket.expired);
       if (ticket.expired) {
         place(card.stamp, { ...p, y: p.y - (TICKET_CARD_HEIGHT / 2) * scale });
@@ -285,16 +297,14 @@ export class Overlays {
         .setBackgroundColor(paired ? 'rgba(0, 0, 0, 0.65)' : '')
         .setVisible(placed.carried || paired);
       const lift = (ticketCardTop(bar !== null) + 2) * scale;
-      place(card.domain, { ...p, y: p.y - lift });
-      if (placed.carried || paired)
-        place(card.title, { ...p, y: p.y - lift - 15 * p.scale * OVERLAY_SCALE });
+      if (placed.carried || paired) place(card.title, { ...p, y: p.y - lift });
     }
     for (const [id, card] of this.cards) {
       if (seen.has(id)) continue;
       card.g.destroy();
       card.title.destroy();
-      card.domain.destroy();
       card.id.destroy();
+      card.scope.destroy();
       card.stamp.destroy();
       this.cards.delete(id);
     }

@@ -29,7 +29,8 @@ import {
 /**
  * A ticket card in the world: a tiny editor window like the HUD's order
  * cards: the order's `#id` (a text the overlays put at
- * `TICKET_CARD_ID`) in its title bar, the order's timer as a line under the
+ * `TICKET_CARD_ID`) in its title bar, with the domain's commit scope (`api`)
+ * at its right, the order's timer as a line under the
  * bar, and a tile per step with its station glyph.
  */
 const CARD_MIN_WIDTH = 46;
@@ -58,6 +59,11 @@ const EXPIRED_EDGE = 0x6b707c;
 const EXPIRED_GLYPH = 0x8a8f99;
 /** Where the order number sits on a card: at the left of its title bar. */
 export const TICKET_CARD_ID = { x: 4, y: -TICKET_CARD_HEIGHT + CARD_BAR / 2 };
+/** The title bar's text size, and roughly how wide a character of it is. */
+export const TICKET_CARD_BAR_FONT = 7;
+const BAR_CHAR_WIDTH = 4.4;
+/** Space between the `#id` and the scope when both are in the title bar. */
+const BAR_TEXT_GAP = 6;
 
 /** What a world ticket card shows. */
 export interface TicketCardLook {
@@ -68,13 +74,18 @@ export interface TicketCardLook {
   timer: number | null;
   /** Finished, but an open incident keeps it from shipping: a lock on its last step. */
   blocked: boolean;
+  /** Characters of text in the title bar (`#id` and scope), so the card is wide enough for them. */
+  barChars?: number;
 }
 
 /** How wide the card for `look` is. */
-export function ticketCardWidth(look: Pick<TicketCardLook, 'steps' | 'expired'>): number {
+export function ticketCardWidth(
+  look: Pick<TicketCardLook, 'steps' | 'expired' | 'barChars'>,
+): number {
   const count = look.steps.length + (look.expired ? 1 : 0);
   const tiles = count * TILE + (count - 1) * TILE_GAP + (TILE_CURRENT - TILE);
-  return Math.max(CARD_MIN_WIDTH, tiles + 2 * CARD_PAD);
+  const bar = (look.barChars ?? 0) * BAR_CHAR_WIDTH + 2 * TICKET_CARD_ID.x + BAR_TEXT_GAP;
+  return Math.max(CARD_MIN_WIDTH, tiles + 2 * CARD_PAD, bar);
 }
 
 const BAR_WIDTH = 44;
