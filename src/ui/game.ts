@@ -201,6 +201,12 @@ export function mountGameHud(root: HTMLElement): GameHud {
           if (parts.length > 0) popup(parts.join(' '), 'gain');
         }
         if (event.type === 'orderExpired' && event.penalty > 0) popup(`-${event.penalty}`, 'loss');
+        if (event.type === 'shipBlocked') {
+          // Restart the head shake even if it's still running.
+          incidentBanner.classList.remove('nope');
+          incidentBanner.getBoundingClientRect();
+          incidentBanner.classList.add('nope');
+        }
         if (event.type === 'pipelineBroke') popup(PIPELINE_BROKE_TEXT, 'loss');
         if (event.type === 'meetingMissed') {
           popup(
