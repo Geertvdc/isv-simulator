@@ -16,6 +16,7 @@
 import {
   PIPELINE_BUILD_TICKS,
   DESIGNED_CODE_FACTOR,
+  PLAYER_MAX_SPEED,
   REVIEWERS_NEEDED,
   REVIEW_RATE,
   WORK_RATE,
@@ -191,10 +192,13 @@ function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | nu
 
   const own = state.tickets.find((t) => t.id === bot.ticketId);
   if (own?.location.kind === 'queue') {
-    const tile = nearest(state, bot.playerId, tilesOf(state.level, QUEUE_TILE[own.location.queue]));
     const head = queuedTickets(state, own.location.queue)[0];
-    const action = bot.assignmentPolicy === 'role-aware' && head?.id !== own.id ? 'wait' : 'interact';
-    return tile ? { tile, action } : null;
+    if (bot.assignmentPolicy === 'role-aware' && head?.id !== own.id) {
+      bot.ticketId = null;
+      return chooseGoal(state, bot, bots);
+    }
+    const tile = nearest(state, bot.playerId, tilesOf(state.level, QUEUE_TILE[own.location.queue]));
+    return tile ? { tile, action: 'interact' } : null;
   }
   if (own?.location.kind === 'tile') {
     const tile = { x: own.location.x, y: own.location.y };
@@ -226,38 +230,31 @@ function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | nu
     if (!player) return null;
     for (const queue of ['bug', 'feature'] as const) {
       const queueTickets = queuedTickets(state, queue);
-      for (const ticket of queueTickets) {
-        const reserved = bots.find((candidate) => candidate.ticketId === ticket.id);
-        if (reserved) {
-          if (reserved.playerId === bot.playerId) {
-            const target = nearest(state, bot.playerId, tilesOf(state.level, QUEUE_TILE[queue]));
-            return target
-              ? { tile: target, action: queueTickets[0]?.id === ticket.id ? 'interact' : 'wait' }
-              : null;
-          }
-          continue;
-        }
-        const available = bots
-          .filter((candidate) => {
-            if (ticketCarriedBy(state, candidate.playerId) || candidate.helping) return false;
-            return candidate.ticketId === null;
-          })
-          .map((candidate) => {
-            const candidatePlayer = getPlayer(state, candidate.playerId);
-            if (!candidatePlayer) throw new Error(`No player ${candidate.playerId}`);
-            return {
-              bot: candidate,
-              score: assignmentTime(ticket, candidatePlayer.roleId),
-            };
-          })
-          .sort((a, b) => a.score - b.score || a.bot.playerId - b.bot.playerId);
-        if (available[0]?.bot.playerId !== bot.playerId) continue;
-        bot.ticketId = ticket.id;
-        const target = nearest(state, bot.playerId, tilesOf(state.level, QUEUE_TILE[queue]));
-        return target
-          ? { tile: target, action: queueTickets[0]?.id === ticket.id ? 'interact' : 'wait' }
-          : null;
-      }
+      const ticket = queueTickets[0];
+      if (!ticket || bots.some((candidate) => candidate.ticketId === ticket.id)) continue;
+      const queueTile = tilesOf(state.level, QUEUE_TILE[queue]);
+      const available = bots
+        .filter((candidate) => {
+          if (ticketCarriedBy(state, candidate.playerId) || candidate.helping) return false;
+          return candidate.ticketId === null;
+        })
+        .flatMap((candidate) => {
+          const candidatePlayer = getPlayer(state, candidate.playerId);
+          if (!candidatePlayer) throw new Error(`No player ${candidate.playerId}`);
+          const walk = nearest(state, candidate.playerId, queueTile);
+          if (!walk) return [];
+          const path = findPath(state.level, currentTile(state, candidate.playerId), walk);
+          if (!path) return [];
+          return [{
+            bot: candidate,
+            score: assignmentTime(ticket, candidatePlayer.roleId) + path.length / PLAYER_MAX_SPEED,
+          }];
+        })
+        .sort((a, b) => a.score - b.score || a.bot.playerId - b.bot.playerId);
+      if (available[0]?.bot.playerId !== bot.playerId) continue;
+      bot.ticketId = ticket.id;
+      const target = nearest(state, bot.playerId, queueTile);
+      return target ? { tile: target, action: 'interact' } : null;
     }
     return null;
   }
@@ -460,6 +457,8 @@ export function botInput(state: GameState, bot: Bot, bots: readonly Bot[]): Inpu
 }
 
 export interface BotRunSummary {
+  ordersCreated: number;
+  openOrdersAtEnd: number;
   shipped: number;
   shippedBugs: number;
   shippedUntested: number;
@@ -484,6 +483,7 @@ export interface BotRunSummary {
   };
   travelTicks: number;
   idleTicks: number;
+  queueWaitTicks: number;
   handovers: number;
   maxQueueLength: Record<QueueKind, number>;
   result: LevelResult;
@@ -523,6 +523,8 @@ export function runBots(
     expired: 0,
     expiredBugs: 0,
     expiredIncidents: 0,
+    ordersCreated: 0,
+    openOrdersAtEnd: 0,
     meetingsAttended: 0,
     meetingsMissed: 0,
     managerBumps: 0,
@@ -532,11 +534,18 @@ export function runBots(
     stationWorkTicks: { code: 0, test: 0, design: 0, review: 0, repair: 0 },
     travelTicks: 0,
     idleTicks: 0,
+    queueWaitTicks: 0,
     handovers: 0,
     maxQueueLength: { feature: 0, bug: 0 },
   };
   while (!state.result) {
     const inputs = bots.map((bot) => botInput(state, bot, bots));
+    for (const bot of bots) {
+      const ticket = state.tickets.find((candidate) => candidate.id === bot.ticketId);
+      if (ticket?.location.kind !== 'queue') continue;
+      const head = queuedTickets(state, ticket.location.queue)[0];
+      if (head?.id !== ticket.id) summary.queueWaitTicks++;
+    }
     const priorLocations = new Map(
       state.tickets.map((ticket) => [ticket.id, ticket.location.kind]),
     );
@@ -566,6 +575,11 @@ export function runBots(
       }
     }
     for (const e of state.events) {
+      if (e.type === 'orderCreated') {
+        summary.ordersCreated++;
+        const key = `created:${e.order.kind}:${e.order.domain}`;
+        summary.ordersByRecipeDomain[key] = (summary.ordersByRecipeDomain[key] ?? 0) + 1;
+      }
       if (e.type === 'orderShipped') {
         summary.shipped++;
         if (e.order?.kind === 'bug') summary.shippedBugs++;
@@ -600,5 +614,6 @@ export function runBots(
       queuedTickets(state, 'bug').length,
     );
   }
+  summary.openOrdersAtEnd = state.orders.length;
   return { ...summary, result: state.result };
 }

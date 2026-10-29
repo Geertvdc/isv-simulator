@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { PIPELINE_FAIL_TICKS, REPAIR_TICKS, TICKS_PER_SECOND } from './balance';
 import { type Bot, botInput, createBot, findPath, runBots } from './bot';
 import { getTile, parseLevelMap } from './level';
-import { DOWN_THE_HALL, GARAGE, levelWithMap } from './levels';
+import { DOWN_THE_HALL, GARAGE, levelById, levelWithMap } from './levels';
 import type { Ticket } from './tickets';
 import { createOrder } from './orders';
 import { type GameState, type PlayerId, createGame } from './state';
@@ -55,6 +55,27 @@ describe('bot run on the garage', () => {
 
   it('is deterministic per seed', () => {
     expect(runBots(GARAGE, 3, 2)).toEqual(runBots(GARAGE, 3, 2));
+  });
+
+  it('accounts for created, shipped, expired, and remaining orders in benchmark metrics', () => {
+    const run = runBots(GARAGE, 9, 2);
+    const createdByRecipe = Object.entries(run.ordersByRecipeDomain)
+      .filter(([key]) => key.startsWith('created:'))
+      .reduce((total, [, count]) => total + count, 0);
+
+    expect(createdByRecipe).toBe(run.ordersCreated);
+    expect(run.ordersCreated).toBe(run.shipped + run.expired + run.openOrdersAtEnd);
+  });
+
+  it('does not strand the three-player mixed role-aware team behind queue heads', () => {
+    const level = levelById('lab-roles');
+    if (!level) throw new Error('Missing role lab');
+    const run = runBots(level, 1, 3, {
+      roles: ['generalist', 'frontend', 'qa'],
+      assignmentPolicy: 'role-aware',
+    });
+
+    expect(run.queueWaitTicks).toBe(0);
   });
 
   it('accepts explicit role compositions and a role-aware task assignment policy', () => {
@@ -146,7 +167,7 @@ describe('bot and new mechanics', () => {
     expect(command.interact).toBe(false);
   });
 
-  it('assigns later queued tickets by role and waits for them to reach the queue head', () => {
+  it('does not reserve a later queued ticket while the queue head is being fetched', () => {
     const state = newTestGame();
     createOrder(state, 'feature', 'Frontend work', undefined, 'frontend');
     createOrder(state, 'feature', 'Backend work', undefined, 'backend');
@@ -166,9 +187,11 @@ describe('bot and new mechanics', () => {
     const backendCommand = botInput(state, backendBot, [frontendBot, backendBot]);
 
     expect(frontendBot.ticketId).toBe(frontendTicket.id);
-    expect(backendBot.ticketId).toBe(backendTicket.id);
+    expect(backendBot.ticketId).toBeNull();
     expect(backendCommand.interact).toBe(false);
+    expect(backendTicket.location.kind).toBe('queue');
   });
+
 });
 
 describe('bot and a broken pipeline', () => {
