@@ -51,6 +51,21 @@ export function glyphSvg(id: GlyphId, className = 'glyph'): SVGSVGElement {
   return svg;
 }
 
+/** A glyph's shapes as SVG markup, for pictures built as strings. */
+export function glyphMarkup(id: GlyphId): string {
+  return GLYPHS[id]
+    .map((shape) => {
+      const fill = shape.type !== 'line' && shape.fill ? ' fill="currentColor"' : '';
+      if (shape.type === 'rect')
+        return `<rect x="${shape.x}" y="${shape.y}" width="${shape.w}" height="${shape.h}" rx="1.5"${fill}/>`;
+      if (shape.type === 'circle')
+        return `<circle cx="${shape.cx}" cy="${shape.cy}" r="${shape.r}"${fill}/>`;
+      const tag = shape.type === 'poly' ? 'polygon' : 'polyline';
+      return `<${tag} points="${shape.points.join(' ')}"${fill}/>`;
+    })
+    .join('');
+}
+
 /** One step tile; `update` sets its live state. */
 export interface StepTileView {
   node: HTMLElement;
