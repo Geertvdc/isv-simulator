@@ -1,6 +1,6 @@
 # Phase 21 proposal: character roles, ticket domains, and a new cast
 
-**Status:** 21a visual investigation and 21b rules/lab are complete. The user approved 21c with a cast-approval checkpoint: production compact-angular cast first, selection/feedback only after visual acceptance. The production cast is implemented and awaiting that human visual gate; selection/feedback and 21d rollout are not implemented. Hats remain optional, non-default accessories, not a blanket prohibition. Numbers below are starting hypotheses, not measured balance results.
+**Status:** 21a visual investigation and 21b rules/lab are complete. The user accepted the revised gender-neutral production cast ("Approve the revised cast and continue"), passing the 21c visual gate. The separately approved selection/readiness/feedback implementation is now playable locally and online; its verification is recorded below. 21d balance/rollout still requires a separate plan and approval. Hats remain optional, non-default accessories, not a blanket prohibition. Numbers below are starting hypotheses, not measured balance results.
 
 **Goal:** a team of generalists is dependable and can earn three stars; a well-coordinated specialist team has a higher ceiling because it assigns work and hands tickets over well. Mixed teams should be a useful middle ground. Replace the current character silhouette, not just its hats.
 
@@ -239,7 +239,7 @@ Verification completed: `npm run check` (80 test files, 1,108 tests) and `npm ru
 - [ ] Domain survives every ticket lifecycle, including delayed bugs and merge/loss; shipping and expiry cannot cross domains.
 - [ ] No extra RNG rolls occur on non-domain levels; authored domain batches meet configured counts and drought limits.
 - [ ] Solo, 2/3/4-player, duplicates, generalist-only, mixed, and specialist compositions remain playable; measured specialist gains come from assignment rather than privileged scoring.
-- [ ] Local and online setup, readiness invalidation, countdown lock, ownership validation, reconnect, controller takeover, retries, and spectators are tested.
+- [x] Local and online setup, readiness invalidation, countdown lock, ownership validation, reconnect, controller takeover, retries, and spectators are tested.
 - [x] Model/pose tests cover attachment points, arm reach, head/accessory bounds, and carried-ticket clearance; geometry is disposed correctly on replacement/destruction.
 - [ ] Approved art direction is legible at real gameplay scale, including four same-role characters, grayscale, rear views, and every action.
 - [ ] `npm run check` and `npm run build` pass for implementation slices; manual local/online checks and couch balance trials are completed.
@@ -266,10 +266,10 @@ Common hand/ticket targets, smoothed-facing alignment, movement, collision, stat
 - [x] Enlarged front/rear, grayscale, all-action and duplicate-role model comparisons; real four-player gameplay scenes show HUD/stations, carried tickets, actual wind-up and actual flight.
 - [x] `npm run check` (81 files, 1,179 tests) and `npm run build` pass after the gender-neutral revision.
 - [x] Independent critic completed three bounded rounds, including revised code and real gameplay/rear/grayscale evidence in the final round. No substantive defects remain; final round's non-blocking caption mismatch was corrected to describe swept/cropped and long/tied rows accurately. Two earlier rounds reviewed rig correctness and improved gameplay-fixture readability; the previous binary variants are superseded.
-- [ ] User accepts the production cast at actual gameplay scale.
+- [x] User accepts the revised production cast: "Approve the revised cast and continue".
 - [ ] Human two-second couch readability, rear/grayscale recognition and four-identical-role play verified.
 
-The two human boxes are intentionally unchecked. Captures demonstrate geometry and game integration, not human recognition or balance. No campaign settings, scores, role rates, bots, lobby/readiness/network UI or 21d tuning changed.
+The couch-readability box remains intentionally unchecked. Captures demonstrate geometry and game integration, not human recognition or balance. The first-part cast PR changed no campaign settings, scores, role rates, bots, lobby/readiness/network UI or 21d tuning.
 
 | Review | URL |
 | --- | --- |
@@ -284,3 +284,27 @@ The two human boxes are intentionally unchecked. Captures demonstrate geometry a
 | Actual sim throw | `/?scene=cast-windup&quality=low`, `/?scene=cast-release&quality=low` |
 
 Capture with `npx vite-node scripts/characterCast.ts --base=http://127.0.0.1:5198 --out=/absolute/evidence/directory` (optional `--cdp-port=9361`). The script uses a private headless Chrome profile, waits for real scene completion and includes a narrow review-page capture. It does not replace the approved `docs/game/` screenshot catalog. The model-sheet release remains illustrative and is labeled as such; actual gameplay flight comes from the unchanged sim.
+
+### 21c second part: role selection and feedback
+
+The local lobby and online couch slots default to generalist. Each bound device cycles its own role with left/right; mouse buttons send the same commands. All five roles have a live preview of the accepted production rig, a strength/tradeoff summary, peak coding/testing comparison, and expandable full work-speed details. Cosmetics stay independent of role and owner-based; there is no gender or appearance control.
+
+The level intro is now team confirmation. It puts the authored workload ahead of the tutorial, including ordinary feature-domain batch counts when enabled, both full-stack coding parts, incidents, design/review, returning bugs and unattended builds. Coverage is advisory, never a class gate. Each participating connected player readies separately; changing that player's role clears only their readiness. Countdown locks the authoritative role map and recreates the prepared round with its original seed. Retry/restart/next-level confirmation keeps roles and resets readiness.
+
+Shared plain-data roster helpers serve local flow and server setup. Protocol 6 validates role/ready/takeover requests; only an owner can configure their own slots, only before countdown. Reconnect and orphaned-gamepad takeover preserve player identity and role. A disconnected owner's readiness is cleared and does not block the connected team; rejoining before countdown requires fresh ready. Late spectators cannot change the active roster.
+
+In-round player badges show role labels/icons; orders and tickets show domain labels/icons separately from workflow names and station steps. Effective rates come from the sim's actual resolved contributors, including design and pairing factors. Only the strongest manual worker or the top two paired coders receive a speed label and work animation; a review reports its quorum rather than inventing a speed bonus. Builds remain unattended and role-neutral.
+
+- [x] Shared local/server role setup, defaults, duplicates, per-device ownership and readiness invalidation.
+- [x] Solo and 2/3/4-slot readiness, countdown locks, connected-owner handling, reconnect, orphan-controller takeover, retry/restart and snapshot/prediction role preservation covered by colocated tests.
+- [x] Real isolated Chrome local gameplay and a real authoritative room with two clients verify selection through countdown into actual roles, movement, page reconnect and late-spectator safety.
+- [x] Desktop and narrow captures inspected for lobby, confirmation/forecast, and real sim-driven domain/rate feedback; online lobby, confirmation, gameplay and spectator captures inspected.
+- [x] `npm run check` (86 files, 1,204 tests) and `npm run build` pass.
+- [x] Independent selection/feedback critic completed three bounded rounds; final review found no significant issues. Round 1 exposed join-only Enter readying keyboard slots, fixed with interact-only readiness plus pure/browser regressions. Round 2 exposed old one-host-press assumptions in online/prediction/screenshot scripts, fixed and verified end to end.
+- [ ] Physical gamepads, multi-human couch play, two-second recognition and human balance trials completed.
+
+Development entry: `/?lab=lab-roles&quality=low` opens a playable local lab without save progression or campaign migration (dev builds only). `/?scene=roles-work&quality=low` freezes actual sim work: a designed matching pair contributes 2.28x each / 4.56x total, QA tests at 1.60x and platform repairs at 1.25x.
+
+With Vite pointing to a running local server, reproduce scoped browser evidence with `npx vite-node scripts/verifyRoles.ts --base=http://127.0.0.1:5217 --out=/absolute/evidence/directory --cdp-port=9371`. It uses private Chrome profiles and closes its browsers. It does not retake the full docs catalog. No role stats, scoring, bot policy, domain schedules or campaign opt-ins changed; the noisy 21b results and the three-player role-aware policy regression remain open for separately approved 21d investigation.
+
+The existing online and prediction verifiers now confirm each owned slot before starting/restarting; the round-start screenshot flow readies both keyboards and requires a real countdown before capture. `npm run verify:online` passes 13/13 checks (drop/reload, host succession, next-round join and grace expiry), and `npm run verify:prediction` passes 16/16 (lagged input, reconciliation, carry/pause and restarted countdown). The online reload check explicitly waits for a new document rather than accidentally accepting the old pre-unload debug handle. The scoped `screens/round-start` capture passes and its intro/countdown/hints/pause images were inspected and updated. Physical gamepads and multiple humans remain untested.

@@ -60,7 +60,9 @@ Settings → Online profile shows this browser's user ID and display name. Copy 
 
 ### Lobby
 
-Press Enter or gamepad A to join. The first Enter joins the left keyboard, the second the right keyboard; every gamepad joins with A. Each player gets a color and a hat shape (circle, triangle, square, diamond) so players can be told apart without color. Player 1 starts with their pick-up button.
+Press Enter or gamepad A to join. The first Enter joins the left keyboard, the second the right keyboard; every gamepad joins with A. Each player gets a color, number and owner shape (circle, triangle, square, diamond), independent of their role and hairstyle. Joining does not also confirm or start. Player 1 continues to level selection with their pick-up button.
+
+Everyone starts as a **generalist**. Left/right on your own controls chooses a role; the card shows the live character, its strength/tradeoff, peak coding speed and testing speed. **All work speeds** expands the domain-by-domain comparison. Generalist is dependable everywhere; frontend/backend specialists prefer their coding domain, QA prefers testing, and platform prefers infrastructure coding with a smaller repair bonus. Every role can do every task, duplicate roles are allowed, and roles do not change movement, scoring or unattended build speed. The numbers are work-speed multipliers: 1.50x is 50% faster work, not 50% less time.
 
 ![Lobby with two keyboard players](images/screens/lobby.webp)
 
@@ -70,7 +72,7 @@ Online play needs the game server (`npm run dev:online` runs it with the game). 
 
 ![Join online with a wrong code](images/screens/join-code.webp)
 
-The online lobby shows the code (with Copy), everyone in the room, the host's badge and each machine's couch players in their colors and hats. Couch players on every machine join with Enter or gamepad A, as on the couch (4 players per room in total). The host starts with their pick-up button and picks the level; everyone else sees "Host is choosing a level" (and the level select's hint says the host picks). Online, only the host's devices drive the level select, the intro card, pause (which pauses the whole room) and the results. Settings and the online profile aren't reachable from an online room. Leave room leaves; so does Esc or gamepad B twice.
+The online lobby shows the code (with Copy), everyone in the room, the host's badge and each machine's couch players in their owner colors/shapes and selected role outfits. Couch players on every machine join with Enter or gamepad A, as on the couch (4 players per room in total). Each machine can change only its own players' roles. The host continues with their pick-up button and picks the level; everyone else sees "Host is choosing a level" (and the level select's hint says the host picks). Only the host's devices drive level select, pause (which pauses the whole room) and results; **everyone confirms their own players on the intro**. Settings and the online profile aren't reachable from an online room. Leave room leaves; so does Esc or gamepad B twice.
 
 ![Online lobby with two machines](images/screens/online-lobby.webp)
 
@@ -80,6 +82,7 @@ Things go wrong on real networks, and the room copes:
 
 - **Dropped connection** (wifi blip, laptop lid): your screen shows "Connection lost. Reconnecting…" and the game keeps trying for 20 seconds; the others see "<name> reconnecting…" and your players stand still meanwhile. Back in, you're in the same round with the same players. If it doesn't work in time you get a message and Back to the title.
 - **Reloading the page** in a room takes you straight back in (same tab, within 20 seconds).
+- Roles survive reconnect and controller takeover. A drop during team confirmation clears that machine's ready states; connected players can continue without it. Rejoining before countdown means confirming again.
 - **The host leaves or drops:** the next person who joined takes over the menus (level select, pause, results), even without a player of their own.
 - **Joining while a round runs:** you watch it ("you're watching, you'll join after it"), then press Enter or gamepad A on the results or the level select to play the next round.
 - Leaving mid-round still counts the round for you; the round counts for everyone who was there when it started.
@@ -103,9 +106,15 @@ On a fresh save (left) only The Garage is open and everything past it is under c
 
 ### Level intro card
 
-Before a round, the level's card shows its name, the recipes (which stations each kind of order needs) and, on levels that bring something new, a tip with a picture. The first level also lists every button.
+Before every round, including retries, the level's card shows its name, **Planned workload**, recipes and tutorial. The forecast comes from the level, not your chosen roles: classic levels announce general-domain features; domain-enabled work also describes its authored feature mix and any full-stack parts or incidents. Coverage notes are advice, never permission checks.
 
-![Intro card of The Garage](images/screens/intro-garage.webp)
+Each player can revise their own role here, then press their pick-up button (E, Right Shift or gamepad A) to ready. Enter is join-only and cannot ready both keyboard players together. Changing a role clears that player's ready. **Every connected participating player must be ready** before countdown; roles then freeze until the next round's confirmation. Roles stay selected across retries and next levels but readiness resets.
+
+![The Garage team confirmation online, with authored workload and separate player readiness](images/screens/role-confirmation.webp)
+
+In a round, role labels beside player badges identify strengths without replacing owner colors/shapes. Tickets and orders show domain labels separately from workflow kind: a frontend-domain **feature** still needs code/test/build, unlike a code-only frontend **part** for merging. Contextual work labels show actual contributions, not just someone holding work nearby: a paired contribution includes design/pair modifiers and explicitly lists the pair total; review says when its quorum is met.
+
+![Actual sim work: designed frontend pair, QA testing and platform repair with effective rates](images/mechanics/roles-work.webp)
 
 The cards that teach something:
 
