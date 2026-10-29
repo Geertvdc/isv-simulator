@@ -5,7 +5,7 @@ import type { GameState, Vec } from '../../sim/state';
 import { pipelinePulse } from '../effects';
 import { type Vec3, gridToWorld } from '../projection';
 import { blockHeight, facingYaw, heroPlacement, stationFacing } from './layout';
-import { PIPELINE_SERVER_AT } from './models';
+import { PIPELINE_SERVER_AT } from './stationModels';
 import { COLOR } from './palette';
 
 const WARN_COLOR = 0xff3030;
@@ -14,7 +14,7 @@ const BROKEN_COLOR = 0x111317;
 const SMOKE_COLOR = 0x26282d;
 const SPARK_COLOR = COLOR.gold;
 const ALARM_COLOR = 0xff3020;
-/** Height of the build server's top over the block's top (see `models.ts`). */
+/** Height of the build server's top over the block's top (see `stationModels.ts`). */
 const SERVER_TOP = 0.42;
 const RUG_COLOR = 0x8e6bd8;
 const RUG_OPACITY = 0.35;

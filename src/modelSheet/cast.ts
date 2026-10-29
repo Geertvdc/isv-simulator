@@ -13,7 +13,7 @@ import {
 } from '../render/three/Characters';
 import { kitMaterials } from '../render/three/kit';
 import { createLights, dressScene } from '../render/three/look';
-import { ticketModel } from '../render/three/models';
+import { ticketModel } from '../render/three/ticketModels';
 import { playerPose } from '../render/three/pose';
 import { playerMarker } from '../render/three/playerMarker';
 import { developerAppearance } from '../render/three/DeveloperRig';

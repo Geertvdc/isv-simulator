@@ -27,7 +27,7 @@ import { blockHeight, levelBox, pickTile, placeTicket } from './layout';
 import { createLights, dressScene } from './look';
 import { kitMaterials } from './kit';
 import { type MapView, buildMap } from './MapView';
-import { ticketModel } from './models';
+import { ticketModel } from './ticketModels';
 import { type Stage, disposeTree, getStage } from './stage';
 
 const HOVER_COLOR = 0xffffff;

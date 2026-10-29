@@ -10,7 +10,7 @@ import {
   studyTicketTarget,
 } from './CharacterStudies';
 import { kitMaterials } from './kit';
-import { ticketModel } from './models';
+import { ticketModel } from './ticketModels';
 
 function intersectsMesh(box: THREE.Box3, mesh: THREE.Object3D): boolean {
   if (!(mesh instanceof THREE.Mesh) || !(mesh.geometry instanceof THREE.BufferGeometry)) {
