@@ -10,7 +10,8 @@ import { writeFileSync } from 'node:fs';
  */
 
 import { PIPELINE_BUILD_TICKS, TICKS_PER_SECOND, WORK_RATE } from '../src/sim/balance';
-import { runBots, type BotAssignmentPolicy, type BotRunSummary } from '../src/sim/bot';
+import type { BotAssignmentPolicy } from '../src/sim/bot';
+import { runBots, type BotRunSummary } from '../src/sim/botRun';
 import { type Level, LEVELS, levelById, settingsForPlayers } from '../src/sim/levels';
 import { isRoleId, roleWorkRate, type RoleId } from '../src/sim/roles';
 
