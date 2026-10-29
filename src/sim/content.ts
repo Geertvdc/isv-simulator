@@ -37,7 +37,10 @@ export const INCIDENT_TITLES: readonly string[] = [
 ];
 
 /** Over the order bar while an incident is open. */
-export const INCIDENT_BANNER_TEXT = 'INCIDENT! New features on hold until the hotfix ships';
+export const INCIDENT_BANNER_TEXT = 'INCIDENT! Nothing ships until the hotfix does';
+
+/** Pops up over a player trying to ship anything but the hotfix during an incident. */
+export const SHIP_BLOCKED_TEXT = 'Hotfix first!';
 
 /** Shown next to the points when a ticket ships with tests skipped. */
 export const UNTESTED_SHIP_TEXT = 'YOLO!';
@@ -343,7 +346,7 @@ export const LEVEL_INTRO_TIPS: Readonly<Record<string, { text: string; picture: 
   },
   'seed-round': {
     picture: 'incident',
-    text: 'Production incident! The red hotfix jumps the bug queue: code it, build it, ship it. No new features until it ships.',
+    text: 'Production incident! The red hotfix jumps the bug queue: code it, build it, ship it. Nothing else ships and no new features come in until it does.',
   },
   'middle-management': {
     picture: 'manager',
