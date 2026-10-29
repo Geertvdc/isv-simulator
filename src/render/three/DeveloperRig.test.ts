@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { STUDY_ACTIONS, studyFrame } from '../../modelSheet/studyScenes';
 import { ROLE_IDS } from '../../sim/roles';
 import { applyPose, createDeveloper, disposeCharacter } from './Characters';
-import { DEVELOPER_TOP, DEVELOPER_PRESENTATIONS, developerAppearance } from './DeveloperRig';
+import { DEVELOPER_TOP, DEVELOPER_HAIRSTYLES, developerAppearance } from './DeveloperRig';
 import { kitMaterials } from './kit';
 import { carryPoint } from './layout';
 import { ticketModel } from './models';
@@ -27,13 +27,11 @@ function intersectsMesh(box: THREE.Box3, mesh: THREE.Object3D): boolean {
 }
 
 describe.each(
-  ROLE_IDS.flatMap((role) =>
-    DEVELOPER_PRESENTATIONS.map((presentation) => [role, presentation] as const),
-  ),
-)('%s %s production rig', (role, presentation) => {
+  ROLE_IDS.flatMap((role) => DEVELOPER_HAIRSTYLES.map((hairstyle) => [role, hairstyle] as const)),
+)('%s %s production rig', (role, hairstyle) => {
   it('attaches shoulders, elbows and wrists; grounds split legs and bounds every accessory', () => {
     const materials = kitMaterials();
-    const c = createDeveloper(1, materials, role, { ...developerAppearance(1), presentation });
+    const c = createDeveloper(1, materials, role, { ...developerAppearance(1), hairstyle });
     const rig = c.rig;
     if (!rig) throw new Error('Missing production rig');
     c.root.position.set(4, 0, 7);
@@ -85,7 +83,7 @@ describe.each(
 
   it('clears the real folder envelope and hands through the complete wind-up, including moving/shoved carriers', () => {
     const materials = kitMaterials();
-    const c = createDeveloper(2, materials, role, { ...developerAppearance(2), presentation });
+    const c = createDeveloper(2, materials, role, { ...developerAppearance(2), hairstyle });
     const folder = ticketModel('feature');
     folder.body.computeBoundingBox();
     const bounds = folder.body.boundingBox;
@@ -130,7 +128,7 @@ describe.each(
 
   it('owns all geometry but never the shared material', () => {
     const materials = kitMaterials();
-    const c = createDeveloper(3, materials, role, { ...developerAppearance(3), presentation });
+    const c = createDeveloper(3, materials, role, { ...developerAppearance(3), hairstyle });
     const parent = new THREE.Group();
     parent.add(c.root);
     const shared = vi.spyOn(materials.body, 'dispose');
@@ -148,7 +146,7 @@ describe.each(
 
 it('keeps role geometry independent of owner color and skin/hair cosmetics', () => {
   const materials = kitMaterials();
-  const appearance = { skin: 0xc68b59, hair: 0x302728, presentation: 'male' as const };
+  const appearance = { skin: 0xc68b59, hair: 0x302728, hairstyle: 'swept' as const };
   const silhouettes = new Set<string>();
   for (const role of ROLE_IDS) {
     const crew = [1, 2, 3, 4].map((id) => createDeveloper(id, materials, role, appearance));
@@ -172,35 +170,55 @@ it('keeps role geometry independent of owner color and skin/hair cosmetics', () 
   for (const m of [materials.body, materials.glow, materials.glass]) m.dispose();
 });
 
-it('provides male and female faces/hair for every role without changing outfit, ownership or rig targets', () => {
+it('provides every hairstyle for every role with a shared face, outfit, ownership and rig targets', () => {
   const materials = kitMaterials();
   for (const role of ROLE_IDS) {
-    const male = createDeveloper(1, materials, role, {
-      ...developerAppearance(1),
-      presentation: 'male',
-    });
-    const female = createDeveloper(1, materials, role, {
-      ...developerAppearance(1),
-      presentation: 'female',
-    });
-    expect(male.rig?.presentation).toBe('male');
-    expect(female.rig?.presentation).toBe('female');
-    expect(male.geometries[0]?.getAttribute('position').array).toEqual(
-      female.geometries[0]?.getAttribute('position').array,
+    const crew = DEVELOPER_HAIRSTYLES.map((hairstyle) =>
+      createDeveloper(1, materials, role, { ...developerAppearance(1), hairstyle }),
     );
-    expect(male.geometries[0]?.getAttribute('color').array).toEqual(
-      female.geometries[0]?.getAttribute('color').array,
-    );
-    expect(male.geometries[1]?.getAttribute('position').array).not.toEqual(
-      female.geometries[1]?.getAttribute('position').array,
-    );
-    for (const c of [male, female]) {
+    const first = crew[0];
+    if (!first) throw new Error('Missing hairstyle comparison');
+    const heads = new Set<string>();
+    const skin = new THREE.Color(developerAppearance(1).skin);
+    const faces: number[][] = [];
+    for (const [i, c] of crew.entries()) {
+      expect(c.rig?.hairstyle).toBe(DEVELOPER_HAIRSTYLES[i]);
+      expect(c.geometries[0]?.getAttribute('position').array).toEqual(
+        first.geometries[0]?.getAttribute('position').array,
+      );
+      expect(c.geometries[0]?.getAttribute('color').array).toEqual(
+        first.geometries[0]?.getAttribute('color').array,
+      );
+      const positions = c.geometries[1]?.getAttribute('position');
+      const colors = c.geometries[1]?.getAttribute('color');
+      if (!positions || !colors) throw new Error('Missing head geometry');
+      heads.add(JSON.stringify(Array.from(positions.array)));
+      const face: number[] = [];
+      for (let vertex = 0; vertex < positions.count; vertex++) {
+        if (
+          Math.abs(colors.getX(vertex) - skin.r) < 1e-6 &&
+          Math.abs(colors.getY(vertex) - skin.g) < 1e-6 &&
+          Math.abs(colors.getZ(vertex) - skin.b) < 1e-6
+        ) {
+          face.push(positions.getX(vertex), positions.getY(vertex), positions.getZ(vertex));
+        }
+      }
+      expect(face.length).toBeGreaterThan(0);
+      faces.push(face);
       applyPose(c, playerPose(studyFrame('carry', 900).input, 900));
+      expect(c.leftHand.position).toEqual(first.leftHand.position);
+      expect(c.rightHand.position).toEqual(first.rightHand.position);
     }
-    expect(male.leftHand.position).toEqual(female.leftHand.position);
-    expect(male.rightHand.position).toEqual(female.rightHand.position);
-    disposeCharacter(male);
-    disposeCharacter(female);
+    expect(heads.size).toBe(DEVELOPER_HAIRSTYLES.length);
+    faces.forEach((face) => {
+      expect(face).toEqual(faces[0]);
+    });
+    crew.forEach(disposeCharacter);
   }
   for (const m of [materials.body, materials.glow, materials.glass]) m.dispose();
+});
+
+it('defaults to a varied crew without a gender field', () => {
+  expect([1, 2, 3, 4].map((id) => developerAppearance(id).hairstyle)).toEqual(DEVELOPER_HAIRSTYLES);
+  expect(Object.keys(developerAppearance(1)).sort()).toEqual(['hair', 'hairstyle', 'skin']);
 });

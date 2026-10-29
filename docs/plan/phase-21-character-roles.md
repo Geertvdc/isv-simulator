@@ -253,19 +253,19 @@ Do not treat production implementation or screenshots as final art acceptance, v
 
 ### 21c first part: production cast review
 
-Each of the five roles has **male and female characters**, as subsequently requested by the user. Both variants keep the role's outfit and shared rig: rolled-sleeve/strap generalist, asymmetric cropped frontend jacket, square-collared backend vest, narrow QA coat with inspection glasses, and platform utility jacket with headset. Role-specific hair cuts, softer/squarer faces, tied hair and optional facial hair distinguish the variants without changing work/movement behavior. Skin/hair color and male/female presentation are person cosmetics, independent of role. Normal four-player casts alternate male/female appearances by owner; the dev review can show either or both for every role. No appearance-selection UI or extra sim/network field is added here. This first set uses hair, clothes, facial hair and accessories rather than default hats; occasional future hats remain permitted.
+The user redirected the cast to **one gender-neutral crew**, replacing the earlier binary variants. Every role uses the same face design and supports swept, cropped, long and tied hairstyles, without a gender field or male/female switch. Hair length/style, skin and hair color are person cosmetics, independent of profession. Normal four-player casts use all four hairstyles. Role outfits remain distinct: rolled-sleeve/strap generalist, asymmetric cropped frontend jacket, square-collared backend vest, narrow QA coat with inspection glasses, and platform utility jacket with headset. Faces, outfits, rig targets and work/movement behavior do not change with hairstyle. No appearance-selection UI or extra sim/network field is added here. This first set uses hair, clothes and accessories rather than default hats; occasional future hats remain permitted.
 
 `DeveloperRig.ts` owns only production geometry and the common attached-limb rig; no study geometry or model-sheet imports enter the game. `Characters.ts` retains the manager/extras' original body behavior. `People.ts` selects from authoritative `roleId` state, including interpolated/spectator views, and replaces/disposes owned geometry when a role changes in the viewed state. This is rendering support, not a mid-round role-selection feature. Player color, floor-tab number and owner shape stay independent of outfit/badge identity. Normal rounds default to the new generalist.
 
 Common hand/ticket targets, smoothed-facing alignment, movement, collision, station reach, gait frequency and sim throw rules remain shared. The torso ducks left and back around the unchanged folder arc. The new dash/carry regression test also verifies wrists after dash removes walk bob. Overlays use an animated head/hair/headset envelope rather than the obsolete tallest-hat assumption.
 
-- [x] Five production role models, each with independent male/female variants; normal game uses the new generalist without adding a selection path.
+- [x] Five production role models with shared gender-neutral faces and four independent hairstyles each; normal game uses the new generalist without adding a selection path.
 - [x] All seven actions, attached arm joints, split grounded legs, common carry/throw alignment.
-- [x] Tests cover both male/female variants of every role, translated/rotated roots, arm segment reach, feet, animated head/accessory bounds, and all 101 wind-up samples against the actual folder/tab/flap envelope while still, walking, dashing and shoved.
+- [x] Tests cover all four hairstyles of every role, shared face geometry, translated/rotated roots, arm segment reach, feet, animated head/accessory bounds, and all 101 wind-up samples against the actual folder/tab/flap envelope while still, walking, dashing and shoved.
 - [x] Tests cover independent owner colors/cosmetics, unique role geometry, stable same-role sync, replacement/removal disposal, and smoothed-facing ticket/wrist alignment. Renderer sync leaves state unchanged.
 - [x] Enlarged front/rear, grayscale, all-action and duplicate-role model comparisons; real four-player gameplay scenes show HUD/stations, carried tickets, actual wind-up and actual flight.
-- [x] `npm run check` (81 files, 1,148 tests) and `npm run build` pass.
-- [x] Independent critic completed (two rounds), with no outstanding substantive defects. Round one's fixture-readability concern led to moving the back pair clear of the conveyor. Round two reviewed male/female code and lineup/rear evidence; final corrected gameplay captures were inspected by the implementing agent after capture completed, not independently re-reviewed.
+- [x] `npm run check` (81 files, 1,179 tests) and `npm run build` pass after the gender-neutral revision.
+- [ ] Independent critic confirms the revised cast. Two earlier rounds reviewed rig correctness and improved gameplay-fixture readability; the previous binary variants are superseded.
 - [ ] User accepts the production cast at actual gameplay scale.
 - [ ] Human two-second couch readability, rear/grayscale recognition and four-identical-role play verified.
 
@@ -273,8 +273,8 @@ The two human boxes are intentionally unchecked. Captures demonstrate geometry a
 
 | Review | URL |
 | --- | --- |
-| Five roles, male/female | `/models.html?cast&still&action=idle&time=900` (male back row, female front row) |
-| Male or female comparison | `/models.html?cast&presentation=male&still&action=idle`, `/models.html?cast&presentation=female&still&action=idle` |
+| Five roles, varied hair | `/models.html?cast&still&action=idle&time=900` (short hair back row, long hair front row) |
+| Every role/hairstyle | `/models.html` (office kit lists all twenty combinations) |
 | All actions, pause/scrub | `/models.html?cast&action=throw` |
 | Rear/grayscale | `/models.html?cast&still&action=idle&rear&gray` |
 | Four copies of a role | `/models.html?cast&role=generalist&still&action=carry` (also `frontend`, `backend`, `qa`, `platform`) |
@@ -283,4 +283,4 @@ The two human boxes are intentionally unchecked. Captures demonstrate geometry a
 | Actual four generalists | `/?scene=cast-duplicates&quality=low` |
 | Actual sim throw | `/?scene=cast-windup&quality=low`, `/?scene=cast-release&quality=low` |
 
-Capture with `npx vite-node scripts/characterCast.ts --base=http://localhost:5197 --out=/absolute/evidence/directory` (optional `--cdp-port=9361`). The script uses a private headless Chrome profile, waits for real scene completion and includes a narrow review-page capture. It does not replace the approved `docs/game/` screenshot catalog. The model-sheet release remains illustrative and is labeled as such; actual gameplay flight comes from the unchanged sim.
+Capture with `npx vite-node scripts/characterCast.ts --base=http://127.0.0.1:5198 --out=/absolute/evidence/directory` (optional `--cdp-port=9361`). The script uses a private headless Chrome profile, waits for real scene completion and includes a narrow review-page capture. It does not replace the approved `docs/game/` screenshot catalog. The model-sheet release remains illustrative and is labeled as such; actual gameplay flight comes from the unchanged sim.

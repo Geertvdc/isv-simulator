@@ -22,7 +22,7 @@ import { STATION_HEIGHT } from '../render/three/layout';
 import { FLOOR_THEMES, WALL_THEMES } from '../render/mapLook';
 import { ROLE_IDS } from '../sim/roles';
 import { ROLE_LABELS } from '../sim/content';
-import { DEVELOPER_PRESENTATIONS, developerAppearance } from '../render/three/DeveloperRig';
+import { DEVELOPER_HAIRSTYLES, developerAppearance } from '../render/three/DeveloperRig';
 
 const SPACING = 2.2;
 const COLUMNS = 7;
@@ -39,10 +39,10 @@ const POSES: [string, Partial<PoseInput>][] = [
 
 const people: Entry[] = [
   ...ROLE_IDS.flatMap((role) =>
-    DEVELOPER_PRESENTATIONS.map((presentation): Entry => [
-      `${ROLE_LABELS[role]} ${presentation}`,
+    DEVELOPER_HAIRSTYLES.map((hairstyle): Entry => [
+      `${ROLE_LABELS[role]} ${hairstyle} hair`,
       () => {
-        const c = createDeveloper(1, materials, role, { ...developerAppearance(1), presentation });
+        const c = createDeveloper(1, materials, role, { ...developerAppearance(1), hairstyle });
         applyPose(c, playerPose(IDLE, 0));
         return c.root;
       },

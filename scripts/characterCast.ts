@@ -18,8 +18,6 @@ const browser = await launchChrome(Number(arg('cdp-port') ?? 9361), 'production-
 try {
   const models: [string, string][] = [
     ['cast-lineup', 'action=idle'],
-    ['cast-male', 'action=idle&presentation=male'],
-    ['cast-female', 'action=idle&presentation=female'],
     ['cast-carry', 'action=carry'],
     ['cast-rear-gray', 'action=idle&rear&gray'],
     ...['walk', 'work', 'dash', 'throw', 'shove'].map((action): [string, string] => [

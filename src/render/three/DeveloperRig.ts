@@ -13,21 +13,21 @@ const TROUSERS = 0x29384e;
 const CREAM = 0xf2e5cf;
 const SKINS = [0xf2c6a0, 0x8d5a3b, 0xc68b59, 0xe8b48a] as const;
 const HAIRS = [0x302728, 0x171c23, 0x885030, 0x493834] as const;
-export const DEVELOPER_PRESENTATIONS = ['male', 'female'] as const;
-export type DeveloperPresentation = (typeof DEVELOPER_PRESENTATIONS)[number];
+export const DEVELOPER_HAIRSTYLES = ['swept', 'cropped', 'long', 'tied'] as const;
+export type DeveloperHairstyle = (typeof DEVELOPER_HAIRSTYLES)[number];
 
 /** Cosmetics belong to the person, never to their profession. */
 export interface DeveloperAppearance {
   skin: number;
   hair: number;
-  presentation?: DeveloperPresentation;
+  hairstyle?: DeveloperHairstyle;
 }
 
 export function developerAppearance(id: PlayerId): Required<DeveloperAppearance> {
   return {
     skin: SKINS[(id - 1) % SKINS.length] ?? PALETTE.skin,
     hair: HAIRS[(id - 1) % HAIRS.length] ?? HAIRS[0],
-    presentation: id % 2 === 0 ? 'female' : 'male',
+    hairstyle: DEVELOPER_HAIRSTYLES[(id - 1) % DEVELOPER_HAIRSTYLES.length] ?? 'swept',
   };
 }
 
@@ -45,7 +45,7 @@ interface Leg {
 }
 export interface DeveloperRig {
   roleId: RoleId;
-  presentation: DeveloperPresentation;
+  hairstyle: DeveloperHairstyle;
   root: THREE.Group;
   torso: THREE.Group;
   head: THREE.Group;
@@ -73,8 +73,7 @@ export function createDeveloperRig(
   const cut = CUTS[roleId];
   const color = playerColor(id);
   const { skin, hair } = appearance;
-  const presentation = appearance.presentation ?? developerAppearance(id).presentation;
-  const female = presentation === 'female';
+  const hairstyle = appearance.hairstyle ?? developerAppearance(id).hairstyle;
   const root = new THREE.Group();
   root.name = `developer-${roleId}`;
   const torso = new THREE.Group();
@@ -135,47 +134,38 @@ export function createDeveloperRig(
   torso.add(mesh(jacket));
 
   const face = new ModelBuilder()
-    .box(female ? 0.36 : 0.39, 0.37, 0.34, skin, { at: [0, 0.17, 0] }, female ? 0.065 : 0.055)
-    .box(female ? 0.085 : 0.1, 0.07, 0.11, skin, { at: [0, 0.14, 0.2] }, 0.02);
-  switch (roleId) {
-    case 'generalist':
+    .box(0.38, 0.37, 0.34, skin, { at: [0, 0.17, 0] }, 0.06)
+    .box(0.09, 0.07, 0.11, skin, { at: [0, 0.14, 0.2] }, 0.02);
+  switch (hairstyle) {
+    case 'swept':
       face
         .box(0.35, 0.13, 0.28, hair, { at: [-0.025, 0.35, -0.025], rot: [0.12, 0, 0.3] })
         .box(0.09, 0.2, 0.25, hair, { at: [-0.17, 0.25, -0.05] }, 0.02);
-      if (female) {
-        face
-          .box(0.32, 0.19, 0.08, hair, { at: [0, 0.21, -0.16] })
-          .box(0.16, 0.2, 0.13, hair, { at: [-0.08, 0.1, -0.22], rot: [-0.25, 0, 0.15] })
-          .box(0.17, 0.035, 0.14, CREAM, { at: [-0.08, 0.18, -0.22] });
-      }
       break;
-    case 'frontend':
-      face
-        .box(0.29, 0.15, 0.32, hair, { at: [-0.07, 0.36, -0.025], rot: [0, 0, 0.2] })
-        .box(female ? 0.15 : 0.08, female ? 0.34 : 0.16, 0.29, hair, {
-          at: [female ? -0.2 : -0.17, female ? 0.22 : 0.3, -0.045],
-        })
-        .box(0.06, 0.18, 0.3, hair, { at: [0.18, 0.29, -0.04] });
-      if (female) face.sphere(0.027, CREAM, { at: [0.205, 0.08, 0.04] });
-      break;
-    case 'backend':
+    case 'cropped':
       face
         .box(0.39, 0.075, 0.33, hair, { at: [0, 0.36, -0.02] })
         .box(0.34, 0.18, 0.08, hair, { at: [0, 0.22, -0.16] });
-      if (female) {
-        face
-          .box(0.27, 0.1, 0.2, hair, { at: [0.06, 0.34, 0.075], rot: [0, 0, -0.18] })
-          .box(0.2, 0.16, 0.14, hair, { at: [0, 0.14, -0.23] });
-      } else {
-        face.box(0.37, 0.12, 0.09, hair, { at: [0, 0.07, 0.145] });
-      }
       break;
-    case 'qa':
+    case 'long':
       face
-        .box(0.47, 0.15, 0.36, hair, { at: [0, 0.37, -0.04] }, 0.05)
-        .box(0.1, female ? 0.3 : 0.13, 0.3, hair, { at: [-0.21, female ? 0.21 : 0.3, -0.05] })
-        .box(0.1, female ? 0.3 : 0.13, 0.3, hair, { at: [0.21, female ? 0.21 : 0.3, -0.05] })
-        .box(0.41, 0.05, 0.035, TROUSERS, { at: [0, 0.23, -0.205] });
+        .box(0.44, 0.13, 0.36, hair, { at: [0, 0.36, -0.04] }, 0.04)
+        .box(0.1, 0.3, 0.3, hair, { at: [-0.21, 0.21, -0.05] })
+        .box(0.1, 0.3, 0.3, hair, { at: [0.21, 0.21, -0.05] })
+        .box(0.34, 0.3, 0.08, hair, { at: [0, 0.21, -0.17] });
+      break;
+    case 'tied':
+      face
+        .box(0.37, 0.09, 0.32, hair, { at: [0, 0.36, -0.02] })
+        .box(0.27, 0.1, 0.2, hair, { at: [0.06, 0.34, 0.075], rot: [0, 0, -0.18] })
+        .box(0.32, 0.22, 0.07, hair, { at: [0, 0.22, -0.17] })
+        .box(0.16, 0.2, 0.13, hair, { at: [-0.08, 0.1, -0.22], rot: [-0.25, 0, 0.15] })
+        .box(0.17, 0.035, 0.14, CREAM, { at: [-0.08, 0.18, -0.22] });
+      break;
+  }
+  switch (roleId) {
+    case 'qa':
+      face.box(0.41, 0.05, 0.035, TROUSERS, { at: [0, 0.23, -0.225] });
       for (const x of [-0.085, 0.085]) {
         face.box(0.155, 0.13, 0.045, TROUSERS, { at: [x, 0.22, 0.19] }, 0.02);
         face.box(0.115, 0.09, 0.02, CREAM, { at: [x, 0.22, 0.218] });
@@ -183,17 +173,11 @@ export function createDeveloperRig(
       break;
     case 'platform':
       face
-        .box(0.37, 0.09, 0.32, hair, { at: [0, 0.36, -0.02] })
         .torus(0.235, 0.028, TROUSERS, { at: [0, 0.22, 0], rot: [0, 0, 0] }, Math.PI)
         .box(0.09, 0.17, 0.18, TROUSERS, { at: [-0.235, 0.21, 0] })
         .box(0.09, 0.17, 0.18, TROUSERS, { at: [0.235, 0.21, 0] })
         .box(0.025, 0.025, 0.16, TROUSERS, { at: [0.23, 0.14, 0.13] })
         .sphere(0.035, CREAM, { at: [0.23, 0.14, 0.22] });
-      if (female) {
-        face
-          .box(0.32, 0.22, 0.07, hair, { at: [0, 0.22, -0.17] })
-          .box(0.22, 0.16, 0.13, hair, { at: [0, 0.23, -0.22] });
-      }
       break;
   }
   for (const sign of [-1, 1]) {
@@ -205,13 +189,13 @@ export function createDeveloperRig(
         { at: [sign * 0.08, 0.215, roleId === 'qa' ? 0.235 : 0.195] },
         [1, 1.2, 0.5],
       )
-      .box(0.075, female ? 0.018 : 0.025, 0.025, hair, {
+      .box(0.075, 0.022, 0.025, hair, {
         at: [sign * 0.08, 0.29, 0.18],
-        rot: [0, 0, sign * (female ? 0.18 : 0.1)],
+        rot: [0, 0, sign * 0.14],
       })
       .sphere(0.045, skin, { at: [sign * 0.195, 0.13, 0] });
   }
-  face.box(0.08, 0.018, 0.025, roleId === 'backend' && !female ? CREAM : PALETTE.ink, {
+  face.box(0.08, 0.018, 0.025, PALETTE.ink, {
     at: [0, 0.065, 0.2],
   });
   head.add(mesh(face));
@@ -241,7 +225,7 @@ export function createDeveloperRig(
   };
   return {
     roleId,
-    presentation,
+    hairstyle,
     root,
     torso,
     head,

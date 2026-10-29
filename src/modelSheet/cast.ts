@@ -16,7 +16,7 @@ import { createLights, dressScene } from '../render/three/look';
 import { ticketModel } from '../render/three/models';
 import { playerPose } from '../render/three/pose';
 import { playerMarker } from '../render/three/playerMarker';
-import { DEVELOPER_PRESENTATIONS, developerAppearance } from '../render/three/DeveloperRig';
+import { developerAppearance } from '../render/three/DeveloperRig';
 import { Stage, disposeTree } from '../render/three/stage';
 import { STUDY_ACTIONS, STUDY_LOOP_MS, studyFrame, type StudyAction } from './studyScenes';
 import './studies.css';
@@ -25,7 +25,6 @@ document.body.classList.add('study-page');
 document.title = 'Compact angular production cast';
 const params = new URLSearchParams(location.search);
 const selected = ROLE_IDS.find((role) => role === params.get('role'));
-const presentation = DEVELOPER_PRESENTATIONS.find((value) => value === params.get('presentation'));
 const action: StudyAction = STUDY_ACTIONS.find((a) => a === params.get('action')) ?? 'carry';
 let time = Number(params.get('time') ?? 900);
 if (!Number.isFinite(time)) throw new Error('Invalid pose time');
@@ -38,11 +37,10 @@ controls.className = 'study-controls';
 controls.setAttribute('aria-label', 'Production cast review');
 controls.innerHTML = `
   <h1>Compact angular crew</h1>
-  <p>Male and female characters in every role · <a href="/?scene=cast-mixed&quality=low">Mixed gameplay</a> · <a href="/?scene=cast-platform&quality=low">Platform gameplay</a> · <a href="/?scene=cast-duplicates&quality=low">Four generalists</a> · <a href="/models.html">Office kit</a></p>
+  <p>One crew, short and long hair in every role · <a href="/?scene=cast-mixed&quality=low">Mixed gameplay</a> · <a href="/?scene=cast-platform&quality=low">Platform gameplay</a> · <a href="/?scene=cast-duplicates&quality=low">Four generalists</a> · <a href="/models.html">Office kit</a></p>
   <form class="study-toolbar">
     <input type="hidden" name="cast">
     <label>Cast <select name="role"><option value="">All five roles</option>${ROLE_IDS.map((role) => `<option value="${role}">${ROLE_LABELS[role]} · four copies</option>`).join('')}</select></label>
-    <label>Characters <select name="presentation"><option value="">Male + female</option><option value="male">Male</option><option value="female">Female</option></select></label>
     <label>Action <select name="action">${STUDY_ACTIONS.map((a) => `<option>${a}</option>`).join('')}</select></label>
     <label><input name="rear" type="checkbox"> Reverse</label>
     <label><input name="gray" type="checkbox"> Grayscale</label>
@@ -52,7 +50,6 @@ controls.innerHTML = `
 document.body.append(controls);
 const form = controls.querySelector('form');
 const roleControl = controls.querySelector<HTMLSelectElement>('[name=role]');
-const presentationControl = controls.querySelector<HTMLSelectElement>('[name=presentation]');
 const actionControl = controls.querySelector<HTMLSelectElement>('[name=action]');
 const rearControl = controls.querySelector<HTMLInputElement>('[name=rear]');
 const grayControl = controls.querySelector<HTMLInputElement>('[name=gray]');
@@ -62,7 +59,6 @@ const pause = controls.querySelector<HTMLButtonElement>('#cast-pause');
 if (
   !form ||
   !roleControl ||
-  !presentationControl ||
   !actionControl ||
   !rearControl ||
   !grayControl ||
@@ -73,7 +69,6 @@ if (
   throw new Error('Missing cast controls');
 }
 roleControl.value = selected ?? '';
-presentationControl.value = presentation ?? '';
 actionControl.value = action;
 rearControl.checked = rear;
 grayControl.checked = gray;
@@ -87,7 +82,7 @@ const save = (): void => {
   if (paused) query.set('still', '');
   history.replaceState(null, '', `?${query}`);
 };
-for (const el of [roleControl, presentationControl, actionControl])
+for (const el of [roleControl, actionControl])
   el.addEventListener('change', () => {
     save();
     location.reload();
@@ -123,9 +118,7 @@ const caption = document.createElement('p');
 caption.className = 'study-caption';
 const variantCaption = selected
   ? 'Four independent owners, with the same role.'
-  : presentation
-    ? `All five roles, ${presentation} characters.`
-    : 'All roles: male back row, female front row.';
+  : 'All roles: short hair back row, long hair front row. Each role supports every hairstyle.';
 caption.textContent = `${variantCaption} Reverse for rear views. Outfits/badges identify role; color/shape/number identify owner. Enlarged review, not couch-distance proof. Model-sheet throw release is illustrative.`;
 document.body.append(caption);
 const stage = new Stage(parent);
@@ -145,9 +138,15 @@ roles.forEach((role, i) => {
     const id = selected ? n + 1 : 1;
     const character = createDeveloper(id, materials, role, {
       ...developerAppearance(id),
-      presentation:
-        presentation ??
-        (selected ? developerAppearance(id).presentation : n === 0 ? 'male' : 'female'),
+      hairstyle: selected
+        ? developerAppearance(id).hairstyle
+        : i % 2 === 0
+          ? n === 0
+            ? 'swept'
+            : 'long'
+          : n === 0
+            ? 'cropped'
+            : 'tied',
     });
     const anchor = new THREE.Group();
     const x = selected ? (n % 2) * 1.6 : i * 1.65;
