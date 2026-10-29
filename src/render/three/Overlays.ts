@@ -191,7 +191,7 @@ export class Overlays {
       const tile = loc.kind === 'tile' ? getTile(state.level, loc.x, loc.y) : null;
       const progress = stationWorkStep(ticket, tile)?.progress ?? 0;
       const bar = progress > 0 && progress < 1 ? progress : null;
-      const key = `${ticket.steps.map((s) => s.progress >= 1).join()}|${bar ?? ''}`;
+      const key = `${ticket.steps.map((s) => s.progress >= 1).join()}|${bar ?? ''}|${ticket.expired}`;
       if (key !== card.drawn) {
         card.drawn = key;
         drawTicketCard(card.g, ticket, bar);

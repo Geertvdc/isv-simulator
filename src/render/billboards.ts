@@ -35,6 +35,10 @@ const OUTLINE_COLOR: Readonly<Record<TicketKind, number>> = {
 const ICON_SPACING = 11;
 const ICON_RADIUS = 4.5;
 const ICON_TODO_COLOR = 0xc9c4b5;
+/** A ticket whose order ran out: grey, with a red cross. */
+const EXPIRED_CARD_COLOR = 0x9a9890;
+const EXPIRED_OUTLINE_COLOR = 0x55534d;
+const EXPIRED_CROSS_COLOR = 0xd62828;
 /** Each step's icon takes the color of the station that does it. */
 const STEP_STATION: Readonly<Record<StepKind, BlockTile>> = {
   design: 'whiteboard',
@@ -63,15 +67,16 @@ export function isPaired(state: GameState, ticket: Ticket): boolean {
 /** Draws the card with its bottom center at (0, 0), and the progress bar above it if any. */
 export function drawTicketCard(
   g: Phaser.GameObjects.Graphics,
-  ticket: Pick<Ticket, 'kind' | 'steps'>,
+  ticket: Pick<Ticket, 'kind' | 'steps' | 'expired'>,
   bar: number | null,
 ): void {
   g.clear();
+  const { expired } = ticket;
   const width = Math.max(CARD_MIN_WIDTH, (ticket.steps.length + 1) * ICON_SPACING);
   const left = -width / 2;
   const top = -CARD_HEIGHT;
-  const outline = OUTLINE_COLOR[ticket.kind];
-  g.fillStyle(CARD_COLOR[ticket.kind]);
+  const outline = expired ? EXPIRED_OUTLINE_COLOR : OUTLINE_COLOR[ticket.kind];
+  g.fillStyle(expired ? EXPIRED_CARD_COLOR : CARD_COLOR[ticket.kind]);
   g.lineStyle(2, outline);
   g.fillRoundedRect(left, top, width, CARD_HEIGHT, 3);
   g.strokeRoundedRect(left, top, width, CARD_HEIGHT, 3);
@@ -84,12 +89,20 @@ export function drawTicketCard(
   ticket.steps.forEach((step, i) => {
     const x = left + spacing * (i + 1);
     const y = -ICON_RADIUS - 3;
-    const done = step.progress >= 1;
+    const done = step.progress >= 1 && !expired;
     g.fillStyle(done ? tileColor(STEP_STATION[step.kind]) : ICON_TODO_COLOR);
     g.fillCircle(x, y, ICON_RADIUS);
-    g.lineStyle(1.5, done ? outline : tileColor(STEP_STATION[step.kind]));
+    g.lineStyle(1.5, done || expired ? outline : tileColor(STEP_STATION[step.kind]));
     g.strokeCircle(x, y, ICON_RADIUS);
   });
+
+  if (expired) {
+    // Its order ran out: a big red cross, fit only for the bin.
+    const inset = 3;
+    g.lineStyle(3, EXPIRED_CROSS_COLOR);
+    g.lineBetween(left + inset, top + inset, left + width - inset, -inset);
+    g.lineBetween(left + width - inset, top + inset, left + inset, -inset);
+  }
 
   if (bar !== null) drawProgressBar(g, 0, top - BAR_GAP - BAR_HEIGHT, bar);
 }
