@@ -11,28 +11,30 @@ export type RosterCommand =
   | { type: 'role'; playerId: number; roleId: RoleId }
   | { type: 'ready'; playerId: number; ready: boolean };
 
+/** Why a roster command was refused (shown with `COMMAND_FAILURE_TEXT`). */
+export type RosterFailure = 'rosterLocked' | 'unknownPlayer' | 'unknownRole';
+
 /** Unconfigured bindings (including old test/dev entry points) start as generalists. */
 export function selection(lobby: Lobby, playerId: number): Selection {
   return lobby.selections?.[playerId] ?? { roleId: 'generalist', ready: false };
 }
 
+/**
+ * The roster command handler. Outside `src/flow` go through `applyCommand`
+ * (`./commands`), which dispatches here.
+ */
 export function configureRoster(
   lobby: Lobby,
   screen: string,
   command: RosterCommand,
-): { ok: true } | { ok: false; reason: string } {
-  if (screen !== 'lobby' && screen !== 'intro') {
-    return {
-      ok: false,
-      reason: 'Roles and readiness are locked until the next team confirmation.',
-    };
-  }
+): { ok: true } | { ok: false; reason: RosterFailure } {
+  if (screen !== 'lobby' && screen !== 'intro') return { ok: false, reason: 'rosterLocked' };
   if (!lobby.players.some((p) => p.playerId === command.playerId)) {
-    return { ok: false, reason: 'That player is not in the roster.' };
+    return { ok: false, reason: 'unknownPlayer' };
   }
   const previous = selection(lobby, command.playerId);
   if (command.type === 'role' && !isRoleId(command.roleId)) {
-    return { ok: false, reason: 'Unknown role.' };
+    return { ok: false, reason: 'unknownRole' };
   }
   const next =
     command.type === 'role'

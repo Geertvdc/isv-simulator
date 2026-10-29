@@ -544,6 +544,13 @@ export const PROFILE_TEXT = {
   badName: 'A name needs 1 to 24 characters.',
 } as const;
 
+/** Why a flow command (`applyCommand` in `src/flow/commands.ts`) was refused. */
+export const COMMAND_FAILURE_TEXT = {
+  rosterLocked: 'Roles and readiness are locked until the next team confirmation.',
+  unknownPlayer: 'That player is not in the roster.',
+  unknownRole: 'Unknown role.',
+} as const;
+
 /** Hosting, joining and the online lobby. */
 export const ONLINE_TEXT = {
   joinTitle: 'Join online',
