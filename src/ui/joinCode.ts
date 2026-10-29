@@ -9,7 +9,7 @@
 import type { OnlineError } from '../flow/flow';
 import { NET_JOIN_CODE_LENGTH } from '../sim/balance';
 import { ONLINE_TEXT } from '../sim/content';
-import { el } from './dom';
+import { type Mounted, el, mountScreen } from './dom';
 import { statusBar } from './statusBar';
 import type { ScreenView } from './screens';
 
@@ -22,7 +22,7 @@ export interface JoinCodeDeps {
   onCancel: () => void;
 }
 
-export function mountJoinCode(root: HTMLElement, deps: JoinCodeDeps): ScreenView {
+export function mountJoinCode(root: HTMLElement, deps: JoinCodeDeps): ScreenView & Mounted {
   const screen = el('div', 'screen join-code-screen');
   screen.hidden = true;
   const boxes = el('div', 'join-code-boxes');
@@ -46,9 +46,9 @@ export function mountJoinCode(root: HTMLElement, deps: JoinCodeDeps): ScreenView
     status,
     statusBar(ONLINE_TEXT.joinCodeHint),
   );
-  root.append(screen);
+  const { scope, unmount } = mountScreen(root, screen);
 
-  input.addEventListener('keydown', (e) => {
+  scope.listen(input, 'keydown', (e) => {
     // Typing is for the box, never for the game.
     e.stopPropagation();
     if (e.key === 'Tab') e.preventDefault();
@@ -61,11 +61,11 @@ export function mountJoinCode(root: HTMLElement, deps: JoinCodeDeps): ScreenView
       deps.onCancel();
     }
   });
-  input.addEventListener('input', () => {
+  scope.listen(input, 'input', () => {
     deps.onText(input.value);
   });
   // A click anywhere on the screen puts the typing back in the box.
-  screen.addEventListener('pointerdown', (e) => {
+  scope.listen(screen, 'pointerdown', (e) => {
     if (e.target !== input) e.preventDefault();
     input.focus();
   });
@@ -73,6 +73,7 @@ export function mountJoinCode(root: HTMLElement, deps: JoinCodeDeps): ScreenView
   let shownError: OnlineError | null = null;
 
   return {
+    unmount,
     render: (view) => {
       const visible = view?.flow.screen === 'joinCode';
       const wasHidden = screen.hidden;
