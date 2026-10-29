@@ -7,7 +7,7 @@ import type { Ticket } from './tickets';
 import { createOrder } from './orders';
 import { type GameState, type PlayerId, createGame } from './state';
 import { pipelineAt } from './pipeline';
-import { COL, addTicket, idle, newTestGame } from './testing';
+import { COL, addTicket, idle, newTestGame, standAt } from './testing';
 import { tick } from './tick';
 
 describe('findPath', () => {
@@ -165,6 +165,38 @@ describe('bot and new mechanics', () => {
 
     expect(unassigned.ticketId).toBeNull();
     expect(command.interact).toBe(false);
+  });
+
+  it('includes walking distance when assigning a queue head', () => {
+    const state = newTestGame();
+    const order = createOrder(state, 'feature', 'Work');
+    const farBot = createBot(1, false, 'role-aware');
+    const nearBot = createBot(2, false, 'role-aware');
+    const bots = [farBot, nearBot];
+    standAt(state, 1, 11);
+    standAt(state, 2, 2);
+
+    botInput(state, farBot, bots);
+    botInput(state, nearBot, bots);
+
+    expect(farBot.ticketId).toBeNull();
+    expect(nearBot.ticketId).toBe(order.id);
+  });
+
+  it('breaks equal assignment costs by player id, independent of bot list order', () => {
+    const state = newTestGame();
+    const order = createOrder(state, 'feature', 'Work');
+    const higherId = createBot(2, false, 'role-aware');
+    const lowerId = createBot(1, false, 'role-aware');
+    const bots = [higherId, lowerId];
+    standAt(state, 1, 2);
+    standAt(state, 2, 2);
+
+    botInput(state, higherId, bots);
+    botInput(state, lowerId, bots);
+
+    expect(higherId.ticketId).toBeNull();
+    expect(lowerId.ticketId).toBe(order.id);
   });
 
   it('does not reserve a later queued ticket while the queue head is being fetched', () => {

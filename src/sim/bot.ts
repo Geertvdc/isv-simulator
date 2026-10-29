@@ -19,6 +19,7 @@ import {
   PLAYER_MAX_SPEED,
   REVIEWERS_NEEDED,
   REVIEW_RATE,
+  TICKS_PER_SECOND,
   WORK_RATE,
 } from './balance';
 import { canPutDown, isAtItsStation } from './interact';
@@ -247,7 +248,9 @@ function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | nu
           if (!path) return [];
           return [{
             bot: candidate,
-            score: assignmentTime(ticket, candidatePlayer.roleId) + path.length / PLAYER_MAX_SPEED,
+            score:
+              assignmentTicks(ticket, candidatePlayer.roleId) +
+              (path.length * TICKS_PER_SECOND) / PLAYER_MAX_SPEED,
           }];
         })
         .sort((a, b) => a.score - b.score || a.bot.playerId - b.bot.playerId);
@@ -259,7 +262,7 @@ function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | nu
     return null;
   }
 
-  function assignmentTime(ticket: Ticket, roleId: RoleId): number {
+  function assignmentTicks(ticket: Ticket, roleId: RoleId): number {
     return ticket.steps.reduce((total, step) => {
       if (step.kind === 'pipeline') return total + PIPELINE_BUILD_TICKS;
       if (step.kind === 'merge') return total;
