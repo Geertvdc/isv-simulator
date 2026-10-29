@@ -1,5 +1,7 @@
 # Phase 21 proposal: character roles, ticket domains, and a new cast
 
+> Numbering: main later used Phase 21 for Tickets, so the roadmap lists this work as phase 22. This file and its 21a–21d slice names keep their original numbers because commits, scripts and evidence refer to them.
+
 **Status:** 21a visual investigation complete; the user selected the compact angular foundation. Hats are optional, non-default accessories for the future cast. 21b–21d are not approved for implementation. Numbers below are starting hypotheses, not measured balance results. Implement one approved subphase at a time.
 
 **Goal:** a team of generalists is dependable and can earn three stars; a well-coordinated specialist team has a higher ceiling because it assigns work and hands tickets over well. Mixed teams should be a useful middle ground. Replace the current character silhouette, not just its hats.

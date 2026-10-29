@@ -95,7 +95,7 @@ export function canPutDown(state: GameState, ticket: Ticket, x: number, y: numbe
   const onTile = ticketOnTile(state, x, y);
   // The merge station takes a coded part, and then its other half (which merges them).
   if (tile === 'merge') {
-    if (!isPart(ticket) || !isFinished(ticket)) return false;
+    if (!isPart(ticket) || !isFinished(ticket) || ticket.expired) return false;
     return !onTile || canMerge(onTile, ticket);
   }
   if (tile === null || onTile) return false;

@@ -10,9 +10,9 @@ import {
   ORDER_SPEED_BONUS_MAX,
 } from './balance';
 import { GARAGE } from './levels';
-import { type Order, bugChance, createOrder, shipPoints, starsFor } from './orders';
+import { type Order, bugChance, createOrder, expireOrders, shipPoints, starsFor } from './orders';
 import { createGame } from './state';
-import { COL, addTicket, give, idle, newTestGame, press, standAt } from './testing';
+import { COL, addTicket, give, holdWork, idle, newTestGame, press, standAt } from './testing';
 import { tick } from './tick';
 import { queuedTickets } from './tickets';
 
@@ -132,15 +132,39 @@ describe('expiry', () => {
     expect(queuedTickets(state, 'feature')).toEqual([]);
   });
 
-  it('leaves tickets that are already in progress alone', () => {
+  it('marks its tickets already out in the office as expired, and no others', () => {
     const state = newTestGame();
-    createOrder(state, 'feature', 'Late');
+    const late = createOrder(state, 'feature', 'Late');
     const t = queuedTickets(state, 'feature')[0];
     if (!t) throw new Error('no ticket');
     give(1, t);
+    const onCounter = addTicket(state, COL.counter, { done: 1, orderId: late.id });
+    const other = createOrder(state, 'feature', 'Other');
+    other.expiresTick += 1000;
+    const otherTicket = addTicket(state, COL.counter2, { done: 1, orderId: other.id });
     idle(state, SCHEDULE.timeLimitTicks);
-    expect(state.orders).toEqual([]);
-    expect(state.tickets).toEqual([t]);
+    expect(state.orders).toEqual([other]);
+    expect(t.expired).toBe(true);
+    expect(onCounter.expired).toBe(true);
+    expect(otherTicket.expired).toBe(false);
+    expect(queuedTickets(state, 'feature').map((q) => q.orderId)).toEqual([other.id]);
+  });
+
+  it('marks a flying ticket of theirs as expired too', () => {
+    const state = newTestGame();
+    const order = createOrder(state, 'feature', 'Late');
+    const t = addTicket(state, COL.floor, { orderId: order.id });
+    t.location = {
+      kind: 'flying',
+      pos: { x: 6, y: 3 },
+      from: { x: 5, y: 3 },
+      dir: { x: 1, y: 0 },
+      thrownBy: 1,
+      lastFloor: { x: 6, y: 3 },
+    };
+    state.tick = order.expiresTick;
+    expireOrders(state);
+    expect(t.expired).toBe(true);
   });
 
   it('never takes the score below 0', () => {
@@ -149,6 +173,18 @@ describe('expiry', () => {
     createOrder(state, 'feature', 'Late');
     idle(state, SCHEDULE.timeLimitTicks);
     expect(state.score).toBe(0);
+  });
+
+  it('expired tickets cannot be worked on any more', () => {
+    const state = newTestGame();
+    const order = createOrder(state, 'feature', 'Late');
+    const ticket = addTicket(state, COL.keyboard, { orderId: order.id });
+    state.tick = order.expiresTick;
+    tick(state, []);
+    expect(ticket.expired).toBe(true);
+    standAt(state, 1, COL.keyboard);
+    holdWork(state, 600);
+    expect(ticket.steps.map((s) => s.progress)).toEqual([0, 0, 0]);
   });
 
   it('expired bugs cost BUG_EXPIRED_PENALTY', () => {
@@ -170,34 +206,47 @@ describe('expiry', () => {
 });
 
 describe('ship', () => {
-  /** Player 1 at the ship tile carrying a finished ticket of `kind`. */
+  /**
+   * Player 1 at the ship tile carrying a finished ticket for a fresh order of
+   * `kind` (its ticket from the queue).
+   */
   function readyToShip(kind: 'feature' | 'bug' = 'feature'): {
     state: ReturnType<typeof newTestGame>;
     ticket: ReturnType<typeof addTicket>;
+    order: Order;
   } {
     const state = newTestGame();
-    const ticket = addTicket(state, COL.counter, { kind, done: 4 });
+    const order = createOrder(state, kind, 'X');
+    state.tickets = [];
+    const ticket = addTicket(state, COL.counter, { kind, done: 4, orderId: order.id });
     give(1, ticket);
     standAt(state, 1, COL.ship);
-    return { state, ticket };
+    return { state, ticket, order };
   }
 
-  it('completes the matching order with the least time left', () => {
-    const { state, ticket } = readyToShip();
-    const later = createOrder(state, 'feature', 'Later');
+  it('completes its own order, not another one with the same steps', () => {
+    const { state, ticket, order } = readyToShip();
     idle(state, 5);
-    const sooner: Order = { ...later, id: 99, expiresTick: later.expiresTick - 100 };
-    state.orders.push(sooner);
+    const sooner = createOrder(state, 'feature', 'Sooner');
+    sooner.expiresTick = order.expiresTick - 100;
     const bug = createOrder(state, 'bug', 'Bug');
     press(state);
     expect(state.tickets).not.toContain(ticket);
-    expect(state.orders.map((o) => o.id)).toEqual([later.id, bug.id]);
-    expect(state.score).toBe(shipPoints(sooner, state.tick - 2));
+    expect(state.orders.map((o) => o.id)).toEqual([sooner.id, bug.id]);
+    expect(state.score).toBe(shipPoints(order, state.tick - 2));
+  });
+
+  it('refuses a ticket whose order is not open', () => {
+    const { state, ticket } = readyToShip();
+    ticket.orderId = 99;
+    createOrder(state, 'feature', 'Same steps');
+    press(state);
+    expect(ticket.location).toEqual({ kind: 'player', playerId: 1 });
+    expect(state.orders).toHaveLength(2);
   });
 
   it('reports the ship with its points', () => {
-    const { state } = readyToShip();
-    const order = createOrder(state, 'feature', 'X');
+    const { state, order } = readyToShip();
     tick(state, [
       {
         playerId: 1,
@@ -220,12 +269,12 @@ describe('ship', () => {
 
   it('ships untested tickets, flagged as untested', () => {
     const state = newTestGame();
-    const ticket = addTicket(state, COL.counter, { done: 1 });
+    const order = createOrder(state, 'feature', 'X');
+    const ticket = addTicket(state, COL.counter, { done: 1, orderId: order.id });
     const pipeline = ticket.steps[2];
     if (pipeline) pipeline.progress = 1;
     give(1, ticket);
     standAt(state, 1, COL.ship);
-    createOrder(state, 'feature', 'X');
     tick(state, [
       {
         playerId: 1,
@@ -242,36 +291,36 @@ describe('ship', () => {
 
   it('refuses tickets that have not been through the pipeline', () => {
     const state = newTestGame();
-    const ticket = addTicket(state, COL.counter, { done: 2, progress: 0.9 });
+    const order = createOrder(state, 'feature', 'X');
+    state.tickets = [];
+    const ticket = addTicket(state, COL.counter, { done: 2, progress: 0.9, orderId: order.id });
     give(1, ticket);
     standAt(state, 1, COL.ship);
-    createOrder(state, 'feature', 'X');
     press(state);
     expect(ticket.location).toEqual({ kind: 'player', playerId: 1 });
     expect(state.orders).toHaveLength(1);
   });
 
-  it('ships tickets whose order already expired, for no points', () => {
-    const { state, ticket } = readyToShip('bug');
-    const feature = createOrder(state, 'feature', 'X');
+  it('refuses an expired ticket, even with another order of the same steps open', () => {
+    const { state, ticket, order } = readyToShip();
     state.score = 50;
-    tick(state, [
-      {
-        playerId: 1,
-        tick: state.tick,
-        move: { x: 0, y: 0 },
-        interact: true,
-        work: false,
-        dash: false,
-      },
-    ]);
+    state.tick = order.expiresTick;
+    tick(state, []);
+    expect(ticket.expired).toBe(true);
+    const same = createOrder(state, 'feature', 'Same steps');
+    press(state);
+    expect(ticket.location).toEqual({ kind: 'player', playerId: 1 });
+    expect(state.orders).toEqual([same]);
+    expect(state.events.some((e) => e.type === 'orderShipped')).toBe(false);
+  });
+
+  it('bins an expired ticket', () => {
+    const { state, ticket, order } = readyToShip();
+    state.tick = order.expiresTick;
+    tick(state, []);
+    standAt(state, 1, COL.bin);
+    press(state);
     expect(state.tickets).not.toContain(ticket);
-    expect(state.orders).toEqual([feature]);
-    expect(state.score).toBe(50);
-    expect(state.events.find((e) => e.type === 'orderShipped')).toMatchObject({
-      order: null,
-      points: 0,
-    });
   });
 
   it(`sends about ${BUG_CHANCE * 100}% of ships back as a bug after BUG_DELAY_TICKS`, () => {
@@ -281,7 +330,6 @@ describe('ship', () => {
       const { state, ticket } = readyToShip();
       state.rngState = seed * 7919;
       ticket.title = 'Center a div';
-      createOrder(state, 'feature', 'X');
       press(state);
       if (state.pendingBugs.length === 0) continue;
       bugs++;

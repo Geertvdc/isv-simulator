@@ -33,11 +33,9 @@ import {
   type QueueKind,
   type Ticket,
   type TicketKind,
-  QUEUE_OF,
   enqueueTicket,
   isPart,
   isShippable,
-  queuedTickets,
   skippedShare,
 } from './tickets';
 
@@ -67,14 +65,15 @@ export type GameEvent =
   | { type: 'orderCreated'; order: Order }
   | {
       type: 'orderShipped';
-      /** `null` when its order had already expired: shipped late, for nothing. */
-      order: Order | null;
+      order: Order;
       points: number;
       playerId: PlayerId;
       /** Some tests were skipped. */
       untested: boolean;
     }
   | { type: 'orderExpired'; order: Order; penalty: number }
+  /** `playerId` tried to ship `ticketId` while an incident is open: hotfix first. */
+  | { type: 'shipBlocked'; playerId: PlayerId; ticketId: number }
   | { type: 'levelEnded'; result: LevelResult }
   /** A finished build was left too long; `ticketId` has to be built again. */
   | { type: 'pipelineBroke'; x: number; y: number; ticketId: number }
@@ -84,8 +83,11 @@ export type GameEvent =
   | { type: 'pickedUp'; playerId: PlayerId; ticketId: number }
   | { type: 'putDown'; playerId: PlayerId; ticketId: number }
   | { type: 'binned'; playerId: PlayerId; ticketId: number }
-  /** A ticket came down in a gap or off the edge: it's back in its queue, its work lost. */
-  | { type: 'ticketLost'; ticketId: number; x: number; y: number; queue: QueueKind }
+  /**
+   * A ticket came down in a gap or off the edge: it's back in its queue, its
+   * work lost. An expired one is gone for good (`queue` is `null`).
+   */
+  | { type: 'ticketLost'; ticketId: number; x: number; y: number; queue: QueueKind | null }
   /** A front end and a back end became full-stack ticket `ticketId` on tile (x, y). */
   | { type: 'merged'; ticketId: number; parts: [number, number]; x: number; y: number }
   /** A conveyor moved a ticket onto tile (x, y). */
@@ -159,21 +161,19 @@ export function openIncident(state: GameState): Order | undefined {
   return state.orders.find((o) => o.kind === 'incident');
 }
 
+/** Whether an open incident keeps `ticket` from shipping: only the hotfix ships then. */
+export function shipBlockedBy(state: GameState, ticket: Ticket): boolean {
+  return ticket.kind !== 'incident' && openIncident(state) !== undefined;
+}
+
 /** Stars for a score: one per threshold reached. */
 export function starsFor(score: number, thresholds: readonly number[]): number {
   return thresholds.filter((t) => score >= t).length;
 }
 
-function sameSteps(a: readonly StepKind[], b: readonly StepKind[]): boolean {
-  return a.length === b.length && a.every((s, i) => s === b[i]);
-}
-
-/** Open orders a ticket could complete, least time left first. */
-export function matchingOrders(state: GameState, ticket: Ticket): Order[] {
-  const steps = ticket.steps.map((s) => s.kind);
-  return state.orders
-    .filter((o) => sameSteps(o.steps, steps))
-    .sort((a, b) => a.expiresTick - b.expiresTick || a.id - b.id);
+/** The open order `ticket` is for, if it's still open. */
+export function orderOf(state: GameState, ticket: Ticket): Order | undefined {
+  return state.orders.find((o) => o.id === ticket.orderId);
 }
 
 /** Opens an order and puts its ticket in the queue for its kind; `steps` default to its kind's. */
@@ -194,29 +194,34 @@ export function createOrder(
   state.orders.push(order);
   if (kind === 'fullstack') {
     // It arrives as its two parts, to be coded apart and merged.
-    for (const part of PART_KINDS) enqueueTicket(state, part, title);
+    for (const part of PART_KINDS) enqueueTicket(state, part, title, order.id);
   } else {
-    enqueueTicket(state, kind, title, steps);
+    enqueueTicket(state, kind, title, order.id, steps);
   }
   state.events.push({ type: 'orderCreated', order });
   return order;
 }
 
 /**
- * Ships the ticket `playerId` carries: completes the matching order with the
- * least time left, scores it and maybe sends a bug back later (more likely
- * when tests were skipped). A ticket whose order already expired still ships,
- * for no points. Refuses tickets missing a required step. Returns whether it
- * shipped.
+ * Ships the ticket `playerId` carries: completes its own order, scores it
+ * and maybe sends a bug back later (more likely when tests were skipped).
+ * Refuses tickets missing a required step, expired tickets (their order ran
+ * out: bin them), and anything but the hotfix while an incident is open.
+ * Returns whether it shipped.
  */
 export function shipTicket(state: GameState, playerId: PlayerId, ticket: Ticket): boolean {
   // Half a full-stack feature can't ship: merge it with its other half first.
-  if (!isShippable(ticket) || isPart(ticket)) return false;
-  const order = matchingOrders(state, ticket)[0] ?? null;
+  if (!isShippable(ticket) || isPart(ticket) || ticket.expired) return false;
+  const order = orderOf(state, ticket);
+  if (!order) return false;
+  if (shipBlockedBy(state, ticket)) {
+    state.events.push({ type: 'shipBlocked', playerId, ticketId: ticket.id });
+    return false;
+  }
 
-  const points = order ? shipPoints(order, state.tick) : 0;
+  const points = shipPoints(order, state.tick);
   state.tickets = state.tickets.filter((t) => t !== ticket);
-  if (order) state.orders = state.orders.filter((o) => o !== order);
+  state.orders = state.orders.filter((o) => o !== order);
   state.score += points;
   const untested = skippedShare(ticket) > 0;
   state.events.push({ type: 'orderShipped', order, points, playerId, untested });
@@ -230,24 +235,21 @@ export function shipTicket(state: GameState, playerId: PlayerId, ticket: Ticket)
 }
 
 /**
- * Expires orders whose timer ran out: the penalty, and one waiting ticket of
- * their kind leaves its queue. Runs after the tick counter moves on, so an
- * order is gone as soon as it has no time left.
+ * Expires orders whose timer ran out: the penalty, their tickets still
+ * waiting in a queue leave it, and every other ticket of theirs (carried, on
+ * a tile, flying) turns expired, fit only for the bin. Runs after the tick
+ * counter moves on, so an order is gone as soon as it has no time left.
  */
 export function expireOrders(state: GameState): void {
   for (const order of state.orders.filter((o) => state.tick >= o.expiresTick)) {
     state.orders = state.orders.filter((o) => o !== order);
     const penalty = Math.min(expiredPenalty(order.kind), state.score);
     state.score -= penalty;
-    // Its waiting ticket leaves the queue too: for a full-stack feature a waiting merged
-    // ticket (lost and back), or else both of its parts.
-    const waitingOf = (kind: TicketKind) =>
-      queuedTickets(state, QUEUE_OF[kind]).find((t) => t.kind === kind);
-    const merged = order.kind === 'fullstack' ? waitingOf('fullstack') : undefined;
-    const kinds = order.kind === 'fullstack' && !merged ? PART_KINDS : [order.kind];
-    for (const kind of kinds) {
-      const waiting = waitingOf(kind);
-      if (waiting) state.tickets = state.tickets.filter((t) => t !== waiting);
+    state.tickets = state.tickets.filter(
+      (t) => t.orderId !== order.id || t.location.kind !== 'queue',
+    );
+    for (const ticket of state.tickets) {
+      if (ticket.orderId === order.id) ticket.expired = true;
     }
     state.events.push({ type: 'orderExpired', order, penalty });
   }
@@ -265,7 +267,8 @@ export function updateOrders(state: GameState): void {
   }
 
   updateIncidents(state);
-  // Production is down: no new features until the hotfix ships (or the incident runs out).
+  // Production is down: nothing else ships and no new features open until the hotfix
+  // ships (or the incident runs out).
   if (openIncident(state)) return;
 
   const { orderSchedule } = state.settings;

@@ -63,7 +63,8 @@ function wantsBuild(ticket: Ticket): boolean {
 export function updatePipelines(state: GameState): void {
   for (const pipeline of state.pipelines) {
     const ticket = ticketOnTile(state, pipeline.x, pipeline.y);
-    if (pipeline.broken || !ticket) {
+    // An expired ticket just sits there, waiting for the bin: it doesn't break anything.
+    if (pipeline.broken || !ticket || ticket.expired) {
       pipeline.doneTicks = 0;
       continue;
     }

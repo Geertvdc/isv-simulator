@@ -59,7 +59,8 @@ export function standAt(state: GameState, playerId: PlayerId, x: number): void {
 
 /**
  * Puts a ticket on row 1 at column `x`. `done` is how many of its steps are
- * finished; `progress` is the progress of the step after those.
+ * finished; `progress` is the progress of the step after those. `orderId` is
+ * the order it's for: by default none (it can't ship).
  */
 export function addTicket(
   state: GameState,
@@ -68,7 +69,8 @@ export function addTicket(
     kind = 'feature',
     done = 0,
     progress = 0,
-  }: { kind?: TicketKind; done?: number; progress?: number } = {},
+    orderId = 0,
+  }: { kind?: TicketKind; done?: number; progress?: number; orderId?: number } = {},
 ): Ticket {
   const ticket: Ticket = {
     id: state.nextTicketId++,
@@ -79,6 +81,8 @@ export function addTicket(
       progress: i < done ? 1 : i === done ? progress : 0,
     })),
     location: { kind: 'tile', x, y: 1 },
+    orderId,
+    expired: false,
   };
   state.tickets.push(ticket);
   return ticket;
