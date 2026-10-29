@@ -657,7 +657,10 @@ describe('resilience', () => {
   function play(room: RoomState, by = 'host', device = 'kb-left'): void {
     menu(room, by, press(device, { interact: true }));
     expect(room.flow.screen).toBe('intro');
-    menu(room, by, press(device, { interact: true }));
+    for (const binding of room.flow.lobby.players) {
+      const [sessionId, deviceId] = binding.deviceId.split(':');
+      if (sessionId && deviceId) menu(room, sessionId, press(deviceId, { interact: true }));
+    }
     steps(room, Math.ceil(COUNTDOWN_MS / TICK_MS) + 1);
     expect(room.flow.screen).toBe('playing');
   }
@@ -754,7 +757,7 @@ describe('resilience', () => {
   });
 
   describe('a host without a player', () => {
-    it('drives the level select, intro, pause and results', () => {
+    it('drives host menus but cannot ready someone else from a spectator device', () => {
       // The host leaves after the lobby; the guest becomes host, and drops: a
       // member who only watched is the host now, with no player of their own.
       const room = twoPlayers();
@@ -766,7 +769,16 @@ describe('resilience', () => {
       menu(room, 'watcher', press('kb-left', { nav: { x: 1, y: 0 } }));
       expect(room.flow.levelIndex).toBe(1);
       menu(room, 'watcher', press('kb-left', { nav: { x: -1, y: 0 } }));
-      play(room, 'watcher');
+      menu(room, 'watcher', press('kb-left', { interact: true }));
+      expect(room.flow.screen).toBe('intro');
+      menu(room, 'watcher', press('kb-left', { interact: true }));
+      expect(room.flow.screen).toBe('intro');
+      rejoinMember(room, 'guest');
+      menu(room, 'guest', press('kb-left', { interact: true }));
+      steps(room, Math.ceil(COUNTDOWN_MS / TICK_MS) + 1);
+      // Guest is the earliest connected member again.
+      expect(room.flow.screen).toBe('playing');
+      dropMember(room, 'guest');
       menu(room, 'watcher', press('kb-left', { menu: true }));
       expect(room.flow.screen).toBe('paused');
       menu(room, 'watcher', press('kb-left', { dash: true }));

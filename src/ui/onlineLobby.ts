@@ -31,6 +31,7 @@ import { playerBadge } from './playerBadge';
 import { copyText } from './profile';
 import type { ScreenView } from './screens';
 import { statusBar } from './statusBar';
+import { rolePanel, type RosterDispatch } from './roles';
 
 export interface OnlineDeps {
   /** The Leave (or Back) button was clicked. */
@@ -38,6 +39,7 @@ export interface OnlineDeps {
 }
 
 export interface OnlineLobbyDeps extends OnlineDeps {
+  roster: RosterDispatch;
   /** This browser's display name. */
   yourName: () => string;
   /** Picks a new display name. Answers why not, or `null` when it worked. */
@@ -178,7 +180,8 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineLobbyDeps): Onli
   const hint = el('div', 'lobby-hint');
   const leave = button('online-leave', ONLINE_TEXT.leave, deps.onLeave);
   const keys = statusBar();
-  screen.append(
+  const content = el('div', 'selection-scroll');
+  content.append(
     el('h1', 'screen-title online-title', ONLINE_TEXT.lobbyTitle),
     codeCard,
     status,
@@ -186,12 +189,13 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineLobbyDeps): Onli
     members,
     hint,
     leave,
-    keys,
   );
+  screen.append(content, keys);
   root.append(screen);
 
   /** Redrawn only when the room changed, so the DOM isn't rebuilt every frame. */
   let drawn = '';
+  let roles: ReturnType<typeof rolePanel>[] = [];
 
   return {
     cancelDialog: closeName,
@@ -199,6 +203,8 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineLobbyDeps): Onli
       const online = view?.online ?? null;
       screen.hidden = !online || !showsLobby(online);
       if (!online || screen.hidden) {
+        for (const role of roles) role.render(null, 0, false, false);
+        roles = [];
         drawn = '';
         copied.textContent = '';
         closeName();
@@ -211,6 +217,7 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineLobbyDeps): Onli
       codeCard.hidden = online.joinCode === null;
       code.textContent = online.joinCode ?? '';
       status.textContent = statusText(online);
+      if (online.setupError) status.textContent += ` · ${online.setupError}`;
       status.dataset.status = online.status;
       hint.textContent = online.status === 'connected' && online.flow ? lobbyHint(online) : '';
       leave.textContent = closed ? ONLINE_TEXT.back : ONLINE_TEXT.leave;
@@ -222,9 +229,11 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineLobbyDeps): Onli
       keys.classList.toggle('armed', !closed && online.leaveArmedAtMs !== null);
 
       const list = membersWithPlayers(online);
-      const key = JSON.stringify(list);
+      const key = JSON.stringify([list, online.flow?.lobby.selections]);
       if (key === drawn) return;
       drawn = key;
+      for (const role of roles) role.render(null, 0, false, false);
+      roles = [];
       members.replaceChildren(
         ...list.map(({ member, isYou, players }) => {
           const row = el('div', 'online-member');
@@ -247,6 +256,14 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineLobbyDeps): Onli
               el('span', 'online-player-name', `Player ${player.playerId}`),
               el('span', 'online-player-device', deviceLabel(player.deviceId)),
             );
+            const role = rolePanel(chip, deps.roster);
+            role.render(
+              online.flow?.lobby ?? null,
+              player.playerId,
+              isYou && member.connected,
+              false,
+            );
+            roles.push(role);
             chips.append(chip);
           }
           row.append(name, chips);
@@ -277,6 +294,7 @@ export function mountOnlineBar(root: HTMLElement, deps: OnlineDeps): ScreenView 
       // The screens under it move down to make room.
       const screen = online?.flow?.screen;
       const inRound = screen === 'countdown' || screen === 'playing';
+      root.classList.toggle('online-round', !!online && inRound);
       root.classList.toggle('with-online-bar', !bar.hidden && !inRound);
       bar.classList.toggle('in-round', inRound);
       if (!online || bar.hidden) return;

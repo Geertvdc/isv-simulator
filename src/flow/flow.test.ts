@@ -95,6 +95,7 @@ function play(flow: Flow, c: FlowContext): void {
   updateFlow(flow, confirm(), c);
   expect(flow.screen).toBe('intro');
   updateFlow(flow, confirm(), c);
+  updateFlow(flow, confirm('kb-left'), c);
   expect(flow.screen).toBe('countdown');
   updateFlow(flow, [], { ...c, nowMs: c.nowMs + COUNTDOWN_MS });
   expect(flow.screen).toBe('playing');
@@ -251,7 +252,7 @@ describe('intro and countdown', () => {
     expect(menuItems(flow)).toEqual([]);
   });
 
-  it('any joined player skips the intro, others cannot', () => {
+  it('every joined player confirms the intro, unjoined devices cannot', () => {
     const c = ctx({ nowMs: 500 });
     for (const id of ['pad-0', 'kb-left']) {
       const flow = atIntro(c);
@@ -259,6 +260,8 @@ describe('intro and countdown', () => {
       updateFlow(flow, confirm('kb-right'), c);
       expect(flow.screen).toBe('intro');
       expect(updateFlow(flow, confirm(id), c).changed).toBe(true);
+      expect(flow.screen).toBe('intro');
+      updateFlow(flow, confirm(id === 'pad-0' ? 'kb-left' : 'pad-0'), c);
       expect(flow).toMatchObject({ screen: 'countdown', countdownStartMs: 500 });
     }
   });
@@ -273,6 +276,7 @@ describe('intro and countdown', () => {
     const c = ctx({ nowMs: 1000 });
     const flow = atIntro(c);
     updateFlow(flow, confirm(), c);
+    updateFlow(flow, confirm('kb-left'), c);
     const at = (ms: number): FlowContext => ({ ...c, nowMs: 1000 + ms });
     expect(countdownNumber(flow, 1000)).toBe(3);
     expect(countdownNumber(flow, 1000 + COUNTDOWN_MS / 3)).toBe(2);
@@ -289,6 +293,7 @@ describe('intro and countdown', () => {
     const c = ctx();
     const flow = atIntro(c);
     updateFlow(flow, confirm(), c);
+    updateFlow(flow, confirm('kb-left'), c);
     for (const presses of [confirm(), back(), menu(), right(), down(), enter(), menu('kb-left')]) {
       const update = updateFlow(flow, presses, { ...c, nowMs: 100 });
       expect(update).toEqual({ changed: false, effects: [] });
@@ -297,12 +302,12 @@ describe('intro and countdown', () => {
     }
   });
 
-  it('Restart skips the intro and counts down again', () => {
+  it('Restart preserves roles but requires a fresh team confirmation', () => {
     const c = ctx();
     const flow = playing(c);
     updateFlow(flow, menu(), c);
     pick(flow, 'restart', { ...c, nowMs: 7000 });
-    expect(flow).toMatchObject({ screen: 'countdown', countdownStartMs: 7000 });
+    expect(flow.screen).toBe('intro');
   });
 });
 
@@ -334,7 +339,7 @@ describe('pause', () => {
 
   it('restarts, or leaves the round for the level select, lobby or title', () => {
     const cases: [MenuItem, Partial<Flow>, string][] = [
-      ['restart', { screen: 'countdown' }, 'startLevel'],
+      ['restart', { screen: 'intro' }, 'startLevel'],
       ['levelSelect', { screen: 'levelSelect' }, 'stopRound'],
       ['changePlayers', { screen: 'lobby' }, 'stopRound'],
       ['quit', { screen: 'title', menuIndex: 0 }, 'stopRound'],
@@ -580,8 +585,8 @@ describe('results', () => {
     const flow = finished(3, c);
     c.nowMs = 10_000;
     expect(pick(flow, 'retry', c).effects).toEqual([{ type: 'startLevel', levelIndex: 0 }]);
-    // Same level again: no intro card, straight to the countdown.
-    expect(flow).toMatchObject({ screen: 'countdown', countdownStartMs: 10_000 });
+    // Same level again: roles persist, but readiness must be reconfirmed.
+    expect(flow).toMatchObject({ screen: 'intro' });
     const other = finished(3, c);
     c.nowMs = 20_000;
     expect(updateFlow(other, back(), c).effects).toEqual([{ type: 'stopRound' }]);

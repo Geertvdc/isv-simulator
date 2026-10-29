@@ -21,6 +21,7 @@ import {
   ONLINE_LEAVE_EVENT,
   ONLINE_RENAME_EVENT,
   PROFILE_ACTION_EVENT,
+  ROSTER_EVENT,
   TILE_HOVER_EVENT,
   TOGGLE_SOUND_EVENT,
   type TicketStore,
@@ -40,6 +41,8 @@ import { mountProfile } from './ui/profile';
 import { mountSoundToggle } from './ui/soundToggle';
 import { mountCredits, mountPause, mountResults, mountSettings, mountTitle } from './ui/screens';
 import './style.css';
+import type { RosterCommand } from './flow/roster';
+import { levelById } from './sim/levels';
 
 function getElement(id: string): HTMLElement {
   const el = document.getElementById(id);
@@ -95,10 +98,12 @@ function browserStorage(): StorageLike | null {
 
 const params = new URLSearchParams(window.location.search);
 const sceneId = params.get('scene');
+const practiceLevel =
+  import.meta.env.DEV && params.get('lab') === 'lab-roles' ? levelById('lab-roles') : undefined;
 const shownScene = sceneId === null ? null : (sceneById(sceneId) ?? null);
 if (sceneId !== null && !shownScene) console.warn(`No scene '${sceneId}'`);
 // A scene never touches the save.
-const storage = shownScene ? null : browserStorage();
+const storage = shownScene || practiceLevel ? null : browserStorage();
 const save = loadSave(storage);
 
 // Online identity: a random id kept in localStorage, shown under Settings → Online profile.
@@ -115,23 +120,25 @@ const scene = new GameScene({
   // For testing: every level open, without touching the save.
   unlockAll: params.has('unlockAll'),
   scene: shownScene,
+  practiceLevel,
   // `?demo`: a kiosk for a booth, bots play whenever nobody does.
   kiosk: !shownScene && params.has('demo'),
   roundRenderer: createThreeRoundRenderer,
   menuRenderer: createWorldMapRenderer,
   // A scene is a picture: it never goes online.
-  online: shownScene
-    ? null
-    : {
-        serverUrl: gameServerUrl,
-        identity: () => identity,
-        // Dev tools: `?lag=100&jitter=20` simulates a slow network; `?nethud` shows the ping corner.
-        lag: parseLag(params.get('lag'), params.get('jitter')),
-        netHud: import.meta.env.DEV || params.has('nethud'),
-        // `?predict=0`: no client-side prediction of your own player, to compare.
-        predict: params.get('predict') !== '0',
-        tickets,
-      },
+  online:
+    shownScene || practiceLevel
+      ? null
+      : {
+          serverUrl: gameServerUrl,
+          identity: () => identity,
+          // Dev tools: `?lag=100&jitter=20` simulates a slow network; `?nethud` shows the ping corner.
+          lag: parseLag(params.get('lag'), params.get('jitter')),
+          netHud: import.meta.env.DEV || params.has('nethud'),
+          // `?predict=0`: no client-side prediction of your own player, to compare.
+          predict: params.get('predict') !== '0',
+          tickets,
+        },
 });
 
 const game = new Phaser.Game({
@@ -156,9 +163,12 @@ game.events.on(TILE_HOVER_EVENT, hud.setHover);
 const gameHud = mountGameHud(ui);
 game.events.on(GAME_FRAME_EVENT, gameHud.render);
 
-const lobby = mountLobby(ui);
+const roster = (command: RosterCommand): void => {
+  game.events.emit(ROSTER_EVENT, command);
+};
+const lobby = mountLobby(ui, roster);
 const levelSelect = mountLevelSelect(ui);
-const intro = mountIntro(ui);
+const intro = mountIntro(ui, roster);
 const countdown = mountCountdown(ui);
 const demo = mountDemo(ui);
 const screens = {
@@ -196,6 +206,7 @@ function changeName(text: string): string | null {
   return null;
 }
 const onlineLobby = mountOnlineLobby(ui, {
+  roster,
   ...leaveOnline,
   yourName: () => identity.displayName,
   changeName,

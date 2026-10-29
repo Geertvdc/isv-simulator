@@ -113,12 +113,14 @@ describe('online state', () => {
     const guest = inRoom('guest');
     const host = inRoom('host');
     expect(hostIsChoosing(guest)).toBe(false);
-    for (const screen of ['levelSelect', 'intro', 'paused', 'results'] as const) {
+    for (const screen of ['levelSelect', 'paused', 'results'] as const) {
       if (guest.flow) guest.flow.screen = screen;
       if (host.flow) host.flow.screen = screen;
       expect(hostIsChoosing(guest)).toBe(true);
       expect(hostIsChoosing(host)).toBe(false);
     }
+    if (guest.flow) guest.flow.screen = 'intro';
+    expect(hostIsChoosing(guest)).toBe(false);
   });
 
   it("lists each member's couch players with their own device ids", () => {

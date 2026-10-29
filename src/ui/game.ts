@@ -17,6 +17,7 @@ import { PART_KINDS, type StepKind, type TicketKind } from '../sim/tickets';
 import { playerCssColor } from '../render/playerColors';
 import { formatClock } from './format';
 import { playerBadge } from './playerBadge';
+import { domainText, roleText, workRateText } from './roles';
 
 /** Each step shows as the letter of its station on the map, in that station's color. */
 export const STEP_LABEL: Readonly<Record<StepKind, { letter: string; color: string }>> = {
@@ -108,9 +109,10 @@ export function mountGameHud(root: HTMLElement): GameHud {
   const alerts = el('div', 'hud-alerts');
   const incidentBanner = el('div', 'hud-incident', INCIDENT_BANNER_TEXT);
   const invites = el('div', 'hud-invites');
+  const roster = el('div', 'hud-roster');
   alerts.append(incidentBanner, invites);
 
-  const parts = [orders, score, clock, pauseHint, alerts];
+  const parts = [orders, score, clock, pauseHint, alerts, roster];
   for (const part of parts) part.hidden = true;
   root.append(...parts);
 
@@ -141,6 +143,7 @@ export function mountGameHud(root: HTMLElement): GameHud {
   function createCard(order: Order): OrderCard {
     const card = el('div', `order order-${order.kind}`);
     card.append(el('div', 'order-kind', ORDER_KIND_LABELS[order.kind]));
+    card.append(el('div', 'domain-chip', domainText(order.domain)));
     const steps = stepChips(order.steps, order.kind);
     const timer = el('div', 'order-timer');
     const fill = el('div', 'order-timer-fill');
@@ -188,6 +191,26 @@ export function mountGameHud(root: HTMLElement): GameHud {
         return;
       }
       const { state } = frame;
+      const rosterKey = JSON.stringify([
+        state.players.map((p) => [p.id, p.roleId]),
+        state.workFeedback,
+      ]);
+      if (roster.dataset.key !== rosterKey) {
+        roster.dataset.key = rosterKey;
+        roster.replaceChildren(
+          ...state.players.map((player) => {
+            const row = el('div', 'hud-player');
+            row.style.setProperty('--player-color', playerCssColor(player.id));
+            row.append(
+              playerBadge(player.id),
+              el('span', 'hud-role', `P${player.id} ${roleText(player.roleId)}`),
+            );
+            const work = state.workFeedback.find((w) => w.playerId === player.id);
+            if (work) row.append(el('span', 'hud-work-rate', workRateText(work)));
+            return row;
+          }),
+        );
+      }
       syncOrders(state);
       syncInvites(state);
       scoreValue.textContent = String(state.score);

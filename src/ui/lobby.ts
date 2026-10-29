@@ -7,6 +7,7 @@ import { playerBadge } from './playerBadge';
 import { statusBar } from './statusBar';
 import { LOBBY_BACK_HINT, playerFile } from '../sim/content';
 import { MAX_PLAYERS } from '../sim/level';
+import { rolePanel, type RosterDispatch } from './roles';
 
 export interface LobbyView {
   /** Shows the lobby, or hides it for `null` (the game has started). */
@@ -32,7 +33,7 @@ export function startHint(lobby: Lobby): string | null {
   return `Player 1: press ${button}${keyboardsFull ? ' or Enter' : ''} to start`;
 }
 
-export function mountLobby(root: HTMLElement): LobbyView {
+export function mountLobby(root: HTMLElement, dispatch: RosterDispatch): LobbyView {
   const panel = document.createElement('div');
   panel.className = 'screen lobby';
   panel.hidden = true;
@@ -54,7 +55,8 @@ export function mountLobby(root: HTMLElement): LobbyView {
     name.append(playerBadge(slots.children.length + 1), label);
     slot.append(name, device);
     slots.append(slot);
-    return { slot, name: label, device };
+    const role = rolePanel(slot, dispatch);
+    return { slot, name: label, device, role };
   });
 
   const hint = document.createElement('div');
@@ -62,15 +64,19 @@ export function mountLobby(root: HTMLElement): LobbyView {
 
   const back = statusBar(LOBBY_BACK_HINT);
 
-  panel.append(title, slots, hint, back);
+  const content = document.createElement('div');
+  content.className = 'selection-scroll';
+  content.append(title, slots, hint);
+  panel.append(content, back);
   root.append(panel);
 
   return {
     render: (lobby) => {
       panel.hidden = lobby === null;
-      if (!lobby) return;
       slotEls.forEach((el, i) => {
-        const player = lobby.players[i];
+        const player = lobby?.players[i];
+        el.role.render(player ? lobby : null, i + 1, true, false);
+        if (!lobby) return;
         const id = i + 1;
         el.slot.classList.toggle('joined', player !== undefined);
         el.slot.style.setProperty('--player-color', playerCssColor(id));
@@ -78,7 +84,7 @@ export function mountLobby(root: HTMLElement): LobbyView {
         el.slot.dataset.file = playerFile(id);
         el.device.textContent = player ? deviceLabel(player.deviceId) : 'Enter or gamepad A';
       });
-      hint.textContent = startHint(lobby) ?? '';
+      hint.textContent = lobby ? `${startHint(lobby) ?? ''} · Left / right: choose role` : '';
     },
   };
 }

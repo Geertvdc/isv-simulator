@@ -7,11 +7,14 @@ import { MAX_PLAYERS } from '../sim/level';
 import type { PlayerBinding } from './commands';
 import type { DeviceId, DevicePress } from './controller';
 import { isGamepadDevice } from './gamepad';
+import type { Selection } from '../flow/roster';
 
 export interface Lobby {
   /** In join order: `players[0]` is player 1. */
   players: PlayerBinding[];
   started: boolean;
+  /** Ephemeral session choices, keyed by stable player identity, not controller. */
+  selections?: Record<number, Selection>;
 }
 
 export function createLobby(): Lobby {

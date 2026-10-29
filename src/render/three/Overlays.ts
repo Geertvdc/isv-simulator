@@ -1,8 +1,14 @@
 import Phaser from 'phaser';
 import type { HintId } from '../../flow/hints';
-import { PAIR_RATE, WORK_RATE } from '../../sim/balance';
 import { stationWorkStep } from '../../sim/interact';
-import { HINT_TEXTS, MEETING_ROOM_TEXT, pairingText } from '../../sim/content';
+import {
+  DOMAIN_ICONS,
+  HINT_TEXTS,
+  MEETING_ROOM_TEXT,
+  ORDER_KIND_LABELS,
+  TICKET_DOMAIN_LABELS,
+  pairingText,
+} from '../../sim/content';
 import { type LevelMap, getTile } from '../../sim/level';
 import { pipelineWarning } from '../../sim/pipeline';
 import type { GameState } from '../../sim/state';
@@ -68,6 +74,7 @@ const TEXT_STYLE = {
 interface CardSprite {
   g: Phaser.GameObjects.Graphics;
   title: Phaser.GameObjects.Text;
+  domain: Phaser.GameObjects.Text;
   drawn: string;
 }
 
@@ -184,6 +191,13 @@ export class Overlays {
             .setOrigin(0.5, 1)
             .setWordWrapWidth(90)
             .setAlign('center'),
+          domain: this.text(
+            `${ORDER_KIND_LABELS[ticket.kind]} · ${DOMAIN_ICONS[ticket.domain]} ${TICKET_DOMAIN_LABELS[ticket.domain]}`,
+            10,
+            '#ffffff',
+          )
+            .setOrigin(0.5, 1)
+            .setBackgroundColor('rgba(10, 15, 25, 0.85)'),
           drawn: '',
         };
         this.cards.set(ticket.id, card);
@@ -205,19 +219,25 @@ export class Overlays {
       place(card.g, p);
       // Over a carried card its title; over a keyboard two players code at, that they're pairing.
       const paired = isPaired(state, ticket);
+      const actualRate = state.workFeedback.find(
+        (w) => w.ticketId === ticket.id && w.teamRate !== undefined,
+      )?.teamRate;
       card.title
-        .setText(paired ? pairingText(PAIR_RATE / WORK_RATE) : ticket.title)
+        .setText(paired && actualRate !== undefined ? pairingText(actualRate) : ticket.title)
         .setColor(paired ? PAIRING_COLOR : '#ffffff')
         // A dark backing so the pairing label reads over the station.
         .setBackgroundColor(paired ? 'rgba(0, 0, 0, 0.65)' : '')
         .setVisible(placed.carried || paired);
       const lift = (bar === null ? 26 : 40) * p.scale * OVERLAY_SCALE;
-      if (placed.carried || paired) place(card.title, { ...p, y: p.y - lift });
+      place(card.domain, { ...p, y: p.y - lift });
+      if (placed.carried || paired)
+        place(card.title, { ...p, y: p.y - lift - 15 * p.scale * OVERLAY_SCALE });
     }
     for (const [id, card] of this.cards) {
       if (seen.has(id)) continue;
       card.g.destroy();
       card.title.destroy();
+      card.domain.destroy();
       this.cards.delete(id);
     }
   }
