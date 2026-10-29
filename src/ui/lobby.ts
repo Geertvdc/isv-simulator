@@ -2,12 +2,10 @@ import type { DeviceId } from '../input/controller';
 import { isGamepadDevice } from '../input/gamepad';
 import { KEY_SCHEMES, LEFT_KEYS, RIGHT_KEYS } from '../input/keyboard';
 import type { Lobby } from '../input/lobby';
-import { playerCssColor } from '../render/playerColors';
-import { playerBadge } from './playerBadge';
 import { statusBar } from './statusBar';
-import { LOBBY_BACK_HINT, playerFile } from '../sim/content';
+import { LOBBY_BACK_HINT } from '../sim/content';
 import { MAX_PLAYERS } from '../sim/level';
-import { rolePanel, type RosterDispatch } from './roles';
+import { rolePanel, seatWindow, type RosterDispatch } from './roles';
 
 export interface LobbyView {
   /** Shows the lobby, or hides it for `null` (the game has started). */
@@ -47,16 +45,11 @@ export function mountLobby(root: HTMLElement, dispatch: RosterDispatch): LobbyVi
   const slotEls = Array.from({ length: MAX_PLAYERS }, () => {
     const slot = document.createElement('div');
     slot.className = 'lobby-slot';
-    const name = document.createElement('div');
-    name.className = 'lobby-slot-name';
-    const label = document.createElement('span');
-    const device = document.createElement('div');
-    device.className = 'lobby-slot-device';
-    name.append(playerBadge(slots.children.length + 1), label);
-    slot.append(name, device);
+    // The title bar, `player-1.ts`, names the seat; one line under it says who plays it.
+    const device = seatWindow(slot, slots.children.length + 1);
     slots.append(slot);
     const role = rolePanel(slot, dispatch);
-    return { slot, name: label, device, role };
+    return { slot, device, role };
   });
 
   const hint = document.createElement('div');
@@ -80,11 +73,7 @@ export function mountLobby(root: HTMLElement, dispatch: RosterDispatch): LobbyVi
         const player = lobby?.players[i];
         el.role.render(player ? lobby : null, i + 1, true, false);
         if (!lobby) return;
-        const id = i + 1;
         el.slot.classList.toggle('joined', player !== undefined);
-        el.slot.style.setProperty('--player-color', playerCssColor(id));
-        el.name.textContent = `Player ${id}`;
-        el.slot.dataset.file = playerFile(id);
         el.device.textContent = player ? deviceLabel(player.deviceId) : 'Enter or gamepad A';
       });
       hint.textContent = lobby?.players.length

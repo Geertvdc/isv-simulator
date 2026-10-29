@@ -121,7 +121,7 @@ body {
   gap: 0.75em;
   width: 100%;
   min-height: 0;
-  flex: 1;
+  flex: 0 1 auto;
 }
 
 /* A window per seat: dim and dashed while empty (see below), the player's color under its title bar once joined. */
@@ -144,21 +144,33 @@ body {
   border-bottom: 0.25rem solid var(--player-color);
 }
 
-.lobby-slot-name {
-  font-family: var(--mono);
-  font-size: 1em;
-  font-weight: 800;
-  color: var(--code-muted);
-}
-
-.lobby-slot.joined .lobby-slot-name {
-  color: var(--code-ink);
-}
-
-.lobby-slot-device {
+/* The one line under a seat's title bar (which names the player): their
+   badge, then the device, owner or ready state. No heading of its own. */
+.seat-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.15em;
+  min-width: 0;
   font-size: 0.75em;
   line-height: 1.25;
-  min-height: 2.5em;
+  color: var(--code-text);
+  text-align: left;
+}
+
+.seat-meta .player-badge {
+  flex: none;
+  width: 1.35em;
+  height: 1.35em;
+  vertical-align: 0;
+}
+
+.seat-meta-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .lobby,
@@ -350,14 +362,6 @@ body {
   border-color: var(--syn-string);
 }
 
-.lobby .lobby-slot {
-  --bar: 1.65em;
-}
-
-.lobby-slot::before {
-  font-size: 0.8em;
-}
-
 .screen.lobby .screen-hint,
 .screen.online-lobby .screen-hint,
 .screen.intro-screen .screen-hint {
@@ -413,11 +417,6 @@ body {
     gap: 0.4em;
   }
 
-  .lobby-slot-device,
-  .online-lobby .online-player-device {
-    min-height: 0;
-  }
-
   .lobby-title {
     font-size: 1.4em;
   }
@@ -425,15 +424,6 @@ body {
   .intro-screen .intro-name {
     font-size: 1.35em;
   }
-}
-
-.domain-chip {
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  color: #e4e9f5;
-  border: 1px solid #53617b;
-  border-radius: 0.2rem;
-  padding: 0.125rem 0.25rem;
 }
 
 .hud-roster {
@@ -451,11 +441,17 @@ body {
   align-items: center;
   flex-wrap: wrap;
   gap: 0.375rem;
-  padding: 0.25rem 0.5rem;
-  background: rgba(15, 21, 35, 0.92);
-  border: 1px solid var(--player-color);
+  padding: 0.2rem 0.5rem 0.2rem 0.4rem;
+  background: rgba(24, 30, 46, 0.92);
+  border: 1px solid var(--window-edge);
+  border-left: 0.2rem solid var(--player-color);
   border-radius: 0.25rem;
+  color: var(--code-text);
   font-size: 0.75rem;
+}
+
+.hud-player .player-badge {
+  margin-right: 0;
 }
 
 .hud-work-rate {
@@ -1374,7 +1370,8 @@ body {
 .map-card,
 .online-code-card,
 .profile-dialog-box,
-.lobby-slot {
+.lobby-slot,
+.seat-window {
   --bar: 2rem;
   position: relative;
   border: 1px solid var(--window-edge);
@@ -1391,7 +1388,8 @@ body {
 .map-card::before,
 .online-code-card::before,
 .profile-dialog-box::before,
-.lobby-slot::before {
+.lobby-slot::before,
+.seat-window::before {
   content: attr(data-file);
   content: attr(data-file) / '';
   position: absolute;
@@ -1416,6 +1414,26 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Seats with a role: a smaller title bar, so the role gets the room. */
+.seat-window {
+  --bar: 1.65em;
+  padding: calc(var(--bar) + 0.45em) 0.8em 0.8em;
+}
+
+.seat-window::before {
+  font-size: 0.8em;
+}
+
+.seat-window:not(.lobby-slot)::before,
+.lobby-slot.joined::before {
+  line-height: calc(var(--bar) - 0.25rem);
+}
+
+/* A taken seat has its player's color under the title bar. */
+.seat-window:not(.lobby-slot)::before {
+  border-bottom: 0.25rem solid var(--player-color);
 }
 
 /* An empty seat in the lobby: a dim window with a dashed edge, waiting. */
@@ -1933,7 +1951,7 @@ body {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.75em;
   min-height: 0;
-  flex: 1;
+  flex: 0 1 auto;
 }
 
 .intro-team[data-count='1'] {
@@ -1949,24 +1967,14 @@ body {
 .intro-seat {
   display: flex;
   flex-direction: column;
-  gap: 0.25em;
+  gap: 0.3em;
   min-width: 0;
-  padding: 0.7em;
-  background: var(--window);
-  border: 1px solid var(--player-color);
-  border-radius: 0.4em;
-}
-
-.intro-player {
-  display: flex;
-  align-items: center;
-  gap: 0.5em;
-  font-weight: 800;
 }
 
 .intro-ready-state {
   color: var(--syn-string);
-  font: 600 0.75em var(--mono);
+  font-family: var(--mono);
+  font-weight: 600;
 }
 
 .intro-forecast {
@@ -2604,7 +2612,7 @@ body {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.75em;
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
   width: 100%;
 }
@@ -2612,38 +2620,23 @@ body {
 .online-player,
 .online-empty-slot {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   flex-direction: column;
   gap: 0.3em;
-  padding: 0.7em;
-  border: 1px solid var(--player-color, var(--code-faint));
-  border-radius: 0.4em;
-  background: var(--window);
   min-width: 0;
 }
 
+/* An open seat: dim and dashed, like an empty local seat. */
 .online-empty-slot {
   justify-content: center;
   align-items: center;
-  border-style: dashed;
+  padding: 0.7em;
+  border: 2px dashed var(--code-faint);
+  border-radius: 0.625rem;
+  background: rgba(24, 30, 46, 0.72);
   font-size: 0.85em;
   text-align: center;
   color: var(--code-text);
-}
-
-.online-player .role-panel {
-  width: 100%;
-}
-
-.online-player-owner {
-  font-size: 0.75em;
-  color: var(--code-text);
-}
-
-.online-player-name {
-  display: flex;
-  gap: 0.5em;
-  align-items: center;
 }
 
 .online-round .hud-roster {
@@ -2658,13 +2651,6 @@ body {
 .online-player-name {
   font-weight: 800;
   color: var(--code-ink);
-}
-
-.online-player-device {
-  font-size: 0.75em;
-  min-height: 2.5em;
-  line-height: 1.25;
-  color: var(--code-text);
 }
 
 .online-no-players {

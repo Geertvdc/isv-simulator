@@ -16,9 +16,7 @@ import { MAX_PLAYERS } from '../sim/level';
 import { coverageHint, workloadForecast } from '../flow/workload';
 import { selection } from '../flow/roster';
 import { localBindings } from '../flow/online';
-import { rolePanel, type RosterDispatch } from './roles';
-import { playerBadge } from './playerBadge';
-import { playerCssColor } from '../render/playerColors';
+import { rolePanel, seatWindow, type RosterDispatch } from './roles';
 import { el } from './dom';
 import { introPicture } from './introPicture';
 import { levelRecipes } from './recipes';
@@ -59,11 +57,8 @@ export function mountIntro(
   const team = el('div', 'intro-team');
   const seats = Array.from({ length: MAX_PLAYERS }, (_, i) => {
     const seat = el('div', 'intro-seat');
-    seat.style.setProperty('--player-color', playerCssColor(i + 1));
-    const who = el('div', 'intro-player', `Player ${i + 1}`);
-    who.prepend(playerBadge(i + 1));
-    const status = el('div', 'intro-ready-state');
-    seat.append(who, status);
+    const status = seatWindow(seat, i + 1);
+    status.classList.add('intro-ready-state');
     const role = rolePanel(seat, dispatch);
     team.append(seat);
     return { seat, status, role };

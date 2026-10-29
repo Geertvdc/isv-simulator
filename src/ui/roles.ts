@@ -1,5 +1,6 @@
 import { selection, type RosterCommand } from '../flow/roster';
 import type { Lobby } from '../input/lobby';
+import { playerCssColor } from '../render/playerColors';
 import {
   DOMAIN_ICONS,
   ROLE_DESCRIPTIONS,
@@ -7,6 +8,7 @@ import {
   ROLE_LABELS,
   TICKET_DOMAIN_LABELS,
   WORK_TASK_LABELS,
+  playerFile,
 } from '../sim/content';
 import {
   ROLE_IDS,
@@ -19,6 +21,7 @@ import {
 import type { WorkFeedback } from '../sim/state';
 import { rolePreviews } from '../render/three/RolePreview';
 import { el } from './dom';
+import { playerBadge } from './playerBadge';
 
 export function domainText(domain: TicketDomain): string {
   return `${DOMAIN_ICONS[domain]} ${TICKET_DOMAIN_LABELS[domain]}`;
@@ -32,6 +35,24 @@ export function workRateText(work: WorkFeedback): string {
   if (work.task === 'review') return 'Review · quorum met';
   const solo = `${WORK_TASK_LABELS[work.task]} ${work.rate.toFixed(2)}x`;
   return work.teamRate === undefined ? solo : `${solo} · pair total ${work.teamRate.toFixed(2)}x`;
+}
+
+/**
+ * The one line under a seat window's title bar (`player-2.ts`, which already
+ * names the player): their badge and who/what is on that seat. The window
+ * itself carries the accessible name, as the title bar is decorative.
+ */
+export function seatWindow(seat: HTMLElement, playerId: number): HTMLElement {
+  seat.classList.add('seat-window');
+  seat.dataset.file = playerFile(playerId);
+  seat.setAttribute('role', 'group');
+  seat.setAttribute('aria-label', `Player ${playerId}`);
+  seat.style.setProperty('--player-color', playerCssColor(playerId));
+  const row = el('div', 'seat-meta');
+  const meta = el('span', 'seat-meta-text');
+  row.append(playerBadge(playerId), meta);
+  seat.append(row);
+  return meta;
 }
 
 export type RosterDispatch = (command: RosterCommand) => void;

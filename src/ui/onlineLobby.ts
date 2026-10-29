@@ -22,16 +22,14 @@ import {
   membersWithPlayers,
   reconnectingMembers,
 } from '../flow/online';
-import { playerCssColor } from '../render/playerColors';
 import { NET_MAX_NAME_LENGTH } from '../sim/balance';
 import { ONLINE_TEXT, WINDOW_FILES } from '../sim/content';
 import { el } from './dom';
 import { deviceLabel } from './lobby';
-import { playerBadge } from './playerBadge';
 import { copyText } from './profile';
 import type { ScreenView } from './screens';
 import { statusBar } from './statusBar';
-import { rolePanel, type RosterDispatch } from './roles';
+import { rolePanel, seatWindow, type RosterDispatch } from './roles';
 
 export interface OnlineDeps {
   /** The Leave (or Back) button was clicked. */
@@ -254,13 +252,9 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineLobbyDeps): Onli
             chips.append(el('div', 'online-no-players', ONLINE_TEXT.noPlayers));
           for (const player of players) {
             const chip = el('div', 'online-player');
-            chip.style.setProperty('--player-color', playerCssColor(player.playerId));
-            chip.append(
-              el('div', 'online-player-owner', `${member.displayName}${isYou ? ' · you' : ''}`),
-            );
-            const who = el('div', 'online-player-name', `Player ${player.playerId}`);
-            who.prepend(playerBadge(player.playerId));
-            chip.append(who, el('span', 'online-player-device', deviceLabel(player.deviceId)));
+            // Whose seat it is and their controls, on the one line under `player-3.ts`.
+            seatWindow(chip, player.playerId).textContent =
+              `${member.displayName}${isYou ? ' · you' : ''} · ${deviceLabel(player.deviceId)}`;
             const role = rolePanel(chip, deps.roster);
             role.render(
               online.flow?.lobby ?? null,
