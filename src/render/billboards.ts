@@ -28,7 +28,7 @@ import {
 
 /**
  * A ticket card in the world: a tiny editor window like the HUD's order
- * cards. Three dots and the order's `#id` (a text the overlays put at
+ * cards: the order's `#id` (a text the overlays put at
  * `TICKET_CARD_ID`) in its title bar, the order's timer as a line under the
  * bar, and a tile per step with its station glyph.
  */
@@ -41,9 +41,6 @@ const CARD_BAR = 9;
 const BAR_COLOR = 0x222a3f;
 /** A hotfix's window is an error panel. */
 const INCIDENT_BAR_COLOR = 0x8a1c17;
-const WINDOW_DOTS = [0xff5f57, 0xfebc2e, 0x28c840] as const;
-const DOT_RADIUS = 1.6;
-const DOT_SPACING = 4.5;
 const TIMER_HEIGHT = 2;
 const TIMER_BACK = 0x2c3550;
 const TILE = 12;
@@ -59,8 +56,8 @@ const GLYPH_SHARE = 0.72;
 const EXPIRED_CARD_COLOR = 0x3b3f4a;
 const EXPIRED_EDGE = 0x6b707c;
 const EXPIRED_GLYPH = 0x8a8f99;
-/** Where the order number sits on a card: in its title bar, right of the dots. */
-export const TICKET_CARD_ID = { x: 3 + 3 * DOT_SPACING + 1, y: -TICKET_CARD_HEIGHT + CARD_BAR / 2 };
+/** Where the order number sits on a card: at the left of its title bar. */
+export const TICKET_CARD_ID = { x: 4, y: -TICKET_CARD_HEIGHT + CARD_BAR / 2 };
 
 /** What a world ticket card shows. */
 export interface TicketCardLook {
@@ -109,14 +106,10 @@ export function drawTicketCard(
   g.fillStyle(expired ? EXPIRED_CARD_COLOR : CARD_COLOR);
   g.lineStyle(1, expired ? EXPIRED_EDGE : CARD_EDGE);
   g.fillRoundedRect(left, top, width, TICKET_CARD_HEIGHT, 3);
-  // The title bar, with the window's three dots.
+  // The title bar, where the overlays put the order number.
   const incident = look.kind === 'incident' && !expired;
   g.fillStyle(expired ? EXPIRED_EDGE : incident ? INCIDENT_BAR_COLOR : BAR_COLOR);
   g.fillRoundedRect(left, top, width, CARD_BAR, { tl: 3, tr: 3, bl: 0, br: 0 });
-  WINDOW_DOTS.forEach((dot, i) => {
-    g.fillStyle(expired ? EXPIRED_GLYPH : dot);
-    g.fillCircle(left + 3 + DOT_SPACING * i + DOT_RADIUS, top + CARD_BAR / 2, DOT_RADIUS);
-  });
   if (look.timer !== null && !expired) {
     g.fillStyle(TIMER_BACK);
     g.fillRect(left, top + CARD_BAR, width, TIMER_HEIGHT);
