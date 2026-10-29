@@ -227,12 +227,13 @@ export const GLYPHS: Readonly<Record<GlyphId, readonly GlyphShape[]>> = {
     { type: 'line', points: [7, 7, 7, 10, 12, 14, 12, 17] },
     { type: 'line', points: [17, 7, 17, 10, 12, 14] },
   ],
-  // A rocket: to production.
+  // A rocket taking off to production, nose up and to the right.
   pipeline: [
-    { type: 'poly', points: [12, 2, 16, 7, 16, 16, 8, 16, 8, 7], fill: true },
-    { type: 'poly', points: [8, 10, 4, 17, 8, 16], fill: true },
-    { type: 'poly', points: [16, 10, 20, 17, 16, 16], fill: true },
-    { type: 'poly', points: [10, 17.5, 12, 22, 14, 17.5], fill: true },
+    { type: 'poly', points: [19.2, 4.8, 18.5, 10.4, 12.9, 16.1, 7.9, 11.1, 13.6, 5.5] },
+    { type: 'circle', cx: 15.3, cy: 8.7, r: 1.8, fill: true },
+    { type: 'poly', points: [12.1, 6.9, 4.7, 9.4, 7.9, 11.1], fill: true },
+    { type: 'poly', points: [17.1, 11.9, 14.6, 19.3, 12.9, 16.1], fill: true },
+    { type: 'line', points: [8.5, 15.5, 4.5, 19.5] },
   ],
   // An inbox tray with a ticket dropping in.
   inbox: [
