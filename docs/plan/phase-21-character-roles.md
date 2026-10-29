@@ -1,6 +1,6 @@
 # Phase 21 proposal: character roles, ticket domains, and a new cast
 
-**Status:** 21a visual investigation complete; the user selected the compact angular foundation. Hats are optional, non-default accessories for the future cast. 21b–21d are not approved for implementation. Numbers below are starting hypotheses, not measured balance results. Implement one approved subphase at a time.
+**Status:** 21a visual investigation complete; the user selected the compact angular foundation. 21b simulation rules and the opt-in lab are approved and implemented; 21c–21d remain unapproved. Hats are optional, non-default accessories for the future cast. Numbers below are starting hypotheses, not measured balance results. Implement one approved subphase at a time.
 
 **Goal:** a team of generalists is dependable and can earn three stars; a well-coordinated specialist team has a higher ceiling because it assigns work and hands tickets over well. Mixed teams should be a useful middle ground. Replace the current character silhouette, not just its hats.
 
@@ -186,9 +186,9 @@ Bump the protocol for the incompatible setup/state change and cover snapshots, r
 | Slice | Files/surfaces | Result and gate |
 | --- | --- | --- |
 | 21a: visual investigation | `src/modelSheet/main.ts`, `src/render/three/Characters.ts`, `pose.ts`, `layout.ts`; study helpers only if needed | Three in-engine silhouette/rig studies, including carrying and throwing at gameplay scale. User approves one before production. No gameplay changes. |
-| 21b: deterministic rules and lab | New `src/sim/roles.ts` + colocated tests; `balance.ts`, `state.ts`, `tickets.ts`, `orders.ts`, `interact.ts`, `pipeline.ts`, `levels.ts`, `content.ts`, `scenes.ts`; bot/sim harness | Opt-in role/domain lab, fixed-seed benchmarks, classic all-generalist behavior preserved. No campaign-wide rebalance. |
+| 21b: deterministic rules and lab | New `src/sim/roles.ts` + colocated tests; `balance.ts`, `state.ts`, `tickets.ts`, `orders.ts`, `interact.ts`, `pipeline.ts`, `levels.ts`, `content.ts`, map-look entry; initial bot/sim role-lab harness | Opt-in role/domain lab, fixed-seed benchmarks, classic all-generalist behavior preserved. No campaign-wide rebalance. |
 | 21c: playable selection and final cast | `src/input/lobby.ts`, `flow/flow.ts`, `ui/lobby.ts`, `ui/onlineLobby.ts`, `ui/intro.ts`, `ui/playerBadge.ts`, `ui/hud.ts`, `ui/recipes.ts`, relevant CSS; `render/GameScene.ts`, `three/People.ts`, `Characters.ts`, `pose.ts`, `layout.ts`, ticket models/billboards; `net/protocol.ts`, snapshot/prediction consumers, `server/roomLogic.ts` | Production cast in the approved style; local/online role selection and pre-round readiness; domains readable throughout. No role is exposed without its rules, UI, and online support. |
-| 21d: balance and rollout | `scripts/sim.ts`, `src/sim/bot.ts`, benchmark fixtures/tests, explicitly selected level settings, `docs/game/`, approved screenshots | Validate target envelope with humans and bots, tune, then opt in selected campaign levels. Expand only after that evidence. |
+| 21d: balance and rollout | Extend `scripts/sim.ts`, `src/sim/bot.ts`, benchmark fixtures/tests beyond the 21b lab; explicitly selected level settings, `docs/game/`, approved screenshots | Validate target envelope with humans and bots, tune, then opt in selected campaign levels. Expand only after that evidence. |
 
 Before each slice, write a short concrete implementation plan and wait for approval as usual. Do not implement all four slices under one approval.
 
@@ -223,7 +223,15 @@ Capture the comparison set with `npx vite-node scripts/characterStudies.ts --out
 
 The shared study rig keeps `carryPoint` and the existing hand targets unchanged. Its torso bends out of the ticket arc and its rubber-hose arms extend for wind-up; these are investigation choices, not a production rig decision. The released-ticket path is illustrative, explicitly labeled, and does not change the sim's throw. No rates, domains, role selection, online behavior, final cast, or campaign tuning are implemented here.
 
-## Tests and completion criteria
+### 21b implementation status
+
+The approved 21b slice adds plain-data role ids and ticket domains, role-aware manual work and repair rates, domain-aware order compatibility/lifecycle, and the opt-in `lab-roles` level. Existing campaign levels remain without a domain schedule. Full-stack orders remain `mixed`; their FE/BE ingredients have their respective domains and are excluded from the exact-count batches, which apply to ordinary feature orders. Incidents use their authored incident domain. The lab borrows the scale-up world look and has no production UI or network role-selection path.
+
+Verification completed: `npm run check` (80 test files, 1,108 tests) and `npm run build` pass. The lab batch tests verify exact configured counts and drought bounds; classic-level tests verify that domain selection makes no additional RNG draws. Exact 60 Hz code/test completion tests cover every role/domain pair; pairing, design composition, strongest-worker selection, repair, worker-order permutation, and same-tick ticket replacement are also covered.
+
+`npm run sim -- --role-lab --players=N 30 1` compares same-policy generalist, mixed, and specialist bots across the same 30 seeds, printing per-seed score deltas, throughput, expired work, stars, station work, travel/idle, handovers, queues, and recipe/domain counts. For role-neutral assignment, mixed/specialist mean score deltas versus generalists were +2.5/+6.2 (2 players), +12.9/+13.9 (3), and +18.8/+4.3 (4); all six 95% normal-approximation intervals crossed zero. With role-aware assignment, the deltas were -3.6/-4.0 (2 players), -66.5/-2.2 (3), and +2.2/+14.9 (4); five of those six intervals crossed zero, while the 3-player mixed team was materially worse (-112.5 to -20.5). Role-neutral mean shipped orders for generalist/mixed/specialist teams were 10.6/10.6/10.6 (2 players), 14.1/14.4/14.6 (3), and 16.2/16.8/16.3 (4). These noisy lab results do not establish the proposed 10–20% throughput target, three-star campaign viability, or couch-play balance; the full round results show incident expiries, broad per-seed score swings, and a role-aware bot-policy regression for one composition that needs further diagnosis before 21d tuning.
+
+### Tests and completion criteria
 
 - [ ] Generalist manual-work timing matches the current baseline; classic levels retain seeded schedules/outcomes and save progression.
 - [ ] Every role/domain pair has exact completion-tick tests; faster speed is never accidentally treated as longer duration.
@@ -239,6 +247,6 @@ The shared study rig keeps `carryPoint` and the existing hand targets unchanged.
 
 ## Decisions still requiring approval
 
-The roster and matrix, exact pilot levels/domain mixes, and pre-round readiness flow are recommendations. The user has approved the underlying generalist/specialist philosophy, a full cast redesign, and the compact angular foundation with varied clothing, hair, and accessories, including optional, non-default hats, not those specific implementation choices.
+The user approved the 21b rules/lab scope and its proposed role matrix as hypotheses to measure, not as proven balance. Campaign opt-in, the pre-round readiness flow, final cast, and the remaining 21c/21d implementation details still require their own approval gates.
 
-The compact angular foundation is selected; individual production characters and their final body/face/animation details remain for the separately approved 21c slice. 21b approval is still pending. Do not treat the study choice as approval to implement later slices, final cast acceptance, or measured balance.
+The compact angular foundation is selected; individual production characters and their final body/face/animation details remain for the separately approved 21c slice. Do not treat the study choice or 21b approval as approval to implement later slices, final cast acceptance, campaign rollout, or measured balance.

@@ -56,6 +56,15 @@ describe('bot run on the garage', () => {
   it('is deterministic per seed', () => {
     expect(runBots(GARAGE, 3, 2)).toEqual(runBots(GARAGE, 3, 2));
   });
+
+  it('accepts explicit role compositions and a role-aware task assignment policy', () => {
+    const options = {
+      roles: ['frontend', 'qa'] as const,
+      assignmentPolicy: 'role-aware' as const,
+    };
+    expect(runBots(GARAGE, 13, 2, options)).toEqual(runBots(GARAGE, 13, 2, options));
+    expect(() => runBots(GARAGE, 13, 2, { roles: ['qa'] })).toThrow(/Expected 2 role ids/);
+  });
 });
 
 // Every level's 1-star bot runs live in campaign.test.ts.
@@ -101,6 +110,64 @@ describe('bot and new mechanics', () => {
     }
     const carried = state.tickets.find((t) => t.location.kind === 'player');
     expect(carried?.kind).toBe('incident');
+  });
+
+  it('assigns a queued domain to the available bot with the shortest role-adjusted work', () => {
+    const state = newTestGame();
+    createOrder(state, 'feature', 'Frontend work', undefined, 'frontend');
+    const queued = state.tickets[0];
+    if (!queued) throw new Error('Missing queued feature ticket');
+    const generalist = state.players.find((player) => player.id === 1);
+    const frontend = state.players.find((player) => player.id === 2);
+    if (!generalist || !frontend) throw new Error('Missing bot players');
+    generalist.roleId = 'backend';
+    frontend.roleId = 'frontend';
+    const bots = [createBot(1, false, 'role-aware'), createBot(2, false, 'role-aware')];
+    const inputs = bots.map((bot) => botInput(state, bot, bots));
+    expect(bots[0]?.ticketId).toBeNull();
+    expect(bots[1]?.ticketId).toBe(queued.id);
+    expect(inputs[0]?.interact).toBe(false);
+  });
+
+  it('does not let an unassigned role-aware bot take a reserved queue ticket', () => {
+    const state = newTestGame();
+    const reserved = createOrder(state, 'feature', 'Reserved work', undefined, 'frontend');
+    const queued = state.tickets.find(
+      (ticket) => ticket.kind === 'feature' && ticket.domain === reserved.domain,
+    );
+    if (!queued) throw new Error('Missing reserved feature ticket');
+    const assigned = createBot(1, false, 'role-aware');
+    const unassigned = createBot(2, false, 'role-aware');
+    assigned.ticketId = queued.id;
+
+    const command = botInput(state, unassigned, [assigned, unassigned]);
+
+    expect(unassigned.ticketId).toBeNull();
+    expect(command.interact).toBe(false);
+  });
+
+  it('assigns later queued tickets by role and waits for them to reach the queue head', () => {
+    const state = newTestGame();
+    createOrder(state, 'feature', 'Frontend work', undefined, 'frontend');
+    createOrder(state, 'feature', 'Backend work', undefined, 'backend');
+    const frontendTicket = state.tickets.find((ticket) => ticket.domain === 'frontend');
+    const backendTicket = state.tickets.find((ticket) => ticket.domain === 'backend');
+    const frontendPlayer = state.players.find((player) => player.id === 1);
+    const backendPlayer = state.players.find((player) => player.id === 2);
+    if (!frontendTicket || !backendTicket || !frontendPlayer || !backendPlayer) {
+      throw new Error('Missing queued tickets or players');
+    }
+    frontendPlayer.roleId = 'frontend';
+    backendPlayer.roleId = 'backend';
+    const frontendBot = createBot(1, false, 'role-aware');
+    const backendBot = createBot(2, false, 'role-aware');
+
+    botInput(state, frontendBot, [frontendBot, backendBot]);
+    const backendCommand = botInput(state, backendBot, [frontendBot, backendBot]);
+
+    expect(frontendBot.ticketId).toBe(frontendTicket.id);
+    expect(backendBot.ticketId).toBe(backendTicket.id);
+    expect(backendCommand.interact).toBe(false);
   });
 });
 
@@ -162,6 +229,7 @@ describe('bots and full-stack features', () => {
       const t: Ticket = {
         id: state.nextTicketId++,
         kind: 'frontend',
+        domain: 'frontend',
         title: 'Checkout',
         steps: [{ kind: 'code', progress: 1 }],
         location: playerId === null ? { kind: 'tile', x: 4, y: 1 } : { kind: 'player', playerId },

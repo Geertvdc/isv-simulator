@@ -32,7 +32,7 @@ function view(state: GameState): RoundView {
 }
 
 function ticket(id: number, location: Ticket['location']): Ticket {
-  return { id, kind: 'feature', title: 'x', steps: [], location } as unknown as Ticket;
+  return { id, kind: 'feature', domain: 'general', title: 'x', steps: [], location };
 }
 
 describe('3D layout', () => {

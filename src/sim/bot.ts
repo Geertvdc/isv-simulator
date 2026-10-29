@@ -13,7 +13,13 @@
  * everything (but keeps carrying) and stands in the meeting room.
  */
 
-import { REVIEWERS_NEEDED } from './balance';
+import {
+  PIPELINE_BUILD_TICKS,
+  DESIGNED_CODE_FACTOR,
+  REVIEWERS_NEEDED,
+  REVIEW_RATE,
+  WORK_RATE,
+} from './balance';
 import { canPutDown, isAtItsStation } from './interact';
 import { type GridPoint, type LevelMap, type Tile, getTile, isSolid } from './level';
 import type { Level } from './levels';
@@ -22,6 +28,7 @@ import { managerTiles } from './manager';
 import { inviteFor } from './meetings';
 import { NEIGHBOURS, pathTo, searchPath } from './path';
 import { isBroken } from './pipeline';
+import { roleWorkRate, type RoleId, type TicketDomain } from './roles';
 import {
   type GameState,
   type InputCommand,
@@ -34,6 +41,7 @@ import { tick } from './tick';
 import {
   OPTIONAL_STEPS,
   QUEUE_TILE,
+  type QueueKind,
   type StepKind,
   type Ticket,
   type TicketKind,
@@ -70,7 +78,10 @@ export interface Bot {
   /** Interact was sent last tick: presses need a release in between. */
   interactWas: boolean;
   skipTests: boolean;
+  assignmentPolicy: BotAssignmentPolicy;
 }
+
+export type BotAssignmentPolicy = 'role-neutral' | 'role-aware';
 
 /** `stand` means: stand on the tile itself (a meeting room tile), not next to it. */
 type Action = 'interact' | 'work' | 'wait' | 'stand';
@@ -82,7 +93,11 @@ interface Goal {
   besideOthers?: boolean;
 }
 
-export function createBot(playerId: PlayerId, skipTests = false): Bot {
+export function createBot(
+  playerId: PlayerId,
+  skipTests = false,
+  assignmentPolicy: BotAssignmentPolicy = 'role-neutral',
+): Bot {
   return {
     playerId,
     ticketId: null,
@@ -90,6 +105,7 @@ export function createBot(playerId: PlayerId, skipTests = false): Bot {
     helping: null,
     interactWas: false,
     skipTests,
+    assignmentPolicy,
   };
 }
 
@@ -174,6 +190,12 @@ function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | nu
   }
 
   const own = state.tickets.find((t) => t.id === bot.ticketId);
+  if (own?.location.kind === 'queue') {
+    const tile = nearest(state, bot.playerId, tilesOf(state.level, QUEUE_TILE[own.location.queue]));
+    const head = queuedTickets(state, own.location.queue)[0];
+    const action = bot.assignmentPolicy === 'role-aware' && head?.id !== own.id ? 'wait' : 'interact';
+    return tile ? { tile, action } : null;
+  }
   if (own?.location.kind === 'tile') {
     const tile = { x: own.location.x, y: own.location.y };
     const kind = getTile(state.level, tile.x, tile.y);
@@ -192,10 +214,64 @@ function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | nu
   if (help) return help;
   const merged = mergedGoal(state, bot, bots) ?? parkedPartGoal(state, bot, bots);
   if (merged) return merged;
+  if (bot.assignmentPolicy === 'role-aware') return roleAwareQueueGoal(state, bot, bots);
   for (const queue of ['bug', 'feature'] as const satisfies readonly TicketKind[]) {
     if (queuedTickets(state, queue).length === 0) continue;
     const tile = nearest(state, bot.playerId, tilesOf(state.level, QUEUE_TILE[queue]));
     if (tile) return { tile, action: 'interact' };
+  }
+
+  function roleAwareQueueGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | null {
+    const player = getPlayer(state, bot.playerId);
+    if (!player) return null;
+    for (const queue of ['bug', 'feature'] as const) {
+      const queueTickets = queuedTickets(state, queue);
+      for (const ticket of queueTickets) {
+        const reserved = bots.find((candidate) => candidate.ticketId === ticket.id);
+        if (reserved) {
+          if (reserved.playerId === bot.playerId) {
+            const target = nearest(state, bot.playerId, tilesOf(state.level, QUEUE_TILE[queue]));
+            return target
+              ? { tile: target, action: queueTickets[0]?.id === ticket.id ? 'interact' : 'wait' }
+              : null;
+          }
+          continue;
+        }
+        const available = bots
+          .filter((candidate) => {
+            if (ticketCarriedBy(state, candidate.playerId) || candidate.helping) return false;
+            return candidate.ticketId === null;
+          })
+          .map((candidate) => {
+            const candidatePlayer = getPlayer(state, candidate.playerId);
+            if (!candidatePlayer) throw new Error(`No player ${candidate.playerId}`);
+            return {
+              bot: candidate,
+              score: assignmentTime(ticket, candidatePlayer.roleId),
+            };
+          })
+          .sort((a, b) => a.score - b.score || a.bot.playerId - b.bot.playerId);
+        if (available[0]?.bot.playerId !== bot.playerId) continue;
+        bot.ticketId = ticket.id;
+        const target = nearest(state, bot.playerId, tilesOf(state.level, QUEUE_TILE[queue]));
+        return target
+          ? { tile: target, action: queueTickets[0]?.id === ticket.id ? 'interact' : 'wait' }
+          : null;
+      }
+    }
+    return null;
+  }
+
+  function assignmentTime(ticket: Ticket, roleId: RoleId): number {
+    return ticket.steps.reduce((total, step) => {
+      if (step.kind === 'pipeline') return total + PIPELINE_BUILD_TICKS;
+      if (step.kind === 'merge') return total;
+      if (step.kind === 'review') return total + 1 / REVIEW_RATE;
+      const rate = roleWorkRate(roleId, step.kind, ticket.domain);
+      const design =
+        step.kind === 'code' && ticket.steps.some((candidate) => candidate.kind === 'design');
+      return total + 1 / (WORK_RATE * rate * (design ? DESIGNED_CODE_FACTOR : 1));
+    }, 0);
   }
   return null;
 }
@@ -396,6 +472,20 @@ export interface BotRunSummary {
   meetingsAttended: number;
   meetingsMissed: number;
   managerBumps: number;
+  shippedByDomain: Record<TicketDomain, number>;
+  expiredByDomain: Record<TicketDomain, number>;
+  ordersByRecipeDomain: Record<string, number>;
+  stationWorkTicks: {
+    code: number;
+    test: number;
+    design: number;
+    review: number;
+    repair: number;
+  };
+  travelTicks: number;
+  idleTicks: number;
+  handovers: number;
+  maxQueueLength: Record<QueueKind, number>;
   result: LevelResult;
 }
 
@@ -404,12 +494,27 @@ export function runBots(
   level: Level,
   seed: number,
   botCount: number,
-  { skipTests = false }: { skipTests?: boolean } = {},
+  {
+    skipTests = false,
+    roles,
+    assignmentPolicy = 'role-neutral',
+  }: {
+    skipTests?: boolean;
+    roles?: readonly RoleId[];
+    assignmentPolicy?: BotAssignmentPolicy;
+  } = {},
 ): BotRunSummary {
   const ids = Array.from({ length: botCount }, (_, i) => i + 1);
-  const state = createGame(level, seed, ids);
-  const bots = ids.map((id) => createBot(id, skipTests));
-  const summary = {
+  if (roles && roles.length !== botCount) {
+    throw new Error(`Expected ${botCount} role ids, received ${roles.length}`);
+  }
+  const roleByPlayer: Partial<Record<PlayerId, RoleId>> = {};
+  ids.forEach((id, index) => {
+    roleByPlayer[id] = roles?.[index] ?? 'generalist';
+  });
+  const state = createGame(level, seed, ids, roleByPlayer);
+  const bots = ids.map((id) => createBot(id, skipTests, assignmentPolicy));
+  const summary: Omit<BotRunSummary, 'result'> = {
     shipped: 0,
     shippedBugs: 0,
     shippedUntested: 0,
@@ -421,12 +526,45 @@ export function runBots(
     meetingsAttended: 0,
     meetingsMissed: 0,
     managerBumps: 0,
+    shippedByDomain: { general: 0, frontend: 0, backend: 0, infra: 0, mixed: 0 },
+    expiredByDomain: { general: 0, frontend: 0, backend: 0, infra: 0, mixed: 0 },
+    ordersByRecipeDomain: {},
+    stationWorkTicks: { code: 0, test: 0, design: 0, review: 0, repair: 0 },
+    travelTicks: 0,
+    idleTicks: 0,
+    handovers: 0,
+    maxQueueLength: { feature: 0, bug: 0 },
   };
   while (!state.result) {
-    tick(
-      state,
-      bots.map((b) => botInput(state, b, bots)),
+    const inputs = bots.map((bot) => botInput(state, bot, bots));
+    const priorLocations = new Map(
+      state.tickets.map((ticket) => [ticket.id, ticket.location.kind]),
     );
+    const priorPositions = new Map(
+      state.players.map((player) => [player.id, { x: player.pos.x, y: player.pos.y }]),
+    );
+    for (const input of inputs) {
+      if (input.work) {
+        const { x, y } = targetTile(state, input.playerId);
+        const tile = getTile(state.level, x, y);
+        if (tile === 'keyboard') summary.stationWorkTicks.code++;
+        if (tile === 'testBench') summary.stationWorkTicks.test++;
+        if (tile === 'whiteboard') summary.stationWorkTicks.design++;
+        if (tile === 'review') summary.stationWorkTicks.review++;
+        if (tile === 'pipeline' && isBroken(state, { x, y })) summary.stationWorkTicks.repair++;
+      }
+    }
+    tick(state, inputs);
+    for (const player of state.players) {
+      const before = priorPositions.get(player.id);
+      if (!before) throw new Error(`Missing prior position for player ${player.id}`);
+      if (Math.hypot(player.pos.x - before.x, player.pos.y - before.y) > 1e-6) {
+        summary.travelTicks++;
+      } else {
+        const input = inputs.find((candidate) => candidate.playerId === player.id);
+        if (input && !input.work && !input.interact) summary.idleTicks++;
+      }
+    }
     for (const e of state.events) {
       if (e.type === 'orderShipped') {
         summary.shipped++;
@@ -434,16 +572,33 @@ export function runBots(
         if (e.untested) summary.shippedUntested++;
         if (e.order?.steps.includes('review')) summary.shippedReviewed++;
         if (e.order?.kind === 'incident') summary.shippedIncidents++;
+        if (e.order) {
+          summary.shippedByDomain[e.order.domain]++;
+          const key = `shipped:${e.order.kind}:${e.order.domain}`;
+          summary.ordersByRecipeDomain[key] = (summary.ordersByRecipeDomain[key] ?? 0) + 1;
+        }
       }
       if (e.type === 'orderExpired') {
         summary.expired++;
         if (e.order.kind === 'bug') summary.expiredBugs++;
         if (e.order.kind === 'incident') summary.expiredIncidents++;
+        summary.expiredByDomain[e.order.domain]++;
+        const key = `expired:${e.order.kind}:${e.order.domain}`;
+        summary.ordersByRecipeDomain[key] = (summary.ordersByRecipeDomain[key] ?? 0) + 1;
       }
+      if (e.type === 'pickedUp' && priorLocations.get(e.ticketId) === 'tile') summary.handovers++;
       if (e.type === 'meetingAttended') summary.meetingsAttended++;
       if (e.type === 'meetingMissed') summary.meetingsMissed++;
       if (e.type === 'managerBumped') summary.managerBumps++;
     }
+    summary.maxQueueLength.feature = Math.max(
+      summary.maxQueueLength.feature,
+      queuedTickets(state, 'feature').length,
+    );
+    summary.maxQueueLength.bug = Math.max(
+      summary.maxQueueLength.bug,
+      queuedTickets(state, 'bug').length,
+    );
   }
   return { ...summary, result: state.result };
 }

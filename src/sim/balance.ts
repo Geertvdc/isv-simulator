@@ -1,5 +1,7 @@
 /** Every tunable number in the game lives here. */
 
+import type { RoleId, TicketDomain } from './roles';
+
 /** Fixed simulation timestep: how many times `tick` runs per real second. High so movement feels responsive. */
 export const TICKS_PER_SECOND = 60;
 
@@ -81,6 +83,30 @@ export const GAMEPAD_DEAD_ZONE = 0.2;
 
 /** Step progress gained per tick of holding work at a station: a step takes ~2.5 s. */
 export const WORK_RATE = 1 / (2.5 * TICKS_PER_SECOND);
+/** Role work-speed multipliers for coding; these replace one another, never stack. */
+export const ROLE_CODE_RATES: Readonly<Record<RoleId, Readonly<Record<TicketDomain, number>>>> = {
+  generalist: { general: 1, frontend: 1, backend: 1, infra: 1, mixed: 1 },
+  frontend: { general: 0.85, frontend: 1.5, backend: 0.85, infra: 0.85, mixed: 1 },
+  backend: { general: 0.85, frontend: 0.85, backend: 1.5, infra: 0.85, mixed: 1 },
+  qa: { general: 0.8, frontend: 0.8, backend: 0.8, infra: 0.8, mixed: 0.8 },
+  platform: { general: 0.85, frontend: 0.85, backend: 0.85, infra: 1.5, mixed: 1 },
+};
+/** Role work-speed multipliers for tests, regardless of the ticket domain. */
+export const ROLE_TEST_RATES: Readonly<Record<RoleId, number>> = {
+  generalist: 1,
+  frontend: 0.9,
+  backend: 0.9,
+  qa: 1.6,
+  platform: 0.9,
+};
+/** Role work-speed multipliers for actively repairing an empty broken pipeline. */
+export const ROLE_REPAIR_RATES: Readonly<Record<RoleId, number>> = {
+  generalist: 1,
+  frontend: 1,
+  backend: 1,
+  qa: 1,
+  platform: 1.25,
+};
 /** Players who must hold work at one review station at once for the review to move. */
 export const REVIEWERS_NEEDED = 2;
 /** Review progress per tick while enough players work it: a review takes ~3 s. */
@@ -90,6 +116,8 @@ export const REVIEW_RATE = 1 / (3 * TICKS_PER_SECOND);
  * one, not twice as fast, so splitting up still makes sense sometimes.
  */
 export const PAIR_RATE = WORK_RATE * 1.9;
+/** Each coder contributes 0.95 of their individual rate while pairing. */
+export const PAIR_WORKER_FACTOR = 0.95;
 /** Designing at the whiteboard takes about as long as coding... */
 export const DESIGN_RATE = 1 / (2.5 * TICKS_PER_SECOND);
 /** ...and pays off: a designed feature codes this much faster. */

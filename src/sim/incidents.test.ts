@@ -104,7 +104,11 @@ describe('an open incident', () => {
   it('lets bugs land and open features keep ticking', () => {
     const state = incidentGame();
     createOrder(state, 'feature', 'Old feature');
-    state.pendingBugs.push({ tick: INCIDENTS.firstTick + 10, title: 'Bug: x' });
+    state.pendingBugs.push({
+      tick: INCIDENTS.firstTick + 10,
+      title: 'Bug: x',
+      domain: 'general',
+    });
     idle(state, INCIDENTS.firstTick + 20);
     expect(state.orders.map((o) => o.kind).sort()).toEqual(['bug', 'feature', 'incident']);
   });

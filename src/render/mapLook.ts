@@ -43,6 +43,7 @@ export const LEVEL_LOOKS: Readonly<Record<string, MapLook>> = {
   // Lab levels have no chapter: they borrow a world.
   'lab-shapes': { walls: 'glass', floor: 'carpet', setting: 'scale-up' },
   'lab-dev': { walls: 'wood', floor: 'parquet', setting: 'startup' },
+  'lab-roles': { walls: 'glass', floor: 'carpet', setting: 'scale-up' },
 };
 
 /** Signature color per block, shared by the HUD recipes, ticket step icons and intro pictures. */

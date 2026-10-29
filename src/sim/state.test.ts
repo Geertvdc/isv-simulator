@@ -29,6 +29,16 @@ describe('createGame', () => {
     for (const p of state.players) expect(p.pos).toEqual(state.level.spawns[p.id - 1]);
   });
 
+  it('defaults roles to generalist and accepts explicit role ids independent of player order', () => {
+    const defaults = createGame(GARAGE, 42, [1, 2]);
+    const configured = createGame(GARAGE, 42, [2, 1], { 1: 'qa', 2: 'platform' });
+    expect(defaults.players.map((player) => player.roleId)).toEqual(['generalist', 'generalist']);
+    expect(configured.players.map((player) => [player.id, player.roleId])).toEqual([
+      [2, 'platform'],
+      [1, 'qa'],
+    ]);
+  });
+
   it('rejects no players, duplicates and ids without a spawn', () => {
     const level = GARAGE;
     expect(() => createGame(level, 1, [])).toThrow();

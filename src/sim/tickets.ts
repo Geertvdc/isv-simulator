@@ -4,6 +4,7 @@
  */
 
 import type { Tile } from './level';
+import type { TicketDomain } from './roles';
 import type { GameState, PlayerId, Vec } from './state';
 
 /**
@@ -20,7 +21,7 @@ export type StepKind = 'design' | 'code' | 'review' | 'test' | 'merge' | 'pipeli
 export type TicketKind = 'feature' | 'bug' | 'incident' | 'frontend' | 'backend' | 'fullstack';
 
 /** The two parts of a full-stack feature, and the ticket they become. */
-export const PART_KINDS: readonly TicketKind[] = ['frontend', 'backend'];
+export const PART_KINDS = ['frontend', 'backend'] as const;
 
 /** The queues tickets wait in: the inbox and the bug queue. */
 export type QueueKind = 'feature' | 'bug';
@@ -101,6 +102,7 @@ export type TicketLocation =
 export interface Ticket {
   id: number;
   kind: TicketKind;
+  domain: TicketDomain;
   /** Flavour only. */
   title: string;
   steps: TicketStep[];
@@ -194,16 +196,25 @@ export function enqueueTicket(
   kind: TicketKind,
   title: string,
   steps: readonly StepKind[] = TICKET_STEPS[kind],
+  domain: TicketDomain = defaultDomain(kind),
 ): Ticket {
   const ticket: Ticket = {
     id: state.nextTicketId++,
     kind,
+    domain,
     title,
     steps: steps.map((k) => ({ kind: k, progress: 0 })),
     location: { kind: 'queue', queue: QUEUE_OF[kind] },
   };
   state.tickets.push(ticket);
   return ticket;
+}
+
+function defaultDomain(kind: TicketKind): TicketDomain {
+  if (kind === 'frontend') return 'frontend';
+  if (kind === 'backend') return 'backend';
+  if (kind === 'fullstack') return 'mixed';
+  return 'general';
 }
 
 /**
@@ -223,7 +234,7 @@ export function loseTicket(state: GameState, ticket: Ticket, at: { x: number; y:
 
 /** Whether `ticket` is one part of a full-stack feature (it can't ship on its own). */
 export function isPart(ticket: Pick<Ticket, 'kind'>): boolean {
-  return PART_KINDS.includes(ticket.kind);
+  return ticket.kind === 'frontend' || ticket.kind === 'backend';
 }
 
 /**
@@ -244,6 +255,7 @@ export function mergeParts(state: GameState, a: Ticket, b: Ticket, x: number, y:
   const merged: Ticket = {
     id: state.nextTicketId++,
     kind: 'fullstack',
+    domain: 'mixed',
     title: front.title,
     steps: TICKET_STEPS.fullstack.map((kind) => ({
       kind,

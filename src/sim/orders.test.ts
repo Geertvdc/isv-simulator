@@ -287,7 +287,7 @@ describe('ship', () => {
       bugs++;
       const shippedAt = state.tick - 2;
       expect(state.pendingBugs).toEqual([
-        { tick: shippedAt + BUG_DELAY_TICKS, title: 'Bug: Center a div' },
+        { tick: shippedAt + BUG_DELAY_TICKS, title: 'Bug: Center a div', domain: 'general' },
       ]);
       idle(state, BUG_DELAY_TICKS - 2);
       expect(state.orders.filter((o) => o.kind === 'bug')).toHaveLength(0);
@@ -317,7 +317,14 @@ describe('bug chance', () => {
 });
 
 describe('scoring', () => {
-  const order: Order = { id: 1, kind: 'feature', steps: [], createdTick: 100, expiresTick: 1100 };
+  const order: Order = {
+    id: 1,
+    kind: 'feature',
+    domain: 'general',
+    steps: [],
+    createdTick: 100,
+    expiresTick: 1100,
+  };
 
   it('pays base points plus a bonus for the share of time left', () => {
     expect(shipPoints(order, 100)).toBe(ORDER_POINTS + ORDER_SPEED_BONUS_MAX);

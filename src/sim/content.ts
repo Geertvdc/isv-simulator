@@ -1,6 +1,31 @@
 /** Text content. Add jokes freely. */
 
 import type { TicketKind } from './tickets';
+import type { RoleId, TicketDomain } from './roles';
+
+export const ROLE_LABELS: Readonly<Record<RoleId, string>> = {
+  generalist: 'Full-stack developer',
+  frontend: 'Frontend specialist',
+  backend: 'Backend specialist',
+  qa: 'QA engineer',
+  platform: 'Platform engineer',
+};
+
+export const ROLE_DESCRIPTIONS: Readonly<Record<RoleId, string>> = {
+  generalist: 'Reliable at every task, with no weak assignment.',
+  frontend: 'Fast at frontend code; slower at other coding domains and testing.',
+  backend: 'Fast at backend code; slower at other coding domains and testing.',
+  qa: 'Fast at testing; slower at coding across every domain.',
+  platform: 'Fast at infrastructure code and pipeline repair.',
+};
+
+export const TICKET_DOMAIN_LABELS: Readonly<Record<TicketDomain, string>> = {
+  general: 'General',
+  frontend: 'Frontend',
+  backend: 'Backend',
+  infra: 'Infrastructure',
+  mixed: 'Cross-cutting',
+};
 
 /** Flavour titles for tickets; they don't change how a ticket plays. */
 export const TICKET_TITLES: readonly string[] = [

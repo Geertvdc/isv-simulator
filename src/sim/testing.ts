@@ -73,6 +73,7 @@ export function addTicket(
   const ticket: Ticket = {
     id: state.nextTicketId++,
     kind,
+    domain: kind === 'frontend' ? 'frontend' : kind === 'backend' ? 'backend' : 'general',
     title: 'Test ticket',
     steps: TICKET_STEPS[kind].map((k, i) => ({
       kind: k,
