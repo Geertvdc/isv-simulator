@@ -20,11 +20,11 @@ Step 1:
 
 Step 2:
 
-- [ ] Shipping completes only the ticket's own order; a ticket from another order with the same steps doesn't steal it
-- [ ] When an order runs out, its tickets out in the office become expired: no work, build, merge or ship, only carry, throw and bin
-- [ ] The Garage has a bin; expired ticket cards are greyed out
-- [ ] Bots bin expired tickets
-- [ ] Tests for the order link, expiry, refusals and bots
+- [x] Shipping completes only the ticket's own order; a ticket from another order with the same steps doesn't steal it
+- [x] When an order runs out, its tickets out in the office become expired: no work, build, merge or ship, only carry, throw and bin
+- [x] The Garage has a bin; expired ticket cards are greyed out
+- [x] Bots bin expired tickets
+- [x] Tests for the order link, expiry, refusals and bots
 
 Step 3:
 
@@ -50,3 +50,9 @@ Step 1, the incident ship block:
 - **Feedback on the refusal:** a `shipBlocked` event (`playerId`, `ticketId`). It plays the existing error sound (`order-expired`, no new asset), pops "Hotfix first!" (`SHIP_BLOCKED_TEXT` in `content.ts`) over the player with a small shake, and the incident banner shakes its head (just the flash with reduced motion). The player keeps the ticket.
 - **Words:** the banner reads "INCIDENT! Nothing ships until the hotfix does"; the Seed Round intro says nothing else ships and no new features come in until the hotfix does.
 - **Bots:** a bot with a finished non-hotfix ticket parks it on the nearest free counter (no belt feeding it, no other bot about to use it) and goes for other work, the hotfix included; with no free counter it holds the ticket. Finished tickets on counters are fetched and shipped once shipping is open again.
+
+Step 2, expired tickets:
+
+- **Tickets belong to their order.** `Ticket.orderId` is set when the order opens (both full-stack parts too, and the merged ticket keeps it). `shipTicket` completes only that order; a ticket whose order is gone can't ship. This replaces phase 6's "first matching order, or ship for nothing".
+- **Expiry:** queued tickets of the order go away as before; every other ticket of the order gets `expired: true`. An expired ticket has no workable steps, so no station, pipeline, review or merge takes it; a pipeline holding one stops building and never breaks. A shoved-off expired ticket is gone, not back in the queue (`ticketLost` with `queue: null`).
+- **Bots** take expired tickets to the bin (or park them on a counter on a level without a bin), and fetch expired tickets lying around when there is a bin.
