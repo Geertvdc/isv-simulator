@@ -185,44 +185,72 @@ body {
   display: none;
 }
 
+/* An order reads like an issue-tracker card in the editor's colors: the
+   timer bar on top, `#id`, a kind chip and the title, then the steps as
+   CI checks. The left edge carries the kind's color. */
 .order {
+  position: relative;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
-  min-width: 6.875rem;
-  padding: 0.5rem 0.625rem;
-  border: 3px solid #f4f1e8;
-  border-radius: 0.625rem;
-  background: rgba(20, 22, 28, 0.85);
+  gap: 0.3125rem;
+  min-width: 7.5rem;
+  max-width: 13rem;
+  padding: 0 0.625rem 0.5rem;
+  border: 1px solid var(--window-edge);
+  border-left: 0.25rem solid var(--kind-color);
+  border-radius: 0.5rem;
+  background: rgba(24, 30, 46, 0.92);
+  box-shadow: 0 0.25rem 0.75rem rgba(5, 8, 18, 0.5);
+  overflow: hidden;
   animation: order-in 0.25s ease-out;
 }
 
 .order-bug {
-  border-color: #e05a5a;
-  background: rgba(70, 20, 20, 0.88);
-}
-
-.order-kind {
-  font-size: 0.875rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.order-bug .order-kind {
-  color: #ff8a80;
+  background: rgba(46, 24, 30, 0.92);
 }
 
 .order-incident {
   border-color: #ff3b2f;
-  background: rgba(150, 15, 10, 0.92);
-  min-width: 8.125rem;
+  background: rgba(110, 16, 12, 0.94);
 }
 
-.order-incident .order-kind {
+.order-head {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+}
+
+.order-id {
+  color: var(--code-muted);
+  font-weight: 700;
+}
+
+.order-chip {
+  padding: 0 0.375rem;
+  border: 1px solid var(--kind-color);
+  border-radius: 999px;
+  color: var(--kind-color);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.order-incident .order-chip {
+  border-color: #fff;
+  background: #ff3b2f;
   color: #fff;
-  font-size: 0.9375rem;
+  font-weight: 800;
+}
+
+.order-title {
+  overflow: hidden;
+  color: var(--code-ink);
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .hud-alerts {
@@ -328,81 +356,196 @@ body {
   }
 }
 
-.order-steps {
+/* Step tiles, like CI checks: queued ones dim, the next one lit and
+   outlined (a fill bar while it runs), passed ones filled with a check,
+   skipped tests struck through with a bug: it may come back. */
+.step-row {
   display: flex;
-  gap: 0.3125rem;
+  gap: 0.25rem;
+  padding: 0.125rem 0;
 }
 
-.order-step {
+.step-tile {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 50%;
-  background: var(--step-color);
-  color: #fff;
-  font-size: 0.8125rem;
-  font-weight: 800;
-  text-shadow: 0 0 3px #000;
+  width: 1.625rem;
+  height: 1.625rem;
+  border: 1px solid var(--window-edge);
+  border-radius: 0.375rem;
+  background: var(--window-bar);
+  color: var(--step-color);
 }
 
-/* A full-stack recipe's two code chips: a mark in the part's folder color. */
-.order-step-frontend,
-.order-step-backend {
-  position: relative;
-  box-shadow: inset 0 -0.35rem 0 var(--part-color);
+.step-tile .glyph {
+  width: 1.0625rem;
+  height: 1.0625rem;
 }
 
-/* FE / BE in the corner, so the two code chips read without color too. */
-.order-step-frontend::after,
-.order-step-backend::after {
+.step-tile[data-state='todo'] .glyph {
+  opacity: 0.45;
+}
+
+.step-tile[data-state='current'] {
+  border: 2px solid var(--step-color);
+  background: color-mix(in srgb, var(--step-color) 22%, var(--window));
+  box-shadow: 0 0 0.5rem color-mix(in srgb, var(--step-color) 55%, transparent);
+  transform: scale(1.1);
+}
+
+.step-fill {
   position: absolute;
-  right: -0.15rem;
-  bottom: -0.35rem;
+  left: 0.125rem;
+  bottom: 0.125rem;
+  width: 0;
+  height: 0.1875rem;
+  border-radius: 1px;
+  background: var(--step-color);
+}
+
+.step-tile[data-state='done'] {
+  border-color: var(--step-color);
+  background: var(--step-color);
+  color: var(--window);
+}
+
+.step-tile[data-state='skipped'] .glyph,
+.step-tile[data-state='expired'] .glyph {
+  opacity: 0.35;
+}
+
+.step-tile[data-state='skipped']::before {
+  position: absolute;
+  inset: 45% -1px auto;
+  height: 2px;
+  background: var(--syn-number);
+  transform: rotate(-35deg);
+  content: '';
+}
+
+.step-tile[data-state='expired'] {
+  color: var(--code-faint);
+}
+
+.step-mark {
+  position: absolute;
+  top: -0.3rem;
+  right: -0.3rem;
+  display: none;
+  width: 0.8125rem;
+  height: 0.8125rem;
+  padding: 1px;
+  border-radius: 50%;
+  stroke-width: 3.5;
+}
+
+.step-tile[data-state='done'] .step-mark-done {
+  display: block;
+  background: var(--syn-string);
+  color: var(--window);
+}
+
+.step-tile[data-state='skipped'] .step-mark-skipped {
+  display: block;
+  background: var(--window);
+  color: var(--syn-number);
+  stroke-width: 2.5;
+}
+
+/* Intro recipes: every tile in full color, nothing done yet. */
+.step-row-recipe .step-tile[data-state] {
+  border-color: var(--step-color);
+  box-shadow: none;
+  transform: none;
+}
+
+.step-row-recipe .step-tile .glyph {
+  opacity: 1;
+}
+
+/* A full-stack order's two code tiles: a mark in the part's folder color. */
+.step-part {
+  box-shadow: inset 0 -0.25rem 0 var(--part-color);
+}
+
+/* FE / BE in the corner, so the two code tiles read without color too. */
+.step-part::after {
+  position: absolute;
+  left: -0.2rem;
+  bottom: -0.3rem;
   padding: 0 0.1rem;
   border-radius: 0.2rem;
   background: var(--part-color);
   color: #10141c;
-  text-shadow: none;
+  font-family: var(--mono);
   font-size: 0.5rem;
   font-weight: 700;
   line-height: 1.2;
 }
 
-.order-step-frontend::after {
-  content: 'FE';
-}
-
-.order-step-backend::after {
-  content: 'BE';
-}
-
-.order-step-frontend {
+.step-part-frontend {
   --part-color: #7ab8f0;
 }
 
-.order-step-backend {
+.step-part-frontend::after {
+  content: 'FE';
+}
+
+.step-part-backend {
   --part-color: #6cbf7a;
 }
 
+.step-part-backend::after {
+  content: 'BE';
+}
+
+/* The timer runs along the top edge: green, then yellow, then red. */
 .order-timer {
-  height: 0.5rem;
-  border-radius: 0.25rem;
-  background: rgba(255, 255, 255, 0.15);
-  overflow: hidden;
+  height: 0.3125rem;
+  margin: 0 -0.625rem 0.125rem;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .order-timer-fill {
   height: 100%;
-  background: #7cf07c;
-}
-
-.order.urgent .order-timer-fill {
-  background: #ff5a4f;
+  transition: background-color 0.3s;
 }
 
 .order.urgent {
   animation: order-flash 0.5s steps(2, jump-none) infinite;
+}
+
+.order.urgent .order-timer-fill {
+  animation: timer-flash 0.5s steps(2, jump-none) infinite;
+}
+
+/* Time ran out: the card greys out under a stamp, then drops off. */
+.order.expired {
+  border-left-color: var(--code-faint);
+  background: rgba(40, 43, 52, 0.94);
+  animation: order-out 1.1s ease-in forwards;
+}
+
+/* Everything but the stamp goes grey: the stamp stays red. */
+.order.expired > :not(.order-stamp) {
+  opacity: 0.55;
+  filter: grayscale(1);
+}
+
+.order-stamp {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  padding: 0.125rem 0.375rem;
+  border: 2px solid #ff5a4f;
+  border-radius: 0.25rem;
+  background: rgba(20, 6, 8, 0.85);
+  color: #ff5a4f;
+  font-family: var(--mono);
+  font-size: 0.875rem;
+  font-weight: 800;
+  white-space: nowrap;
+  transform: translate(-50%, -50%) rotate(-10deg);
 }
 
 @keyframes order-in {
@@ -412,10 +555,26 @@ body {
   }
 }
 
+@keyframes order-out {
+  70% {
+    transform: none;
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-1rem);
+    opacity: 0;
+  }
+}
+
 @keyframes order-flash {
   to {
     border-color: #ff5a4f;
-    background: rgba(140, 30, 25, 0.9);
+  }
+}
+
+@keyframes timer-flash {
+  to {
+    opacity: 0.35;
   }
 }
 
@@ -1506,10 +1665,14 @@ body {
   text-align: right;
 }
 
-.intro-recipe .order-step {
-  width: 2rem;
-  height: 2rem;
-  font-size: 1.125rem;
+.intro-recipe .step-tile {
+  width: 2.125rem;
+  height: 2.125rem;
+}
+
+.intro-recipe .step-tile .glyph {
+  width: 1.375rem;
+  height: 1.375rem;
 }
 
 .intro-controls {
@@ -2164,5 +2327,15 @@ body {
   }
   .hud-incident.nope {
     animation: incident-flash 0.8s steps(2, jump-none) infinite;
+  }
+  /* Urgent orders and their timers stay lit instead of flashing; cards just appear and go. */
+  .order,
+  .order.urgent,
+  .order.urgent .order-timer-fill,
+  .order.expired {
+    animation: none;
+  }
+  .order.urgent {
+    border-color: #ff5a4f;
   }
 }
