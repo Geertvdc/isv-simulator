@@ -3,6 +3,7 @@ import type { MapPoint } from '../../../flow/worldMap';
 import { gateSign } from '../../../sim/content';
 import { gridToWorld } from '../../projection';
 import { type KitMaterials, ModelBuilder } from '../kit';
+import { COLOR } from '../palette';
 import type { Puff } from './locks';
 
 /**
@@ -31,11 +32,11 @@ export const LOCK_COLORS = {
   signBar: '#2a3348',
   signDots: ['#ff5f57', '#febc2e', '#28c840'],
   padlock: 0xf2b632,
-  shackle: 0xc9ccd2,
-  keyhole: 0x3a3f47,
+  shackle: COLOR.lightSteel,
+  keyhole: COLOR.gunmetal,
   /** The grey of a locked level's flag. */
   lockedCloth: 0x9aa1aa,
-  starEarned: 0xffc83d,
+  starEarned: COLOR.sunYellow,
   starMissing: 0x7d8a9a,
 } as const;
 

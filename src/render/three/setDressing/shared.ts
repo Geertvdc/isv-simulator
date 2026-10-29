@@ -1,5 +1,6 @@
 import { type Model, ModelBuilder } from '../kit';
 import { PALETTE } from '../look';
+import { COLOR } from '../palette';
 
 /** Shared bits of the set dressing: types, colors, and pieces several props are built from. */
 
@@ -23,17 +24,17 @@ export interface SetPiece {
 }
 
 export const INK = PALETTE.ink;
-export const DARK = 0x2b2f38;
+export const DARK = COLOR.charcoal;
 export const WOOD = 0x9a6a42;
-export const WOOD_LIGHT = 0xc8a070;
-export const WOOD_DARK = 0x6a4a32;
-export const LEAF = 0x4f9d4a;
-export const LEAF_LIGHT = 0x6cbf5a;
+export const WOOD_LIGHT = COLOR.woodLight;
+export const WOOD_DARK = COLOR.woodDark;
+export const LEAF = COLOR.leaf;
+export const LEAF_LIGHT = COLOR.leafLight;
 export const LEAF_DARK = 0x3d7a45;
-const POT = 0xd0704a;
+const POT = COLOR.terracotta;
 export const WHITE = PALETTE.white;
-export const STEEL = 0x8b939e;
-export const CARDBOARD = 0xc8955a;
+export const STEEL = COLOR.steel;
+export const CARDBOARD = COLOR.cardboard;
 
 /** Item `i` of `list`, wrapping round. */
 export function nth<T>(list: readonly T[], i: number): T {
@@ -64,7 +65,7 @@ export function looks(
 // ---- Shared bits ----
 
 /** Pots: terracotta, white, charcoal, sage, sand. Nothing in a player's color. */
-const POTS = [POT, 0xe8e4da, 0x3a3f4a, 0x8aa08a, 0xc8b48a];
+const POTS = [POT, COLOR.porcelain, COLOR.graphite, 0x8aa08a, 0xc8b48a];
 
 /**
  * A potted plant, its pot's foot at (x, z), `size` times the base size. Five
@@ -83,7 +84,7 @@ export function plantPot(b: ModelBuilder, x: number, z: number, size = 1, look =
     b.sphere(0.13 * s, LEAF, { at: [x - 0.1 * s, 0.6 * s, z - 0.04 * s] });
   } else if (kind === 1) {
     // A cactus with two arms and a pink flower.
-    const c = 0x5f9a62;
+    const c = COLOR.cactus;
     b.capsule(0.08 * s, 0.34 * s, c, { at: [x, 0.5 * s, z] });
     b.capsule(0.045 * s, 0.12 * s, c, { at: [x + 0.12 * s, 0.52 * s, z] });
     b.capsule(0.04 * s, 0.1 * s, c, { at: [x - 0.11 * s, 0.44 * s, z] });
@@ -94,7 +95,7 @@ export function plantPot(b: ModelBuilder, x: number, z: number, size = 1, look =
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * Math.PI * 2;
       const h = (0.38 + (i % 3) * 0.08) * s;
-      b.box(0.06 * s, h, 0.015 * s, i % 2 ? LEAF_DARK : 0x7aa86a, {
+      b.box(0.06 * s, h, 0.015 * s, i % 2 ? LEAF_DARK : COLOR.fern, {
         at: [x + Math.cos(a) * 0.05 * s, 0.28 * s + h / 2, z + Math.sin(a) * 0.05 * s],
         rot: [Math.sin(a) * 0.15, a, Math.cos(a) * 0.15],
       });
@@ -120,7 +121,7 @@ export function plantPot(b: ModelBuilder, x: number, z: number, size = 1, look =
 }
 
 /** Desk mugs: white, charcoal, mint, terracotta. */
-const MUGS = [WHITE, 0x3a3f4a, 0x9fd4c0, 0xd0704a];
+const MUGS = [WHITE, COLOR.graphite, 0x9fd4c0, COLOR.terracotta];
 
 export function mug(b: ModelBuilder, x: number, y: number, z: number, look = 0): ModelBuilder {
   const c = nth(MUGS, look);
@@ -130,7 +131,15 @@ export function mug(b: ModelBuilder, x: number, y: number, z: number, look = 0):
 }
 
 /** Book spines, muted. */
-export const SPINES = [0x9a6a5a, 0x5a6a8a, 0xb8a67a, 0x6a7a6a, 0x7a5a8c, 0xc8b8a0, 0x4a5a6a];
+export const SPINES = [
+  COLOR.clay,
+  COLOR.dustyBlue,
+  COLOR.khaki,
+  COLOR.sage,
+  COLOR.plum,
+  COLOR.linen,
+  0x4a5a6a,
+];
 
 /** A row of books standing from `x0` along x, on `y`, `n` of them. */
 export function books(
@@ -152,7 +161,7 @@ export function books(
 }
 
 /** Code-ish screens: an editor, a dashboard, a terminal, a call, a design. */
-export const SCREENS = [0x4ee08a, 0x7ab8ff, 0x9fe0c8, 0xffc77a, 0xc8a8ff];
+export const SCREENS = [COLOR.codeGreen, COLOR.screenBlue, 0x9fe0c8, 0xffc77a, COLOR.lavender];
 
 /**
  * A desk with a monitor (or two) and a chair; the person sits at +z,
@@ -162,7 +171,7 @@ export const SCREENS = [0x4ee08a, 0x7ab8ff, 0x9fe0c8, 0xffc77a, 0xc8a8ff];
 export function desk(
   b: ModelBuilder,
   look: number,
-  tops = [0xe8dcc4, 0xd8ccb0, 0xc8a070],
+  tops = [COLOR.birch, COLOR.oatmeal, WOOD_LIGHT],
 ): ModelBuilder {
   const top = nth(tops, look);
   b.box(1.1, 0.05, 0.6, top, { at: [0, 0.5, -0.1] }, 0.02);
@@ -180,14 +189,14 @@ export function desk(
   } else if (look % 3 === 2) {
     // A laptop on a stand.
     b.box(0.3, 0.1, 0.2, STEEL, { at: [0, 0.57, -0.25] }, 0.01);
-    b.box(0.36, 0.24, 0.02, 0xc9ccd2, { at: [0, 0.74, -0.33], rot: [-0.2, 0, 0] }, 0.01);
+    b.box(0.36, 0.24, 0.02, COLOR.lightSteel, { at: [0, 0.74, -0.33], rot: [-0.2, 0, 0] }, 0.01);
     b.screen(0.32, 0.2, screen, { at: [0, 0.74, -0.318], rot: [-0.2, 0, 0] });
   } else {
     b.box(0.5, 0.32, 0.04, INK, { at: [0, 0.75, -0.3] }, 0.015);
     b.screen(0.44, 0.26, screen, { at: [0, 0.75, -0.277] });
   }
   b.box(0.06, 0.18, 0.04, DARK, { at: [0, 0.6, -0.32] }, 0);
-  b.box(0.36, 0.02, 0.12, 0x3a3f4a, { at: [0, 0.535, -0.04] }, 0);
+  b.box(0.36, 0.02, 0.12, COLOR.graphite, { at: [0, 0.535, -0.04] }, 0);
   // Something on the desk: a mug, a plant, a lamp, a rubber duck.
   const thing = look % 4;
   if (thing === 0) mug(b, 0.38, 0.525, -0.05, look);
@@ -197,12 +206,12 @@ export function desk(
     b.cylinder(0.01, 0.01, 0.3, DARK, { at: [0.42, 0.68, -0.22], rot: [0.3, 0, 0] }, 6);
     b.cone(0.06, 0.08, DARK, { at: [0.42, 0.82, -0.15], rot: [2.4, 0, 0] }, 10);
   } else {
-    b.sphere(0.05, 0x5fc4b8, { at: [-0.4, 0.57, -0.02] }, [1.1, 0.85, 1]);
-    b.sphere(0.032, 0x5fc4b8, { at: [-0.4, 0.635, 0.0] });
-    b.box(0.03, 0.012, 0.03, 0xe08a3a, { at: [-0.4, 0.63, 0.035] }, 0);
+    b.sphere(0.05, COLOR.aqua, { at: [-0.4, 0.57, -0.02] }, [1.1, 0.85, 1]);
+    b.sphere(0.032, COLOR.aqua, { at: [-0.4, 0.635, 0.0] });
+    b.box(0.03, 0.012, 0.03, COLOR.tangerine, { at: [-0.4, 0.63, 0.035] }, 0);
   }
   // The chair pushed back behind where they stand.
-  const chair = nth([0x3a3f4a, 0x4a5262, 0x5a4a48, 0x3f4a44], look);
+  const chair = nth([COLOR.graphite, COLOR.slate, COLOR.umber, 0x3f4a44], look);
   b.box(0.42, 0.08, 0.4, chair, { at: [0, 0.4, 0.8] }, 0.03);
   b.box(0.42, 0.42, 0.07, chair, { at: [0, 0.68, 1.0] }, 0.03);
   b.cylinder(0.03, 0.03, 0.3, STEEL, { at: [0, 0.22, 0.8] }, 8);
@@ -219,7 +228,7 @@ export function rack(b: ModelBuilder, x: number, h: number, look: number): Model
     b.box(0.46, 0.08, 0.01, 0x3a4252, { at: [x, y, 0.302] }, 0);
     for (let k = 0; k < 3; k++) {
       const on = (r * 3 + k + look) % 5;
-      b.led(0.014, on === 0 ? 0xffc04a : on === 3 ? 0x7ab8ff : 0x5cf08a, {
+      b.led(0.014, on === 0 ? COLOR.amber : on === 3 ? COLOR.screenBlue : COLOR.ledGreen, {
         at: [x - 0.18 + k * 0.04, y, 0.31],
       });
     }
@@ -229,4 +238,4 @@ export function rack(b: ModelBuilder, x: number, h: number, look: number): Model
 }
 
 /** Bike frames: muted, never a player's color. */
-export const FRAMES = [0x5a6470, 0x8a6a5a, 0x5a7a7a, 0x7a6a8a, 0x9a9a8a];
+export const FRAMES = [COLOR.pewter, COLOR.cinnamon, 0x5a7a7a, 0x7a6a8a, 0x9a9a8a];

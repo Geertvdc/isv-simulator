@@ -8,6 +8,7 @@ import { playerColor } from '../playerColors';
 import { type KitMaterials, ModelBuilder, tint } from './kit';
 import { carryPoint } from './layout';
 import { PALETTE } from './look';
+import { COLOR } from './palette';
 import { type PoseInput, playerPose } from './pose';
 
 export const STUDY_STYLES = ['angular', 'clay', 'cartoon'] as const;
@@ -22,10 +23,10 @@ export const STUDY_NAMES: Record<StudyStyle, string> = {
 export const STUDY_HEAD_TOP = 1.54;
 const MAX_ARM_LENGTH = 0.56;
 const UP = new THREE.Vector3(0, 1, 0);
-const SKIN = [0xf2c6a0, 0x8d5a3b, 0xc68b59, 0xe8b48a] as const;
-const HAIR = 0x302728;
-const TROUSERS = 0x29384e;
-const SOLE = 0xf2e5cf;
+const SKIN = [COLOR.skinLight, COLOR.skinDeep, COLOR.skinTan, COLOR.skinWarm] as const;
+const HAIR = COLOR.hairDark;
+const TROUSERS = COLOR.denim;
+const SOLE = COLOR.cream;
 
 const SHAPES = {
   angular: { hip: 0.13, shoulder: 0.24, torsoY: 0.55, neck: 0.33, beat: 1 },

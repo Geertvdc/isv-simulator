@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { ModelBuilder, tint } from '../../kit';
+import { COLOR } from '../../palette';
 import { type CityPiece, STOREY, styleOf } from '../cityPlan';
 import { C, choose, frac, type Parts } from './shared';
 
@@ -119,7 +120,7 @@ function curtainWall(
       const [x, z] = face.at((rng() - 0.5) * face.len * 0.4);
       glow.add(
         new THREE.PlaneGeometry(face.len * 0.45, STOREY * 0.45),
-        0x9a8a60,
+        COLOR.windowDim,
         {
           at: [
             x - (face.yaw === 0 ? 0 : Math.sign(x - cx) * 0.004),
@@ -223,8 +224,8 @@ export function skyscraper(
 
 export function helipad(p: CityPiece, { body: b, glow }: Parts): void {
   const r = p.w / 2;
-  b.cylinder(r, r, 0.06, 0x4a505c, { at: [0, 0.03, 0] }, 32);
-  b.add(new THREE.RingGeometry(r * 0.72, r * 0.8, 32).rotateX(-Math.PI / 2), 0xffc83d, {
+  b.cylinder(r, r, 0.06, COLOR.asphalt, { at: [0, 0.03, 0] }, 32);
+  b.add(new THREE.RingGeometry(r * 0.72, r * 0.8, 32).rotateX(-Math.PI / 2), COLOR.sunYellow, {
     at: [0, 0.065, 0],
   });
   // The H.
@@ -232,7 +233,9 @@ export function helipad(p: CityPiece, { body: b, glow }: Parts): void {
   b.box(0.28, 0.01, 0.07, C.white, { at: [0, 0.065, 0] }, 0);
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2;
-    glow.led(0.03, 0x9fff8a, { at: [Math.cos(a) * (r - 0.06), 0.08, Math.sin(a) * (r - 0.06)] });
+    glow.led(0.03, COLOR.neonLime, {
+      at: [Math.cos(a) * (r - 0.06), 0.08, Math.sin(a) * (r - 0.06)],
+    });
   }
   // The founders' helicopter, parked across the H.
   const yaw = 0.7;

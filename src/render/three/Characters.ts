@@ -9,6 +9,7 @@ import {
 } from './DeveloperRig';
 import { type KitMaterials, ModelBuilder, tint } from './kit';
 import { PALETTE } from './look';
+import { COLOR } from './palette';
 import type { Pose } from './pose';
 
 /**
@@ -31,10 +32,10 @@ const HEAD_RADIUS = 0.25;
 /** The head leans forward a little, so the face shows to a camera looking down. */
 const HEAD_TILT = 0.15;
 export const HAND_RADIUS = 0.09;
-const SKIN = [0xf2c6a0, 0xc68b59, 0xe8b48a, 0x8d5a3b] as const;
+const SKIN = [COLOR.skinLight, COLOR.skinTan, COLOR.skinWarm, COLOR.skinDeep] as const;
 const HAIR = [0x3b2a20, 0x14110f, 0xb5651d, 0x2a1d14] as const;
 const DENIM = 0x34425e;
-const GLOVE = 0xfdfdf6;
+const GLOVE = COLOR.white;
 
 export interface Character {
   rig?: DeveloperRig;
@@ -180,7 +181,7 @@ export function createManager(materials: KitMaterials): Character {
     .cone(0.1, 0.22, PALETTE.white, { at: [0, NECK - 0.09, 0.19], rot: [Math.PI, 0, 0] }, 3)
     .box(0.055, 0.24, 0.03, 0xd2322d, { at: [0, NECK - 0.18, 0.205] }, 0)
     .box(0.08, 0.05, 0.035, 0xd2322d, { at: [0, NECK - 0.05, 0.2] }, 0)
-    .box(0.04, 0.05, 0.02, 0xffd166, { at: [0.18, 0.5, 0.195] }, 0)
+    .box(0.04, 0.05, 0.02, COLOR.gold, { at: [0.18, 0.5, 0.195] }, 0)
     .build().body;
   const skin = PALETTE.skin;
   const r = HEAD_RADIUS * 0.92;
@@ -221,13 +222,13 @@ export function createManager(materials: KitMaterials): Character {
   const mug = new ModelBuilder()
     .cylinder(0.06, 0.055, 0.13, PALETTE.white, { at: [0, 0.07, 0.03] })
     .torus(0.04, 0.013, PALETTE.white, { at: [0.065, 0.07, 0.03], rot: [0, 0, Math.PI / 2] })
-    .cylinder(0.052, 0.052, 0.004, 0x5a3a22, { at: [0, 0.135, 0.03] })
+    .cylinder(0.052, 0.052, 0.004, COLOR.coffee, { at: [0, 0.135, 0.03] })
     .build().body;
   const clipboard = new ModelBuilder()
     // Held flat-ish, face up toward the camera.
-    .box(0.2, 0.02, 0.28, 0x8c5f3d, { at: [0, 0.02, 0.1], rot: [0.5, 0, 0] }, 0)
+    .box(0.2, 0.02, 0.28, COLOR.woodFrame, { at: [0, 0.02, 0.1], rot: [0.5, 0, 0] }, 0)
     .box(0.17, 0.01, 0.22, PALETTE.white, { at: [0, 0.035, 0.1], rot: [0.5, 0, 0] }, 0)
-    .box(0.08, 0.03, 0.03, 0xb8bec8, { at: [0, 0.1, -0.02], rot: [0.5, 0, 0] }, 0)
+    .box(0.08, 0.03, 0.03, COLOR.chrome, { at: [0, 0.1, -0.02], rot: [0.5, 0, 0] }, 0)
     .build().body;
   for (const [geometry, hand] of [
     [mug, c.rightHand],

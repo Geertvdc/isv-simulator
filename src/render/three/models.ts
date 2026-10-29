@@ -5,6 +5,7 @@ import type { WallPiece } from '../mapShape';
 import { type Model, ModelBuilder, tint } from './kit';
 import { CARD_SIZE, FRONT_WALL_HEIGHT, STATION_HEIGHT, WALL_HEIGHT } from './layout';
 import { FLOOR_COLORS, PALETTE, WALL_COLORS } from './look';
+import { COLOR } from './palette';
 
 /**
  * The office kit: every prop built in code from the kit's rounded boxes and
@@ -17,10 +18,10 @@ import { FLOOR_COLORS, PALETTE, WALL_COLORS } from './look';
 const TOP = STATION_HEIGHT;
 const TOP_THICKNESS = 0.07;
 const INK = PALETTE.ink;
-const DARK = 0x2b2f38;
-const STEEL = 0x8b939e;
+const DARK = COLOR.charcoal;
+const STEEL = COLOR.steel;
 const PAPER = 0xf7f3ea;
-const WOOD_FRAME = 0x8c5f3d;
+const WOOD_FRAME = COLOR.woodFrame;
 
 /** Tiles that get a station model: counters and stations (walls, belts and drops have their own). */
 export type StationTile = Exclude<BlockTile, 'wall' | 'conveyor'>;
@@ -76,16 +77,16 @@ function keyboardStation(): StationModel {
   const color = PALETTE.station.keyboard;
   const base = counter(new ModelBuilder(), color);
   // A wide keyboard with colored keycaps, a mouse and a mug, in front of the screen.
-  base.box(0.56, 0.035, 0.2, 0x3a3f4a, { at: [-0.04, TOP + 0.018, 0.08] }, 0.012);
-  const caps = [0xfdfdf6, 0xffc04a, 0x5cc8f0, 0xfdfdf6];
+  base.box(0.56, 0.035, 0.2, COLOR.graphite, { at: [-0.04, TOP + 0.018, 0.08] }, 0.012);
+  const caps = [COLOR.white, COLOR.amber, 0x5cc8f0, COLOR.white];
   for (let r = 0; r < 3; r++) {
     for (let c = 0; c < 8; c++) {
-      const cap = caps[(r * 3 + c) % caps.length] ?? 0xfdfdf6;
+      const cap = caps[(r * 3 + c) % caps.length] ?? COLOR.white;
       base.box(
         0.05,
         0.02,
         0.045,
-        r === 2 && c > 1 && c < 6 ? 0xfdfdf6 : cap,
+        r === 2 && c > 1 && c < 6 ? COLOR.white : cap,
         {
           at: [-0.04 - 0.21 + c * 0.06, TOP + 0.045, 0.02 + r * 0.06],
         },
@@ -93,12 +94,12 @@ function keyboardStation(): StationModel {
       );
     }
   }
-  base.sphere(0.045, 0x3a3f4a, { at: [0.33, TOP + 0.02, 0.1] }, [0.8, 0.45, 1.2]);
+  base.sphere(0.045, COLOR.graphite, { at: [0.33, TOP + 0.02, 0.1] }, [0.8, 0.45, 1.2]);
   base.cylinder(0.06, 0.055, 0.13, 0xffffff, { at: [0.36, TOP + 0.065, -0.25] });
   base.torus(0.04, 0.013, 0xffffff, { at: [0.42, TOP + 0.07, -0.25], rot: [0, 0, Math.PI / 2] });
-  base.cylinder(0.05, 0.05, 0.004, 0x5a3a22, { at: [0.36, TOP + 0.128, -0.25] });
+  base.cylinder(0.05, 0.05, 0.004, COLOR.coffee, { at: [0.36, TOP + 0.128, -0.25] });
 
-  const hero = monitor(new ModelBuilder(), 0.58, 0.36, 0x4ee08a);
+  const hero = monitor(new ModelBuilder(), 0.58, 0.36, COLOR.codeGreen);
   // Lines of "code", brighter, and a cursor.
   const lines = [0.32, 0.42, 0.2, 0.36, 0.26];
   lines.forEach((w, i) => {
@@ -113,7 +114,7 @@ function testBench(): StationModel {
   const color = PALETTE.station.testBench;
   const base = counter(new ModelBuilder(), color);
   // A rack of test tubes with green liquid, front left.
-  base.box(0.34, 0.05, 0.1, 0x8c5f3d, { at: [-0.2, TOP + 0.025, 0.2] }, 0.01);
+  base.box(0.34, 0.05, 0.1, COLOR.woodFrame, { at: [-0.2, TOP + 0.025, 0.2] }, 0.01);
   for (let i = 0; i < 4; i++) {
     const x = -0.32 + i * 0.08;
     base.cylinder(0.025, 0.025, 0.18, 0xe8f6ff, { at: [x, TOP + 0.1, 0.2] }, 10);
@@ -121,7 +122,7 @@ function testBench(): StationModel {
       0.022,
       0.022,
       0.1 - (i % 2) * 0.03,
-      i === 2 ? 0xff5f57 : 0x5cf08a,
+      i === 2 ? 0xff5f57 : COLOR.ledGreen,
       {
         at: [x, TOP + 0.06, 0.2],
       },
@@ -155,9 +156,9 @@ function reviewStation(): StationModel {
       0,
     );
   }
-  base.box(0.16, 0.006, 0.02, 0xe0402f, { at: [-0.22, TOP + 0.068, -0.18] }, 0);
-  base.box(0.1, 0.006, 0.02, 0xe0402f, { at: [-0.26, TOP + 0.068, -0.12] }, 0);
-  base.capsule(0.025, 0.24, 0xe0402f, {
+  base.box(0.16, 0.006, 0.02, COLOR.signalRed, { at: [-0.22, TOP + 0.068, -0.18] }, 0);
+  base.box(0.1, 0.006, 0.02, COLOR.signalRed, { at: [-0.26, TOP + 0.068, -0.12] }, 0);
+  base.capsule(0.025, 0.24, COLOR.signalRed, {
     at: [0.25, TOP + 0.03, 0.22],
     rot: [0, 0, Math.PI / 2 - 0.3],
   });
@@ -186,15 +187,15 @@ function pipelineStation(): StationModel {
     });
   }
   for (let i = 0; i < 6; i++) {
-    base.box(0.03, 0.006, 0.46, 0x4a505c, { at: [-0.4 + i * 0.16, TOP + 0.038, 0.12] }, 0);
+    base.box(0.03, 0.006, 0.46, COLOR.asphalt, { at: [-0.4 + i * 0.16, TOP + 0.038, 0.12] }, 0);
   }
   // The hero: a chunky build server with blinking lights.
   const hero = new ModelBuilder();
-  hero.box(0.62, 0.42, 0.24, 0x3a3f4a, { at: [0, TOP + 0.21, 0] }, 0.03);
+  hero.box(0.62, 0.42, 0.24, COLOR.graphite, { at: [0, TOP + 0.21, 0] }, 0.03);
   for (let i = 0; i < 3; i++) {
     const y = TOP + 0.09 + i * 0.12;
     hero.box(0.54, 0.08, 0.01, INK, { at: [0, y, 0.122] }, 0);
-    hero.led(0.022, i === 1 ? 0xffc04a : 0x4ef07a, { at: [0.2, y, 0.13] });
+    hero.led(0.022, i === 1 ? COLOR.amber : 0x4ef07a, { at: [0.2, y, 0.13] });
     hero.led(0.022, 0x4ef07a, { at: [0.14, y, 0.13] });
   }
   return { base: base.build(), hero: hero.build(), heroAt: PIPELINE_SERVER_AT };
@@ -221,8 +222,8 @@ function inboxStation(): StationModel {
   hero.box(0.22, 0.16, 0.3, blue, { at: [0, TOP + 0.24, 0] }, 0.04);
   hero.cylinder(0.11, 0.11, 0.3, blue, { at: [0, TOP + 0.32, 0], rot: [Math.PI / 2, 0, 0] }, 20);
   hero.box(0.16, 0.02, 0.01, INK, { at: [0, TOP + 0.33, 0.152] }, 0);
-  hero.box(0.02, 0.18, 0.02, 0xe0402f, { at: [0.13, TOP + 0.36, -0.06] }, 0);
-  hero.box(0.02, 0.07, 0.1, 0xe0402f, { at: [0.13, TOP + 0.42, -0.02] }, 0);
+  hero.box(0.02, 0.18, 0.02, COLOR.signalRed, { at: [0.13, TOP + 0.36, -0.06] }, 0);
+  hero.box(0.02, 0.07, 0.1, COLOR.signalRed, { at: [0.13, TOP + 0.42, -0.02] }, 0);
   // A letter sticking out.
   hero.box(0.14, 0.1, 0.01, PAPER, { at: [0, TOP + 0.45, 0.06], rot: [-0.3, 0, 0] }, 0);
   return { base: base.build(), hero: hero.build(), heroAt: [0.36, -0.3] };
@@ -232,9 +233,9 @@ function bugQueueStation(): StationModel {
   const base = trayStation(PALETTE.station.bugQueue);
   // The hero: a big friendly ladybug-like bug, front toward the camera.
   const hero = new ModelBuilder();
-  const bug = 0x2b2f38;
+  const bug = DARK;
   hero.sphere(0.15, bug, { at: [0, TOP + 0.12, -0.03] }, [1, 0.62, 1.2]);
-  hero.sphere(0.135, 0xe0402f, { at: [0, TOP + 0.17, -0.04] }, [1.05, 0.5, 1.15]);
+  hero.sphere(0.135, COLOR.signalRed, { at: [0, TOP + 0.17, -0.04] }, [1.05, 0.5, 1.15]);
   for (const [x, z] of [
     [-0.06, -0.08],
     [0.06, -0.02],
@@ -278,16 +279,16 @@ function shipStation(): StationModel {
   // A chute in the top, edged in yellow and black hazard stripes.
   base.box(0.6, 0.014, 0.5, INK, { at: [0, TOP + 0.003, 0.08] }, 0);
   for (let i = 0; i < 8; i++) {
-    const c = i % 2 ? INK : 0xffd166;
+    const c = i % 2 ? INK : COLOR.gold;
     base.box(0.085, 0.03, 0.05, c, { at: [-0.3 + i * 0.085 + 0.04, TOP + 0.015, 0.355] }, 0);
     base.box(0.085, 0.03, 0.05, c, { at: [-0.3 + i * 0.085 + 0.04, TOP + 0.015, -0.195] }, 0);
   }
   // A big red mushroom button, front right.
   base.cylinder(0.09, 0.1, 0.05, 0xd8d2c6, { at: [0.38, TOP + 0.025, 0.36] });
-  base.sphere(0.085, 0xe0402f, { at: [0.38, TOP + 0.07, 0.36] }, [1, 0.55, 1]);
+  base.sphere(0.085, COLOR.signalRed, { at: [0.38, TOP + 0.07, 0.36] }, [1, 0.55, 1]);
   // The hero: a parcel with tape, ready to go.
   const hero = new ModelBuilder();
-  hero.box(0.36, 0.28, 0.3, 0xc8955a, { at: [0, TOP + 0.14, 0] }, 0.02);
+  hero.box(0.36, 0.28, 0.3, COLOR.cardboard, { at: [0, TOP + 0.14, 0] }, 0.02);
   hero.box(0.37, 0.02, 0.06, 0xe8d4a8, { at: [0, TOP + 0.281, 0] }, 0);
   hero.box(0.06, 0.29, 0.305, 0xe8d4a8, { at: [0, TOP + 0.14, 0] }, 0);
   hero.box(0.1, 0.07, 0.005, 0xffffff, { at: [-0.1, TOP + 0.16, 0.152] }, 0);
@@ -332,30 +333,30 @@ function bin(): StationModel {
   );
   // Crumpled paper sticking out.
   b.sphere(0.09, PAPER, { at: [-0.08, h, 0.06] }, [1, 0.85, 1]);
-  b.sphere(0.08, 0xf6c4bd, { at: [0.1, h - 0.01, -0.02] }, [1, 0.8, 1]);
+  b.sphere(0.08, COLOR.blush, { at: [0.1, h - 0.01, -0.02] }, [1, 0.8, 1]);
   b.sphere(0.07, 0xe8c77a, { at: [0.02, h + 0.02, 0.14] }, [1, 0.8, 1]);
   return { base: b.build(), hero: null, heroAt: [0, 0] };
 }
 
 function whiteboardStation(): StationModel {
   const color = PALETTE.station.whiteboard;
-  const base = counter(new ModelBuilder(), 0x8a96a3, tint(color, 0.2));
+  const base = counter(new ModelBuilder(), COLOR.zinc, tint(color, 0.2));
   // Markers and an eraser on the top.
   for (const [x, c] of [
     [-0.32, 0x3a7be0],
-    [-0.22, 0xe0402f],
+    [-0.22, COLOR.signalRed],
     [-0.12, 0x2f9a5c],
   ] as const) {
     base.capsule(0.02, 0.1, c, { at: [x, TOP + 0.02, 0.3], rot: [0, 0, Math.PI / 2] });
   }
-  base.box(0.14, 0.04, 0.06, 0x3a3f4a, { at: [0.3, TOP + 0.02, 0.3] }, 0.01);
+  base.box(0.14, 0.04, 0.06, COLOR.graphite, { at: [0.3, TOP + 0.02, 0.3] }, 0.01);
   // The hero: a big whiteboard on legs, a sketch of boxes and arrows on it.
   const hero = new ModelBuilder();
   for (const x of [-0.42, 0.42]) {
-    hero.box(0.04, 0.95, 0.04, 0xb8bec8, { at: [x, TOP + 0.47, 0] }, 0);
-    hero.box(0.04, 0.04, 0.3, 0xb8bec8, { at: [x, TOP + 0.02, 0] }, 0);
+    hero.box(0.04, 0.95, 0.04, COLOR.chrome, { at: [x, TOP + 0.47, 0] }, 0);
+    hero.box(0.04, 0.04, 0.3, COLOR.chrome, { at: [x, TOP + 0.02, 0] }, 0);
   }
-  hero.box(0.92, 0.6, 0.04, 0xb8bec8, { at: [0, TOP + 0.62, 0] }, 0.015);
+  hero.box(0.92, 0.6, 0.04, COLOR.chrome, { at: [0, TOP + 0.62, 0] }, 0.015);
   hero.box(0.86, 0.54, 0.01, 0xfbfbf8, { at: [0, TOP + 0.62, 0.025] }, 0);
   const ink = (w: number, h: number, x: number, y: number, c: number, rot = 0) =>
     hero.box(w, h, 0.004, c, { at: [x, TOP + y, 0.032], rot: [0, 0, rot] }, 0);
@@ -370,8 +371,8 @@ function whiteboardStation(): StationModel {
     ink(0.012, 0.1, x - 0.08, y, 0x3a7be0);
     ink(0.012, 0.1, x + 0.08, y, 0x3a7be0);
   }
-  ink(0.12, 0.012, -0.13, 0.72, 0xe0402f);
-  ink(0.16, 0.012, 0.17, 0.62, 0xe0402f, -0.8);
+  ink(0.12, 0.012, -0.13, 0.72, COLOR.signalRed);
+  ink(0.16, 0.012, 0.17, 0.62, COLOR.signalRed, -0.8);
   ink(0.012, 0.08, -0.28, 0.48, 0x2f9a5c);
   ink(0.06, 0.012, -0.28, 0.5, 0x2f9a5c);
   hero.sphere(0.025, 0x2f9a5c, { at: [-0.28, TOP + 0.55, 0.032] }, [1, 1, 0.2]);
@@ -425,9 +426,9 @@ export function conveyorModel(): Model {
   b.slab(0.94, TOP - 0.1, 0.96, steel, 0, 0.06, 0);
   // Rails either side of the belt, yellow and black.
   for (const x of [-0.38, 0.38]) {
-    b.box(0.14, 0.08, 1, 0x3a3f4a, { at: [x, TOP - 0.02, 0] }, 0.02);
+    b.box(0.14, 0.08, 1, COLOR.graphite, { at: [x, TOP - 0.02, 0] }, 0.02);
     for (let i = 0; i < 4; i++) {
-      b.box(0.141, 0.02, 0.12, 0xffd166, { at: [x, TOP + 0.02, -0.375 + i * 0.25] }, 0);
+      b.box(0.141, 0.02, 0.12, COLOR.gold, { at: [x, TOP + 0.02, -0.375 + i * 0.25] }, 0);
     }
   }
   // Rollers under the belt, showing at the ends.
@@ -482,21 +483,28 @@ export function wallModel(theme: WallTheme, piece: WallPiece): Model {
 export const WALL_DECO_MODELS: Readonly<Record<string, () => Model>> = {
   whiteboard: () => {
     const b = new ModelBuilder();
-    b.box(0.72, 0.42, 0.03, 0xb8bec8, { at: [0, 0.68, 0.515] }, 0.01);
+    b.box(0.72, 0.42, 0.03, COLOR.chrome, { at: [0, 0.68, 0.515] }, 0.01);
     b.box(0.66, 0.36, 0.01, 0xfbfbf8, { at: [0, 0.68, 0.53] }, 0.004);
     for (const [x, y, w, c] of [
       [-0.12, 0.76, 0.3, 0x3a7be0],
       [-0.05, 0.69, 0.42, 0x3a7be0],
-      [0.1, 0.6, 0.2, 0xe0402f],
+      [0.1, 0.6, 0.2, COLOR.signalRed],
     ] as const) {
       b.box(w, 0.018, 0.004, c, { at: [x, y, 0.537] }, 0.002);
     }
-    b.box(0.5, 0.025, 0.06, 0xb8bec8, { at: [0, 0.465, 0.54] }, 0.008);
+    b.box(0.5, 0.025, 0.06, COLOR.chrome, { at: [0, 0.465, 0.54] }, 0.008);
     return b.build();
   },
   clock: () => {
     const b = new ModelBuilder();
-    b.cylinder(0.17, 0.17, 0.04, 0xe0402f, { at: [0, 0.78, 0.52], rot: [Math.PI / 2, 0, 0] }, 28);
+    b.cylinder(
+      0.17,
+      0.17,
+      0.04,
+      COLOR.signalRed,
+      { at: [0, 0.78, 0.52], rot: [Math.PI / 2, 0, 0] },
+      28,
+    );
     b.cylinder(0.14, 0.14, 0.01, 0xffffff, { at: [0, 0.78, 0.542], rot: [Math.PI / 2, 0, 0] }, 28);
     b.box(0.015, 0.1, 0.006, INK, { at: [0, 0.82, 0.55] }, 0.002);
     b.box(0.07, 0.015, 0.006, INK, { at: [0.03, 0.78, 0.55] }, 0.002);
@@ -504,22 +512,22 @@ export const WALL_DECO_MODELS: Readonly<Record<string, () => Model>> = {
   },
   poster: () => {
     const b = new ModelBuilder();
-    b.box(0.42, 0.56, 0.015, 0x2b3756, { at: [0, 0.66, 0.51] }, 0.004);
-    b.cylinder(0.11, 0.11, 0.004, 0xffc04a, { at: [0, 0.72, 0.52], rot: [Math.PI / 2, 0, 0] });
+    b.box(0.42, 0.56, 0.015, COLOR.midnight, { at: [0, 0.66, 0.51] }, 0.004);
+    b.cylinder(0.11, 0.11, 0.004, COLOR.amber, { at: [0, 0.72, 0.52], rot: [Math.PI / 2, 0, 0] });
     b.box(0.3, 0.04, 0.004, 0xffffff, { at: [0, 0.5, 0.52] }, 0.002);
     return b.build();
   },
   kanban: () => {
     const b = new ModelBuilder();
     b.box(0.8, 0.5, 0.02, 0xc9a77a, { at: [0, 0.66, 0.51] }, 0.006);
-    const notes = [0xffe066, 0x8fd3ff, 0xff9fb0, 0xa6e88a];
+    const notes = [COLOR.noteYellow, COLOR.noteBlue, COLOR.notePink, COLOR.noteGreen];
     for (let c = 0; c < 3; c++) {
       for (let r = 0; r < 3 - c; r++) {
         b.box(
           0.14,
           0.12,
           0.006,
-          notes[(c + r) % notes.length] ?? 0xffe066,
+          notes[(c + r) % notes.length] ?? COLOR.noteYellow,
           {
             at: [-0.25 + c * 0.25, 0.8 - r * 0.15, 0.523],
             rot: [0, 0, ((c * 3 + r) % 3) * 0.05 - 0.05],
@@ -533,19 +541,19 @@ export const WALL_DECO_MODELS: Readonly<Record<string, () => Model>> = {
   dashboard: () => {
     const b = new ModelBuilder();
     b.box(0.6, 0.38, 0.04, INK, { at: [0, 0.72, 0.52] }, 0.012);
-    b.screen(0.54, 0.32, 0x1d3a5a, { at: [0, 0.72, 0.542] });
+    b.screen(0.54, 0.32, COLOR.screenNavy, { at: [0, 0.72, 0.542] });
     for (let i = 0; i < 5; i++) {
       const h = [0.08, 0.14, 0.11, 0.2, 0.17][i] ?? 0.1;
-      b.screen(0.06, h, 0x5cf0a8, { at: [-0.18 + i * 0.09, 0.6 + h / 2, 0.544] });
+      b.screen(0.06, h, COLOR.screenMint, { at: [-0.18 + i * 0.09, 0.6 + h / 2, 0.544] });
     }
     return b.build();
   },
   plants: () => {
     const b = new ModelBuilder();
-    b.box(0.6, 0.04, 0.14, 0x8c5f3d, { at: [0, 0.62, 0.57] }, 0.01);
+    b.box(0.6, 0.04, 0.14, COLOR.woodFrame, { at: [0, 0.62, 0.57] }, 0.01);
     for (const x of [-0.18, 0.16]) {
-      b.cylinder(0.06, 0.045, 0.1, 0xd0704a, { at: [x, 0.69, 0.57] });
-      b.sphere(0.09, 0x4f9d4a, { at: [x, 0.8, 0.57] }, [1, 1.1, 1]);
+      b.cylinder(0.06, 0.045, 0.1, COLOR.terracotta, { at: [x, 0.69, 0.57] });
+      b.sphere(0.09, COLOR.leaf, { at: [x, 0.8, 0.57] }, [1, 1.1, 1]);
       b.sphere(0.06, 0x67b85e, { at: [x + 0.05, 0.86, 0.6] });
     }
     return b.build();
@@ -554,9 +562,9 @@ export const WALL_DECO_MODELS: Readonly<Record<string, () => Model>> = {
     // Three framed pictures, hung a little unevenly: a team photo, a print, the first invoice.
     const b = new ModelBuilder();
     for (const [x, y, w, h, frame, art] of [
-      [-0.24, 0.74, 0.22, 0.28, 0x3a3f4a, 0x8aa0b8],
+      [-0.24, 0.74, 0.22, 0.28, COLOR.graphite, 0x8aa0b8],
       [0.04, 0.8, 0.2, 0.16, WOOD_FRAME, 0xd8a070],
-      [0.25, 0.66, 0.18, 0.22, 0xe8e4da, PAPER],
+      [0.25, 0.66, 0.18, 0.22, COLOR.porcelain, PAPER],
     ] as const) {
       b.box(w, h, 0.02, frame, { at: [x, y, 0.515] }, 0.004);
       b.box(w - 0.05, h - 0.05, 0.004, art, { at: [x, y, 0.527] }, 0.001);
@@ -569,7 +577,7 @@ export const WALL_DECO_MODELS: Readonly<Record<string, () => Model>> = {
     // A floating shelf: books, a rubber duck, a little cactus.
     const b = new ModelBuilder();
     b.box(0.66, 0.035, 0.16, WOOD_FRAME, { at: [0, 0.62, 0.58] }, 0.006);
-    const spines = [0x9a6a5a, 0x5a6a8a, 0xb8a67a, 0x6a7a6a, 0x7a5a8c];
+    const spines = [COLOR.clay, COLOR.dustyBlue, COLOR.khaki, COLOR.sage, COLOR.plum];
     spines.forEach((c, i) =>
       b.box(
         0.04,
@@ -580,10 +588,10 @@ export const WALL_DECO_MODELS: Readonly<Record<string, () => Model>> = {
         0,
       ),
     );
-    b.sphere(0.045, 0x5fc4b8, { at: [0.08, 0.67, 0.6] }, [1.2, 0.8, 1]);
-    b.sphere(0.03, 0x5fc4b8, { at: [0.1, 0.71, 0.6] });
-    b.cylinder(0.04, 0.032, 0.06, 0xd0704a, { at: [0.24, 0.67, 0.58] }, 10);
-    b.capsule(0.025, 0.06, 0x5f9a62, { at: [0.24, 0.74, 0.58] });
+    b.sphere(0.045, COLOR.aqua, { at: [0.08, 0.67, 0.6] }, [1.2, 0.8, 1]);
+    b.sphere(0.03, COLOR.aqua, { at: [0.1, 0.71, 0.6] });
+    b.cylinder(0.04, 0.032, 0.06, COLOR.terracotta, { at: [0.24, 0.67, 0.58] }, 10);
+    b.capsule(0.025, 0.06, COLOR.cactus, { at: [0.24, 0.74, 0.58] });
     return b.build();
   },
   pinboard: () => {
@@ -595,10 +603,17 @@ export const WALL_DECO_MODELS: Readonly<Record<string, () => Model>> = {
       [0.06, 0.72, 0.14, 0.18, 0.05],
       [0.2, 0.8, 0.1, 0.1, 0.1],
     ] as const) {
-      b.box(w, h, 0.004, x > 0.15 ? 0xffe066 : PAPER, { at: [x, y, 0.523], rot: [0, 0, r] }, 0.001);
-      b.sphere(0.012, 0xd05a4a, { at: [x, y + h / 2 - 0.02, 0.528] });
+      b.box(
+        w,
+        h,
+        0.004,
+        x > 0.15 ? COLOR.noteYellow : PAPER,
+        { at: [x, y, 0.523], rot: [0, 0, r] },
+        0.001,
+      );
+      b.sphere(0.012, COLOR.pinRed, { at: [x, y + h / 2 - 0.02, 0.528] });
     }
-    b.box(0.02, 0.2, 0.004, 0x5a7ad0, { at: [0.2, 0.62, 0.524] }, 0.001);
+    b.box(0.02, 0.2, 0.004, COLOR.periwinkle, { at: [0.2, 0.62, 0.524] }, 0.001);
     b.box(0.07, 0.09, 0.004, PAPER, { at: [0.2, 0.52, 0.524] }, 0.001);
     return b.build();
   },
@@ -613,17 +628,17 @@ export const WALL_DECO_MODELS: Readonly<Record<string, () => Model>> = {
       b.screen(0.025, 0.08, cyan, { at: [x, 0.69, 0.523], rot: [0, 0, -s * 0.15] });
       b.screen(0.045, 0.022, cyan, { at: [x + s * 0.02, 0.74, 0.523] });
     }
-    b.screen(0.05, 0.1, 0xff7ab0, { at: [0, 0.74, 0.523] });
+    b.screen(0.05, 0.1, COLOR.hotPink, { at: [0, 0.74, 0.523] });
     return b.build();
   },
   tv: () => {
     // A wall TV in a light bezel with the build status: green checks, an amber and a red one.
     const b = new ModelBuilder();
-    b.box(0.74, 0.44, 0.04, 0xc9ccd2, { at: [0, 0.72, 0.52] }, 0.012);
+    b.box(0.74, 0.44, 0.04, COLOR.lightSteel, { at: [0, 0.72, 0.52] }, 0.012);
     b.screen(0.68, 0.38, 0x162a3a, { at: [0, 0.72, 0.542] });
     for (let i = 0; i < 4; i++) {
       b.screen(0.4, 0.04, 0x2f4a5f, { at: [0.06, 0.84 - i * 0.08, 0.543] });
-      b.screen(0.05, 0.05, i === 2 ? 0xffc04a : i === 3 ? 0xff7a6a : 0x5cf0a8, {
+      b.screen(0.05, 0.05, i === 2 ? COLOR.amber : i === 3 ? COLOR.coral : COLOR.screenMint, {
         at: [-0.22, 0.84 - i * 0.08, 0.544],
       });
     }
@@ -684,7 +699,7 @@ export function ticketModel(kind: TicketKind, expired = false): Model {
       w * 0.9,
       t * 0.12,
       d * 0.18,
-      0xffd166,
+      COLOR.gold,
       { at: [0, t * 1.02, 0.03], rot: [-0.06, 0, 0] },
       0.002,
     );
