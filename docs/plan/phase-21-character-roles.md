@@ -353,3 +353,28 @@ Reproduce the matrix with `npm run sim -- --role-bench 30 1 --json=/absolute/pat
 - [x] Record actual resolved station work, player travel/idle, queue waits, handovers, order demand/expiry, and domain/recipe outcomes.
 - [x] Preserve role rates, classic seeded behavior, score, deadlines, star thresholds, campaign schedules, and campaign opt-in.
 - [ ] Human couch trials and campaign rollout reviewed and separately approved; campaign rollout remains held.
+
+#### Post-integration evidence: order-owned lifecycle
+
+Ordinary merge `6b5d429` integrates repaired parent `df3cb1e` (including main `8a167a05`) without rebasing. It preserves main's `orderId` ownership, expired-ticket disposal and incident shipping rules alongside the benchmark policy fixes and domain counters. The pre-integration measurements above remain historical; their 9,960 records must not be presented as measurements of this combined lifecycle.
+
+On the combined code, `npm run sim -- --role-bench 10 1 --json=/absolute/path/role-benchmarks-integrated.json` completed **3,320 run/seed records**: the same six fixtures, both policies, solo generalist, all 15/35/70 unordered balanced-lab team compositions, and the same candidate teams on the five other fixtures. Seeds 1–10 are shared within comparisons; composition seats rotate as before. This bounded rerun has less precision than the historical 30-seed sweep. The table shows three-player role-aware mixed teams versus same-policy generalists; intervals are paired 95% normal approximations, exploratory and not adjusted for the many comparisons.
+
+| Fixture | Generalist shipped | Mixed shipped | Paired mixed minus generalist |
+| --- | ---: | ---: | --- |
+| Balanced lab | 7.10 | 7.10 | 0.00 [0.00, 0.00] |
+| Frontend-skew | 24.30 | 24.30 | 0.00 [0.00, 0.00] |
+| Infra incidents | 10.70 | 10.70 | 0.00 [0.00, 0.00] |
+| Design pairing | 22.30 | 22.60 | +0.30 [-0.21, +0.81] |
+| Conveyor/gaps | 19.40 | 18.30 | -1.10 [-3.74, +1.54] |
+| Meetings/incidents | 18.90 | 18.30 | -0.60 [-1.91, +0.71] |
+
+The balanced two-player mixed delta was 0.00 [0.00, 0.00]; four-player mixed was -0.10 [-0.30, +0.10]. Zero-width intervals here mean the ten observed per-seed deltas were identical, not proof of population equivalence. Generalist role-aware minus role-neutral throughput in the three-player meetings fixture was -0.80 [-2.86, +1.26], still a policy/map limitation rather than grounds for role-rate tuning.
+
+The separate full-length diagnosis rerun, `npm run sim -- --role-lab --players=3 30 1`, completed another **180 rounds** on seeds 1–30. Role-aware mixed teams shipped 13.9 versus 13.8 generalist orders; paired throughput delta was +0.10 [-0.15, +0.35] and score delta +2.7 [-11.7, +17.1]. This does **not** reproduce the historical post-fix +0.63 throughput gain. Non-head queue-wait remained zero in every integrated matrix run and the diagnosis groups, so the diagnosed reservation starvation has not returned.
+
+Demand and disruption still limit interpretation. Three-player balanced generalists created 11.5 orders, shipped 7.1, expired 1.6 and left 2.8 open on average. Their code/test utilization was 6.8%/11.2%, with 3,462 travel and 9,888 idle player-ticks; this is not saturated work-station throughput. Design pairing left 4.6 orders open with no expiries; conveyor/gaps left 2.7 open with no generalist expiries. The infra fixture still shipped no incidents and expired three per round, with zero repair work, so it cannot establish a repair-rate target. Every raw matrix record satisfies created = shipped + expired + open; full domain/recipe, utilization, work, travel, idle, queue and handover summaries remain in the artifact.
+
+Integrated evidence is retained in session files `role-benchmarks-integrated.json`, `role-benchmarks-integrated.txt`, and `role-lab-integrated-3p.txt`, separate from the pre-integration artifacts. `npm run check` passed (87 test files, 1,244 tests, typecheck and lint) and `npm run build` passed on the combined code. The merge required only test-import and document-status conflict resolution; both lifecycle and policy regressions pass. No additional critic round was claimed beyond the original three-round gauntlet.
+
+**Decision unchanged:** no role-rate tuning, no campaign expansion, and no claim of human balance or campaign three-star viability. The integrated measurements do not establish the proposed general 10–20% specialist throughput advantage. Human couch trials and separate rollout approval remain outstanding.
