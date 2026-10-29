@@ -93,6 +93,32 @@ describe('pipeline failure: timing', () => {
   });
 });
 
+describe('pipeline: expired tickets', () => {
+  it('stops building, never breaks and hands the ticket back', () => {
+    const state = newGame();
+    const ticket = addTicket(state, COL.pipeline, { done: 2 });
+    idle(state, 10);
+    ticket.expired = true;
+    const progress = buildProgress(ticket);
+    idle(state, PIPELINE_BUILD_TICKS + PIPELINE_FAIL_TICKS * 2);
+    expect(buildProgress(ticket)).toBe(progress);
+    expect(pipeline(state).broken).toBe(false);
+    standAt(state, 1, COL.pipeline);
+    press(state);
+    expect(ticket.location).toEqual({ kind: 'player', playerId: 1 });
+  });
+
+  it('will not take one in', () => {
+    const state = newGame();
+    const ticket = addTicket(state, COL.counter, { done: 2 });
+    ticket.expired = true;
+    give(1, ticket);
+    standAt(state, 1, COL.pipeline);
+    press(state);
+    expect(ticket.location).toEqual({ kind: 'player', playerId: 1 });
+  });
+});
+
 describe('pipeline failure: the ticket', () => {
   it('resets only the pipeline step and stays on the pipeline', () => {
     const { ticket } = brokenPipeline();

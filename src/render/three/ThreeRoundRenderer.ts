@@ -52,7 +52,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
   private readonly world = new THREE.Scene();
   private pose: CameraPose;
   private readonly tickets = new Map<number, THREE.Mesh>();
-  private readonly ticketGeometries = new Map<TicketKind, THREE.BufferGeometry>();
+  private readonly ticketGeometries = new Map<TicketKind | 'expired', THREE.BufferGeometry>();
   private readonly materials = kitMaterials();
   private readonly targets = new Map<PlayerId, THREE.Group>();
   private readonly hover: THREE.LineLoop;
@@ -130,12 +130,15 @@ export class ThreeRoundRenderer implements RoundRenderer {
       if (!placed) continue;
       seenTickets.add(ticket.id);
       let mesh = this.tickets.get(ticket.id);
+      const geometry = this.ticketGeometry(ticket.kind, ticket.expired);
       if (!mesh) {
-        mesh = new THREE.Mesh(this.ticketGeometry(ticket.kind), this.materials.body);
+        mesh = new THREE.Mesh(geometry, this.materials.body);
         mesh.castShadow = true;
         this.world.add(mesh);
         this.tickets.set(ticket.id, mesh);
       }
+      // Turns grey when its order runs out.
+      mesh.geometry = geometry;
       mesh.visible = placed.visible;
       putAt(mesh, placed.pos);
       mesh.rotation.y = placed.yaw;
@@ -265,12 +268,13 @@ export class ThreeRoundRenderer implements RoundRenderer {
     putAt(mesh, gridToWorld(target.x, target.y, top + 0.01 + id * 0.002));
   }
 
-  /** One folder geometry per ticket kind, made on first use. */
-  private ticketGeometry(kind: TicketKind): THREE.BufferGeometry {
-    let geometry = this.ticketGeometries.get(kind);
+  /** One folder geometry per ticket kind (and grey once expired), made on first use. */
+  private ticketGeometry(kind: TicketKind, expired: boolean): THREE.BufferGeometry {
+    const key = expired ? 'expired' : kind;
+    let geometry = this.ticketGeometries.get(key);
     if (!geometry) {
-      geometry = ticketModel(kind).body;
-      this.ticketGeometries.set(kind, geometry);
+      geometry = ticketModel(kind, expired).body;
+      this.ticketGeometries.set(key, geometry);
     }
     return geometry;
   }

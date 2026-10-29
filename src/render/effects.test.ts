@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { PIPELINE_FAIL_TICKS, PIPELINE_WARN_TICKS } from '../sim/balance';
+import { SHIP_BLOCKED_TEXT } from '../sim/content';
 import { GARAGE } from '../sim/levels';
 import { createGame } from '../sim/state';
-import { SHAKE_PIPELINE_BROKE, effectsFor, pipelinePulse } from './effects';
+import { POPUP_LOST_COLOR, SHAKE_PIPELINE_BROKE, effectsFor, pipelinePulse } from './effects';
 
 describe('effectsFor', () => {
   const state = createGame(GARAGE, 1, [1, 2]);
@@ -26,6 +27,19 @@ describe('effectsFor', () => {
   it('pops up on the shoved player and shakes a little', () => {
     const kinds = effectsFor(state, [{ type: 'shoved', by: 1, target: 2 }]).map((e) => e.kind);
     expect(kinds).toEqual(['popup', 'shake']);
+  });
+
+  it('says "hotfix first" over a player shipping past an incident', () => {
+    const player = state.players[0];
+    if (!player) throw new Error('no player');
+    const [popup, shake] = effectsFor(state, [{ type: 'shipBlocked', playerId: 1, ticketId: 1 }]);
+    expect(popup).toEqual({
+      kind: 'popup',
+      at: player.pos,
+      text: SHIP_BLOCKED_TEXT,
+      color: POPUP_LOST_COLOR,
+    });
+    expect(shake).toMatchObject({ kind: 'shake' });
   });
 
   it('ignores events with no visual reaction', () => {

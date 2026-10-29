@@ -296,8 +296,8 @@ describe('work', () => {
 describe('queues', () => {
   it('takes the oldest ticket from the inbox, and never puts one back', () => {
     const state = newGame();
-    const first = enqueueTicket(state, 'feature', 'First');
-    const second = enqueueTicket(state, 'feature', 'Second');
+    const first = enqueueTicket(state, 'feature', 'First', 0);
+    const second = enqueueTicket(state, 'feature', 'Second', 0);
     standAt(state, 1, COL.inbox);
     press(state);
     expect(first.location).toEqual({ kind: 'player', playerId: 1 });
@@ -311,14 +311,14 @@ describe('queues', () => {
 
   it('holds any number of tickets', () => {
     const state = newGame();
-    for (let i = 0; i < 10; i++) enqueueTicket(state, 'feature', `T${i}`);
+    for (let i = 0; i < 10; i++) enqueueTicket(state, 'feature', `T${i}`, 0);
     expect(state.tickets.filter((t) => t.location.kind === 'queue')).toHaveLength(10);
   });
 
   it('keeps bugs and features apart', () => {
     const state = newGame();
-    const feature = enqueueTicket(state, 'feature', 'Feature');
-    const bug = enqueueTicket(state, 'bug', 'Bug');
+    const feature = enqueueTicket(state, 'feature', 'Feature', 0);
+    const bug = enqueueTicket(state, 'bug', 'Bug', 0);
     standAt(state, 1, COL.bugQueue);
     press(state);
     expect(bug.location).toEqual({ kind: 'player', playerId: 1 });
@@ -455,7 +455,7 @@ describe('review station', () => {
   function reviewGame(): { state: GameState; ticket: Ticket } {
     const state = createGame(levelWithMap(parseLevelMap(MAP)), 1, [1, 2, 3]);
     state.nextOrderTick = Number.MAX_SAFE_INTEGER;
-    const ticket = enqueueTicket(state, 'feature', 'Review me', REVIEWED_FEATURE_STEPS);
+    const ticket = enqueueTicket(state, 'feature', 'Review me', 0, REVIEWED_FEATURE_STEPS);
     const code = getStep(ticket, 'code');
     if (code) code.progress = 1;
     ticket.location = { kind: 'tile', x: 2, y: 1 };

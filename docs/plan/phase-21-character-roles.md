@@ -1,5 +1,7 @@
 # Phase 21 proposal: character roles, ticket domains, and a new cast
 
+> Numbering: main later used Phase 21 for Tickets, so the roadmap lists this work as phase 22. This file and its 21a–21d slice names keep their original numbers because commits, scripts and evidence refer to them.
+
 **Status:** 21a visual investigation complete; the user selected the compact angular foundation. 21b simulation rules and the opt-in lab are approved and implemented; 21c–21d remain unapproved. Hats are optional, non-default accessories for the future cast. Numbers below are starting hypotheses, not measured balance results. Implement one approved subphase at a time.
 
 **Goal:** a team of generalists is dependable and can earn three stars; a well-coordinated specialist team has a higher ceiling because it assigns work and hands tickets over well. Mixed teams should be a useful middle ground. Replace the current character silhouette, not just its hats.
@@ -224,6 +226,8 @@ Capture the comparison set with `npx vite-node scripts/characterStudies.ts --out
 The shared study rig keeps `carryPoint` and the existing hand targets unchanged. Its torso bends out of the ticket arc and its rubber-hose arms extend for wind-up; these are investigation choices, not a production rig decision. The released-ticket path is illustrative, explicitly labeled, and does not change the sim's throw. No rates, domains, role selection, online behavior, final cast, or campaign tuning are implemented here.
 
 ### 21b implementation status
+
+**Main integration:** after main's Tickets redesign, shipping and expiry use explicit `orderId` ownership on every level, superseding the proposal's recipe/domain matching path. Expired carried/placed/flying tickets remain bin-only; queued ones leave the queue. Domains remain metadata on owned orders/tickets and survive delayed bugs, merges and loss. Generalist work rates and classic domain-generation RNG remain unchanged, but the whole-round measurements below predate this lifecycle integration and must not be treated as post-integration balance evidence. Integration validation passes `npm run check` (81 files, 1,141 tests) and `npm run build`.
 
 The approved 21b slice adds plain-data role ids and ticket domains, role-aware manual work and repair rates, domain-aware order compatibility/lifecycle, and the opt-in `lab-roles` level. Existing campaign levels remain without a domain schedule. Full-stack orders remain `mixed`; their FE/BE ingredients have their respective domains and are excluded from the exact-count batches, which apply to ordinary feature orders. Incidents use their authored incident domain. The lab borrows the scale-up world look and has no production UI or network role-selection path.
 
