@@ -7,7 +7,13 @@ import { createSave } from './save';
 
 const shipped: GameEvent = {
   type: 'orderShipped',
-  order: null,
+  order: {
+    id: 1,
+    kind: 'feature',
+    steps: ['code', 'test', 'pipeline'],
+    createdTick: 0,
+    expiresTick: 1000,
+  },
   points: 20,
   playerId: 1,
   untested: false,
@@ -31,7 +37,7 @@ describe('first-level hints', () => {
     expect(updateHints(open, [], state)).toEqual({ open: HINT_IDS, finished: false });
 
     // Grab a ticket from the inbox.
-    enqueueTicket(state, 'feature', 'Hint me');
+    enqueueTicket(state, 'feature', 'Hint me', 0);
     standAt(state, 1, COL.inbox);
     press(state);
     const pickUp = updateHints(open, [{ type: 'pickedUp', playerId: 1, ticketId: 0 }], state);

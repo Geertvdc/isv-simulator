@@ -9,6 +9,7 @@
  * better to do (empty hands, a build running, or no free station for what
  * it carries) goes and works the review station with the owner.
  * Incident hotfixes come first in the bug queue, so bots take them first.
+ * Tickets whose order expired go straight in the bin.
  * Bots plan their walks around managers, and an invited bot drops
  * everything (but keeps carrying) and stands in the meeting room.
  */
@@ -17,7 +18,7 @@ import { REVIEWERS_NEEDED } from './balance';
 import { canPutDown, isAtItsStation } from './interact';
 import { type GridPoint, type LevelMap, type Tile, getTile, isSolid } from './level';
 import type { Level } from './levels';
-import { type LevelResult, matchingOrders, shipBlockedBy } from './orders';
+import { type LevelResult, shipBlockedBy } from './orders';
 import { managerTiles } from './manager';
 import { inviteFor } from './meetings';
 import { NEIGHBOURS, pathTo, searchPath } from './path';
@@ -179,7 +180,7 @@ function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | nu
     const tile = { x: own.location.x, y: own.location.y };
     const kind = getTile(state.level, tile.x, tile.y);
     // A coded part waits on the merge station for its other half, or parked on a counter.
-    if ((kind === 'merge' || kind === 'counter') && isPart(own)) {
+    if ((kind === 'merge' || kind === 'counter') && isPart(own) && !own.expired) {
       bot.ticketId = null;
       return chooseGoal(state, bot, bots);
     }
@@ -197,6 +198,7 @@ function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | nu
   const help = reviewHelpGoal(state, bot, bots);
   if (help) return help;
   const merged =
+    expiredGoal(state, bot, bots) ??
     mergedGoal(state, bot, bots) ??
     parkedPartGoal(state, bot, bots) ??
     parkedFinishedGoal(state, bot, bots);
@@ -207,6 +209,20 @@ function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | nu
     if (tile) return { tile, action: 'interact' };
   }
   return null;
+}
+
+/** The nearest expired ticket lying on a tile that no other bot is fetching: it goes in the bin. */
+function expiredGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | null {
+  if (!state.level.tiles.includes('bin')) return null;
+  const lying = state.tickets.flatMap((t) =>
+    t.expired && t.location.kind === 'tile' && !bots.some((b) => b !== bot && b.ticketId === t.id)
+      ? [{ x: t.location.x, y: t.location.y }]
+      : [],
+  );
+  const tile = nearest(state, bot.playerId, lying);
+  if (!tile) return null;
+  bot.ticketId = ticketOnTile(state, tile.x, tile.y)?.id ?? null;
+  return { tile, action: 'interact' };
 }
 
 /** The nearest merged ticket waiting on a merge station that no other bot is fetching. */
@@ -245,7 +261,7 @@ function freeCounterGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal
 
 /** A finished ticket that can't ship yet because an incident is open. */
 function isParkedForIncident(state: GameState, ticket: Ticket): boolean {
-  return !isPart(ticket) && isShippable(ticket) && shipBlockedBy(state, ticket);
+  return !isPart(ticket) && !ticket.expired && isShippable(ticket) && shipBlockedBy(state, ticket);
 }
 
 /** The nearest finished ticket parked on a counter that may ship again and no other bot is fetching. */
@@ -255,6 +271,7 @@ function parkedFinishedGoal(state: GameState, bot: Bot, bots: readonly Bot[]): G
     return (
       ticket &&
       !isPart(ticket) &&
+      !ticket.expired &&
       isShippable(ticket) &&
       !shipBlockedBy(state, ticket) &&
       !bots.some((b) => b !== bot && b.ticketId === ticket.id)
@@ -304,6 +321,11 @@ function meetingGoal(state: GameState, bot: Bot): Goal | null {
 }
 
 function carryGoal(state: GameState, bot: Bot, bots: readonly Bot[], ticket: Ticket): Goal | null {
+  // Its order ran out: straight in the bin (or parked on a counter without one).
+  if (ticket.expired) {
+    const bin = nearest(state, bot.playerId, tilesOf(state.level, 'bin'));
+    return bin ? { tile: bin, action: 'interact' } : freeCounterGoal(state, bot, bots);
+  }
   const step = bot.skipTests
     ? workableSteps(ticket).find((s) => !OPTIONAL_STEPS.has(s.kind))
     : currentStep(ticket);
@@ -326,10 +348,7 @@ function carryGoal(state: GameState, bot: Bot, bots: readonly Bot[], ticket: Tic
   if (!step) {
     // Only the hotfix ships during an incident: park the rest on a counter, or hold on.
     if (shipBlockedBy(state, ticket)) return freeCounterGoal(state, bot, bots);
-    // Without a bin, a ticket whose order expired still ships, for nothing.
-    const hasBin = state.level.tiles.includes('bin');
-    const where = matchingOrders(state, ticket).length > 0 || !hasBin ? 'ship' : 'bin';
-    const tile = nearest(state, bot.playerId, tilesOf(state.level, where));
+    const tile = nearest(state, bot.playerId, tilesOf(state.level, 'ship'));
     return tile ? { tile, action: 'interact' } : null;
   }
   const empty = tilesOf(state.level, STEP_TILE[step.kind]).filter(
@@ -481,10 +500,10 @@ export function runBots(
     for (const e of state.events) {
       if (e.type === 'orderShipped') {
         summary.shipped++;
-        if (e.order?.kind === 'bug') summary.shippedBugs++;
+        if (e.order.kind === 'bug') summary.shippedBugs++;
         if (e.untested) summary.shippedUntested++;
-        if (e.order?.steps.includes('review')) summary.shippedReviewed++;
-        if (e.order?.kind === 'incident') summary.shippedIncidents++;
+        if (e.order.steps.includes('review')) summary.shippedReviewed++;
+        if (e.order.kind === 'incident') summary.shippedIncidents++;
       }
       if (e.type === 'orderExpired') {
         summary.expired++;

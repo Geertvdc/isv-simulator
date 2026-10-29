@@ -105,6 +105,13 @@ export interface Ticket {
   title: string;
   steps: TicketStep[];
   location: TicketLocation;
+  /** The order this ticket is for: it can only complete that one. */
+  orderId: number;
+  /**
+   * Its order ran out: nothing can be done with it any more but carrying,
+   * throwing and binning it.
+   */
+  expired: boolean;
 }
 
 const PROGRESS_EPSILON = 1e-9;
@@ -135,9 +142,11 @@ export function isFinished(ticket: Ticket): boolean {
  * Steps that can be worked on now: from the step last worked on, the
  * unfinished steps up to and including the first unfinished required one.
  * Optional steps (tests) can be skipped, but once work moves past a test it
- * stays skipped: you test in its phase or not at all.
+ * stays skipped: you test in its phase or not at all. Nothing is workable on
+ * an expired ticket.
  */
 export function workableSteps(ticket: Ticket): TicketStep[] {
+  if (ticket.expired) return [];
   let lastWorked = 0;
   ticket.steps.forEach((s, i) => {
     if (s.progress > 0) lastWorked = i;
@@ -188,11 +197,12 @@ export function queuedTickets(state: GameState, queue: QueueKind): Ticket[] {
     .sort((a, b) => QUEUE_PRIORITY[a.kind] - QUEUE_PRIORITY[b.kind] || a.id - b.id);
 }
 
-/** Puts a new ticket in the queue for its kind; `steps` default to its kind's. */
+/** Puts a new ticket for order `orderId` in the queue for its kind; `steps` default to its kind's. */
 export function enqueueTicket(
   state: GameState,
   kind: TicketKind,
   title: string,
+  orderId: number,
   steps: readonly StepKind[] = TICKET_STEPS[kind],
 ): Ticket {
   const ticket: Ticket = {
@@ -201,6 +211,8 @@ export function enqueueTicket(
     title,
     steps: steps.map((k) => ({ kind: k, progress: 0 })),
     location: { kind: 'queue', queue: QUEUE_OF[kind] },
+    orderId,
+    expired: false,
   };
   state.tickets.push(ticket);
   return ticket;
@@ -209,8 +221,14 @@ export function enqueueTicket(
 /**
  * A ticket that fell into a gap or off the edge: back in its queue, every
  * step undone ("git reset --hard"), except a merge. Its order can still be met.
+ * An expired ticket is simply gone: nobody needs it back.
  */
 export function loseTicket(state: GameState, ticket: Ticket, at: { x: number; y: number }): void {
+  if (ticket.expired) {
+    state.tickets = state.tickets.filter((t) => t !== ticket);
+    state.events.push({ type: 'ticketLost', ticketId: ticket.id, x: at.x, y: at.y, queue: null });
+    return;
+  }
   // A merged ticket keeps its merge (its parts are gone): only the work since is lost.
   const merged = ticket.steps.findIndex((s) => s.kind === 'merge');
   ticket.steps.forEach((step, i) => {
@@ -228,15 +246,24 @@ export function isPart(ticket: Pick<Ticket, 'kind'>): boolean {
 
 /**
  * Whether two tickets are the two halves of a full-stack feature, both coded,
- * ready to merge.
+ * ready to merge (and neither has expired).
  */
 export function canMerge(a: Ticket, b: Ticket): boolean {
-  return isPart(a) && isPart(b) && a.kind !== b.kind && isFinished(a) && isFinished(b);
+  return (
+    isPart(a) &&
+    isPart(b) &&
+    a.kind !== b.kind &&
+    isFinished(a) &&
+    isFinished(b) &&
+    !a.expired &&
+    !b.expired
+  );
 }
 
 /**
  * Merges two parts into one full-stack ticket on tile (x, y): the code and
- * the merge done, test and pipeline to go. Takes the front end's title.
+ * the merge done, test and pipeline to go. Takes the front end's title and
+ * its order.
  */
 export function mergeParts(state: GameState, a: Ticket, b: Ticket, x: number, y: number): Ticket {
   const front = a.kind === 'frontend' ? a : b;
@@ -250,6 +277,8 @@ export function mergeParts(state: GameState, a: Ticket, b: Ticket, x: number, y:
       progress: kind === 'code' || kind === 'merge' ? 1 : 0,
     })),
     location: { kind: 'tile', x, y },
+    orderId: front.orderId,
+    expired: false,
   };
   state.tickets.push(merged);
   state.events.push({ type: 'merged', ticketId: merged.id, parts: [a.id, b.id], x, y });

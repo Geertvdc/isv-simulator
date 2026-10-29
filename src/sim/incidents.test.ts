@@ -139,10 +139,14 @@ describe('shipping during an incident', () => {
   } {
     const state = incidentGame();
     state.nextIncidentTick = null;
-    createOrder(state, kind === 'incident' ? 'bug' : kind, 'Order');
-    createOrder(state, 'incident', 'Prod is down');
+    const order = createOrder(state, kind === 'incident' ? 'bug' : kind, 'Order');
+    const incident = createOrder(state, 'incident', 'Prod is down');
     state.tickets = [];
-    const ticket = addTicket(state, COL.floor, { kind, done: TICKET_STEPS[kind].length });
+    const ticket = addTicket(state, COL.floor, {
+      kind,
+      done: TICKET_STEPS[kind].length,
+      orderId: kind === 'incident' ? incident.id : order.id,
+    });
     give(1, ticket);
     standAt(state, 1, COL.ship);
     return { state, ticket };
@@ -168,9 +172,12 @@ describe('shipping during an incident', () => {
 
   it('ships the rest again once the hotfix has shipped', () => {
     const { state, ticket } = blockedGame('feature');
+    const incident = openIncident(state);
+    if (!incident) throw new Error('No incident');
     const hotfix = addTicket(state, COL.floor, {
       kind: 'incident',
       done: TICKET_STEPS.incident.length,
+      orderId: incident.id,
     });
     give(2, hotfix);
     expect(shipTicket(state, 2, hotfix)).toBe(true);
