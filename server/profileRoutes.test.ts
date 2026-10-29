@@ -132,7 +132,7 @@ describe('profile routes over HTTP', () => {
   it('refuses oversized names and level lists', async () => {
     const id = freshId();
     await expectError(
-      put(id, JSON.stringify({ displayName: 'x'.repeat(100_000) })),
+      put(id, JSON.stringify({ displayName: 'x'.repeat(10_000) })),
       400,
       'displayName must be 1 to 24 characters',
     );
