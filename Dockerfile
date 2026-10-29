@@ -3,6 +3,10 @@
 #
 #   docker build -t isv-simulator-server .
 #   docker run --rm -p 2567:2567 -v isv-profiles:/app/server/data isv-simulator-server
+#
+# In production also set ALLOWED_ORIGINS to the browser game's origin, and
+# TRUST_PROXY=true behind a reverse proxy (see server/README.md):
+#   -e ALLOWED_ORIGINS=https://isv.example.com -e TRUST_PROXY=true
 
 # ---- build: bundle server/ (with the level maps inlined) into dist-server/
 FROM node:22-slim AS build

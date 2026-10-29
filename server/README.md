@@ -12,13 +12,15 @@ npm run dev:online    # the Vite client and the server together
 curl localhost:2567/health
 ```
 
-| Env var              | Default                                                       | What                                                         |
-| -------------------- | ------------------------------------------------------------- | ------------------------------------------------------------ |
-| `PORT`               | `2567`                                                        | Port for HTTP and WebSockets                                 |
-| `PROFILE_STORE_PATH` | `data/profiles.json` (repo root, outside the watched folders) | The online profiles (gitignored; created on the first write) |
-| `ROUND_SECONDS`      | (the level's length)                                          | Dev: every round lasts this long, to reach the results fast  |
-| `NET_LAG_MS`         | `0`                                                           | Dev: delays every message in and out by this much            |
-| `NET_JITTER_MS`      | `0`                                                           | Dev: plus up to this much at random (order is kept)          |
+| Env var              | Default                                                       | What                                                                                                                                                                                   |
+| -------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PORT`               | `2567`                                                        | Port for HTTP and WebSockets                                                                                                                                                           |
+| `PROFILE_STORE_PATH` | `data/profiles.json` (repo root, outside the watched folders) | The online profiles (gitignored; created on the first write)                                                                                                                           |
+| `ROUND_SECONDS`      | (the level's length)                                          | Dev: every round lasts this long, to reach the results fast                                                                                                                            |
+| `NET_LAG_MS`         | `0`                                                           | Dev: delays every message in and out by this much                                                                                                                                      |
+| `NET_JITTER_MS`      | `0`                                                           | Dev: plus up to this much at random (order is kept)                                                                                                                                    |
+| `ALLOWED_ORIGINS`    | (any origin)                                                  | Comma-separated origins (`https://game.example,http://localhost:5173`) whose pages may call the server; others get no usable CORS answer. Unset allows any (dev); set it in production |
+| `TRUST_PROXY`        | (off)                                                         | `true` (one proxy) or a hop count: take the client IP for the rate limits from `X-Forwarded-For`. Only set it behind a reverse proxy that adds that header                             |
 
 `npm run dev:online` leaves `PORT` alone: Vite reads it too, so setting it there would put both on one port.
 
@@ -29,7 +31,8 @@ curl localhost:2567/health
 - `joinCodes.ts`: codes of the rooms alive in this process, so they stay unique.
 - `profileStore.ts`: `ProfileStore` with `JsonFileProfileStore` (one JSON file, read on first use, rewritten through a temp file and a rename after every change, one change at a time; a corrupt file is moved to `<path>.corrupt-<time>` and the store starts empty) and `MemoryProfileStore` for tests.
 - `profileRoutes.ts`: `GET`/`PUT /profiles/:userId`.
-- `app.ts`: `startGameServer(port, { store, roundSeconds, lag })`, with the HTTP routes. `main.ts` is the entry point (reads the env vars above).
+- `httpGuard.ts`: runs before every HTTP request: body size limit, per-IP rate limits (`rateLimit.ts`, a token bucket per key) and the CORS origins.
+- `app.ts`: `startGameServer(port, { store, roundSeconds, lag, allowedOrigins, trustProxyHops, limits })`, with the HTTP routes. `main.ts` is the entry point (reads the env vars above).
 - `roomLogic.test.ts`, `server.test.ts` (a real server on a free port with `@colyseus/sdk` clients), `client.test.ts` (the browser's wrapper against a real server), `round.test.ts` (two browsers' network code play a whole short round, from the lobby to the profiles), `resilience.test.ts` (clients behind a small TCP proxy whose sockets get cut: reconnecting within and after the grace period, a reloaded page rejoining with its token, the host moving while away, floods, room cleanup, shutdown).
 
 `npm run verify:online` (`scripts/verifyOnline.ts`, not in CI) starts its own server and Vite and drives three headless Chromes through a session with a network drop, a page reload, a late joiner and the host leaving; see the top of the file.
@@ -82,6 +85,18 @@ room.send('ping', { type: 'ping', id: 1, clientTimeMs: performance.now() });
 
 HTTP: `GET /health` → `ok`. `GET /rooms/:code` → `{ joinCode }` for an open room (any case, spaces and dashes allowed), 404 otherwise.
 
+### Limits
+
+Per client IP (token buckets; numbers in `src/sim/balance.ts`), past which the server answers 429 with `Retry-After` (the browser shows a failed join as "unreachable"):
+
+- creating rooms: 10 at once, then one per 6 s (`NET_ROOM_CREATE_*`);
+- failed joins (`joinById` with a code that doesn't work) and failed `GET /rooms/:code` lookups: 10, then one per 6 s (`NET_FAILED_JOIN_*`), so 4-letter codes can't be guessed; while out of attempts every join and lookup is refused;
+- `PUT /profiles/:userId`: 30, then one per second (`NET_PROFILE_WRITE_*`).
+
+Request bodies over 64 KB (`NET_MAX_BODY_BYTES`) get a 413 without being read (over 1 MB the connection is cut); bodies without a `Content-Length` get a 411. The store holds at most 10,000 profiles (`NET_MAX_PROFILES`): a `PUT` that would create one more gets a 507 (`{ "error": "profile limit reached" }`), existing profiles still update, and a round isn't recorded for a new user.
+
+The client IP is the socket's address. Behind a reverse proxy that is the proxy for everyone, so set `TRUST_PROXY` there (and only there: otherwise anyone could pick their own IP with the header).
+
 ### Profiles
 
 A profile is `{ userId, displayName, levels, createdAt, updatedAt }`, with `levels` shaped like the browser save's (`{ [levelId]: { bestStars, bestScore, plays } }`). User ids are UUID v4s, any case (stored in lower case); anything else gets a 400.
@@ -111,6 +126,8 @@ The `Dockerfile` bundles `server/` with Vite (`npm run build:server`, which inli
 - **WebSockets and sticky sessions.** The platform's ingress must allow WebSocket upgrades. With one instance, no sticky sessions are needed.
 - **TLS.** Let the platform terminate HTTPS; browsers on an `https://` page need `wss://`. The client finds the server through `VITE_SERVER_URL` (13d/13e).
 - **Health check:** `GET /health`. The platform sets `PORT`; the image defaults to 2567.
-- **No auth.** Every message is validated and each client has a message budget, but anyone who knows a code can join. Fine for an internal game; don't expose it widely.
+- **CORS.** The browser game is static files hosted somewhere else, so set `ALLOWED_ORIGINS` to its origin (e.g. `-e ALLOWED_ORIGINS=https://isv.example.com`). Unset, any web page may call the server (the server warns at start-up).
+- **Proxy.** Behind the platform's ingress (Azure Container Apps, Fly.io, Render), set `TRUST_PROXY=true` so the rate limits see real client IPs instead of the proxy's.
+- **No auth.** Every message is validated and each client has a message budget, and IPs are rate-limited (see Limits), but anyone who knows a code can join. Fine for an internal game; don't expose it widely.
 
 `npm run build` still builds only the browser game.
