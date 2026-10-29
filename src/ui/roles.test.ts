@@ -29,6 +29,8 @@ describe('role and effective speed labels', () => {
   });
   it('puts the ticket domain in the commit scope, keeping a hotfix breaking', () => {
     expect(commitHead('feature', 'general')).toEqual({ type: 'feat', breaking: false });
+    expect(commitHead('frontend', 'general').scope).toBeUndefined();
+    expect(commitHead('frontend', 'frontend').scope).toBe('ui');
     expect(commitHead('feature', 'backend')).toEqual({
       type: 'feat',
       scope: 'api',

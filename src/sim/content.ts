@@ -113,20 +113,20 @@ export function pairingText(speedup: number): string {
 
 /**
  * An order card's title reads as a conventional commit, `feat: Make it pop`:
- * the type (and scope) says the kind of ticket. A hotfix is breaking news.
+ * the type says the kind of ticket, the scope its domain. A hotfix is breaking news.
  */
-export const COMMIT_TYPES: Readonly<Record<TicketKind, { type: string; scope?: string }>> = {
+export const COMMIT_TYPES: Readonly<Record<TicketKind, { type: string }>> = {
   feature: { type: 'feat' },
   bug: { type: 'fix' },
   incident: { type: 'fix!' },
-  frontend: { type: 'feat', scope: 'ui' },
-  backend: { type: 'feat', scope: 'api' },
-  fullstack: { type: 'feat', scope: 'app' },
+  frontend: { type: 'feat' },
+  backend: { type: 'feat' },
+  fullstack: { type: 'feat' },
 };
 
 /**
  * A ticket's domain as its commit scope, `feat(api): …`, on HUD order cards
- * and in world card title bars. General work has none and keeps its kind's.
+ * and in world card title bars. General work has none.
  */
 export const DOMAIN_SCOPES: Readonly<Record<TicketDomain, string | undefined>> = {
   general: undefined,
@@ -143,7 +143,7 @@ export function commitHead(
 ): { type: string; scope?: string; breaking: boolean } {
   const base = COMMIT_TYPES[kind];
   const breaking = base.type.endsWith('!');
-  const scope = DOMAIN_SCOPES[domain] ?? base.scope;
+  const scope = DOMAIN_SCOPES[domain];
   return { type: breaking ? base.type.slice(0, -1) : base.type, scope, breaking };
 }
 
