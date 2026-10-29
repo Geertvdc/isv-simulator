@@ -79,9 +79,9 @@ describe('optional tests', () => {
 describe('queues', () => {
   it('enqueues fresh tickets of the right kind, oldest first', () => {
     const state = newTestGame();
-    const a = enqueueTicket(state, 'feature', 'A');
-    const bug = enqueueTicket(state, 'bug', 'B');
-    const c = enqueueTicket(state, 'feature', 'C');
+    const a = enqueueTicket(state, 'feature', 'A', 0);
+    const bug = enqueueTicket(state, 'bug', 'B', 0);
+    const c = enqueueTicket(state, 'feature', 'C', 0);
     expect(a.steps).toEqual(TICKET_STEPS.feature.map((kind) => ({ kind, progress: 0 })));
     expect(bug.steps).toHaveLength(4);
     expect(queuedTickets(state, 'feature')).toEqual([a, c]);

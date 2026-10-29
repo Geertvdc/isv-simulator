@@ -43,6 +43,8 @@ function newTicket(state: GameState, done = 0): Ticket {
     title: 'Over the gap',
     steps: TICKET_STEPS.feature.map((kind, i) => ({ kind, progress: i < done ? 1 : 0 })),
     location: { kind: 'queue', queue: 'feature' },
+    orderId: 0,
+    expired: false,
   };
   state.tickets.push(ticket);
   return ticket;

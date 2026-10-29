@@ -11,6 +11,7 @@ describe('sounds', () => {
     expect(soundFor({ type: 'dashed', playerId: 1 })).toBe('dash');
     expect(soundFor({ type: 'levelEnded', result: { score: 0, stars: 0 } })).toBe('level-end');
     expect(soundFor({ type: 'pipelineRepaired', x: 0, y: 0 })).toBeNull();
+    expect(soundFor({ type: 'shipBlocked', playerId: 1, ticketId: 1 })).toBe('order-expired');
   });
 
   it('plays each sound once per frame', () => {
