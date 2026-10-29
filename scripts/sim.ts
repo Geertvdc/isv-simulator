@@ -159,7 +159,13 @@ function pairedScoreDelta(
     if (!baselineResult) throw new Error(`Missing paired baseline at index ${index}`);
     return result.result.score - baselineResult.result.score;
   });
-  return { ...pairedEstimate(perSeed, perSeed.map(() => 0)), perSeed };
+  return {
+    ...pairedEstimate(
+      perSeed,
+      perSeed.map(() => 0),
+    ),
+    perSeed,
+  };
 }
 
 function runRoleLab(): void {
@@ -366,7 +372,10 @@ function rotateForSeed(roles: readonly RoleId[], offset: number): RoleId[] {
   return [...roles.slice(rotation), ...roles.slice(0, rotation)];
 }
 
-function meanOf(results: readonly BotRunSummary[], select: (result: BotRunSummary) => number): number {
+function meanOf(
+  results: readonly BotRunSummary[],
+  select: (result: BotRunSummary) => number,
+): number {
   return average(results.map(select));
 }
 
@@ -385,7 +394,11 @@ function printNoTravelChecks(): void {
   const testSeconds = (role: RoleId): number =>
     baseWorkSeconds / roleWorkRate(role, 'test', 'frontend');
   const plans = [
-    { name: 'generalist code/test', code: codeSeconds('generalist'), test: testSeconds('generalist') },
+    {
+      name: 'generalist code/test',
+      code: codeSeconds('generalist'),
+      test: testSeconds('generalist'),
+    },
     { name: 'frontend hands to QA', code: codeSeconds('frontend'), test: testSeconds('qa') },
     { name: 'QA does both', code: codeSeconds('qa'), test: testSeconds('qa') },
     { name: 'frontend does both', code: codeSeconds('frontend'), test: testSeconds('frontend') },
@@ -487,13 +500,9 @@ function runRoleBench(): void {
             .map((task) => meanOf(results, (result) => result.stationWorkTicks[task]).toFixed(0))
             .join('/');
           const utilization = work
-            .map((task) =>
-              meanOf(results, (result) => result.stationUtilization[task]).toFixed(1),
-            )
+            .map((task) => meanOf(results, (result) => result.stationUtilization[task]).toFixed(1))
             .join('/');
-          const domainShipExpire = (
-            ['general', 'frontend', 'backend', 'infra', 'mixed'] as const
-          )
+          const domainShipExpire = (['general', 'frontend', 'backend', 'infra', 'mixed'] as const)
             .map(
               (domain) =>
                 `${meanOf(results, (result) => result.shippedByDomain[domain]).toFixed(1)}/` +

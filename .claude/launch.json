@@ -11,7 +11,14 @@
     {
       "name": "dev-online",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["concurrently", "-k", "-n", "client,server", "vite", "PORT=2567 npm run server"],
+      "runtimeArgs": [
+        "concurrently",
+        "-k",
+        "-n",
+        "client,server",
+        "vite",
+        "PORT=2567 npm run server"
+      ],
       "port": 5173
     }
   ]
