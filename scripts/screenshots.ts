@@ -411,6 +411,9 @@ const SHOTS: Record<string, Shot> = {
     for (const [id, chapter, row] of intros) {
       await toLevelSelect(page);
       await openIntro(page, chapter, row);
+      await page.key('ArrowUp');
+      if (!(await page.eval<boolean>(`!document.querySelector('.intro-guide').hidden`)))
+        throw new Error('Level guide did not open');
       await page.shot(`screens/intro-${id}`);
     }
   },

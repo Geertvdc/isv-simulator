@@ -88,8 +88,9 @@ try {
     mobile: false,
   });
   await shot(local, 'local-intro-narrow');
-  await local.eval('document.querySelector(".intro-body").scrollTop = 500');
-  await shot(local, 'local-intro-narrow-team');
+  await local.eval('document.querySelector(".intro-guide-button").click()');
+  await shot(local, 'local-guide-narrow');
+  await local.eval('document.querySelector(".intro-guide-button").click()');
   await local.send('Emulation.clearDeviceMetricsOverride');
   await local.key('KeyE');
   await local.key('ShiftRight', 'Shift');

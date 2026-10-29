@@ -62,9 +62,9 @@ Settings → Online profile shows this browser's user ID and display name. Copy 
 
 Press Enter or gamepad A to join. The first Enter joins the left keyboard, the second the right keyboard; every gamepad joins with A. Each player gets a color, number and owner shape (circle, triangle, square, diamond), independent of their role and hairstyle. Joining does not also confirm or start. Player 1 continues to level selection with their pick-up button.
 
-Everyone starts as a **generalist**. Left/right on your own controls chooses a role; the card shows the live character, its strength/tradeoff, peak coding speed and testing speed. **All work speeds** expands the domain-by-domain comparison. Generalist is dependable everywhere; frontend/backend specialists prefer their coding domain, QA prefers testing, and platform prefers infrastructure coding with a smaller repair bonus. Every role can do every task, duplicate roles are allowed, and roles do not change movement, scoring or unattended build speed. The numbers are work-speed multipliers: 1.50x is 50% faster work, not 50% less time.
+Everyone starts as a **generalist**. Left/right on your own controls chooses a role; each compact card shows the live character, its strength/tradeoff and skill bars for all five coding domains, testing, design and repair. All bars share one scale and mark the 1.00x baseline, with exact multipliers alongside. Four players fit on one screen without scrolling; narrow screens use a two-by-two layout. Generalist is dependable everywhere; frontend/backend specialists prefer their coding domain, QA prefers testing, and platform prefers infrastructure coding with a smaller repair bonus. Every role can do every task, duplicate roles are allowed, and roles do not change movement, scoring or unattended build speed. The numbers are work-speed multipliers: 1.50x is 50% faster work, not 50% less time.
 
-![Lobby with two keyboard players](images/screens/lobby.webp)
+![Compact four-player lobby with comparable skill bars](images/screens/lobby.webp)
 
 ### Playing online
 
@@ -106,7 +106,7 @@ On a fresh save (left) only The Garage is open and everything past it is under c
 
 ### Level intro card
 
-Before every round, including retries, the level's card shows its name, **Planned workload**, recipes and tutorial. The forecast comes from the level, not your chosen roles: classic levels announce general-domain features; domain-enabled work also describes its authored feature mix and any full-stack parts or incidents. Coverage notes are advice, never permission checks.
+Before every round, including retries, team confirmation shows the level's name, a compact **Planned workload** band and everyone's role cards. **Level guide** swaps the team area for recipes, tutorial and detailed workload without scrolling or hiding the forecast; **Back to team** returns to readiness. Up/down on a keyboard or controller toggles the guide too. The forecast comes from the level, not your chosen roles: classic levels announce general-domain features; domain-enabled work also describes its authored feature mix and any full-stack parts or incidents. Coverage notes are advice, never permission checks.
 
 Each player can revise their own role here, then press their pick-up button (E, Right Shift or gamepad A) to ready. Enter is join-only and cannot ready both keyboard players together. Changing a role clears that player's ready. **Every connected participating player must be ready** before countdown; roles then freeze until the next round's confirmation. Roles stay selected across retries and next levels but readiness resets.
 
