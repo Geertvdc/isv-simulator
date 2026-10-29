@@ -10,7 +10,7 @@ import { kitMaterials } from '../kit';
 import { MAP_PALETTE, createLights, dressScene } from '../look';
 import { type Stage, disposeTree, getStage } from '../stage';
 import { type Diorama, ROAD_SURFACE, buildDiorama } from './diorama';
-import { planCity } from './cityPlan';
+import { planCity } from './cityPlanner';
 import { type Cityscape, buildCityscape } from './cityscape';
 import { type LockState, lockStateOf, newlyOpened, sameLocks, vanStop } from './locks';
 import { cameraTarget, glide } from './mapCamera';
