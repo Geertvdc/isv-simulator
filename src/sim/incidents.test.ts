@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { INCIDENT_EXPIRED_PENALTY, INCIDENT_POINTS, ORDER_SPEED_BONUS_MAX } from './balance';
 import { INCIDENT_TITLES } from './content';
 import type { IncidentSchedule } from './levels';
-import { createOrder, openIncident, shipPoints } from './orders';
-import { COL, cmd, holdWork, idle, newTestGame, press, standAt } from './testing';
+import { createOrder, openIncident, shipPoints, shipTicket } from './orders';
+import { COL, addTicket, cmd, give, holdWork, idle, newTestGame, press, standAt } from './testing';
 import { tick } from './tick';
-import { queuedTickets } from './tickets';
+import { TICKET_STEPS, type Ticket, queuedTickets } from './tickets';
 
 const INCIDENTS: IncidentSchedule = {
   firstTick: 100,
@@ -128,6 +128,72 @@ describe('an open incident', () => {
     expect(expired).toMatchObject({ penalty: INCIDENT_EXPIRED_PENALTY });
     expect(state.score).toBe(100 - INCIDENT_EXPIRED_PENALTY);
     expect(queuedTickets(state, 'bug').map((t) => t.kind)).toEqual(['bug']);
+  });
+});
+
+describe('shipping during an incident', () => {
+  /** A game with an open incident and player 1 at the ship tile holding a finished `kind`. */
+  function blockedGame(kind: 'feature' | 'bug' | 'incident'): {
+    state: ReturnType<typeof newTestGame>;
+    ticket: Ticket;
+  } {
+    const state = incidentGame();
+    state.nextIncidentTick = null;
+    createOrder(state, kind === 'incident' ? 'bug' : kind, 'Order');
+    createOrder(state, 'incident', 'Prod is down');
+    state.tickets = [];
+    const ticket = addTicket(state, COL.floor, { kind, done: TICKET_STEPS[kind].length });
+    give(1, ticket);
+    standAt(state, 1, COL.ship);
+    return { state, ticket };
+  }
+
+  it.each(['feature', 'bug'] as const)('refuses a finished %s and says why', (kind) => {
+    const { state, ticket } = blockedGame(kind);
+    tick(state, [cmd(state, 1, { interact: true })]);
+    expect(ticket.location).toEqual({ kind: 'player', playerId: 1 });
+    expect(state.events).toContainEqual({ type: 'shipBlocked', playerId: 1, ticketId: ticket.id });
+    expect(state.events.some((e) => e.type === 'orderShipped')).toBe(false);
+    expect(state.orders.map((o) => o.kind).sort()).toEqual([kind, 'incident'].sort());
+    expect(state.score).toBe(0);
+  });
+
+  it('ships the hotfix', () => {
+    const { state, ticket } = blockedGame('incident');
+    tick(state, [cmd(state, 1, { interact: true })]);
+    expect(state.tickets).not.toContain(ticket);
+    expect(state.events.some((e) => e.type === 'shipBlocked')).toBe(false);
+    expect(openIncident(state)).toBeUndefined();
+  });
+
+  it('ships the rest again once the hotfix has shipped', () => {
+    const { state, ticket } = blockedGame('feature');
+    const hotfix = addTicket(state, COL.floor, {
+      kind: 'incident',
+      done: TICKET_STEPS.incident.length,
+    });
+    give(2, hotfix);
+    expect(shipTicket(state, 2, hotfix)).toBe(true);
+    expect(openIncident(state)).toBeUndefined();
+    tick(state, [cmd(state, 1, { interact: true })]);
+    expect(state.tickets).not.toContain(ticket);
+    const shipped = state.events.find((e) => e.type === 'orderShipped');
+    expect(shipped).toMatchObject({ order: { kind: 'feature' }, playerId: 1 });
+  });
+
+  it('ships the rest again once the incident has expired', () => {
+    const { state, ticket } = blockedGame('feature');
+    const incident = openIncident(state);
+    const feature = state.orders.find((o) => o.kind === 'feature');
+    if (!incident || !feature) throw new Error('Missing orders');
+    feature.expiresTick = incident.expiresTick + 1000;
+    idle(state, incident.expiresTick - state.tick);
+    expect(openIncident(state)).toBeUndefined();
+    tick(state, [cmd(state, 1, { interact: true })]);
+    expect(state.tickets).not.toContain(ticket);
+    expect(state.events.find((e) => e.type === 'orderShipped')).toMatchObject({
+      order: { kind: 'feature' },
+    });
   });
 });
 

@@ -75,6 +75,8 @@ export type GameEvent =
       untested: boolean;
     }
   | { type: 'orderExpired'; order: Order; penalty: number }
+  /** `playerId` tried to ship `ticketId` while an incident is open: hotfix first. */
+  | { type: 'shipBlocked'; playerId: PlayerId; ticketId: number }
   | { type: 'levelEnded'; result: LevelResult }
   /** A finished build was left too long; `ticketId` has to be built again. */
   | { type: 'pipelineBroke'; x: number; y: number; ticketId: number }
@@ -159,6 +161,11 @@ export function openIncident(state: GameState): Order | undefined {
   return state.orders.find((o) => o.kind === 'incident');
 }
 
+/** Whether an open incident keeps `ticket` from shipping: only the hotfix ships then. */
+export function shipBlockedBy(state: GameState, ticket: Ticket): boolean {
+  return ticket.kind !== 'incident' && openIncident(state) !== undefined;
+}
+
 /** Stars for a score: one per threshold reached. */
 export function starsFor(score: number, thresholds: readonly number[]): number {
   return thresholds.filter((t) => score >= t).length;
@@ -206,12 +213,16 @@ export function createOrder(
  * Ships the ticket `playerId` carries: completes the matching order with the
  * least time left, scores it and maybe sends a bug back later (more likely
  * when tests were skipped). A ticket whose order already expired still ships,
- * for no points. Refuses tickets missing a required step. Returns whether it
- * shipped.
+ * for no points. Refuses tickets missing a required step, and anything but
+ * the hotfix while an incident is open. Returns whether it shipped.
  */
 export function shipTicket(state: GameState, playerId: PlayerId, ticket: Ticket): boolean {
   // Half a full-stack feature can't ship: merge it with its other half first.
   if (!isShippable(ticket) || isPart(ticket)) return false;
+  if (shipBlockedBy(state, ticket)) {
+    state.events.push({ type: 'shipBlocked', playerId, ticketId: ticket.id });
+    return false;
+  }
   const order = matchingOrders(state, ticket)[0] ?? null;
 
   const points = order ? shipPoints(order, state.tick) : 0;
@@ -265,7 +276,8 @@ export function updateOrders(state: GameState): void {
   }
 
   updateIncidents(state);
-  // Production is down: no new features until the hotfix ships (or the incident runs out).
+  // Production is down: nothing else ships and no new features open until the hotfix
+  // ships (or the incident runs out).
   if (openIncident(state)) return;
 
   const { orderSchedule } = state.settings;
