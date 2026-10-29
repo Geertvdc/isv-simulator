@@ -22,7 +22,7 @@ describe('resolved work feedback', () => {
       state,
       state.players.map((p) => cmd(state, p.id, { work: true })),
     );
-    expect(state.workFeedback).toEqual([{ playerId: 2, task: 'test', ticketId: 1, rate: 1.6 }]);
+    expect(state.workFeedback).toEqual([{ playerId: 2, task: 'test', ticketId: 1, rate: 2 }]);
     const restored = decodeSnapshot(encodeSnapshot(state, 6, []), state.level);
     expect(restored.workFeedback).toEqual(state.workFeedback);
     expect(restored.players.map((p) => p.roleId)).toEqual(['frontend', 'qa']);
@@ -46,8 +46,8 @@ describe('resolved work feedback', () => {
     );
     expect(state.workFeedback).toHaveLength(2);
     for (const work of state.workFeedback) {
-      expect(work.rate).toBeCloseTo(2.28);
-      expect(work.teamRate).toBeCloseTo(4.56);
+      expect(work.rate).toBeCloseTo(3.04);
+      expect(work.teamRate).toBeCloseTo(6.08);
       expect(work.task).toBe('code');
     }
   });
@@ -64,7 +64,7 @@ describe('resolved work feedback', () => {
       state.players.map((p) => cmd(state, p.id, { work: true })),
     );
     expect(state.workFeedback.map((w) => w.playerId)).toEqual([1, 2]);
-    expect(state.workFeedback[0]?.teamRate).toBeCloseTo(2.85);
+    expect(state.workFeedback[0]?.teamRate).toBeCloseTo(3.8);
   });
 
   it('repair is strongest-only and review keeps quorum rather than a QA bonus', () => {
@@ -79,7 +79,7 @@ describe('resolved work feedback', () => {
       state,
       state.players.map((p) => cmd(state, p.id, { work: true })),
     );
-    expect(state.workFeedback).toEqual([{ playerId: 2, task: 'repair', rate: 1.25 }]);
+    expect(state.workFeedback).toEqual([{ playerId: 2, task: 'repair', rate: 1.5 }]);
     const ticket = addTicket(state, 9);
     ticket.steps = [{ kind: 'review', progress: 0 }];
     for (const p of state.players) standAt(state, p.id, 9);

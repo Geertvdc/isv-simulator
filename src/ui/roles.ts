@@ -18,6 +18,7 @@ import {
   type TicketDomain,
   type WorkTask,
 } from '../sim/roles';
+import { ROLE_SKILL_BAR_MAX_RATE } from '../sim/balance';
 import type { WorkFeedback } from '../sim/state';
 import { rolePreviews } from '../render/three/RolePreview';
 import { el } from './dom';
@@ -63,7 +64,7 @@ export interface SkillBar {
   percent: number;
 }
 
-/** Every chart shares a scale: 1.00x is the baseline, 1.60x fills the track. */
+/** Every chart shares a scale: 1.00x is the baseline, 2.00x fills the track. */
 export function roleSkills(role: RoleId): SkillBar[] {
   const skills: { label: string; task: WorkTask; domain: TicketDomain }[] = [
     ...TICKET_DOMAINS.map((domain) => ({
@@ -77,7 +78,7 @@ export function roleSkills(role: RoleId): SkillBar[] {
   ];
   return skills.map(({ label, task, domain }) => {
     const rate = roleWorkRate(role, task, domain);
-    return { label, rate, percent: (rate / 1.6) * 100 };
+    return { label, rate, percent: (rate / ROLE_SKILL_BAR_MAX_RATE) * 100 };
   });
 }
 

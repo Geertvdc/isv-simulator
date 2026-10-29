@@ -109,7 +109,7 @@ try {
   );
   await check(
     local,
-    'document.querySelector(".hud-roster").textContent.includes("pair total 4.56x") && document.querySelector(".hud-roster").textContent.includes("Test 1.60x") && document.querySelector(".hud-roster").textContent.includes("Repair 1.25x")',
+    'document.querySelector(".hud-roster").textContent.includes("pair total 6.08x") && document.querySelector(".hud-roster").textContent.includes("Test 2.00x") && document.querySelector(".hud-roster").textContent.includes("Repair 1.50x")',
     'actual designed pair, testing and repair feedback',
   );
   await shot(local, 'roles-work');

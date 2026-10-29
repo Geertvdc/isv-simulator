@@ -38,12 +38,12 @@ Start with five roles:
 | Role | General code | Frontend code | Backend code | Infra code | Mixed code | Test | Design | Repair |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Full-stack developer / generalist | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| Frontend specialist | 0.85 | 1.50 | 0.85 | 0.85 | 1.00 | 0.90 | 1.00 | 1.00 |
-| Backend specialist | 0.85 | 0.85 | 1.50 | 0.85 | 1.00 | 0.90 | 1.00 | 1.00 |
-| QA engineer | 0.80 | 0.80 | 0.80 | 0.80 | 0.80 | 1.60 | 1.00 | 1.00 |
-| Platform engineer | 0.85 | 0.85 | 0.85 | 1.50 | 1.00 | 0.90 | 1.00 | 1.25 |
+| Frontend specialist | 0.85 | 2.00 | 0.85 | 0.85 | 1.00 | 0.90 | 1.00 | 1.00 |
+| Backend specialist | 0.85 | 0.85 | 2.00 | 0.85 | 1.00 | 0.90 | 1.00 | 1.00 |
+| QA engineer | 0.80 | 0.80 | 0.80 | 0.80 | 0.80 | 2.00 | 1.00 | 1.00 |
+| Platform engineer | 0.85 | 0.85 | 0.85 | 2.00 | 1.00 | 0.90 | 1.00 | 1.50 |
 
-All values multiply **work speed**, not duration. Thus 1.50x is 50% faster work and about 33% less time. UI copy must use that distinction consistently. The generalist is competent and reliable, not a deliberately bad character.
+All values multiply **work speed**, not duration. Thus 2.00x is twice the work speed (half the task time); 1.50x is 50% faster work and about 33% less time. UI copy must use that distinction consistently. The generalist is competent and reliable, not a deliberately bad character. The benchmark results below record the earlier 1.50x coding / 1.60x testing values and are historical, not measurements of this stronger rate set.
 
 Use one coding-domain lookup, not a role bonus multiplied by another affinity bonus. QA's testing bonus applies to all domains, including the reproduction test on a bug. Review speed and reviewer count stay unchanged. Merge stays instantaneous. Shipping score and bug probability do not depend on the worker's role.
 
@@ -84,7 +84,7 @@ At most two coders contribute. If more are present, choose the two highest effec
 
 Repair needs the worker's repair rate, but still only one contribution per pipeline per tick. Review remains the existing quorum mechanic; QA cannot review alone. Do not add hidden proximity auras.
 
-Designed coding can be fast: a matching specialist gets 1.50 x 1.60 = 2.40x, and a matching pair 2.85 x 1.60 = 4.56x. Those are explicit combinations, not accidental extra multipliers. Include them in balance trials before deciding whether later tuning is needed.
+Designed coding can be fast: a matching specialist gets 2.00 x 1.60 = 3.20x, and a matching pair 3.80 x 1.60 = 6.08x. Those are explicit combinations, not accidental extra multipliers.
 
 ## 5. Balance: measure the entire kitchen, not average stats
 
@@ -97,11 +97,11 @@ For a single frontend feature, ignoring travel, queues, bugs, and overlapping ot
 | Assignment | Code | Test | Unattended build | Total |
 | --- | --- | --- | --- | --- |
 | Generalists | 2.50 s | 2.50 s | 4.00 s | 9.00 s |
-| Frontend specialist hands to QA | 1.67 s | 1.56 s | 4.00 s | 7.23 s |
-| QA does everything | 3.13 s | 1.56 s | 4.00 s | 8.69 s |
-| Frontend specialist does everything | 1.67 s | 2.78 s | 4.00 s | 8.45 s |
+| Frontend specialist hands to QA | 1.25 s | 1.25 s | 4.00 s | 6.50 s |
+| QA does everything | 3.13 s | 1.25 s | 4.00 s | 8.38 s |
+| Frontend specialist does everything | 1.25 s | 2.78 s | 4.00 s | 8.03 s |
 
-The ideal handover path saves about 1.77 seconds versus generalists before extra coordination costs. Extra handover/travel cost above that erases its latency benefit. These are continuous-time estimates; implementation tests use actual 60 Hz completion ticks.
+The ideal handover path saves 2.50 seconds versus generalists before extra coordination costs. Extra handover/travel cost above that erases its latency benefit. These are continuous-time estimates; implementation tests use actual 60 Hz completion ticks.
 
 This is **not** a prediction of round throughput. Generalists can also divide stations or process orders concurrently. Compare equal-sized teams with competent scheduling on both sides. One QA handling all tests can become the bottleneck, especially with bugs, even when code is exceptionally fast.
 
@@ -177,7 +177,7 @@ The lobby shows a live model preview, role name, one-sentence strength/tradeoff,
 
 Because level selection currently follows the lobby, add a pre-countdown team confirmation at the level intro: show the authored work mix, role selections, and a non-blocking coverage hint. Players can revise their own role there. Changing role resets that player's ready state; starting requires all participating players ready. Freeze roles at countdown, with no mid-round swapping exploit.
 
-In game, show a compact role icon next to the player badge and a contextual effective speed when actually working, such as `Code 1.50x` or `Test 0.90x`. Domain chips use a short label plus icon on tickets and orders. Keep workflow kinds, domain chips, and station step colors visually distinct; do not create more competing permanent HUD bars.
+In game, show a compact role icon next to the player badge and a contextual effective speed when actually working, such as `Code 2.00x` or `Test 0.90x`. Domain chips use a short label plus icon on tickets and orders. Keep workflow kinds, domain chips, and station step colors visually distinct; do not create more competing permanent HUD bars.
 
 Local round creation and the authoritative server must consume the same validated player-role setup. Online clients request only roles for their owned player slots; the server validates ids and lobby state, owns readiness, and rejects role changes once countdown starts. Reconnect and orphaned-controller takeover preserve the existing player's role. A late spectator cannot alter the roster.
 
@@ -309,7 +309,7 @@ In-round player badges show role labels/icons; orders and tickets show domain la
 - [x] Independent selection/feedback critic completed three bounded rounds; final review found no significant issues. Round 1 exposed join-only Enter readying keyboard slots, fixed with interact-only readiness plus pure/browser regressions. Round 2 exposed old one-host-press assumptions in online/prediction/screenshot scripts, fixed and verified end to end.
 - [ ] Physical gamepads, multi-human couch play, two-second recognition and human balance trials completed.
 
-Development entry: `/?lab=lab-roles&quality=low` opens a playable local lab without save progression or campaign migration (dev builds only). `/?scene=roles-work&quality=low` freezes actual sim work: a designed matching pair contributes 2.28x each / 4.56x total, QA tests at 1.60x and platform repairs at 1.25x.
+Development entry: `/?lab=lab-roles&quality=low` opens a playable local lab without save progression or campaign migration (dev builds only). `/?scene=roles-work&quality=low` freezes actual sim work: a designed matching pair contributes 3.04x each / 6.08x total, QA tests at 2.00x and platform repairs at 1.50x.
 
 With Vite pointing to a running local server, reproduce scoped browser evidence with `npx vite-node scripts/verifyRoles.ts --base=http://127.0.0.1:5217 --out=/absolute/evidence/directory --cdp-port=9371`. It uses private Chrome profiles and closes its browsers. It does not retake the full docs catalog. The 21c selection/feedback slice changed no role stats, scoring, bot policy, domain schedules or campaign opt-ins; the separately approved 21d policy diagnosis and benchmark evidence follow.
 
@@ -377,4 +377,24 @@ Demand and disruption still limit interpretation. Three-player balanced generali
 
 Integrated evidence is retained in session files `role-benchmarks-integrated.json`, `role-benchmarks-integrated.txt`, and `role-lab-integrated-3p.txt`, separate from the pre-integration artifacts. `npm run check` passed (87 test files, 1,244 tests, typecheck and lint) and `npm run build` passed on the combined code. The merge required only test-import and document-status conflict resolution; both lifecycle and policy regressions pass. No additional critic round was claimed beyond the original three-round gauntlet.
 
-**Decision unchanged:** no role-rate tuning, no campaign expansion, and no claim of human balance or campaign three-star viability. The integrated measurements do not establish the proposed general 10–20% specialist throughput advantage. Human couch trials and separate rollout approval remain outstanding.
+At the time of these integrated measurements, there was no role-rate tuning or campaign expansion, and no claim of human balance or campaign three-star viability. Those measurements did not establish the proposed general 10–20% specialist throughput advantage. The following separately requested specialist-strength retuning does not change campaign settings or replace human couch trials and separate rollout approval.
+
+#### Specialist-strength retuning (2026-10-29)
+
+Matching-domain frontend/backend/platform coding and QA testing are now 2.00x; platform repair is 1.50x. Generalist speeds and all off-role penalties, neutral speeds, design/review rates, pairing factors, build times, deadlines, scoring, bug probabilities, level settings, and star thresholds remain unchanged. Two matching specialists contribute 3.80x together while pairing, or 6.08x on designed code; each contributes 3.04x on that designed pair. Skill bars use a shared 2.00x-full scale so their displayed maxima are not clipped.
+
+At 60 Hz, matching coding now takes 75 ticks (1.25 s) instead of 100 ticks (1.67 s); QA testing takes 75 ticks instead of 94 (1.57 s); and platform repair takes 120 ticks (2.00 s) instead of 144 (2.40 s). These are isolated task times, excluding movement and interruptions.
+
+The same 30 role-lab seeds (1–30), team compositions, and both assignment policies were run before and after the change. For the role-aware specialist team versus same-policy all-generalists, shipped-order deltas were +0.23 [−0.15, +0.62] at two players before and after, +0.13 [−0.47, +0.73] before and +0.03 [−0.67, +0.73] after at three players, and −0.50 [−1.34, +0.34] before and −0.20 [−0.87, +0.47] after at four players. These are comparisons against generalists, not direct tuning deltas; the intervals include zero and do not establish a general round-throughput advantage.
+
+For a focused direct comparison, the 10-seed `design-pairing` fixture (seeds 1–10, role-aware specialist team, same policy and seats) was run with the old and new rates:
+
+| Players | Shipped before → after | Paired shipment change (95% CI) | Score before → after | Expired before → after |
+| --- | ---: | ---: | ---: | ---: |
+| 2 | 15.5 → 15.5 | +0.00 [0.00, 0.00] | 377.5 → 380.9 | 0.0 → 0.0 |
+| 3 | 22.2 → 22.2 | +0.00 [−0.29, +0.29] | 546.8 → 544.8 | 0.0 → 0.0 |
+| 4 | 27.6 → 27.9 | +0.30 [−0.21, +0.81] | 679.0 → 690.3 | 0.0 → 0.0 |
+
+No shipment interval excludes zero. The design fixture also left orders open, so faster station work does not translate directly into shipped-order throughput when movement, design, demand, and round limits remain. The wider 10-seed matrix used both policies and all 15/35/70 balanced-lab compositions on the same six fixtures, yielding 3,320 matched run/seed records before and after. It is exploratory evidence, not proof of human balance or campaign three-star viability.
+
+Raw per-seed evidence is in session files `pre-role-lab-{2,3,4}p.txt`, `post-role-lab-{2,3,4}p.txt`, `pre-role-bench-10.{txt,json}`, and `post-role-bench-10.{txt,json}`. The focused real-browser role verifier passed local and online selection, role feedback, reconnect, and spectator checks; its screenshots and logs are in `role-ui-verification/`. Human couch trials and the separately approved campaign rollout remain outstanding.

@@ -86,17 +86,17 @@ export const WORK_RATE = 1 / (2.5 * TICKS_PER_SECOND);
 /** Role work-speed multipliers for coding; these replace one another, never stack. */
 export const ROLE_CODE_RATES: Readonly<Record<RoleId, Readonly<Record<TicketDomain, number>>>> = {
   generalist: { general: 1, frontend: 1, backend: 1, infra: 1, mixed: 1 },
-  frontend: { general: 0.85, frontend: 1.5, backend: 0.85, infra: 0.85, mixed: 1 },
-  backend: { general: 0.85, frontend: 0.85, backend: 1.5, infra: 0.85, mixed: 1 },
+  frontend: { general: 0.85, frontend: 2, backend: 0.85, infra: 0.85, mixed: 1 },
+  backend: { general: 0.85, frontend: 0.85, backend: 2, infra: 0.85, mixed: 1 },
   qa: { general: 0.8, frontend: 0.8, backend: 0.8, infra: 0.8, mixed: 0.8 },
-  platform: { general: 0.85, frontend: 0.85, backend: 0.85, infra: 1.5, mixed: 1 },
+  platform: { general: 0.85, frontend: 0.85, backend: 0.85, infra: 2, mixed: 1 },
 };
 /** Role work-speed multipliers for tests, regardless of the ticket domain. */
 export const ROLE_TEST_RATES: Readonly<Record<RoleId, number>> = {
   generalist: 1,
   frontend: 0.9,
   backend: 0.9,
-  qa: 1.6,
+  qa: 2,
   platform: 0.9,
 };
 /** Role work-speed multipliers for actively repairing an empty broken pipeline. */
@@ -105,8 +105,10 @@ export const ROLE_REPAIR_RATES: Readonly<Record<RoleId, number>> = {
   frontend: 1,
   backend: 1,
   qa: 1,
-  platform: 1.25,
+  platform: 1.5,
 };
+/** Maximum work-speed multiplier shown by each role skill bar. */
+export const ROLE_SKILL_BAR_MAX_RATE = 2;
 /** Players who must hold work at one review station at once for the review to move. */
 export const REVIEWERS_NEEDED = 2;
 /** Review progress per tick while enough players work it: a review takes ~3 s. */

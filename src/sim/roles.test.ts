@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { DESIGN_RATE, PAIR_RATE, PAIR_WORKER_FACTOR, REPAIR_TICKS, WORK_RATE } from './balance';
+import {
+  DESIGN_RATE,
+  PAIR_RATE,
+  PAIR_WORKER_FACTOR,
+  REPAIR_TICKS,
+  ROLE_CODE_RATES,
+  ROLE_REPAIR_RATES,
+  ROLE_TEST_RATES,
+  WORK_RATE,
+} from './balance';
 import { parseLevelMap } from './level';
 import { levelWithMap } from './levels';
 import { roleWorkRate, ROLE_IDS, TICKET_DOMAINS } from './roles';
@@ -29,6 +38,30 @@ function progress(ticket: Ticket, kind: 'code' | 'test'): number {
 }
 
 describe('role work rates', () => {
+  it('raises specialist strengths while preserving every neutral speed and off-role penalty', () => {
+    expect(ROLE_CODE_RATES).toEqual({
+      generalist: { general: 1, frontend: 1, backend: 1, infra: 1, mixed: 1 },
+      frontend: { general: 0.85, frontend: 2, backend: 0.85, infra: 0.85, mixed: 1 },
+      backend: { general: 0.85, frontend: 0.85, backend: 2, infra: 0.85, mixed: 1 },
+      qa: { general: 0.8, frontend: 0.8, backend: 0.8, infra: 0.8, mixed: 0.8 },
+      platform: { general: 0.85, frontend: 0.85, backend: 0.85, infra: 2, mixed: 1 },
+    });
+    expect(ROLE_TEST_RATES).toEqual({
+      generalist: 1,
+      frontend: 0.9,
+      backend: 0.9,
+      qa: 2,
+      platform: 0.9,
+    });
+    expect(ROLE_REPAIR_RATES).toEqual({
+      generalist: 1,
+      frontend: 1,
+      backend: 1,
+      qa: 1,
+      platform: 1.5,
+    });
+  });
+
   it.each(ROLE_IDS.flatMap((role) => TICKET_DOMAINS.map((domain) => [role, domain] as const)))(
     '%s completes %s coding at the configured 60 Hz rate',
     (role, domain) => {
@@ -118,7 +151,7 @@ describe('role work rates', () => {
     p2.facing = { x: -Math.SQRT1_2, y: -Math.SQRT1_2 };
     p3.pos = { x: 1, y: 2 };
     p3.facing = { x: Math.SQRT1_2, y: -Math.SQRT1_2 };
-    const delta = PAIR_WORKER_FACTOR * WORK_RATE * (1.5 + 1);
+    const delta = PAIR_WORKER_FACTOR * WORK_RATE * (2 + 1);
     const reversed = structuredClone(state);
     reversed.players.reverse();
     tick(state, [
@@ -150,7 +183,7 @@ describe('role work rates', () => {
     qa.pos = { x: COL.testBench + 1, y: 2 };
     qa.facing = { x: -Math.SQRT1_2, y: -Math.SQRT1_2 };
     tick(state, [input(state, 1, { work: true }), input(state, 2, { work: true })]);
-    expect(progress(ticket, 'test')).toBeCloseTo(WORK_RATE * 1.6);
+    expect(progress(ticket, 'test')).toBeCloseTo(WORK_RATE * 2);
   });
 
   it('uses platform repair speed once even when several workers repair together', () => {
@@ -165,7 +198,7 @@ describe('role work rates', () => {
     platform.pos = { x: COL.pipeline + 1, y: 2 };
     platform.facing = { x: -Math.SQRT1_2, y: -Math.SQRT1_2 };
     tick(state, [input(state, 1, { work: true }), input(state, 2, { work: true })]);
-    expect(pipeline.repair).toBeCloseTo(1.25 / REPAIR_TICKS);
+    expect(pipeline.repair).toBeCloseTo(1.5 / REPAIR_TICKS);
     expect(ticketOnTile(state, COL.pipeline, 1)).toBeUndefined();
   });
 
@@ -203,7 +236,7 @@ describe('role work rates', () => {
         input(state, 3, { interact: true, work: true }),
       ]);
       expect(old.location).toEqual({ kind: 'player', playerId: 2 });
-      expect(progress(old, 'code')).toBe(WORK_RATE * 1.5);
+      expect(progress(old, 'code')).toBe(WORK_RATE * 2);
       expect(replacement.location).toEqual({ kind: 'tile', x: COL.keyboard, y: 1 });
       expect(progress(replacement, 'code')).toBe(0);
     },
