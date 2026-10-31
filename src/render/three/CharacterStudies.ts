@@ -219,16 +219,18 @@ export function poseStudy(c: StudyCharacter, input: PoseInput, timeMs: number): 
   const shape = SHAPES[c.style];
   const pose = playerPose(input, timeMs);
   const wind = Math.max(0, Math.min(1, input.windUp));
-  // Duck left out of the unchanged carryPoint arc. The hands/ticket never drift.
-  const duck = Math.sin(Math.PI * wind);
-  const bend = duck * 1.15;
+  // The carryPoint arc swings round below the head, so no duck is needed any more.
+  const duck = 0;
+  const bend = 0;
   const waistHeight = shape.torsoY - 0.36;
   c.torso.position.set(
     -waistHeight * Math.sin(bend),
     0.36 + waistHeight * Math.cos(bend) + pose.bob,
     -0.3 * duck,
   );
-  c.torso.rotation.set(pose.lean * 0.5 + wind * 0.5, 0, pose.roll * shape.beat + bend);
+  // The shoulders turn with the folder as it swings round for a throw.
+  const turn = input.carrying ? carryPoint(wind).yaw * 0.9 : 0;
+  c.torso.rotation.set(pose.lean * 0.5, turn, pose.roll * shape.beat + bend, 'XZY');
   c.head.rotation.x = 0.12 + pose.nod * shape.beat;
   c.head.rotation.z = Math.sin(timeMs / 550 + input.phase) * 0.025 * shape.beat;
   c.root.updateMatrixWorld(true);

@@ -31,14 +31,19 @@ export const QUEUE_STACK_MAX = 4;
 /** Height of the carried ticket's bottom above the floor: held out in front at chest height. */
 export const CARRY_HEIGHT = 0.62;
 /**
- * A full throw wind-up swings the carried ticket up, back and out to the
- * right, over the shoulder and clear of the head.
+ * A full throw wind-up swings the carried ticket round to the carrier's
+ * right (turning it with their shoulders), up to shoulder height and back,
+ * well clear of the head.
  */
-const WIND_UP_LIFT = 0.68;
-const WIND_UP_BACK = 0.7;
-const WIND_UP_SIDE = 0.3;
+const WIND_UP_TURN = 1.45;
+const WIND_UP_LIFT = 0.2;
+const WIND_UP_BACK = 0.12;
+/** Extra reach at full wind-up, so the turned folder clears the ear. */
+const WIND_UP_OUT = 0.1;
 /** How far in front of the carrier's center the carried ticket floats. */
 export const CARRY_REACH = PLAYER_RADIUS + 0.1;
+/** The hands hold a carried ticket by its short sides, this far either side of its middle. */
+export const CARRY_HALF_GAP = 0.22;
 /** How much of a tile a ticket glides across on a belt each step: middle to middle. */
 const BELT_GLIDE = 1;
 /** A ticket waiting for the next tile to free up waits just short of the edge. */
@@ -198,7 +203,7 @@ export function placeTicket(
           pos.y - hold.side * sin + hold.reach * cos,
           hold.height,
         ),
-        yaw,
+        yaw: yaw + hold.yaw,
         visible: true,
         carried: true,
       };
@@ -206,16 +211,41 @@ export function placeTicket(
   }
 }
 
+/** Where a carried ticket is held, in the carrier's space (see `carryPoint`). */
+export interface CarryHold {
+  /** Height of the ticket's bottom. */
+  height: number;
+  /** How far in front of the carrier its middle is. */
+  reach: number;
+  /** How far to the carrier's right (+x) its middle is. */
+  side: number;
+  /** How far it is turned with the carrier's shoulders (radians, like `rotation.y`). */
+  yaw: number;
+}
+
 /**
- * Where a carried ticket is held, in the carrier's space: `height` of its
- * bottom and `reach` in front. A throw wind-up (0 to 1) swings it back over
- * the shoulder. The carrier's hands hold it there (`pose.ts`).
+ * Where a carried ticket is held: in front at chest height, or, through a
+ * throw wind-up (0 to 1), swung round to the right and up to the shoulder.
+ * The carrier's hands hold it there (`carryGrip`, `pose.ts`).
  */
-export function carryPoint(windUp: number): { height: number; reach: number; side: number } {
+export function carryPoint(windUp: number): CarryHold {
+  const w = Math.max(0, Math.min(1, windUp));
+  const yaw = WIND_UP_TURN * w;
+  const radius = CARRY_REACH + WIND_UP_OUT * w;
   return {
-    height: CARRY_HEIGHT + WIND_UP_LIFT * windUp,
-    reach: CARRY_REACH - WIND_UP_BACK * windUp,
-    side: WIND_UP_SIDE * windUp,
+    height: CARRY_HEIGHT + WIND_UP_LIFT * w,
+    reach: radius * Math.cos(yaw) - WIND_UP_BACK * w,
+    side: radius * Math.sin(yaw),
+    yaw,
+  };
+}
+
+/** Where a hand (`sign` −1 left, +1 right) grips a held ticket: its short side, just above its bottom. */
+export function carryGrip(hold: CarryHold, sign: number): { x: number; y: number; z: number } {
+  return {
+    x: hold.side + sign * CARRY_HALF_GAP * Math.cos(hold.yaw),
+    y: hold.height + 0.03,
+    z: hold.reach - sign * CARRY_HALF_GAP * Math.sin(hold.yaw),
   };
 }
 

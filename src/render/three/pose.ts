@@ -8,7 +8,7 @@
  * Background people and the manager retain their original body posing.
  */
 
-import { carryPoint } from './layout';
+import { carryGrip, carryPoint } from './layout';
 
 export interface PoseInput {
   /** Speed over the floor, tiles per second. */
@@ -23,6 +23,10 @@ export interface PoseInput {
   windUp: number;
   /** Milliseconds since being shoved, or `null` when not stumbling. */
   shovedMs: number | null;
+  /** Milliseconds since shoving someone out of the way, or `null`/absent. */
+  shovingMs?: number | null;
+  /** Milliseconds since letting a thrown ticket go, or `null`/absent. */
+  throwingMs?: number | null;
   /** A per-character offset so a room of idle people doesn't breathe in sync. */
   phase: number;
   /**
@@ -55,6 +59,16 @@ export interface Pose {
   nod: number;
   leftHand: Vec3;
   rightHand: Vec3;
+  /** Holding a ticket: the hands are on it (`leftHand`/`rightHand` are exact). */
+  carrying: boolean;
+  /** Dashing, 0 or 1. */
+  dash: number;
+  /** Pushing out after a shove, 0 to 1 (rises fast, settles). */
+  thrust: number;
+  /** Stumbling after being shoved, 1 just hit, settling to 0. */
+  stumble: number;
+  /** Following through after a throw, 0 to 1 (snaps out, settles). */
+  release: number;
 }
 
 /** Walk cycles per second: slow when ambling, faster at full speed (each cycle is two bounces). */
@@ -65,12 +79,12 @@ const LEAN_WALK = 0.14;
 const LEAN_DASH = 0.35;
 const BREATHE_HZ = 0.5;
 const STUMBLE_MS = 350;
+/** A shove's push: arms out for this long, then back. */
+const THRUST_MS = 420;
 /** Typing: how fast hands tap and how far. */
 const TYPE_HZ = 9;
 /** Where idle hands hang, either side of the belly, clear of the hoodie. */
 const HAND_REST = { x: 0.4, y: 0.38, z: 0.05 };
-/** Half the gap between the hands holding a ticket: on its short sides. */
-const CARRY_HALF_GAP = 0.22;
 
 /** How far into the walk `speed` is: 0 standing, 1 at `fullSpeed` and above. */
 function walkAmount(speed: number, fullSpeed: number): number {
@@ -166,9 +180,11 @@ export function playerPose(input: PoseInput, timeMs: number): Pose {
     }
   }
 
+  let stumble = 0;
   if (input.shovedMs !== null && input.shovedMs < STUMBLE_MS) {
     // A wobble that dies down.
     const k = 1 - input.shovedMs / STUMBLE_MS;
+    stumble = k;
     roll += Math.sin((input.shovedMs / STUMBLE_MS) * Math.PI * 4) * 0.35 * k;
     lean -= 0.15 * k;
   }
@@ -176,11 +192,38 @@ export function playerPose(input: PoseInput, timeMs: number): Pose {
   if (input.carrying) {
     // Keep wrists on the ticket after the final body bob is known (dash removes it).
     const hold = carryPoint(windUp);
-    leftHand = { x: hold.side - CARRY_HALF_GAP, y: hold.height + 0.03 - bob, z: hold.reach };
-    rightHand = { x: hold.side + CARRY_HALF_GAP, y: hold.height + 0.03 - bob, z: hold.reach };
+    const left = carryGrip(hold, -1);
+    const right = carryGrip(hold, 1);
+    leftHand = { ...left, y: left.y - bob };
+    rightHand = { ...right, y: right.y - bob };
   }
 
-  return { bob, lean, roll, squash, nod, leftHand, rightHand, walk, stride: stepPhase, windUp };
+  return {
+    bob,
+    lean,
+    roll,
+    squash,
+    nod,
+    leftHand,
+    rightHand,
+    walk,
+    stride: stepPhase,
+    windUp,
+    carrying: input.carrying,
+    dash: input.dashing ? 1 : 0,
+    thrust: thrustAmount(input.shovingMs ?? null),
+    stumble,
+    release: input.carrying ? 0 : thrustAmount(input.throwingMs ?? null),
+  };
+}
+
+/** How far a shove's push is out `ms` after it landed: snaps out, holds, eases back. */
+export function thrustAmount(ms: number | null): number {
+  if (ms === null || ms < 0 || ms >= THRUST_MS) return 0;
+  const rise = Math.min(1, ms / 70);
+  const fall = ms < 200 ? 1 : 1 - (ms - 200) / (THRUST_MS - 200);
+  const k = Math.min(rise, fall);
+  return k * k * (3 - 2 * k);
 }
 
 /** Turns `from` toward `to` (radians) by at most `maxStep`, the short way round. */

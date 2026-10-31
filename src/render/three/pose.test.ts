@@ -70,24 +70,29 @@ describe('playerPose', () => {
     expect(p.lean).toBeGreaterThan(0.2);
   });
 
-  it('leans back with the ticket over the shoulder while winding up a throw', () => {
+  it('leans back with the ticket swung round to the shoulder while winding up a throw', () => {
     const p = playerPose({ ...still, carrying: true, windUp: 1 }, 0);
+    const hold = carryPoint(1);
     expect(p.lean).toBeLessThan(0);
-    expect(p.leftHand.y).toBeGreaterThan(0.9);
-    expect(p.leftHand.z).toBeLessThan(0);
+    expect(p.leftHand.y).toBeGreaterThan(0.8);
+    expect(hold.reach).toBeLessThan(0);
+    expect(hold.side).toBeGreaterThan(0.3);
+    expect(p.rightHand.z).toBeLessThan(p.leftHand.z);
   });
 
   it('holds the ticket where it is drawn: on its sides, at its height and reach', () => {
     for (const windUp of [0, 0.5, 1]) {
       const hold = carryPoint(windUp);
       const p = playerPose({ ...still, carrying: true, windUp }, 0);
-      expect(p.leftHand.z).toBeCloseTo(hold.reach);
-      expect(p.rightHand.z).toBeCloseTo(hold.reach);
+      expect((p.leftHand.z + p.rightHand.z) / 2).toBeCloseTo(hold.reach);
       expect(p.leftHand.y + p.bob - hold.height).toBeGreaterThan(0);
       expect(p.leftHand.y + p.bob - hold.height).toBeLessThan(0.1);
-      // Just outside the card's short sides.
-      const half = (p.rightHand.x - p.leftHand.x) / 2;
+      // Just outside the card's short sides, turned with the card.
+      const half = Math.hypot(p.rightHand.x - p.leftHand.x, p.rightHand.z - p.leftHand.z) / 2;
       expect((p.rightHand.x + p.leftHand.x) / 2).toBeCloseTo(hold.side);
+      expect(Math.atan2(p.leftHand.z - p.rightHand.z, p.rightHand.x - p.leftHand.x)).toBeCloseTo(
+        hold.yaw,
+      );
       expect(half).toBeGreaterThan(CARD_SIZE.width / 2 - 0.05);
       expect(half).toBeLessThan(CARD_SIZE.width / 2 + 0.1);
     }

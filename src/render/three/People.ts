@@ -58,6 +58,10 @@ interface Person {
   /** Visual-only memory of the work in front of them. */
   work: WorkMemory;
   shovedAtMs: number | null;
+  /** When they last shoved someone, for the push-out pose. */
+  shovingAtMs: number | null;
+  /** When this player last let go of a throw (for the follow-through). */
+  throwingAtMs: number | null;
   ring: THREE.Mesh | null;
   materials: THREE.Material[];
   geometries: THREE.BufferGeometry[];
@@ -99,6 +103,14 @@ export class People {
       if (event.type === 'shoved' || event.type === 'managerBumped') {
         const person = this.players.get(event.target);
         if (person) person.shovedAtMs = timeMs;
+      }
+      if (event.type === 'shoved') {
+        const shover = this.players.get(event.by);
+        if (shover) shover.shovingAtMs = timeMs;
+      }
+      if (event.type === 'thrown') {
+        const thrower = this.players.get(event.playerId);
+        if (thrower) thrower.throwingAtMs = timeMs;
       }
     }
 
@@ -188,6 +200,8 @@ export class People {
       dashing: isDashing(player),
       windUp: carrying ? player.throwCharge / THROW_HOLD_TICKS : 0,
       shovedMs: person.shovedAtMs === null ? null : timeMs - person.shovedAtMs,
+      shovingMs: person.shovingAtMs === null ? null : timeMs - person.shovingAtMs,
+      throwingMs: person.throwingAtMs === null ? null : timeMs - person.throwingAtMs,
       phase: person.phase,
       stride: person.gait.stride,
     };
@@ -237,6 +251,8 @@ export class People {
       facing: createFacingHold(),
       work: createWorkMemory(),
       shovedAtMs: null,
+      shovingAtMs: null,
+      throwingAtMs: null,
       ring,
       materials: [],
       geometries: [],

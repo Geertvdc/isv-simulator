@@ -5,15 +5,18 @@ import { ROLE_IDS } from '../../sim/roles';
 import { applyPose, createDeveloper, disposeCharacter } from './Characters';
 import { DEVELOPER_TOP, DEVELOPER_HAIRSTYLES, developerAppearance } from './DeveloperRig';
 import { kitMaterials } from './kit';
-import { carryPoint } from './layout';
+import { carryGrip, carryPoint } from './layout';
 import { ticketModel } from './ticketModels';
 import { playerPose } from './pose';
 
-function intersectsMesh(box: THREE.Box3, mesh: THREE.Object3D): boolean {
+/** Whether `mesh` cuts into `box`, which sits in `frame` (world when absent). */
+function intersectsMesh(box: THREE.Box3, mesh: THREE.Object3D, frame?: THREE.Matrix4): boolean {
   if (!(mesh instanceof THREE.Mesh) || !(mesh.geometry instanceof THREE.BufferGeometry)) {
     throw new Error('Missing production mesh');
   }
-  if (!box.intersectsBox(new THREE.Box3().setFromObject(mesh, true))) return false;
+  const outer = frame ? box.clone().applyMatrix4(frame) : box;
+  if (!outer.intersectsBox(new THREE.Box3().setFromObject(mesh, true))) return false;
+  const toBox = frame ? frame.clone().invert().multiply(mesh.matrixWorld) : mesh.matrixWorld;
   const positions: unknown = mesh.geometry.getAttribute('position');
   if (!(positions instanceof THREE.BufferAttribute)) throw new Error('Missing model vertices');
   const index = mesh.geometry.index;
@@ -21,9 +24,9 @@ function intersectsMesh(box: THREE.Box3, mesh: THREE.Object3D): boolean {
   const count = index ? index.count : positions.count;
   const triangle = new THREE.Triangle();
   for (let i = 0; i < count; i += 3) {
-    triangle.a.fromBufferAttribute(positions, vertex(i)).applyMatrix4(mesh.matrixWorld);
-    triangle.b.fromBufferAttribute(positions, vertex(i + 1)).applyMatrix4(mesh.matrixWorld);
-    triangle.c.fromBufferAttribute(positions, vertex(i + 2)).applyMatrix4(mesh.matrixWorld);
+    triangle.a.fromBufferAttribute(positions, vertex(i)).applyMatrix4(toBox);
+    triangle.b.fromBufferAttribute(positions, vertex(i + 1)).applyMatrix4(toBox);
+    triangle.c.fromBufferAttribute(positions, vertex(i + 2)).applyMatrix4(toBox);
     if (box.intersectsTriangle(triangle)) return true;
   }
   return false;
@@ -103,12 +106,12 @@ describe.each(
         applyPose(c, playerPose(input, 900));
         c.root.updateMatrixWorld(true);
         const hold = carryPoint(wind);
-        const card = bounds
-          .clone()
-          .translate(new THREE.Vector3(hold.side, hold.height, hold.reach));
+        const frame = new THREE.Matrix4()
+          .makeRotationY(hold.yaw)
+          .setPosition(hold.side, hold.height, hold.reach);
         c.body.traverse((part) => {
           if (!(part instanceof THREE.Mesh)) return;
-          expect(intersectsMesh(card, part), `${motion} folder at ${wind}`).toBe(false);
+          expect(intersectsMesh(bounds, part, frame), `${motion} folder at ${wind}`).toBe(false);
           if (part.parent === c.head) {
             for (const hand of [c.leftHand, c.rightHand]) {
               expect(
@@ -118,10 +121,13 @@ describe.each(
             }
           }
         });
-        expect(c.leftHand.position.x).toBeCloseTo(hold.side - 0.22);
-        expect(c.rightHand.position.x).toBeCloseTo(hold.side + 0.22);
-        expect(c.leftHand.position.y).toBeCloseTo(hold.height + 0.03);
-        expect(c.rightHand.position.z).toBeCloseTo(hold.reach);
+        const left = carryGrip(hold, -1);
+        const right = carryGrip(hold, 1);
+        expect(c.leftHand.position.x).toBeCloseTo(left.x);
+        expect(c.rightHand.position.x).toBeCloseTo(right.x);
+        expect(c.leftHand.position.y).toBeCloseTo(left.y);
+        expect(c.leftHand.position.z).toBeCloseTo(left.z);
+        expect(c.rightHand.position.z).toBeCloseTo(right.z);
       }
     }
     disposeCharacter(c);

@@ -10,20 +10,24 @@ import {
   studyTicketTarget,
 } from './CharacterStudies';
 import { kitMaterials } from './kit';
+import { carryGrip, carryPoint } from './layout';
 import { ticketModel } from './ticketModels';
 
-function intersectsMesh(box: THREE.Box3, mesh: THREE.Object3D): boolean {
+/** Whether `mesh` cuts into `box`, which sits in `frame` (world when absent). */
+function intersectsMesh(box: THREE.Box3, mesh: THREE.Object3D, frame?: THREE.Matrix4): boolean {
   if (!(mesh instanceof THREE.Mesh) || !(mesh.geometry instanceof THREE.BufferGeometry)) {
     throw new Error('Expected study mesh geometry');
   }
-  if (!box.intersectsBox(new THREE.Box3().setFromObject(mesh, true))) return false;
+  const outer = frame ? box.clone().applyMatrix4(frame) : box;
+  if (!outer.intersectsBox(new THREE.Box3().setFromObject(mesh, true))) return false;
+  const toBox = frame ? frame.clone().invert().multiply(mesh.matrixWorld) : mesh.matrixWorld;
   const positions: unknown = mesh.geometry.getAttribute('position');
   if (!(positions instanceof THREE.BufferAttribute)) throw new Error('Missing study vertices');
   const triangle = new THREE.Triangle();
   for (let i = 0; i < positions.count; i += 3) {
-    triangle.a.fromBufferAttribute(positions, i).applyMatrix4(mesh.matrixWorld);
-    triangle.b.fromBufferAttribute(positions, i + 1).applyMatrix4(mesh.matrixWorld);
-    triangle.c.fromBufferAttribute(positions, i + 2).applyMatrix4(mesh.matrixWorld);
+    triangle.a.fromBufferAttribute(positions, i).applyMatrix4(toBox);
+    triangle.b.fromBufferAttribute(positions, i + 1).applyMatrix4(toBox);
+    triangle.c.fromBufferAttribute(positions, i + 2).applyMatrix4(toBox);
     if (box.intersectsTriangle(triangle)) return true;
   }
   return false;
@@ -76,10 +80,12 @@ describe.each(STUDY_STYLES)('%s study rig', (style) => {
       poseStudy(c, input, 900);
       c.root.updateMatrixWorld(true);
       const target = studyTicketTarget(wind);
-      const card = ticketBounds.clone().translate(target);
+      const hold = carryPoint(wind);
+      const frame = new THREE.Matrix4().makeRotationY(hold.yaw).setPosition(target);
+      const card = ticketBounds;
       c.head.traverse((part) => {
         if (part instanceof THREE.Mesh) {
-          expect(intersectsMesh(card, part), `head at wind-up ${wind}`).toBe(false);
+          expect(intersectsMesh(card, part, frame), `head at wind-up ${wind}`).toBe(false);
           for (const arm of c.arms) {
             const hand = new THREE.Box3().setFromObject(arm.hand, true);
             expect(intersectsMesh(hand, part), `hand/head at wind-up ${wind}`).toBe(false);
@@ -89,14 +95,16 @@ describe.each(STUDY_STYLES)('%s study rig', (style) => {
       });
       const jacket = c.torso.children.find((child) => child instanceof THREE.Mesh);
       if (!jacket) throw new Error('Missing study jacket');
-      expect(intersectsMesh(card, jacket), `jacket at ${wind}`).toBe(false);
-      expect(intersectsMesh(card, c.waist), `waist at ${wind}`).toBe(false);
+      expect(intersectsMesh(card, jacket, frame), `jacket at ${wind}`).toBe(false);
+      expect(intersectsMesh(card, c.waist, frame), `waist at ${wind}`).toBe(false);
       const left = c.arms[0].hand.position;
       const right = c.arms[1].hand.position;
-      expect(left.x).toBeCloseTo(target.x - 0.22);
-      expect(right.x).toBeCloseTo(target.x + 0.22);
-      expect(left.y).toBeCloseTo(target.y + 0.03);
-      expect(right.z).toBeCloseTo(target.z);
+      const leftGrip = carryGrip(hold, -1);
+      const rightGrip = carryGrip(hold, 1);
+      expect(left.x).toBeCloseTo(leftGrip.x);
+      expect(right.x).toBeCloseTo(rightGrip.x);
+      expect(left.y).toBeCloseTo(leftGrip.y);
+      expect(right.z).toBeCloseTo(rightGrip.z);
     }
     disposeStudy(c);
     for (const m of [materials.body, materials.glow, materials.glass]) m.dispose();

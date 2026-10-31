@@ -160,7 +160,7 @@ describe('character heights', () => {
       const yaw = people.yawOf(p.id);
       if (yaw === undefined) throw new Error('Missing displayed facing');
       const hold = carryPoint(charge / THROW_HOLD_TICKS);
-      expect(placed.yaw).toBe(yaw);
+      expect(placed.yaw).toBeCloseTo(yaw + hold.yaw);
       const midpoint = left
         .getWorldPosition(new THREE.Vector3())
         .add(right.getWorldPosition(new THREE.Vector3()))

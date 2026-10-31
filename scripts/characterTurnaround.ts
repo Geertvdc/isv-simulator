@@ -28,12 +28,24 @@ try {
       `turnaround-${role}`,
       `role=${role}&action=idle&time=900`,
     ]),
-    ...['idle', 'walk', 'work', 'carry', 'dash', 'throw', 'shove'].map(
-      (action): [string, string] => [
-        `lineup-${action}`,
-        `lineup&action=${action}&time=${action === 'throw' ? 1200 : 900}`,
-      ],
-    ),
+    // Times land on each action's key pose: stride extremes, wind-up, release, push, stumble.
+    ...(
+      [
+        ['idle', 'idle', 900],
+        ['walk', 'walk', 1023],
+        ['work', 'work', 900],
+        ['carry', 'carry', 1023],
+        ['dash', 'dash', 1023],
+        ['throw-windup', 'throw', 900],
+        ['throw-cocked', 'throw', 1560],
+        ['throw-release', 'throw', 1800],
+        ['shove-push', 'shove', 300],
+        ['shove-stumble', 'shove', 1345],
+      ] as const
+    ).map(([name, action, time]): [string, string] => [
+      `lineup-${name}`,
+      `lineup&action=${action}&time=${time}`,
+    ]),
     ['lineup-rear-gray', 'lineup&action=idle&time=900&rear&gray'],
   ];
   for (const [name, query] of sheets) {
