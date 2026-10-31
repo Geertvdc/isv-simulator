@@ -10,9 +10,23 @@ export function levelShotName(id: string): string {
   return `levels/${id}`;
 }
 
-/** File name of a draft's 3D render in the sketch folder. */
-export function renderFileName(id: string): string {
-  return `${id}-3d.webp`;
+/** File name of a draft's 3D render in the sketch folder; later reorg phases get their own. */
+export function renderFileName(id: string, phase = 1): string {
+  return phase > 1 ? `${id}-phase${phase}-3d.webp` : `${id}-3d.webp`;
+}
+
+/**
+ * Render passes: the live maps can hold one phase of each level at a time,
+ * so pass N renders phase N of every level that has one.
+ */
+export function phasePasses<T extends { phase: number }>(
+  phasesById: ReadonlyMap<string, readonly T[]>,
+): { id: string; draft: T }[][] {
+  const passes: { id: string; draft: T }[][] = [];
+  for (const [id, phases] of phasesById) {
+    for (const draft of phases) (passes[draft.phase - 1] ??= []).push({ id, draft });
+  }
+  return passes.filter((pass) => pass.length > 0);
 }
 
 export type ShotRequest = { ids: string[] } | { error: string };

@@ -26,6 +26,8 @@ export const FUTURE_CHARS: Readonly<Record<string, FutureChar>> = {
   // Scale-Up
   l: { name: 'express lift cabin (lifts)', standIn: '.' },
   H: { name: 'mail chute hatch (lifts)', standIn: 'C' },
+  // Enterprise
+  D: { name: 'rolling desk (reorgs)', standIn: 'C' },
 };
 
 /** The map text with every future char replaced by its stand-in. */

@@ -5,6 +5,7 @@
  * (phase 23): the current map and its draft side by side, same scale.
  *
  *   npm run sketch -- <level-id>         current + draft  -> docs/plan/images/level-redesign/<id>.svg
+ *                                        (a draft with reorg phases gets a panel per phase)
  *   npm run sketch -- --drafts           every level with a draft in maps/drafts/
  *   npm run sketch -- --all              every campaign level (draft side empty if there is none)
  *   npm run sketch -- <file.txt> [out]   one map file, to out (default: next to it, .svg)
@@ -19,9 +20,11 @@ import {
   currentMapPath,
   draftIds,
   draftMapPath,
+  draftPhases,
   levelLabel,
   readText,
 } from './mapTools/mapFiles';
+import { phaseProblems } from './mapTools/phases';
 import { type SketchPanel, renderSketchSvg } from './mapTools/sketch';
 
 /** A panel for a map file; the note says why it doesn't parse yet, if it doesn't. */
@@ -39,10 +42,23 @@ function panel(kind: string, path: string | null): SketchPanel {
   return { title: `${kind}: ${path ?? ''}${size}`, text, ...(note ? { note } : {}) };
 }
 
+/** One panel per reorg phase of the draft, or a single `Draft` panel. */
+function draftPanels(id: string): SketchPanel[] {
+  const phases = draftPhases(id);
+  if (phases.length <= 1) return [panel('Draft', draftMapPath(id))];
+  const first = readText(draftMapPath(id)) ?? '';
+  return phases.map(({ phase, path }) => {
+    const result = panel(`Draft phase ${phase}`, path);
+    const problems = phase > 1 ? phaseProblems(first, readText(path) ?? '') : [];
+    if (result.note || problems.length === 0) return result;
+    return { ...result, note: `not a reorg of phase 1: ${problems.slice(0, 3).join('; ')}` };
+  });
+}
+
 function sketchLevel(id: string): string {
   if (!LEVEL_IDS.includes(id)) throw new Error(`Unknown level id '${id}'`);
   const svg = renderSketchSvg(
-    [panel('Current', currentMapPath(id)), panel('Draft', draftMapPath(id))],
+    [panel('Current', currentMapPath(id)), ...draftPanels(id)],
     `${levelLabel(id)} (${id})`,
   );
   mkdirSync(SKETCH_DIR, { recursive: true });

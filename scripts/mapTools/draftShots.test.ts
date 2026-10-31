@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { levelShotName, renderFileName, shotIds } from './draftShots';
+import { levelShotName, phasePasses, renderFileName, shotIds } from './draftShots';
 import { levelMapFile } from './mapFiles';
 
 describe('levelMapFile', () => {
@@ -42,5 +42,25 @@ describe('names', () => {
   it('match the screenshot and the sketch folder', () => {
     expect(levelShotName('garage')).toBe('levels/garage');
     expect(renderFileName('garage')).toBe('garage-3d.webp');
+    expect(renderFileName('the-reorg', 1)).toBe('the-reorg-3d.webp');
+    expect(renderFileName('the-reorg', 3)).toBe('the-reorg-phase3-3d.webp');
+  });
+});
+
+describe('phasePasses', () => {
+  it('renders phase N of every level in pass N', () => {
+    const phases = new Map([
+      ['garage', [{ phase: 1 }]],
+      ['the-reorg', [{ phase: 1 }, { phase: 2 }, { phase: 3 }]],
+      ['synergy', [{ phase: 1 }, { phase: 2 }]],
+    ]);
+    const passes = phasePasses(phases).map((pass) =>
+      pass.map(({ id, draft }) => `${id}:${draft.phase}`),
+    );
+    expect(passes).toEqual([
+      ['garage:1', 'the-reorg:1', 'synergy:1'],
+      ['the-reorg:2', 'synergy:2'],
+      ['the-reorg:3'],
+    ]);
   });
 });
