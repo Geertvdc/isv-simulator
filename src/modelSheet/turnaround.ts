@@ -140,8 +140,12 @@ if (lineup) {
     ['Side', -Math.PI / 2],
     ['Back', Math.PI],
   ];
+  const hairstyle = DEVELOPER_HAIRSTYLES.find((h) => h === params.get('hair'));
   views.forEach(([name, yaw], i) => {
-    const character = createDeveloper(1, materials, role);
+    const character = createDeveloper(1, materials, role, {
+      ...developerAppearance(1),
+      ...(hairstyle ? { hairstyle } : {}),
+    });
     place(character, (i - 1.5) * SPACING, yaw, name);
   });
 }
@@ -150,7 +154,7 @@ title.style.cssText = 'position:absolute;left:24px;top:18px;font-size:20px;color
 const first = actors[0];
 title.textContent = lineup
   ? `Developer line-up · ${action}${rear ? ' · rear' : ''}${faces ? ' · faces' : ''}`
-  : `${ROLE_LABELS[role]} · ${action} · ${first ? Math.round(triangles(first.character)) : 0} triangles`;
+  : `${ROLE_LABELS[role]} · ${first?.character.rig?.hairstyle ?? ''} hair · ${action} · ${first ? Math.round(triangles(first.character)) : 0} triangles`;
 labels.append(title);
 const tags = actors.map((actor) => {
   const el = document.createElement('div');
