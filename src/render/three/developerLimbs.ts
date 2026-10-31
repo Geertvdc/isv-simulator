@@ -164,78 +164,89 @@ export function lowerArm(look: ArmLook): THREE.BufferGeometry {
 /** Hands are drawn big and chunky, cartoon style. */
 const HAND_SCALE = 1.2;
 
+/** The hand's shapes: hanging relaxed, clamped round a carried folder, or flat on a keyboard. */
+export type HandShape = 'relaxed' | 'grip' | 'type';
+
 /**
- * A hand: relaxed and curled, or (`grip`) clamped round the edge of a held
- * folder, the palm against the edge (~0.04 out from the wrist, see
- * `CARRY_HALF_GAP`), fingers under it and the thumb on top (the folder's
- * middle at x 0 in hand space).
+ * A hand: relaxed, (`grip`) clamped round the edge of a held folder, the palm
+ * against the edge (~0.04 out from the wrist, see `CARRY_HALF_GAP`), fingers
+ * under it and the thumb on top (the folder's middle at x 0 in hand space),
+ * or (`type`) fingers out flat over the keys.
  */
-export function hand(look: ArmLook, sign: number, grip = false): THREE.BufferGeometry {
+export function hand(
+  look: ArmLook,
+  sign: number,
+  shape: HandShape = 'relaxed',
+): THREE.BufferGeometry {
   const b = new SculptBuilder();
   const h = look.hands;
   const thumb = -sign;
-  const f = grip ? grippingHand(h, thumb) : relaxedHand(h, thumb);
+  const f =
+    shape === 'grip'
+      ? grippingHand(h, thumb)
+      : openHand(h, thumb, shape === 'type' ? TYPING_CURL : RELAXED_CURL);
   b.merge(f.build(), { scale: [HAND_SCALE, HAND_SCALE, HAND_SCALE] });
   cuffAndWatch(b, h, sign);
   return b.build();
 }
 
-function relaxedHand(h: Hands, thumb: number): SculptBuilder {
+/** How far each finger curls in (index to pinky), hanging relaxed and resting on the keys. */
+const RELAXED_CURL = [0.15, 0.4, 0.62, 0.85];
+const TYPING_CURL = [0.05, 0.12, 0.18, 0.26];
+
+function openHand(h: Hands, thumb: number, curl: number[]): SculptBuilder {
   const f = new SculptBuilder();
   const p = h.puff;
-  // Palm and the back of the hand.
-  f.ellipsoid([0.057 + p, 0.06 + p, 0.036 + p], h.color, h.finish, { at: [0, 0.058, 0] }, [16, 12]);
-  f.ellipsoid([0.05 + p, 0.032, 0.034 + p], h.color, h.finish, { at: [0, 0.012, -0.002] }, [12, 8]);
-  // The ball of the thumb, bulging out of the palm.
+  // A thick palm and the back of the hand.
   f.ellipsoid(
-    [0.026 + p, 0.04 + p, 0.026 + p],
+    [0.058 + p, 0.06 + p, 0.042 + p],
     h.color,
     h.finish,
-    { at: [thumb * 0.034, 0.04, 0.016], rot: [0, 0, thumb * 0.5] },
+    { at: [0, 0.058, 0.002] },
+    [16, 12],
+  );
+  f.ellipsoid([0.051 + p, 0.034, 0.038 + p], h.color, h.finish, { at: [0, 0.012, 0] }, [12, 8]);
+  // The ball of the thumb, bulging out of the palm.
+  f.ellipsoid(
+    [0.027 + p, 0.042 + p, 0.028 + p],
+    h.color,
+    h.finish,
+    { at: [thumb * 0.033, 0.04, 0.02], rot: [0, 0, thumb * 0.4] },
     [12, 8],
   );
-  // Four thick curled fingers, the middle one longest.
+  // Four thick fingers, the middle one longest: the index nearly straight, each next one curled in more.
   const fingers = [
-    { x: 0.036, length: 0.066 },
-    { x: 0.012, length: 0.072 },
-    { x: -0.012, length: 0.068 },
-    { x: -0.035, length: 0.056 },
+    { x: 0.036, length: 0.068 },
+    { x: 0.012, length: 0.074 },
+    { x: -0.012, length: 0.07 },
+    { x: -0.035, length: 0.058 },
   ];
-  for (const g of fingers) {
+  fingers.forEach((g, k) => {
     const x = thumb * g.x;
     const L = g.length;
-    const r = 0.0215 + p * 0.8;
-    f.sweep(
-      [
-        [x, 0.088, 0.003],
-        [x * 1.04, 0.088 + L * 0.5, 0.012],
-        [x * 1.06, 0.088 + L * 0.85, 0.034],
-        [x * 1.04, 0.088 + L * 0.92, 0.058],
-      ],
-      (t) => {
-        const k =
-          t < 0.82 ? 1 - 0.12 * t : 0.9 * Math.sqrt(Math.max(0.05, 1 - ((t - 0.82) / 0.18) ** 2));
-        return [r * k, r * k * 0.92] as const;
-      },
-      h.color,
-      h.finish,
-      { segments: 8, radial: 7 },
-    );
-  }
-  // The thumb: set well apart, out to the side and curling in over the palm.
-  const tr = 0.025 + p * 0.8;
+    const c = curl[k] ?? 0;
+    const bends = [0.12 + 0.35 * c, 0.2 + 0.55 * c, 0.2 + 0.6 * c];
+    const lengths = [0.45, 0.33, 0.22];
+    const path: V3[] = [[x, 0.086, 0.004]];
+    let angle = 0;
+    let [y, z] = [0.086, 0.004];
+    bends.forEach((bend, j) => {
+      angle += bend;
+      y += Math.cos(angle) * L * (lengths[j] ?? 0);
+      z += Math.sin(angle) * L * (lengths[j] ?? 0);
+      path.push([x * (1 + 0.03 * (j + 1)), y, z]);
+    });
+    f.sweep(path, digit(0.0225 + p * 0.8, 0.82), h.color, h.finish, { segments: 8, radial: 7 });
+  });
+  // The thumb: lying forward along the index finger, just in front of it.
   f.sweep(
     [
-      [thumb * 0.046, 0.034, 0.014],
-      [thumb * 0.08, 0.06, 0.032],
-      [thumb * 0.086, 0.09, 0.05],
-      [thumb * 0.07, 0.108, 0.064],
+      [thumb * 0.044, 0.034, 0.018],
+      [thumb * 0.062, 0.058, 0.034],
+      [thumb * 0.066, 0.086, 0.044],
+      [thumb * 0.058, 0.106, 0.05],
     ],
-    (t) => {
-      const k =
-        t < 0.8 ? 1 - 0.1 * t : 0.92 * Math.sqrt(Math.max(0.05, 1 - ((t - 0.8) / 0.2) ** 2));
-      return [tr * k, tr * k] as const;
-    },
+    digit(0.025 + p * 0.8, 0.8),
     h.color,
     h.finish,
     { segments: 8, radial: 7 },
@@ -289,20 +300,20 @@ function grippingHand(h: Hands, thumb: number): SculptBuilder {
       { segments: 8, radial: 7 },
     );
   }
-  // The thumb over the top, pressing the folder down.
+  // The thumb over the top, pressing the folder down: one smooth digit growing out of the palm.
   f.ellipsoid(
-    [0.026 + p, 0.04 + p, 0.026 + p],
+    [0.024 + p, 0.036 + p, 0.022 + p],
     h.color,
     h.finish,
-    { at: [thumb * 0.034, 0.036, 0.004] },
+    { at: [thumb * 0.03, 0.04, 0.004], rot: [0.5, 0, 0] },
     [12, 8],
   );
   f.sweep(
     [
-      [thumb * 0.046, 0.034, 0.006],
-      [thumb * 0.06, 0.058, 0.036],
-      [thumb * 0.06, 0.068, 0.07],
-      [thumb * 0.056, 0.07, 0.092],
+      [thumb * 0.04, 0.036, 0.004],
+      [thumb * 0.054, 0.054, 0.034],
+      [thumb * 0.058, 0.064, 0.066],
+      [thumb * 0.055, 0.068, 0.09],
     ],
     digit(0.025 + p * 0.8, 0.8),
     h.color,

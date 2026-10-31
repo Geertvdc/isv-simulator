@@ -60,9 +60,10 @@ interface Arm {
   lower: THREE.Mesh;
   elbow: THREE.Mesh;
   hand: THREE.Mesh;
-  /** The hand's two shapes: hanging relaxed, or clamped round a carried folder's edge. */
+  /** The hand's shapes: hanging relaxed, clamped round a carried folder's edge, flat on the keys. */
   open: THREE.BufferGeometry;
   grip: THREE.BufferGeometry;
+  type: THREE.BufferGeometry;
   shoulder: THREE.Object3D;
 }
 interface Leg {
@@ -154,9 +155,12 @@ export function createDeveloperRig(
     shoulder.position.set(sign * outfit.shoulder, 0.16, 0);
     torso.add(shoulder);
     const open = handGeometry(outfit.arm, sign);
-    const grip = handGeometry(outfit.arm, sign, true);
-    geometries.push(grip);
-    bakeCreases(grip);
+    const grip = handGeometry(outfit.arm, sign, 'grip');
+    const type = handGeometry(outfit.arm, sign, 'type');
+    for (const g of [grip, type]) {
+      geometries.push(g);
+      bakeCreases(g);
+    }
     const arm = {
       upper: mesh(upper),
       lower: mesh(lowerGeometry),
@@ -164,6 +168,7 @@ export function createDeveloperRig(
       hand: mesh(open),
       open,
       grip,
+      type,
       shoulder,
     };
     root.add(arm.upper, arm.lower, arm.elbow, arm.hand);
@@ -375,6 +380,7 @@ export function poseDeveloperRig(c: DeveloperRig, pose: Pose): void {
     let palm: THREE.Vector3;
     let fingersUp = 0;
     let slack = 0;
+    let tap = 0;
     if (carrying) {
       // Clamped round the ticket's short side, elbows out and down, palms in.
       hand = new THREE.Vector3(target.x, target.y + pose.bob, target.z);
@@ -398,10 +404,13 @@ export function poseDeveloperRig(c: DeveloperRig, pose: Pose): void {
       // Sprinting: arms swept back, still pumping a little.
       blend(hand, new THREE.Vector3(sign * 0.3, 0.6 + lift, -0.36 + forward + swing * 0.08), dash);
       if (dash > 0) pole.lerp(new THREE.Vector3(sign * 0.4, 0.4, -0.6), dash);
-      // Typing: upper arms by the ribs, forearms out to the keys, palms down.
+      // Typing: elbows by the ribs, hands apart on the keys, palms down. The hand whose turn
+      // it is lifts a little and cocks its fingers up, then strikes.
       if (typing > 0) {
-        blend(hand, new THREE.Vector3(sign * 0.15, target.y + pose.bob, 0.39), typing);
-        pole.lerp(new THREE.Vector3(sign * 0.35, -1, -0.35), typing);
+        const keys = Math.min(pose.leftHand.y, pose.rightHand.y);
+        tap = target.y - keys;
+        blend(hand, new THREE.Vector3(sign * 0.2, keys + tap * 0.35 + pose.bob, 0.38), typing);
+        pole.lerp(new THREE.Vector3(sign * 0.5, -1, -0.3), typing);
         palm.lerp(new THREE.Vector3(0, -1, 0.05), typing);
       }
       // Shoving: both arms punched out, palms forward.
@@ -435,9 +444,10 @@ export function poseDeveloperRig(c: DeveloperRig, pose: Pose): void {
     arm.elbow.position.copy(elbow);
     arm.elbow.quaternion.copy(arm.upper.quaternion);
     arm.hand.position.copy(hand);
-    arm.hand.geometry = carrying ? arm.grip : arm.open;
+    arm.hand.geometry = carrying ? arm.grip : typing > 0.5 ? arm.type : arm.open;
     const along = hand.clone().sub(elbow).normalize();
     if (fingersUp > 0) along.lerp(new THREE.Vector3(0, 1, 0.25).normalize(), fingersUp);
+    if (typing > 0) along.lerp(new THREE.Vector3(0, -0.2 + tap * 5, 1).normalize(), typing);
     orientHand(arm.hand, along, palm);
   });
 
