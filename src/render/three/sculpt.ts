@@ -27,12 +27,12 @@ export const FINISH = {
   denim: { rough: 0.9, metal: 0, glow: 0 },
   skin: { rough: 0.62, metal: 0, glow: 0.03, scatter: 1 },
   hair: { rough: 0.6, metal: 0, glow: 0 },
-  leather: { rough: 0.34, metal: 0, glow: 0 },
+  leather: { rough: 0.24, metal: 0, glow: 0 },
   rubber: { rough: 0.68, metal: 0, glow: 0 },
   plastic: { rough: 0.32, metal: 0, glow: 0 },
   enamel: { rough: 0.22, metal: 0, glow: 0.05 },
-  metal: { rough: 0.26, metal: 1, glow: 0.04 },
-  brass: { rough: 0.28, metal: 1, glow: 0.04 },
+  metal: { rough: 0.17, metal: 1, glow: 0.04 },
+  brass: { rough: 0.2, metal: 1, glow: 0.04 },
   glass: { rough: 0.06, metal: 0.4, glow: 0.12 },
   eye: { rough: 0.14, metal: 0, glow: 0.12 },
   sparkle: { rough: 0.2, metal: 0, glow: 1 },
@@ -531,7 +531,7 @@ const CREASE_RAYS = Array.from({ length: 14 }, (_, i) => {
 const CREASE_GRID = 56;
 /** How far (in voxels) a crease looks for a neighbour, and how dark it gets. */
 const CREASE_REACH = 5;
-const CREASE_DARK = 0.42;
+const CREASE_DARK = 0.5;
 /** Smoothing passes over the baked shade. */
 const CREASE_BLUR = 2;
 
@@ -659,6 +659,9 @@ const RIM = 0.32;
 /** Warm fake-subsurface light on skin: in its shadowed side, and at its edges. */
 const SCATTER = 0.22;
 const SCATTER_RIM = 0.35;
+/** Grazing sheen on cloth, and the broader fuzz on knit and fleece. */
+const SHEEN = 0.2;
+const FUZZ = 0.16;
 
 /**
  * The one material every developer draws with: vertex colors, per-vertex
@@ -693,12 +696,19 @@ export function sculptMaterial(): THREE.MeshStandardMaterial {
         '#include <opaque_fragment>',
         `float sculptRim = pow(1.0 - saturate(dot(normal, normalize(vViewPosition))), 3.0);
 outgoingLight += diffuseColor.rgb * sculptRim * ${RIM.toFixed(3)} * (1.0 - vFinish.y);
+// Cloth catches a soft sheen at grazing angles; knit and fleece a broader, fuzzier one.
+float sculptCloth = smoothstep(0.8, 0.86, vFinish.x);
+float sculptFuzz = smoothstep(0.95, 1.0, vFinish.x);
+float sculptGraze = 1.0 - saturate(dot(normal, normalize(vViewPosition)));
+outgoingLight += (diffuseColor.rgb * 0.6 + 0.4) * sculptCloth * (1.0 - vFinish.w) *
+  (${SHEEN.toFixed(3)} * pow(sculptGraze, 2.5) + ${FUZZ.toFixed(3)} * sculptFuzz * pow(sculptGraze, 1.2)) *
+  saturate(dot(reflectedLight.directDiffuse + reflectedLight.indirectDiffuse, vec3(0.333)) / max(dot(diffuseColor.rgb, vec3(0.333)), 1e-3));
 // Skin: light bleeding warm through the turned-away side and the edges.
 float sculptLit = saturate(dot(outgoingLight, vec3(0.333)) / max(dot(diffuseColor.rgb, vec3(0.333)), 1e-3));
 outgoingLight += diffuseColor.rgb * SCATTER_TINT * vFinish.w * (${SCATTER.toFixed(3)} * (1.0 - sculptLit) + ${SCATTER_RIM.toFixed(3)} * sculptRim);
 #include <opaque_fragment>`,
       );
   };
-  material.customProgramCacheKey = () => 'sculpt-finish-v2';
+  material.customProgramCacheKey = () => 'sculpt-finish-v3';
   return material;
 }

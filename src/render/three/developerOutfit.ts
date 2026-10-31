@@ -420,7 +420,7 @@ function generalist(color: number, skin: number): Outfit {
     shoulder: 0.26,
     nod: 1,
     arm: {
-      upper: { color, finish: FINISH.cloth, r: [0.074, 0.068, 0.06] },
+      upper: { color, finish: FINISH.cloth, r: [0.072, 0.064, 0.06] },
       lower: { color: skin, finish: FINISH.skin, r: [0.058, 0.056, 0.048] },
       roll: shade(color, 0.12),
       hands: { color: skin, finish: FINISH.skin, puff: 0, cuff: null, watch: true },
@@ -608,8 +608,8 @@ function frontend(color: number, skin: number): Outfit {
     shoulder: 0.27,
     nod: 1.15,
     arm: {
-      upper: { color: CREAM, finish: FINISH.cloth, r: [0.076, 0.068, 0.062] },
-      lower: { color: CREAM, finish: FINISH.cloth, r: [0.068, 0.064, 0.058] },
+      upper: { color: CREAM, finish: FINISH.cloth, r: [0.07, 0.061, 0.058] },
+      lower: { color: CREAM, finish: FINISH.cloth, r: [0.062, 0.061, 0.052] },
       roll: null,
       hands: {
         color: skin,
@@ -787,8 +787,8 @@ function backend(color: number, skin: number): Outfit {
     shoulder: 0.28,
     nod: 0.8,
     arm: {
-      upper: { color, finish: knit, r: [0.086, 0.078, 0.07] },
-      lower: { color, finish: knit, r: [0.078, 0.074, 0.07] },
+      upper: { color, finish: knit, r: [0.078, 0.068, 0.064] },
+      lower: { color, finish: knit, r: [0.07, 0.068, 0.06] },
       roll: null,
       hands: {
         color: skin,
@@ -1059,8 +1059,8 @@ function qa(color: number): Outfit {
     shoulder: 0.255,
     nod: 1.3,
     arm: {
-      upper: { color: COAT, finish: FINISH.cloth, r: [0.075, 0.066, 0.06] },
-      lower: { color: COAT, finish: FINISH.cloth, r: [0.066, 0.064, 0.064] },
+      upper: { color: COAT, finish: FINISH.cloth, r: [0.069, 0.06, 0.057] },
+      lower: { color: COAT, finish: FINISH.cloth, r: [0.06, 0.06, 0.06] },
       roll: null,
       hands: {
         color,
@@ -1390,8 +1390,8 @@ function platform(color: number): Outfit {
     shoulder: 0.27,
     nod: 0.9,
     arm: {
-      upper: { color: navy, finish: FINISH.cloth, r: [0.078, 0.07, 0.064] },
-      lower: { color: navy, finish: FINISH.cloth, r: [0.07, 0.066, 0.062] },
+      upper: { color: navy, finish: FINISH.cloth, r: [0.072, 0.064, 0.06] },
+      lower: { color: navy, finish: FINISH.cloth, r: [0.066, 0.063, 0.056] },
       roll: shade(navy, 0.1),
       hands: {
         color: 0xc9a46a,
