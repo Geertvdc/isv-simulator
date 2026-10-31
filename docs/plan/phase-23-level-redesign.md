@@ -216,42 +216,106 @@ Layout gimmick: no new code: the founder's house (rooms, serving hatch, hallway)
 
 ### Chapter 2: Startup
 
-Layout gimmick: **Spills** (`_` wet floor). Sketches: _not drawn yet_.
+Layout gimmick: **Spills** (`_` wet floor: players slide and overshoot). Sketches: [seed-round](images/level-redesign/seed-round.svg), [demo-day](images/level-redesign/demo-day.svg), [on-call](images/level-redesign/on-call.svg). 3D renders: [seed-round](images/level-redesign/seed-round-3d.webp), [demo-day](images/level-redesign/demo-day-3d.webp), [on-call](images/level-redesign/on-call-3d.webp). The sketches draw wet tiles glossy blue; the 3D renders show them as plain floor until spills are built, so each level below says where they are. The report reads `_` as floor too: its numbers are for walking, not for sliding.
 
 #### 2-1 Seed Round (`seed-round`)
 
 **Concept:** 15×10 medium. Coworking loft, L-shaped, desk island in the middle, incidents. Gimmick: none new. 1p / 4p: Two pipelines.
 
-- **Draft:** `maps/drafts/seed-round.txt`: _not drawn yet_
-- **Sketch:** _`images/level-redesign/seed-round.svg` (current left, draft right) goes here_
-- **Report:** _row from `npm run level-report -- seed-round --table` goes here_
-- **Intent:** _what the layout teaches and where players bump_
-- **Solo:** _the solo route and how long it is_
-- **4 players:** _how the team splits, the chokepoint and its bypass_
+- **Draft:** `maps/drafts/seed-round.txt`
+
+  ```text
+  ##II##BB#######
+  #..1..........#
+  #....KKKK.....X
+  #....CCCC...2.#
+  #.............#
+  #######.CTTC..#
+        #.......P
+        S..3....P
+        S.....4.#
+        #########
+  ```
+
+- **Sketch:** ![2-1 Seed Round, current left, draft right](images/level-redesign/seed-round.svg)
+- **3D render:** ![2-1 Seed Round draft in the game](images/level-redesign/seed-round-3d.webp)
+- **Report:**
+
+  | Level                    | Size  | Floor | Stations             | Solo run | Loop | Chokepoints    | Reachable |
+  | ------------------------ | ----- | ----- | -------------------- | -------- | ---- | -------------- | --------- |
+  | 2-1 Seed Round (current) | 14×10 | 76    | I2 B2 K4 T2 P2 S4 X1 | 23       | 30   | none           | all       |
+  | 2-1 Seed Round (draft)   | 15×10 | 68    | I2 B2 K4 T2 P2 S2 X1 | 22       | 32   | detour 7,5 +10 | all       |
+
+- **Intent:** a coworking loft in an L: a wide loft along the back (15×5) and a deploy corner below its right half (8×5); the front-left of the map is the building's stairwell, left empty. The loft has inbox and bug queue on the back wall and one desk island in the middle: four keyboards in a row with a counter strip in front of it to park tickets on when an incident freezes everything. A divider wall separates loft and deploy corner: the test benches sit in it (9,5–10,5), usable from both sides, with a counter either side as a pass-through. The divider leaves a 1-wide door on the left (7,5), right above the ship (a hatch in the deploy corner's left wall, 6,7–6,8), and a 2-wide opening on the right (12,5–13,5), right above the two pipelines. The work goes round clockwise: inbox → island → test benches → down the wide opening → pipelines → ship → up the narrow door → inbox. Incidents (the chapter's mechanic, nothing else new) skip the test: bug queue → keyboard → pipeline → ship, the same lap without the stop at the divider. Players bump in the door.
+- **Solo:** spawn 1 under the inbox, two steps from the island: 22 steps to ship the first ticket, a loop is 32 (current 30). The narrow door is the way back to the inbox; with it blocked the lap goes back up the wide opening (+10, the report's `detour 7,5`).
+- **4 players:** spawns 1 and 2 in the loft, 3 and 4 in the deploy corner. The loft pair takes tickets and codes at the island (room for four side by side); the deploy-corner pair tests from below, deploys and ships. Coded tickets go down through the door or over the divider counters, empty hands come back up the door: flows cross there. Bypasses: the 2-wide opening (a longer walk) and the pass-through counters. Two pipelines and two ship tiles, so the deploy corner never queues on one station.
 - **Review:** _human feedback from gate 1_
 
 #### 2-2 Demo Day (`demo-day`)
 
 **Concept:** 18×10 large. Coworking floor + stage hall; a spilled-kombucha lane between them; counter wall with a gap. Gimmick: **Spills intro**. 1p / 4p: Dry detour exists.
 
-- **Draft:** `maps/drafts/demo-day.txt`: _not drawn yet_
-- **Sketch:** _`images/level-redesign/demo-day.svg` (current left, draft right) goes here_
-- **Report:** _row from `npm run level-report -- demo-day --table` goes here_
-- **Intent:** _what the layout teaches and where players bump_
-- **Solo:** _the solo route and how long it is_
-- **4 players:** _how the team splits, the chokepoint and its bypass_
+- **Draft:** `maps/drafts/demo-day.txt`
+
+  ```text
+         ###########
+         #.........#
+  #KK#BB##.........#
+  #..........RR....#
+  #.1....C.........#
+  I......C.....3...#
+  I..KK..C__..CC...P
+  #.2....___.......P
+  #......C__.....4.#
+  ###X######TT##SS##
+  ```
+
+- **Sketch:** ![2-2 Demo Day, current left, draft right](images/level-redesign/demo-day.svg)
+- **3D render:** ![2-2 Demo Day draft in the game](images/level-redesign/demo-day-3d.webp)
+- **Report:**
+
+  | Level                  | Size  | Floor | Stations                | Solo run | Loop | Chokepoints    | Reachable |
+  | ---------------------- | ----- | ----- | ----------------------- | -------- | ---- | -------------- | --------- |
+  | 2-2 Demo Day (current) | 14×10 | 85    | I2 B2 K4 T2 R1 P2 S4 X1 | 37       | 52   | none           | all       |
+  | 2-2 Demo Day (draft)   | 18×10 | 104   | I2 B2 K4 T2 R2 P2 S2 X1 | 23       | 36   | detour 7,7 +10 | all       |
+
+- **Intent:** two rooms side by side: a coworking floor (left, 6×6: inbox, bug queue, four keyboards, bin) and a stage hall (right, 9×8, two rows deeper because of the stage at the back: review table on the stage, test benches and ship on the front wall, pipelines on the right). Between them stands the kombucha bar, a counter wall (column 7) with one gap near the front (7,7). Someone knocked the tap over: **the gap and the lane behind it are wet** (7,7, then 8,6–9,8: 7 tiles). The gap is the short way from the keyboards to the test benches and back from the ship, but it spits you onto the wet lane: you slide, overshoot the turn to the tests and bump into the bar or into each other. The **dry detour** is the 1-wide door at the back end of the bar (7,3): into the hall past the stage, then down column 10 or further right, which stays dry. That is +10 steps a loop (the report's `detour 7,7`), so the wet gap is a real temptation, not a trap. Reviews sit on the dry route anyway (keyboard → back door → stage → tests), which teaches the detour for free. Players bump in the gap and slide into each other on the lane.
+- **Solo:** spawn 1 between the inbox and the back keyboards: 23 steps to the first ship, a loop is 36 through the gap (current 52), 46 on the dry detour. Solo never needs the wet tiles, and no station is next to one: the tests (10,9–11,9) are used from dry floor.
+- **4 players:** spawns 1 and 2 on the coworking floor, 3 and 4 in the hall. The coworking pair codes and puts tickets on the bar: the two back counters (7,4–7,5) are dry on both sides, so hand-offs there are safe; the front counter (7,8) is reached from the wet lane on the hall side. The hall pair tests, deploys and ships, with a demo table (12,6–13,6) in the middle of the hall to park tickets. Reviews pull one player from each room to the stage. The chokepoint is the wet gap where coded tickets go right and empty hands go back left; the bypasses are the dry back door (also 1-wide, but on the quieter review route) and throwing over the bar.
 - **Review:** _human feedback from gate 1_
 
 #### 2-3 On Call (`on-call`)
 
 **Concept:** 18×11 large. Night shift: ring corridor round a server room, freshly mopped (wet) corridor sections; two ways round. Gimmick: Spills + long walks. 1p / 4p: Ring gives 4p two directions.
 
-- **Draft:** `maps/drafts/on-call.txt`: _not drawn yet_
-- **Sketch:** _`images/level-redesign/on-call.svg` (current left, draft right) goes here_
-- **Report:** _row from `npm run level-report -- on-call --table` goes here_
-- **Intent:** _what the layout teaches and where players bump_
-- **Solo:** _the solo route and how long it is_
-- **4 players:** _how the team splits, the chokepoint and its bypass_
+- **Draft:** `maps/drafts/on-call.txt`
+
+  ```text
+  #BB#KK      ##TT##
+  #.....#######....#
+  I.1...___...#....#
+  I.....___.......3#
+  #.....####P##....#
+  #.KK..#######RR..C
+  #.2...#P#####....#
+  X........___.....#
+  #........___...4.#
+  #.....#######....#
+  ##SS##      ######
+  ```
+
+- **Sketch:** ![2-3 On Call, current left, draft right](images/level-redesign/on-call.svg)
+- **3D render:** ![2-3 On Call draft in the game](images/level-redesign/on-call-3d.webp)
+- **Report:**
+
+  | Level                 | Size  | Floor | Stations                | Solo run | Loop | Chokepoints                                                      | Reachable |
+  | --------------------- | ----- | ----- | ----------------------- | -------- | ---- | ---------------------------------------------------------------- | --------- |
+  | 2-3 On Call (current) | 14×10 | 71    | I2 B1 K2 T2 R1 P2 S2 X1 | 28       | 42   | detour 2,1 +38; detour 1,2–1,3 (2) +38; detour 12,2–12,6 (5) +22 | all       |
+  | 2-3 On Call (draft)   | 18×11 | 104   | I2 B2 K4 T2 R2 P2 S2 X1 | 38       | 44   | none                                                             | all       |
+
+- **Intent:** the night shift, an H-shaped floor: the on-call desks (left, 5×9: inbox, bug queue, four keyboards, bin, ship) and the ops room (right, 4×9: test benches, review table, a counter) joined by two 2-wide corridors that run round the server room in the middle. The server room is a solid block of racks with a pipeline on each side: one faces the back corridor (10,4), one the front corridor (7,6), so you can deploy whichever way round you go. The ops room has its own wall with a 1-wide door to the back corridor (12,3) and a 2-wide one to the front corridor (12,7–12,8). The cleaner has just been round: **one section of each corridor is freshly mopped** (back corridor 6,2–8,3, right outside the desks; front corridor 9,7–11,8, right outside the ops room: 12 wet tiles). Every way round crosses one wet section, and both pipelines face dry tiles. A feature is one lap of the ring: desks → back corridor (wet) → narrow door → tests → wide door → front corridor (wet) → pipeline → ship. An incident hotfix never leaves the desks' end: keyboard → front pipeline (5 steps from the desk island) → ship. Players bump in the narrow door and slide into each other on the mopped sections.
+- **Solo:** spawn 1 by the inbox: 38 steps to the first ship and a loop of 44 (current 42): the long walk is the point of the level. Either direction round works; the report shows no chokepoint because blocking the narrow door only costs +8 (under its 25% bar): the other half of the ring is the bypass.
+- **4 players:** spawns 1 and 2 at the desks, 3 and 4 in the ops room. The ring gives two directions: the natural lap is clockwise (out the back, home along the front), so a player who cuts back the short way meets the traffic head-on, usually on a wet section. The chokepoint is the narrow ops door (12,3) where coded tickets come in and testers head out; the bypass is the 2-wide front door, round the other way. Reviews pull a desk player round to the ops room; hotfixes pull nobody out of position, because the front pipeline is next to the desks.
 - **Review:** _human feedback from gate 1_
 
 ### Chapter 3: Scale-Up
