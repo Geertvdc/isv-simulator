@@ -2,20 +2,41 @@ import * as THREE from 'three';
 import { isRoleId, type RoleId } from '../../sim/roles';
 import type { PlayerId } from '../../sim/state';
 import { playerColor } from '../playerColors';
-import { type KitMaterials, ModelBuilder, tint } from './kit';
+import { DEVELOPER_HAIRSTYLES, type DeveloperHairstyle, buildHead } from './developerHead';
+import {
+  elbow as elbowGeometry,
+  hand as handGeometry,
+  knee as kneeGeometry,
+  lowerArm,
+  pelvis,
+  shin,
+  shoe as shoeGeometry,
+  soleHull,
+  soleRise,
+  thigh,
+  upperArm,
+} from './developerLimbs';
+import { type SwingPart, buildOutfit } from './developerOutfit';
+import type { KitMaterials } from './kit';
 import { PALETTE } from './look';
 import { COLOR } from './palette';
 import type { Pose } from './pose';
 
-/** Compact angular production crew. Shared targets/cadence, different garment and head cuts. */
+export { DEVELOPER_HAIRSTYLES, type DeveloperHairstyle };
+
+/**
+ * The production crew: chunky sculpted developers (big heads, big hands, big
+ * shoes) in their role's kit, cut in the owner's color. Shared targets and
+ * cadence; each role differs in silhouette, garments and gear.
+ */
 export const DEVELOPER_TOP = 1.54;
 const UP = new THREE.Vector3(0, 1, 0);
-const TROUSERS = COLOR.denim;
-const CREAM = COLOR.cream;
 const SKINS = [COLOR.skinLight, COLOR.skinDeep, COLOR.skinTan, COLOR.skinWarm] as const;
 const HAIRS = [COLOR.hairDark, 0x171c23, 0x885030, 0x493834] as const;
-export const DEVELOPER_HAIRSTYLES = ['swept', 'cropped', 'long', 'tied'] as const;
-export type DeveloperHairstyle = (typeof DEVELOPER_HAIRSTYLES)[number];
+/** The neck on the torso. */
+const NECK_Y = 0.31;
+/** Torso swing pieces never rock further than this. */
+const SWING_LIMIT = 0.9;
 
 /** Cosmetics belong to the person, never to their profession. */
 export interface DeveloperAppearance {
@@ -41,8 +62,18 @@ interface Arm {
 }
 interface Leg {
   upper: THREE.Mesh;
+  knee: THREE.Mesh;
   lower: THREE.Mesh;
   shoe: THREE.Mesh;
+  /** The shoe's lower side-view hull, `[y, z]`, to keep it on the floor when it rocks. */
+  hull: [number, number][];
+}
+interface Swing {
+  mesh: THREE.Mesh;
+  hang: SwingPart['hang'];
+  amp: number;
+  /** −1 on the right of the body, +1 on the left. */
+  side: number;
 }
 export interface DeveloperRig {
   roleId: RoleId;
@@ -53,16 +84,12 @@ export interface DeveloperRig {
   waist: THREE.Mesh;
   arms: [Arm, Arm];
   legs: [Leg, Leg];
+  /** Badges, scarf tails, tools: pieces hanging from the torso that swing as they move. */
+  swings: Swing[];
+  /** How hard this role nods into the work. */
+  nod: number;
   geometries: THREE.BufferGeometry[];
 }
-
-const CUTS = {
-  generalist: { width: 0.5, height: 0.32, shoulder: 0.24, nod: 1 },
-  frontend: { width: 0.55, height: 0.26, shoulder: 0.26, nod: 1.15 },
-  backend: { width: 0.54, height: 0.34, shoulder: 0.26, nod: 0.8 },
-  qa: { width: 0.43, height: 0.43, shoulder: 0.21, nod: 1.3 },
-  platform: { width: 0.53, height: 0.35, shoulder: 0.25, nod: 0.9 },
-} satisfies Record<RoleId, { width: number; height: number; shoulder: number; nod: number }>;
 
 export function createDeveloperRig(
   roleId: RoleId,
@@ -71,158 +98,66 @@ export function createDeveloperRig(
   appearance: DeveloperAppearance = developerAppearance(id),
 ): DeveloperRig {
   if (!isRoleId(roleId)) throw new Error(`Unknown developer role: ${String(roleId)}`);
-  const cut = CUTS[roleId];
   const color = playerColor(id);
   const { skin, hair } = appearance;
   const hairstyle = appearance.hairstyle ?? developerAppearance(id).hairstyle;
+  const outfit = buildOutfit(roleId, color, skin);
   const root = new THREE.Group();
   root.name = `developer-${roleId}`;
   const torso = new THREE.Group();
   const head = new THREE.Group();
   const geometries: THREE.BufferGeometry[] = [];
-  const mesh = (builder: ModelBuilder): THREE.Mesh => {
-    const geometry = builder.build().body;
-    geometries.push(geometry);
-    const made = new THREE.Mesh(geometry, materials.body);
+  const mesh = (geometry: THREE.BufferGeometry): THREE.Mesh => {
+    if (!geometries.includes(geometry)) geometries.push(geometry);
+    const made = new THREE.Mesh(geometry, materials.character);
     made.castShadow = made.receiveShadow = true;
     return made;
   };
   root.add(torso);
   torso.add(head);
-  head.position.y = 0.33;
+  head.position.y = NECK_Y;
+  torso.add(mesh(outfit.torso));
+  head.add(mesh(buildHead(roleId, { skin, hair, hairstyle }, color)));
 
-  const jacket = new ModelBuilder()
-    .box(cut.width, cut.height, 0.3, color, { at: [0, 0.12, 0] }, 0.035)
-    .box(0.35, 0.16, 0.29, tint(color, -0.18), { at: [0, -0.07, 0] }, 0.02);
-  switch (roleId) {
-    case 'generalist':
-      jacket
-        .box(0.08, 0.33, 0.025, CREAM, { at: [-0.08, 0.12, 0.16], rot: [0, 0, -0.28] })
-        .box(0.15, 0.1, 0.03, tint(color, -0.35), { at: [0.12, 0.08, 0.17] })
-        .box(0.07, 0.29, 0.025, CREAM, { at: [0.04, 0.1, -0.16], rot: [0, 0, 0.3] });
-      break;
-    case 'frontend':
-      jacket
-        .box(0.23, 0.27, 0.032, CREAM, { at: [-0.12, 0.12, 0.16] })
-        .box(0.12, 0.08, 0.035, TROUSERS, { at: [0.15, 0.17, 0.17] })
-        .box(0.25, 0.12, 0.032, CREAM, { at: [0.1, 0.08, -0.16] });
-      break;
-    case 'backend':
-      jacket
-        .box(0.32, 0.34, 0.032, TROUSERS, { at: [0, 0.11, 0.16] })
-        .box(0.32, 0.33, 0.025, TROUSERS, { at: [0, 0.12, -0.16] })
-        .box(0.3, 0.09, 0.32, tint(color, -0.3), { at: [0, 0.31, 0] })
-        .box(0.025, 0.3, 0.025, CREAM, { at: [0, 0.12, 0.183] });
-      break;
-    case 'qa':
-      jacket
-        .box(0.15, 0.44, 0.025, CREAM, { at: [-0.1, 0.08, 0.16] })
-        .box(0.15, 0.44, 0.025, CREAM, { at: [0.1, 0.08, 0.16] })
-        .box(0.14, 0.1, 0.03, TROUSERS, { at: [0.1, -0.02, 0.18] })
-        .box(0.035, 0.38, 0.025, CREAM, { at: [0, 0.1, -0.16] });
-      break;
-    case 'platform':
-      jacket
-        .box(0.18, 0.31, 0.04, tint(color, -0.4), { at: [-0.15, 0.1, 0.17] })
-        .box(0.18, 0.31, 0.04, tint(color, -0.4), { at: [0.15, 0.1, 0.17] })
-        .box(0.12, 0.1, 0.05, CREAM, { at: [-0.15, 0.01, 0.2] })
-        .box(0.12, 0.1, 0.05, CREAM, { at: [0.15, 0.01, 0.2] })
-        .box(0.42, 0.065, 0.025, CREAM, { at: [0, 0.19, -0.16] });
-      break;
-  }
-  // Matching front/back pictograms survive rear views and grayscale.
-  for (const z of [0.205, -0.18]) badge(jacket, roleId, 0.1, 0.19, z);
-  torso.add(mesh(jacket));
-
-  const face = new ModelBuilder()
-    .box(0.38, 0.37, 0.34, skin, { at: [0, 0.17, 0] }, 0.06)
-    .box(0.09, 0.07, 0.11, skin, { at: [0, 0.14, 0.2] }, 0.02);
-  switch (hairstyle) {
-    case 'swept':
-      face
-        .box(0.35, 0.13, 0.28, hair, { at: [-0.025, 0.35, -0.025], rot: [0.12, 0, 0.3] })
-        .box(0.09, 0.2, 0.25, hair, { at: [-0.17, 0.25, -0.05] }, 0.02);
-      break;
-    case 'cropped':
-      face
-        .box(0.39, 0.075, 0.33, hair, { at: [0, 0.36, -0.02] })
-        .box(0.34, 0.18, 0.08, hair, { at: [0, 0.22, -0.16] });
-      break;
-    case 'long':
-      face
-        .box(0.44, 0.13, 0.36, hair, { at: [0, 0.36, -0.04] }, 0.04)
-        .box(0.1, 0.3, 0.3, hair, { at: [-0.21, 0.21, -0.05] })
-        .box(0.1, 0.3, 0.3, hair, { at: [0.21, 0.21, -0.05] })
-        .box(0.34, 0.3, 0.08, hair, { at: [0, 0.21, -0.17] });
-      break;
-    case 'tied':
-      face
-        .box(0.37, 0.09, 0.32, hair, { at: [0, 0.36, -0.02] })
-        .box(0.27, 0.1, 0.2, hair, { at: [0.06, 0.34, 0.075], rot: [0, 0, -0.18] })
-        .box(0.32, 0.22, 0.07, hair, { at: [0, 0.22, -0.17] })
-        .box(0.16, 0.2, 0.13, hair, { at: [-0.08, 0.1, -0.22], rot: [-0.25, 0, 0.15] })
-        .box(0.17, 0.035, 0.14, CREAM, { at: [-0.08, 0.18, -0.22] });
-      break;
-  }
-  switch (roleId) {
-    case 'qa':
-      face.box(0.41, 0.05, 0.035, TROUSERS, { at: [0, 0.23, -0.225] });
-      for (const x of [-0.085, 0.085]) {
-        face.box(0.155, 0.13, 0.045, TROUSERS, { at: [x, 0.22, 0.19] }, 0.02);
-        face.box(0.115, 0.09, 0.02, CREAM, { at: [x, 0.22, 0.218] });
-      }
-      break;
-    case 'platform':
-      face
-        .torus(0.235, 0.028, TROUSERS, { at: [0, 0.22, 0], rot: [0, 0, 0] }, Math.PI)
-        .box(0.09, 0.17, 0.18, TROUSERS, { at: [-0.235, 0.21, 0] })
-        .box(0.09, 0.17, 0.18, TROUSERS, { at: [0.235, 0.21, 0] })
-        .box(0.025, 0.025, 0.16, TROUSERS, { at: [0.23, 0.14, 0.13] })
-        .sphere(0.035, CREAM, { at: [0.23, 0.14, 0.22] });
-      break;
-  }
-  for (const sign of [-1, 1]) {
-    face
-      .sphere(0.036, CREAM, { at: [sign * 0.08, 0.22, 0.177] }, [1, 1.18, 0.4])
-      .sphere(
-        0.02,
-        PALETTE.ink,
-        { at: [sign * 0.08, 0.215, roleId === 'qa' ? 0.235 : 0.195] },
-        [1, 1.2, 0.5],
-      )
-      .box(0.075, 0.022, 0.025, hair, {
-        at: [sign * 0.08, 0.29, 0.18],
-        rot: [0, 0, sign * 0.14],
-      })
-      .sphere(0.045, skin, { at: [sign * 0.195, 0.13, 0] });
-  }
-  face.box(0.08, 0.018, 0.025, PALETTE.ink, {
-    at: [0, 0.065, 0.2],
+  const swings = outfit.swings.map((part): Swing => {
+    const made = mesh(part.geometry);
+    made.position.set(...part.pivot);
+    torso.add(made);
+    return { mesh: made, hang: part.hang, amp: part.amp, side: Math.sign(part.pivot[0]) || 1 };
   });
-  head.add(mesh(face));
-  const waist = mesh(new ModelBuilder().cylinder(0.13, 0.14, 1, tint(color, -0.18), {}, 8));
+
+  const waist = mesh(pelvis(outfit.leg));
   root.add(waist);
+  const upper = upperArm(outfit.arm);
+  const joint = elbowGeometry(outfit.arm);
+  const lowerGeometry = lowerArm(outfit.arm);
   const makeArm = (sign: number): Arm => {
     const shoulder = new THREE.Object3D();
-    shoulder.position.set(sign * cut.shoulder, 0.16, 0);
+    shoulder.position.set(sign * outfit.shoulder, 0.16, 0);
     torso.add(shoulder);
-    const upper = mesh(new ModelBuilder().cylinder(0.085, 0.07, 1, color, {}, 8));
-    const lower = mesh(new ModelBuilder().cylinder(0.06, 0.055, 1, skin, {}, 8));
-    const elbow = mesh(new ModelBuilder().sphere(0.068, skin));
-    const hand = mesh(new ModelBuilder().box(0.13, 0.12, 0.14, skin, {}, 0.025));
-    root.add(upper, lower, elbow, hand);
-    return { upper, lower, elbow, hand, shoulder };
+    const arm = {
+      upper: mesh(upper),
+      lower: mesh(lowerGeometry),
+      elbow: mesh(joint),
+      hand: mesh(handGeometry(outfit.arm, sign)),
+      shoulder,
+    };
+    root.add(arm.upper, arm.lower, arm.elbow, arm.hand);
+    return arm;
   };
-  const makeLeg = (): Leg => {
-    const upper = mesh(new ModelBuilder().cylinder(0.085, 0.07, 1, TROUSERS, {}, 8));
-    const lower = mesh(new ModelBuilder().cylinder(0.07, 0.06, 1, TROUSERS, {}, 8));
-    const shoe = mesh(
-      new ModelBuilder()
-        .box(0.18, 0.1, 0.3, tint(color, -0.6), { at: [0, 0.065, 0.055] }, 0.04)
-        .box(0.19, 0.035, 0.31, CREAM, { at: [0, 0.02, 0.055] }, 0.012),
-    );
-    root.add(upper, lower, shoe);
-    return { upper, lower, shoe };
+  const kneeShape = kneeGeometry(outfit.leg);
+  const shinShape = shin(outfit.leg);
+  const makeLeg = (sign: number): Leg => {
+    const shoeShape = shoeGeometry(outfit.leg, roleId, sign);
+    const leg = {
+      upper: mesh(thigh(outfit.leg, sign)),
+      knee: mesh(kneeShape),
+      lower: mesh(shinShape),
+      shoe: mesh(shoeShape),
+      hull: soleHull(shoeShape),
+    };
+    root.add(leg.upper, leg.knee, leg.lower, leg.shoe);
+    return leg;
   };
   return {
     roleId,
@@ -232,45 +167,11 @@ export function createDeveloperRig(
     head,
     waist,
     arms: [makeArm(-1), makeArm(1)],
-    legs: [makeLeg(), makeLeg()],
+    legs: [makeLeg(-1), makeLeg(1)],
+    swings,
+    nod: outfit.nod,
     geometries,
   };
-}
-
-function badge(b: ModelBuilder, role: RoleId, x: number, y: number, z: number): void {
-  b.box(0.12, 0.11, 0.018, CREAM, { at: [x, y, z] });
-  const front = z + Math.sign(z) * 0.012;
-  switch (role) {
-    case 'generalist':
-      b.box(0.07, 0.018, 0.01, TROUSERS, { at: [x, y, front] }).box(0.018, 0.07, 0.01, TROUSERS, {
-        at: [x, y, front],
-      });
-      break;
-    case 'frontend':
-      b.box(0.08, 0.065, 0.01, TROUSERS, { at: [x, y, front] }).box(0.06, 0.018, 0.012, CREAM, {
-        at: [x, y + 0.013, front + Math.sign(z) * 0.006],
-      });
-      break;
-    case 'backend':
-    case 'platform':
-      for (const dy of [-0.027, 0, 0.027]) {
-        b.box(role === 'backend' ? 0.065 : 0.085, 0.015, 0.01, TROUSERS, {
-          at: [x, y + dy, front],
-        });
-      }
-      if (role === 'platform')
-        b.box(0.012, 0.07, 0.012, CREAM, { at: [x + 0.02, y, front + Math.sign(z) * 0.006] });
-      break;
-    case 'qa':
-      b.box(0.018, 0.04, 0.01, TROUSERS, { at: [x - 0.02, y - 0.01, front], rot: [0, 0, 0.7] }).box(
-        0.018,
-        0.075,
-        0.01,
-        TROUSERS,
-        { at: [x + 0.01, y, front], rot: [0, 0, -0.6] },
-      );
-      break;
-  }
 }
 
 function segment(mesh: THREE.Mesh, from: THREE.Vector3, to: THREE.Vector3): void {
@@ -296,6 +197,20 @@ function elbowAt(shoulder: THREE.Vector3, hand: THREE.Vector3, sign: number): TH
     .addScaledVector(out, Math.sqrt(length ** 2 - (distance / 2) ** 2));
 }
 
+/** Turns a hand along its forearm with the palm toward `palm` (inward, or down to type). */
+function orientHand(hand: THREE.Mesh, elbow: THREE.Vector3, palm: THREE.Vector3): void {
+  const y = hand.position.clone().sub(elbow).normalize();
+  const z = palm.clone().addScaledVector(y, -palm.dot(y));
+  if (z.lengthSq() < 1e-6) z.set(0, 0, 1).addScaledVector(y, -y.z);
+  z.normalize();
+  const x = new THREE.Vector3().crossVectors(y, z);
+  hand.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
+}
+
+function clampSwing(a: number): number {
+  return Math.max(-SWING_LIMIT, Math.min(SWING_LIMIT, a));
+}
+
 export function poseDeveloperRig(c: DeveloperRig, pose: Pose): void {
   const wind = pose.windUp;
   const duck = Math.sin(Math.PI * wind);
@@ -306,33 +221,78 @@ export function poseDeveloperRig(c: DeveloperRig, pose: Pose): void {
     0.36 + 0.19 * Math.cos(bend) + pose.bob,
     -0.3 * duck - Math.max(0, pose.squash.x - 1) * 0.7,
   );
-  c.torso.rotation.set(pose.lean * 0.5 + wind * 0.5, 0, pose.roll + bend);
+  const tilt = pose.lean * 0.5 + wind * 0.5;
+  const twist = Math.sin(pose.stride) * 0.07 * pose.walk * (1 - wind);
+  c.torso.rotation.set(tilt, twist, pose.roll + bend);
   c.torso.scale.set(pose.squash.x, pose.squash.y, pose.squash.x);
+  // Walk sway and stumbles roll the body about the hem, so the hem never sweeps into the legs.
+  const pivot = new THREE.Vector3(0, -0.2, 0).multiply(c.torso.scale);
+  const unrolled = new THREE.Quaternion().setFromEuler(new THREE.Euler(tilt, twist, bend));
+  c.torso.position
+    .add(pivot.clone().applyQuaternion(unrolled))
+    .sub(pivot.applyQuaternion(c.torso.quaternion));
   c.head.scale.set(1 / pose.squash.x, 1 / pose.squash.y, 1 / pose.squash.x);
-  c.head.rotation.x = 0.12 + pose.nod * CUTS[c.roleId].nod;
+  c.head.rotation.set(0.12 + pose.nod * c.nod, -twist * 0.8, 0);
+
+  // Hanging pieces stay roughly plumb, bounce with the walk and never swing into the body.
+  const roll = pose.roll + bend;
+  const bounce = pose.walk * (0.5 + 0.5 * Math.sin(pose.stride * 2));
+  for (const s of c.swings) {
+    if (s.hang === 'front') {
+      s.mesh.rotation.set(clampSwing(Math.min(0, -tilt - bounce * s.amp)), 0, clampSwing(-roll));
+    } else if (s.hang === 'back') {
+      s.mesh.rotation.set(clampSwing(Math.max(0, -tilt + bounce * s.amp)), 0, clampSwing(-roll));
+    } else {
+      const sway = -roll + bounce * s.amp * 0.5;
+      s.mesh.rotation.set(
+        clampSwing(-tilt + Math.sin(pose.stride) * pose.walk * s.amp),
+        0,
+        clampSwing(s.side > 0 ? Math.max(0, sway) : Math.min(0, sway)),
+      );
+    }
+  }
+
   c.root.updateMatrixWorld(true);
+  const base = new THREE.Vector3(0, 0.36 + pose.bob, 0);
   const waistTop = c.root.worldToLocal(c.torso.localToWorld(new THREE.Vector3(0, -0.1, 0)));
-  segment(c.waist, new THREE.Vector3(0, 0.36 + pose.bob, 0), waistTop);
+  c.waist.position.copy(base);
+  c.waist.quaternion.setFromUnitVectors(UP, waistTop.sub(base).normalize());
+  c.waist.scale.set(pose.squash.x, 1, pose.squash.x);
+
+  const typing = Math.min(1, Math.max(0, pose.nod / 0.25));
   c.arms.forEach((arm, i) => {
+    const sign = i === 0 ? -1 : 1;
     const target = i === 0 ? pose.leftHand : pose.rightHand;
     const hand = new THREE.Vector3(target.x, target.y + pose.bob, target.z);
     const shoulder = c.root.worldToLocal(arm.shoulder.getWorldPosition(new THREE.Vector3()));
-    const elbow = elbowAt(shoulder, hand, i === 0 ? -1 : 1);
+    const elbow = elbowAt(shoulder, hand, sign);
     segment(arm.upper, shoulder, elbow);
     segment(arm.lower, elbow, hand);
     arm.elbow.position.copy(elbow);
+    arm.elbow.quaternion.copy(arm.upper.quaternion);
     arm.hand.position.copy(hand);
+    const palm = new THREE.Vector3(-sign * (1 - typing), -typing, 0.15 * (1 - typing));
+    orientHand(arm.hand, elbow, palm);
   });
   c.legs.forEach((leg, i) => {
     const sign = i === 0 ? -1 : 1;
     const stride = pose.stride + i * Math.PI;
     const swing = Math.sin(stride) * pose.walk;
     const lift = Math.max(0, Math.cos(stride)) * 0.09 * pose.walk;
-    const foot = new THREE.Vector3(sign * 0.13, lift, swing * 0.16);
+    // Heel strike in front, toe-off behind.
+    const pitch = -0.28 * swing;
+    const foot = new THREE.Vector3(
+      sign * 0.13,
+      lift + soleRise(leg.hull, pitch) + 1e-5,
+      swing * 0.16,
+    );
     leg.shoe.position.copy(foot);
-    const hip = new THREE.Vector3(sign * 0.13, 0.4 + pose.bob, 0);
+    leg.shoe.rotation.set(pitch, 0, 0);
+    const hip = new THREE.Vector3(sign * 0.1, 0.4 + pose.bob, 0);
     const knee = new THREE.Vector3(sign * 0.13, 0.23 + lift, swing * 0.08 + 0.025);
+    const ankle = foot.clone().add(new THREE.Vector3(0, 0.1, 0.1 * Math.sin(pitch)));
     segment(leg.upper, hip, knee);
-    segment(leg.lower, knee, foot.clone().add(new THREE.Vector3(0, 0.1, 0)));
+    leg.knee.position.copy(knee);
+    segment(leg.lower, knee, ankle);
   });
 }
