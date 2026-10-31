@@ -30,6 +30,8 @@ CI is `.github/workflows/ci.yml` (`npm ci`, `npm run check`, `npm run build`).
 - Default: `gh pr checks <number> --watch --fail-fast`.
 - If your agent has its own PR/CI integration (for example a PR status tool in a desktop app) and its rules say not to poll CI, use that instead.
 - Auto-merge is disabled on this repo, so you have to merge yourself once CI is green.
+- Wait until the `check` job has actually **finished** green on the PR's latest commit. "Pending" is not green: a passing local `npm run check` is not enough, because the CI runner is slower than a laptop and can time out tests that pass locally.
+- `main` is protected: GitHub rejects the merge until `check` is green (admins included). Never bypass it with `--admin` or by pushing to `main` directly.
 
 If CI fails: read the log (`gh run view <run-id> --log-failed`), fix, commit, push, and wait again. Never merge red.
 
