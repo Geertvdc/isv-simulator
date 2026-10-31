@@ -26,7 +26,7 @@ export const FINISH = {
   knit: { rough: 1, metal: 0, glow: 0 },
   denim: { rough: 0.9, metal: 0, glow: 0 },
   skin: { rough: 0.62, metal: 0, glow: 0.03, scatter: 1 },
-  hair: { rough: 0.42, metal: 0, glow: 0 },
+  hair: { rough: 0.6, metal: 0, glow: 0 },
   leather: { rough: 0.34, metal: 0, glow: 0 },
   rubber: { rough: 0.68, metal: 0, glow: 0 },
   plastic: { rough: 0.32, metal: 0, glow: 0 },
@@ -532,6 +532,8 @@ const CREASE_GRID = 56;
 /** How far (in voxels) a crease looks for a neighbour, and how dark it gets. */
 const CREASE_REACH = 5;
 const CREASE_DARK = 0.42;
+/** Smoothing passes over the baked shade. */
+const CREASE_BLUR = 2;
 
 /**
  * Bakes a cheap ambient occlusion into the vertex colors: points with other
@@ -594,6 +596,7 @@ export function bakeCreases(geometry: THREE.BufferGeometry): void {
   const ty = new THREE.Vector3();
   const dir = new THREE.Vector3();
   const tint = new THREE.Color();
+  const shade = new Float32Array(position.count).fill(1);
   for (let i = 0; i < position.count; i++) {
     if (finish.getZ(i) > 0.5) continue;
     p.fromBufferAttribute(position, i);
@@ -607,9 +610,9 @@ export function bakeCreases(geometry: THREE.BufferGeometry): void {
       dir.copy(tx).multiplyScalar(r.x).addScaledVector(ty, r.y).addScaledVector(nrm, r.z);
       for (let step = 1.6; step <= CREASE_REACH; step += 0.9) {
         const g = voxel(
-          p.x + (dir.x * step + nrm.x * 0.6) * cell,
-          p.y + (dir.y * step + nrm.y * 0.6) * cell,
-          p.z + (dir.z * step + nrm.z * 0.6) * cell,
+          p.x + (dir.x * step + nrm.x * 1.1) * cell,
+          p.y + (dir.y * step + nrm.y * 1.1) * cell,
+          p.z + (dir.z * step + nrm.z * 1.1) * cell,
         );
         if (g >= 0 && grid[g]) {
           blocked += 1 - ((step - 1.6) / (CREASE_REACH - 1.6)) * 0.6;
@@ -617,8 +620,30 @@ export function bakeCreases(geometry: THREE.BufferGeometry): void {
         }
       }
     }
-    const dark = 1 - CREASE_DARK * Math.min(1, blocked / CREASE_RAYS.length) ** 0.8;
-    tint.fromBufferAttribute(color, i).multiplyScalar(dark);
+    shade[i] = 1 - CREASE_DARK * Math.min(1, blocked / CREASE_RAYS.length) ** 0.8;
+  }
+  // Blur the shade along the mesh's edges so the voxel steps don't speckle.
+  if (index) {
+    for (let pass = 0; pass < CREASE_BLUR; pass++) {
+      const sum = Float32Array.from(shade);
+      const count = new Float32Array(position.count).fill(1);
+      for (let k = 0; k < index.count; k += 3) {
+        for (let e = 0; e < 3; e++) {
+          const i = index.getX(k + e);
+          const j = index.getX(k + ((e + 1) % 3));
+          sum[i] = (sum[i] ?? 0) + (shade[j] ?? 1);
+          sum[j] = (sum[j] ?? 0) + (shade[i] ?? 1);
+          count[i] = (count[i] ?? 0) + 1;
+          count[j] = (count[j] ?? 0) + 1;
+        }
+      }
+      for (let i = 0; i < position.count; i++) {
+        if (finish.getZ(i) <= 0.5) shade[i] = (sum[i] ?? 0) / (count[i] ?? 1);
+      }
+    }
+  }
+  for (let i = 0; i < position.count; i++) {
+    tint.fromBufferAttribute(color, i).multiplyScalar(shade[i] ?? 1);
     color.setXYZ(i, tint.r, tint.g, tint.b);
   }
   color.needsUpdate = true;
