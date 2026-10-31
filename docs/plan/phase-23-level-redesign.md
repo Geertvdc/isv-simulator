@@ -658,54 +658,141 @@ Every meeting room in this chapter is a real room: `#` (or partition) walls on a
 
 ### Chapter 5: Big Tech
 
-Layout gimmick: no new code: gaps and belts on a campus (buildings, skybridges, an atrium). Sketches: _not drawn yet_.
+Layout gimmick: no new code: gaps and belts on a campus (buildings, skybridges, an atrium). Sketches: [the-atrium](images/level-redesign/the-atrium.svg), [design-sprint](images/level-redesign/design-sprint.svg), [monorepo](images/level-redesign/monorepo.svg), [hackathon](images/level-redesign/hackathon.svg). 3D renders: [the-atrium](images/level-redesign/the-atrium-3d.webp), [design-sprint](images/level-redesign/design-sprint-3d.webp), [monorepo](images/level-redesign/monorepo-3d.webp), [hackathon](images/level-redesign/hackathon-3d.webp).
 
 #### 5-1 The Atrium (`the-atrium`)
 
 **Concept:** 20×11 large. Two buildings across an atrium, a 1-wide skybridge, belt bridges. Gimmick: gaps, belts. 1p / 4p: Skybridge + walk-round for solo.
 
-- **Draft:** `maps/drafts/the-atrium.txt`: _not drawn yet_
-- **Sketch:** _`images/level-redesign/the-atrium.svg` (current left, draft right) goes here_
-- **Report:** _row from `npm run level-report -- the-atrium --table` goes here_
-- **Intent:** _what the layout teaches and where players bump_
-- **Solo:** _the solo route and how long it is_
-- **4 players:** _how the team splits, the chokepoint and its bypass_
+- **Draft:** `maps/drafts/the-atrium.txt`
+
+  ```text
+  ##II#KK##
+  #........~~~~#BB#TT#
+  K..1.....>>>>C.....#
+  K........~~~~......P
+  S...............3..P
+  S........~~~~......#
+  #.......C<<<<..4...T
+  X..2.....~~~~......T
+  #........~~~~......#
+  #..................#
+  ####################
+  ```
+
+- **Sketch:** ![5-1 The Atrium, current left, draft right](images/level-redesign/the-atrium.svg)
+- **3D render:** ![5-1 The Atrium draft in the game](images/level-redesign/the-atrium-3d.webp)
+- **Report:**
+
+  | Level                    | Size  | Floor | Stations             | Solo run | Loop | Chokepoints             | Reachable |
+  | ------------------------ | ----- | ----- | -------------------- | -------- | ---- | ----------------------- | --------- |
+  | 5-1 The Atrium (current) | 16×10 | 85    | I2 B2 K2 T3 P2 S2 X1 | 44       | 52   | cut 6,8–8,8 (3)         | all       |
+  | 5-1 The Atrium (draft)   | 20×11 | 126   | I2 B2 K4 T4 P2 S2 X1 | 40       | 44   | detour 9,4–12,4 (4) +16 | all       |
+
+- **Intent:** the first campus map: two buildings face each other across a 4-wide atrium (gaps, x9..12). The west building is where work starts and ends: inbox and two keyboards on the back wall, two more keyboards, the ship and the bin on the left wall. The east building is where work gets checked: bug queue and two test benches on the back wall, pipelines and two more test benches on the right wall. Three ways across: the 1-wide skybridge in the middle (r4), the belt bridges (r2 eastbound into a counter at 13,2, r6 westbound into a counter at 8,6), and the long walk round over the 1-wide front bridge (r9). Tickets cross on the belts, people cross on the skybridge, and anything dropped into the atrium is gone. Players bump on the skybridge, used both ways because the ship is back on the west side.
+- **Solo:** spawn 1 stands under the inbox and keyboards: 40 steps to the first ship, a loop is 44 (current 52). Grab, code in the west building, walk over the skybridge to test and deploy, walk back over it to ship. The belts save walking: put a coded ticket on the r2 belt, cross the skybridge empty-handed and pick it up at the far counter; the r6 belt brings a deployed ticket home. Nothing needs a second player.
+- **4 players:** spawns 1 and 2 in the west building (inbox, keyboards, ship), 3 and 4 in the east (bugs, tests, pipelines): a natural code team and a QA/ops team, with the belts as the hand-off in both directions. The chokepoint is the skybridge (9,4–12,4); the bypass is the front bridge, 16 steps longer, or not walking at all and sending tickets over the belts.
 - **Review:** _human feedback from gate 1_
 
 #### 5-2 Design Sprint (`design-sprint`)
 
 **Concept:** 18×10 medium. Small cosy design studio (whiteboards) joined by a hallway to a big engineering hall built for pairing. Gimmick: design, pairing. 1p / 4p: Studio fits 2.
 
-- **Draft:** `maps/drafts/design-sprint.txt`: _not drawn yet_
-- **Sketch:** _`images/level-redesign/design-sprint.svg` (current left, draft right) goes here_
-- **Report:** _row from `npm run level-report -- design-sprint --table` goes here_
-- **Intent:** _what the layout teaches and where players bump_
-- **Solo:** _the solo route and how long it is_
-- **4 players:** _how the team splits, the chokepoint and its bypass_
+- **Draft:** `maps/drafts/design-sprint.txt`
+
+  ```text
+  ###W##
+  #....#   ##BB#TT##
+  W..2.#####.......#
+  W.........3......P
+  #.1..#...........P
+  #....>>>>C.KK.KK.#
+  #II###   #.......#
+           #...4...#
+           X.......#
+           ###SS####
+  ```
+
+- **Sketch:** ![5-2 Design Sprint, current left, draft right](images/level-redesign/design-sprint.svg)
+- **3D render:** ![5-2 Design Sprint draft in the game](images/level-redesign/design-sprint-3d.webp)
+- **Report:**
+
+  | Level                       | Size  | Floor | Stations                | Solo run | Loop | Chokepoints | Reachable |
+  | --------------------------- | ----- | ----- | ----------------------- | -------- | ---- | ----------- | --------- |
+  | 5-2 Design Sprint (current) | 16×10 | 80    | I2 B1 K4 T2 P2 S2 X1 W4 | 28       | 38   | none        | all       |
+  | 5-2 Design Sprint (draft)   | 18×10 | 74    | I2 B2 K4 T2 P2 S2 X1 W3 | 29       | 46   | cut 5,3     | all       |
+
+- **Intent:** a small studio and a big hall. The studio (4×5) has the inbox on its front wall and three whiteboards (two on the left wall, one on the back wall), and it has one 1-wide door (5,3) into a 2-wide hallway. The hall is built for pairing: two free-standing keyboard islands (KK, workable from above and below), bug queue and test benches on the back wall, pipelines on the right wall, the ship at the front. A belt runs from the studio through the wall into a hall counter (9,5): designed tickets ride over, people walk through the door. Players bump in the studio door: everyone going back for a new ticket or a whiteboard meets the people coming out.
+- **Solo:** spawn 1 stands by the inbox in the studio: 29 steps to the first ship, a loop is 46 (current 38): longer because the studio and the hall are two rooms now. Grab a ticket, design it at a whiteboard if it needs it, drop it on the belt, walk through the door and pick it up at the hall counter, code at an island, test, deploy, ship, walk back. Pairing is a speed-up, never needed.
+- **4 players:** spawns 1 and 2 in the studio (designers: inbox, whiteboards, belt), 3 and 4 in the hall (engineers: pair on the islands, test, deploy, ship). The studio fits two; a third person in there is in the way. The chokepoint is the studio door (5,3), a cut for people; the bypass for tickets is the belt (studio to hall) and throwing back through the door (hall to studio). Open question for review: is the door alone OK, or should the studio get a second door?
 - **Review:** _human feedback from gate 1_
 
 #### 5-3 Monorepo (`monorepo`)
 
 **Concept:** 22×10 large. FE building and BE building with the merge "integration room" between them, reached by two corridors; belt across. Gimmick: merge, gaps, belts. 1p / 4p: Teams split FE/BE.
 
-- **Draft:** `maps/drafts/monorepo.txt`: _not drawn yet_
-- **Sketch:** _`images/level-redesign/monorepo.svg` (current left, draft right) goes here_
-- **Report:** _row from `npm run level-report -- monorepo --table` goes here_
-- **Intent:** _what the layout teaches and where players bump_
-- **Solo:** _the solo route and how long it is_
-- **4 players:** _how the team splits, the chokepoint and its bypass_
+- **Draft:** `maps/drafts/monorepo.txt`
+
+  ```text
+  #I###K#        #K###I#
+  #.....#        #.....#
+  #..1..>>>>G<<<<<..2..#
+  #.....# T....P #.....B
+  #.KK..# T....P #.....B
+  #............# #.....#
+  #.....# #..3.T #.KK..#
+  X.4...# #............X
+  #.....# #....# #.....#
+  ####### ##SS## #######
+  ```
+
+- **Sketch:** ![5-3 Monorepo, current left, draft right](images/level-redesign/monorepo.svg)
+- **3D render:** ![5-3 Monorepo draft in the game](images/level-redesign/monorepo-3d.webp)
+- **Report:**
+
+  | Level                  | Size  | Floor | Stations                | Solo run | Loop | Chokepoints                        | Reachable |
+  | ---------------------- | ----- | ----- | ----------------------- | -------- | ---- | ---------------------------------- | --------- |
+  | 5-3 Monorepo (current) | 16×10 | 92    | I2 B1 K6 T3 P2 S2 X1 G1 | 28       | 36   | none                               | all       |
+  | 5-3 Monorepo (draft)   | 22×10 | 106   | I2 B2 K6 T3 P2 S2 X2 G1 | 24       | 38   | cut 6,5–8,5 (3); cut 13,7–15,7 (3) | all       |
+
+- **Intent:** three buildings on one campus with open air between them. The FE building (left) and BE building (right) each have their own inbox, a wall keyboard and a free-standing keyboard island for pairing, and a bin by the side wall; bugs come in at the BE building. In the middle the integration room has the merge station (G) on its back wall, fed by a belt from each building, tests and pipelines on both of its sides, and the ship at its front. The buildings join the integration room by one 1-wide corridor each, staggered: FE at r5, BE at r7. Full-stack orders give one FE and one BE ticket; each team codes its half at home, puts it on its belt and both halves meet at G. Players bump in the corridors and around the merge station.
+- **Solo:** spawn 1 stands in the FE building under the inbox: 24 steps to the first ship, a loop is 38 (current 36). A full-stack order means coding the FE half, putting it on the FE belt, walking through both corridors to code the BE half, putting it on the BE belt, then merging, testing, deploying and shipping in the middle. Both belts deliver to G on their own, so a solo player never carries both halves.
+- **4 players:** spawns 1 and 4 in the FE building, 2 in the BE building, 3 in the integration room: the team splits FE / BE / integration by itself. The chokepoints are the two corridors (6,5–8,5 and 13,7–15,7), cuts for people; the bypass for tickets is the belts, which run straight into G. Open questions for review: are 1-wide corridors too tight for 4 players, or is that the joke? The space between buildings is void (open air), not `~` gap tiles: it behaves the same and reads as outdoors.
 - **Review:** _human feedback from gate 1_
 
 #### 5-4 Hackathon (`hackathon`)
 
 **Concept:** 22×12 large. Big hall with a belt loop + side rooms; everything at once (optionally one partition shift as a callback). Gimmick: everything. 1p / 4p: Many routes.
 
-- **Draft:** `maps/drafts/hackathon.txt`: _not drawn yet_
-- **Sketch:** _`images/level-redesign/hackathon.svg` (current left, draft right) goes here_
-- **Report:** _row from `npm run level-report -- hackathon --table` goes here_
-- **Intent:** _what the layout teaches and where players bump_
-- **Solo:** _the solo route and how long it is_
-- **4 players:** _how the team splits, the chokepoint and its bypass_
+- **Draft:** `maps/drafts/hackathon.txt`
+
+  ```text
+       ##II##BB#KK#
+       #.1........#
+  #WW###...KK.....#
+  #...............##TT##
+  W....#..>>>>>v..#....P
+  #....#..^~~~~v..C....P
+  #..3....^~~~~v..#....#
+  #....#..^<<<<<.......#
+  ######......2...#.4..X
+       #....G.....######
+       #..........#
+       ###TT##SS###
+  ```
+
+- **Sketch:** ![5-4 Hackathon, current left, draft right](images/level-redesign/hackathon.svg)
+- **3D render:** ![5-4 Hackathon draft in the game](images/level-redesign/hackathon-3d.webp)
+- **Report:**
+
+  | Level                   | Size  | Floor | Stations                   | Solo run | Loop | Chokepoints                             | Reachable |
+  | ----------------------- | ----- | ----- | -------------------------- | -------- | ---- | --------------------------------------- | --------- |
+  | 5-4 Hackathon (current) | 16×10 | 69    | I2 B2 K4 T4 P2 S2 X1 W2 G1 | 27       | 36   | detour 6,8 +16; detour 9,8–10,8 (2) +16 | all       |
+  | 5-4 Hackathon (draft)   | 22×12 | 116   | I2 B2 K4 T4 P2 S2 X1 W3 G1 | 35       | 50   | cut 16,7                                | all       |
+
+- **Intent:** the finale: a big cross-shaped hall with a design room on the left and a server room on the right. In the hall a closed "sushi" belt loop runs round a pit in the middle: put a ticket on anywhere and it goes round until someone takes it off on the other side. The hall has the inbox, bug queue and two keyboards on the back wall, a free-standing keyboard island for pairing, the merge station (10,9) in the front bay, and two test benches and the ship on the front wall. The design room has three whiteboards and two doors (5,3 and 5,6). The server room has two test benches on its back wall and the pipelines and bin on its right wall; it has one door (16,7) and a serving hatch counter (16,5) into the hall. Incidents land on top of everything else. Players bump in the server-room door and around the loop. No partition (`=`): the loop and three rooms are enough.
+- **Solo:** spawn 1 stands under the inbox: 35 steps to the first ship, a loop is 50 (current 36): the longest in the game, as the finale. Walk the loop the long way round or use it: drop a ticket on the loop at the design-room side and pick it up at the server-room side. The hatch counter saves walking into the server room with every ticket.
+- **4 players:** spawns 1 and 2 in the hall (inbox, keyboards, merge, ship), 3 in the design room (whiteboards), 4 in the server room (tests, pipelines, incidents): four jobs, four rooms. The chokepoint is the server-room door (16,7), a cut for people; the bypass for tickets is the hatch counter (16,5): hand over, or throw onto it. Open question for review: can the closed loop fill up and get in the way? It keeps turning when full, so nothing jams, but four players dumping tickets on it could be chaos.
 - **Review:** _human feedback from gate 1_
 
 ## Delivery
