@@ -223,6 +223,23 @@ it('provides every hairstyle for every role with a shared face, outfit, ownershi
   for (const m of [materials.body, materials.glow, materials.glass]) m.dispose();
 });
 
+it('gasps while knocked flying and gets its own face back after', () => {
+  const materials = kitMaterials();
+  for (const role of ROLE_IDS) {
+    const c = createDeveloper(2, materials, role, developerAppearance(2));
+    const rig = c.rig;
+    if (!rig) throw new Error('Missing production rig');
+    const input = studyFrame('idle', 900).input;
+    applyPose(c, playerPose({ ...input, shovedMs: 60 }, 900));
+    expect(rig.face.mesh.geometry).toBe(rig.face.shocked);
+    expect(c.geometries).toContain(rig.face.shocked);
+    applyPose(c, playerPose({ ...input, shovedMs: null }, 900));
+    expect(rig.face.mesh.geometry).toBe(rig.face.calm);
+    disposeCharacter(c);
+  }
+  for (const m of [materials.body, materials.glow, materials.glass]) m.dispose();
+});
+
 it('defaults to a varied crew without a gender field', () => {
   expect([1, 2, 3, 4].map((id) => developerAppearance(id).hairstyle)).toEqual(DEVELOPER_HAIRSTYLES);
   expect(Object.keys(developerAppearance(1)).sort()).toEqual(['hair', 'hairstyle', 'skin']);
