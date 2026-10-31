@@ -434,6 +434,10 @@ function generalist(color: number, skin: number): Outfit {
   };
 }
 
+/** Round the waist from the front: where the swatch fan and the thermos hang, clear of hands and legs. */
+const FAN_PHI = 2.05;
+const THERMOS_PHI = -1.85;
+
 // --- Frontend: color-block bomber, scarf, beret (on the head), swatch fan --------
 
 function frontend(color: number, skin: number): Outfit {
@@ -557,11 +561,12 @@ function frontend(color: number, skin: number): Outfit {
       6,
     );
   }
-  // A big swatch fan on the right hip: cards fanned round a brass pin.
+  // A big swatch fan clipped to the belt behind the left hip: cards fanned back round a brass pin,
+  // so the hand and the striding leg pass in front of it.
   const fan = new SculptBuilder();
   const swatches = [0xe84393, 0xff9f43, 0xfeca57, 0x1dd1a1, 0x54a0ff, 0x8e6cf0];
   swatches.forEach((c, k) => {
-    const a = -0.65 + k * 0.24;
+    const a = -0.15 + k * 0.22;
     const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(a, 0, 0));
     const at = new THREE.Vector3(0, -0.07, 0).applyQuaternion(q);
     fan.box(0.005, 0.14, 0.042, 0.004, c, FINISH.enamel, {
@@ -597,10 +602,13 @@ function frontend(color: number, skin: number): Outfit {
     swings: [
       { geometry: tail.build(), pivot: [-0.07, 0.27, 0.17], hang: 'front', amp: 0.04 },
       {
-        geometry: fan.build().scale(2.2, 2.2, 2.2),
-        pivot: [0.25, -0.16, -0.03],
+        geometry: fan
+          .build()
+          .scale(2, 2, 2)
+          .rotateY(FAN_PHI - Math.PI / 2),
+        pivot: v3(surf(P, -0.15, FAN_PHI, 0.012)),
         hang: 'side',
-        amp: 0.3,
+        amp: 0.12,
       },
     ],
     shoulder: 0.27,
@@ -725,9 +733,9 @@ function backend(color: number, skin: number): Outfit {
       { at: [0, 0, surf(P, 0.11, 0, 0.01).z] },
     );
   }
-  // The thermos in a strap holster on the front-right hip.
+  // The thermos in a strap holster on the right hip, just behind the hand line.
   const steel = 0xb9c1cb;
-  const hip = surf(P, -0.12, -0.9, 0.066);
+  const hip = surf(P, -0.12, THERMOS_PHI, 0.066);
   const tx = hip.x;
   const tz = hip.z;
   const ty = -0.13;
@@ -758,8 +766,8 @@ function backend(color: number, skin: number): Outfit {
   );
   b.cylinder(0.06, 0.06, 0.03, 0xff8a3d, FINISH.rubber, { at: [tx, ty - 0.06, tz] }, 24);
   b.box(0.04, 0.05, 0.004, 0.006, 0xfdfdf6, FINISH.enamel, {
-    at: [tx - 0.04, ty - 0.12, tz + 0.03],
-    rot: [0, -0.9, 0],
+    at: [tx + Math.sin(THERMOS_PHI) * 0.05, ty - 0.12, tz + Math.cos(THERMOS_PHI) * 0.05],
+    rot: [0, THERMOS_PHI, 0],
   });
   b.torus(
     0.062,
