@@ -229,12 +229,21 @@ export interface CarryHold {
 }
 
 /**
+ * How far a throw wind-up (0 to 1) has loaded the body: fast at first, so
+ * the turn and lean read from the first frames, settling into the cocked pose.
+ */
+export function windUpCurve(windUp: number): number {
+  const w = Math.max(0, Math.min(1, windUp));
+  return 1 - (1 - w) ** 2;
+}
+
+/**
  * Where a carried ticket is held: in front at chest height, or, through a
  * throw wind-up (0 to 1), swung round to the right and up to the shoulder.
  * The carrier's hands hold it there (`carryGrip`, `pose.ts`).
  */
 export function carryPoint(windUp: number): CarryHold {
-  const w = Math.max(0, Math.min(1, windUp));
+  const w = windUpCurve(windUp);
   const yaw = WIND_UP_TURN * w;
   const radius = CARRY_REACH + WIND_UP_OUT * w;
   return {

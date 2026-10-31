@@ -18,7 +18,7 @@ import {
 } from './developerLimbs';
 import { type SwingPart, buildOutfit } from './developerOutfit';
 import type { KitMaterials } from './kit';
-import { carryPoint } from './layout';
+import { carryPoint, windUpCurve } from './layout';
 import { PALETTE } from './look';
 import { COLOR } from './palette';
 import type { Pose } from './pose';
@@ -210,12 +210,18 @@ function across(axis: THREE.Vector3, pole: THREE.Vector3): THREE.Vector3 {
 }
 
 /** The elbow between `shoulder` and `hand`, bending toward `pole`; arms stretch rather than miss a hold. */
-function elbowAt(shoulder: THREE.Vector3, hand: THREE.Vector3, pole: THREE.Vector3): THREE.Vector3 {
+function elbowAt(
+  shoulder: THREE.Vector3,
+  hand: THREE.Vector3,
+  pole: THREE.Vector3,
+  slack = 0,
+): THREE.Vector3 {
   const axis = hand.clone().sub(shoulder);
   const distance = axis.length();
   if (distance > 1.12) throw new Error('Developer hand target exceeds arm reach');
   axis.normalize();
-  const length = Math.max(ARM, distance / 2 + 0.008);
+  // `slack` stretches a reaching arm a touch more so its elbow still cocks (cartoon reach).
+  const length = Math.max(ARM, distance / 2 + 0.008, distance * (0.5 + slack));
   return shoulder
     .clone()
     .add(hand)
@@ -260,7 +266,8 @@ function blend(a: THREE.Vector3, b: THREE.Vector3, t: number): THREE.Vector3 {
  * shoulders away from the throw, a sprinting dash and a two-handed shove.
  */
 export function poseDeveloperRig(c: DeveloperRig, pose: Pose): void {
-  const wind = pose.windUp;
+  // Loads fast, so the turn and lean read from the first frames of a wind-up.
+  const wind = pose.carrying ? windUpCurve(pose.windUp) : 0;
   const walk = pose.walk;
   const s = pose.stride;
   const dash = pose.dash;
@@ -269,14 +276,14 @@ export function poseDeveloperRig(c: DeveloperRig, pose: Pose): void {
   const thrust = carrying ? 0 : pose.thrust;
   const stumble = pose.stumble;
   const release = carrying ? 0 : pose.release;
-  const turn = carrying ? carryPoint(wind).yaw : 0;
+  const turn = carrying ? carryPoint(pose.windUp).yaw : 0;
 
   // The body: highest as the legs pass, lowest at heel strike; sunk into bent knees for effort.
   const run = Math.max(walk, dash);
   const stepBob = run * (0.03 * Math.abs(Math.cos(s)) - 0.022) * (1 + dash * 0.4);
   // Hands full: stay upright and tall so the chest and hair never run into the folder.
   const hold = carrying ? 0.1 : 1;
-  const crouch = 0.045 * wind + 0.03 * dash * hold + 0.035 * thrust + 0.02 * stumble;
+  const crouch = 0.06 * wind + 0.03 * dash * hold + 0.035 * thrust + 0.02 * stumble;
   const lift = stepBob - crouch;
   const forward = (0.03 * dash + 0.05 * thrust) * hold - 0.04 * stumble + 0.04 * release;
   const tilt =
@@ -287,7 +294,8 @@ export function poseDeveloperRig(c: DeveloperRig, pose: Pose): void {
     0.3 * release -
     0.3 * stumble -
     0.28 * wind;
-  const roll = pose.roll * 0.7 * (1 - 0.85 * wind);
+  // A wind-up also leans away from the folder, loading the back leg.
+  const roll = pose.roll * 0.7 * (1 - 0.85 * wind) + 0.14 * wind;
   // Shoulders counter the hips on a walk; a wind-up turns them most of the way round.
   // A throw's follow-through unwinds them past square, the other way.
   const twist = -Math.sin(s) * 0.12 * walk * (1 - dash * 0.5) * hold + turn * 0.95 - 0.45 * release;
@@ -354,6 +362,7 @@ export function poseDeveloperRig(c: DeveloperRig, pose: Pose): void {
     let pole: THREE.Vector3;
     let palm: THREE.Vector3;
     let fingersUp = 0;
+    let slack = 0;
     if (carrying) {
       // Clamped round the ticket's short side, elbows out and down, palms in.
       hand = new THREE.Vector3(target.x, target.y + pose.bob, target.z);
@@ -361,6 +370,9 @@ export function poseDeveloperRig(c: DeveloperRig, pose: Pose): void {
         new THREE.Quaternion().setFromAxisAngle(UP, turn),
       );
       palm = new THREE.Vector3(-sign * chest.z, 0, sign * chest.x);
+      // Cocked: elbows bent and dropped under the folder, not aimed out like a rifle.
+      slack = 0.09 * wind;
+      pole.y -= 0.8 * wind;
     } else {
       // Hanging relaxed just ahead of the thighs, swinging against the legs.
       const swing = Math.sin(s) * walk * -sign;
@@ -404,7 +416,7 @@ export function poseDeveloperRig(c: DeveloperRig, pose: Pose): void {
         palm.lerp(new THREE.Vector3(0, -1, 0.2), stumble);
       }
     }
-    const elbow = elbowAt(shoulder, hand, pole);
+    const elbow = elbowAt(shoulder, hand, pole, slack);
     segment(arm.upper, shoulder, elbow);
     segment(arm.lower, elbow, hand);
     arm.elbow.position.copy(elbow);
@@ -425,9 +437,9 @@ export function poseDeveloperRig(c: DeveloperRig, pose: Pose): void {
     let pitch = swing > 0 ? -0.3 * swing : -(0.3 + 0.5 * dash) * swing;
     let x = sign * 0.13;
     let z = swing * (0.22 + 0.06 * dash) - 0.06 * dash + forward;
-    // Wind-up: lead foot forward, back foot planted behind and out.
-    x += sign * 0.04 * wind;
-    z += -sign * 0.13 * wind;
+    // Wind-up: lead foot forward, back foot planted behind and out, its knee taking the weight.
+    x += sign * 0.05 * wind;
+    z += -sign * (sign > 0 ? 0.17 : 0.13) * wind;
     // Shove: lead (left) foot steps in, back foot pushes off on its toes.
     const push = Math.max(thrust, release);
     z += (sign < 0 ? 0.2 : -0.2) * push;
