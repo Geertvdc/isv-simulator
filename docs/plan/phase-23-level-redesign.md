@@ -1,6 +1,6 @@
 # Phase 23: Level redesign
 
-**Status:** in progress. Layer 1 (this file, `maps/drafts/`, the sketch and report tools) is in; the draft maps come chapter by chapter in the next layers, Garage first. Nothing in the game changes until the greybox step.
+**Status:** in progress. Layer 1 (this file, `maps/drafts/`, the sketch and report tools) is in; layer 2 has the Garage drafts, waiting for review; the other chapters come in the next layers. Nothing in the game changes until the greybox step.
 
 **Goal:** levels that differ in size and shape (small rooms, big halls, two rooms joined by a hallway where people bump into each other) and a layout play element per chapter, not only furniture placement. Today all 16 campaign maps are the same 14×10 rectangle (Big Tech 16×10) with furniture moved around. Every level must work from 1 to 4 players on one map.
 
@@ -114,42 +114,97 @@ Each level gets: the draft map, the sketch (current left, draft right), its repo
 
 ### Chapter 1: Garage
 
-Layout gimmick: no new code: the founder's house (rooms, serving hatch, hallway). Sketches: _not drawn yet_.
+Layout gimmick: no new code: the founder's house (rooms, serving hatch, hallway). Sketches: [garage](images/level-redesign/garage.svg), [open-plan](images/level-redesign/open-plan.svg), [scale-up](images/level-redesign/scale-up.svg).
 
 #### 1-1 The Garage (`garage`)
 
 **Concept:** 10×7 small. One single-car garage, roll-up door is the ship hatch, workbench counters. Gimmick: none (tutorial). 1p / 4p: Short solo loop; 4p crowding is the joke.
 
-- **Draft:** `maps/drafts/garage.txt`: _not drawn yet_
-- **Sketch:** _`images/level-redesign/garage.svg` (current left, draft right) goes here_
-- **Report:** _row from `npm run level-report -- garage --table` goes here_
-- **Intent:** _what the layout teaches and where players bump_
-- **Solo:** _the solo route and how long it is_
-- **4 players:** _how the team splits, the chokepoint and its bypass_
+- **Draft:** `maps/drafts/garage.txt`
+
+  ```text
+  ##BI#KK#
+  #......#
+  #..1...###
+  X......2T#
+  #..CCC...T
+  #.3...4..P
+  ###SS#####
+  ```
+
+- **Sketch:** ![1-1 The Garage, current left, draft right](images/level-redesign/garage.svg)
+- **Report:**
+
+  | Level                    | Size  | Floor | Stations             | Solo run | Loop | Chokepoints           | Reachable |
+  | ------------------------ | ----- | ----- | -------------------- | -------- | ---- | --------------------- | --------- |
+  | 1-1 The Garage (current) | 14×10 | 85    | I1 B1 K2 T2 P1 S1 X1 | 24       | 32   | none                  | all       |
+  | 1-1 The Garage (draft)   | 10×7  | 32    | I1 B1 K2 T2 P1 S2 X1 | 14       | 20   | detour 4,5–5,5 (2) +6 | all       |
+
+- **Intent:** the smallest map in the game: a single-car garage, L-shaped because the house's utility room takes the back-right corner. The tutorial stations sit in a row on the back wall (bug queue, inbox, two keyboards), tests and the one pipeline step down the right side, and the roll-up door at the front is a 2-wide ship hatch, right in front of the camera. A workbench (3 counters) stands in the middle where the car would be. Players bump in the 1-wide strip between the workbench and the roll-up door (4,5–5,5): everyone who ships squeezes through there.
+- **Solo:** spawn 1 stands under the inbox and keyboards: 14 steps to grab, code, test, deploy and ship the first ticket; a loop is 20 steps (current 32). Inbox → keyboard → test bench → pipeline → ship is one lap round the workbench, so the tutorial hints (inbox, keyboard, ship) are all on screen edges the player faces.
+- **4 players:** 32 floor tiles for four people (current 85): crowding is the joke. Spawns: 1 under the inbox, 2 at the test benches, 3 and 4 either side of the roll-up door. The only chokepoint is the strip in front of the roll-up door; the bypass is the 2-wide lane behind the workbench, and the workbench takes tickets for hand-offs. One pipeline for everyone stays (as today), so the queue there is the other bump.
 - **Review:** _human feedback from gate 1_
 
 #### 1-2 Open Plan Office (`open-plan`)
 
 **Concept:** 16×9 medium. First rented office: open room split by a desk-row divider with one gap and a review island; throw over it. Gimmick: rooms, throwing. 1p / 4p: Walk-around exists for solo.
 
-- **Draft:** `maps/drafts/open-plan.txt`: _not drawn yet_
-- **Sketch:** _`images/level-redesign/open-plan.svg` (current left, draft right) goes here_
-- **Report:** _row from `npm run level-report -- open-plan --table` goes here_
-- **Intent:** _what the layout teaches and where players bump_
-- **Solo:** _the solo route and how long it is_
-- **4 players:** _how the team splits, the chokepoint and its bypass_
+- **Draft:** `maps/drafts/open-plan.txt`
+
+  ```text
+  ##KK##B##TT#
+  #..........#
+  #..........#####
+  X......R.......#
+  #.1....R...2...P
+  #......C.......P
+  #...3..C...4...#
+  #..............#
+  ####II###SS#####
+  ```
+
+- **Sketch:** ![1-2 Open Plan Office, current left, draft right](images/level-redesign/open-plan.svg)
+- **Report:**
+
+  | Level                          | Size  | Floor | Stations                | Solo run | Loop | Chokepoints    | Reachable |
+  | ------------------------------ | ----- | ----- | ----------------------- | -------- | ---- | -------------- | --------- |
+  | 1-2 Open Plan Office (current) | 14×10 | 89    | I2 B1 K2 T2 R1 P2 S2 X1 | 37       | 50   | cut 6,8        | all       |
+  | 1-2 Open Plan Office (draft)   | 16×9  | 86    | I2 B1 K2 T2 R2 P2 S2 X1 | 33       | 34   | detour 7,7 +10 | all       |
+
+- **Intent:** the first rented office: one open floor with a stepped outline (the landlord's storage takes the top-right corner). A desk-row divider (column 7) splits it into a code side (left: keyboards, inbox, bug queue, bin) and a ship side (right: test benches, pipelines, ship). The divider is two review desks (7,3–7,4) and two counters (7,5–7,6): a review is done across the desk, one player on each side, and coded tickets are thrown or put over the counters. The divider leaves a 2-wide aisle along the back wall (the walk-around) and one 1-wide gap at the front (7,7), between inbox and ship. The work goes round clockwise: inbox (front left) → keyboards (back left) → over the back aisle → test benches (back right) → pipelines (right wall) → ship (front right) → back through the gap. Players bump in the gap.
+- **Solo:** spawn 1 between the keyboards and the inbox; the full lap is 34 steps (current 50), the first ticket 33. Solo uses the gap on the way back; with it blocked the lap goes round the back aisle (+10). No order needs a review solo, so the review desks are only a counter.
+- **4 players:** spawns 1 and 3 on the code side, 2 and 4 on the ship side, so the team splits along the divider: the left pair takes tickets and codes, then puts them on the divider counters; the right pair tests, deploys and ships. Reviews pull one player from each side to the review desks. Players walking back to the inbox meet the ones going to the ship in the gap; the back aisle is the 2-wide bypass and the counters are the throw-over.
 - **Review:** _human feedback from gate 1_
 
 #### 1-3 Down the Hall (`scale-up`)
 
 **Concept:** 20×9 large. Two rooms joined by a long hallway (2 wide, 1-wide doors at both ends); review room at the far end. Gimmick: hallway bumping. 1p / 4p: Spawns 3/4 in far room.
 
-- **Draft:** `maps/drafts/scale-up.txt`: _not drawn yet_
-- **Sketch:** _`images/level-redesign/scale-up.svg` (current left, draft right) goes here_
-- **Report:** _row from `npm run level-report -- scale-up --table` goes here_
-- **Intent:** _what the layout teaches and where players bump_
-- **Solo:** _the solo route and how long it is_
-- **4 players:** _how the team splits, the chokepoint and its bypass_
+- **Draft:** `maps/drafts/scale-up.txt`
+
+  ```text
+  ##II#KK##
+  #.......#     ######
+  B.1.....#######..3.K
+  #.............C....K
+  T.......C.......RR.#
+  T..CC.2.#######..4.#
+  X.......P     #....#
+  #.......P     ######
+  ###SS####
+  ```
+
+- **Sketch:** ![1-3 Down the Hall, current left, draft right](images/level-redesign/scale-up.svg)
+- **Report:**
+
+  | Level                       | Size  | Floor | Stations                | Solo run | Loop | Chokepoints       | Reachable |
+  | --------------------------- | ----- | ----- | ----------------------- | -------- | ---- | ----------------- | --------- |
+  | 1-3 Down the Hall (current) | 14×10 | 81    | I2 B1 K2 T2 R1 P2 S2 X1 | 16       | 28   | none              | all       |
+  | 1-3 Down the Hall (draft)   | 20×9  | 77    | I2 B1 K4 T2 R2 P2 S2 X1 | 23       | 30   | cut 8,3; cut 14,4 | all       |
+
+- **Intent:** the founder's house: a big main room (left, 9×9) and a small review room (right, 6×7) joined by a 5-long, 2-wide hallway. Each end has a 1-wide door (8,3 and 14,4), set diagonally so people going opposite ways cross in the hall, and a serving-hatch counter next to it (8,4 and 14,3) to pass tickets through the wall when the door is jammed. The main room has the whole feature line (inbox, keyboards, bug queue, test benches, pipelines, ship); the review room has a 2-tile review table in the middle (16–17,4, room on all sides for a pair) and two more keyboards on its back wall. Half the features need a review, so with two or more players tickets go down the hall and come back to be tested and shipped. Players bump in the doors and the hallway.
+- **Solo:** never needs the hallway: solo has no reviews, and the main room holds the full lap of 30 steps (current 28; first ticket 23). The far keyboards are optional.
+- **4 players:** spawns 1 and 2 in the main room, 3 and 4 in the review room. The main-room pair takes tickets and runs test, deploy and ship; the review-room pair codes and reviews. Tickets go down the hall fresh and come back reviewed, so the hall has traffic both ways. The two doors are the only cuts in the map (the report's `cut 8,3; cut 14,4`), which the concept asks for; none is on the solo lap. The bypass is for tickets, not people: the hatch next to each door. Two players need the review room at once, so with 2 players both walk the hall for every review; the main room keeps its own keyboards so the hall is never needed just to code. For review: if the doors jam too much in greybox, the far door can become 2-wide.
 - **Review:** _human feedback from gate 1_
 
 ### Chapter 2: Startup
