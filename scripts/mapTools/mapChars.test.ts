@@ -1,0 +1,38 @@
+import { describe, expect, it } from 'vitest';
+import { parseLevelMap } from '../../src/sim/level';
+import { FUTURE_CHARS, countFutureChars, mapRows, parseDraftMap, toStandIns } from './mapChars';
+
+const DRAFT = ['#I##K#', '#1_L2#', '#3=.4#', '#S##T#', ''].join('\n');
+
+describe('future map chars', () => {
+  it('are not game chars yet, and stand in for game chars', () => {
+    for (const [char, { standIn }] of Object.entries(FUTURE_CHARS)) {
+      const spawns = '1234';
+      expect(() => parseLevelMap(`#${char}${spawns}#`)).toThrow(/Unknown map char/);
+      expect(() => parseLevelMap(`#${standIn}${spawns}#`)).not.toThrow();
+    }
+  });
+
+  it('are swapped for their stand-ins', () => {
+    expect(toStandIns('_L=.#')).toBe('..#.#');
+  });
+
+  it('let a draft parse: wet floor and lifts as floor, partitions as wall', () => {
+    const map = parseDraftMap(DRAFT);
+    const at = (x: number, y: number): string | undefined => map.tiles[y * map.width + x];
+    expect(at(2, 1)).toBe('floor');
+    expect(at(3, 1)).toBe('floor');
+    expect(at(2, 2)).toBe('wall');
+    expect(map.spawns).toHaveLength(4);
+  });
+
+  it('are counted', () => {
+    expect(countFutureChars(DRAFT)).toEqual({ _: 1, L: 1, '=': 1 });
+  });
+});
+
+describe('mapRows', () => {
+  it('drops trailing blank lines and keeps uneven rows', () => {
+    expect(mapRows('##\r\n#\n\n')).toEqual(['##', '#']);
+  });
+});
