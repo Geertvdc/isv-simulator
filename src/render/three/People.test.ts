@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import { DEVELOPER_TOP } from './DeveloperRig';
-import { HEAD_TOP, carryPoint, placeTicket } from './layout';
+import { CARD_SIZE, HEAD_TOP, carryPoint, placeTicket } from './layout';
 import { People, createWorkMemory, noteWork, workSample } from './People';
 import { kitMaterials } from './kit';
 import { ROLE_IDS } from '../../sim/roles';
@@ -167,7 +167,7 @@ describe('character heights', () => {
         .multiplyScalar(0.5);
       expect(midpoint.x).toBeCloseTo(placed.pos.x);
       expect(midpoint.z).toBeCloseTo(placed.pos.z);
-      expect(midpoint.y).toBeCloseTo(hold.height + 0.03);
+      expect(midpoint.y).toBeCloseTo(hold.height + CARD_SIZE.thickness / 2);
     }
     people.destroy();
     for (const m of [materials.body, materials.glow, materials.glass]) m.dispose();

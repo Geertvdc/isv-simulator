@@ -25,7 +25,7 @@ export const HEAD_TOP = 1.54;
 export const SLAB_DEPTH = 0.45;
 
 /** Ticket cards (folders lying flat): size in world units. */
-export const CARD_SIZE = { width: 0.42, depth: 0.32, thickness: 0.05 };
+export const CARD_SIZE = { width: 0.42, depth: 0.32, thickness: 0.07 };
 /** Queued tickets stack up on their queue; past this many only the count grows. */
 export const QUEUE_STACK_MAX = 4;
 /** Height of the carried ticket's bottom above the floor: held out in front at chest height. */
@@ -39,11 +39,16 @@ const WIND_UP_TURN = 1.45;
 const WIND_UP_LIFT = 0.2;
 const WIND_UP_BACK = 0.12;
 /** Extra reach at full wind-up, so the turned folder clears the ear. */
-const WIND_UP_OUT = 0.1;
+const WIND_UP_OUT = 0.13;
 /** How far in front of the carrier's center the carried ticket floats. */
 export const CARRY_REACH = PLAYER_RADIUS + 0.1;
-/** The hands hold a carried ticket by its short sides, this far either side of its middle. */
-export const CARRY_HALF_GAP = 0.22;
+/**
+ * The hands hold a carried ticket by its short sides: the wrists this far
+ * either side of its middle (a gripping palm's thickness outside the edge,
+ * see `hand` in developerLimbs.ts), level with its middle.
+ */
+export const CARRY_HALF_GAP = CARD_SIZE.width / 2 + 0.045;
+const CARRY_GRIP_RISE = CARD_SIZE.thickness / 2;
 /** How much of a tile a ticket glides across on a belt each step: middle to middle. */
 const BELT_GLIDE = 1;
 /** A ticket waiting for the next tile to free up waits just short of the edge. */
@@ -244,7 +249,7 @@ export function carryPoint(windUp: number): CarryHold {
 export function carryGrip(hold: CarryHold, sign: number): { x: number; y: number; z: number } {
   return {
     x: hold.side + sign * CARRY_HALF_GAP * Math.cos(hold.yaw),
-    y: hold.height + 0.03,
+    y: hold.height + CARRY_GRIP_RISE,
     z: hold.reach - sign * CARRY_HALF_GAP * Math.sin(hold.yaw),
   };
 }

@@ -6,7 +6,7 @@ import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometr
  * A sculpting kit for the developers: smooth, high-segment pieces (deformed
  * spheres, lathes, thick shells, tapered sweeps) merged into one indexed
  * geometry per rigid part. Besides a vertex color every vertex carries a
- * `finish` (roughness, metalness, glow), so cloth, leather, skin, metal and
+ * `finish` (roughness, metalness, glow, scatter), so cloth, leather, skin, metal and
  * glass share one material (`sculptMaterial`) and still read as different stuff.
  */
 
@@ -17,20 +17,22 @@ export interface Finish {
   metal: number;
   /** Self-lit share of the color: 1 is a highlight that ignores the light. */
   glow: number;
+  /** Fake subsurface scatter: a warm glow in the shadowed side and edges (skin). */
+  scatter?: number;
 }
 
 export const FINISH = {
   cloth: { rough: 0.86, metal: 0, glow: 0 },
-  knit: { rough: 0.95, metal: 0, glow: 0 },
+  knit: { rough: 1, metal: 0, glow: 0 },
   denim: { rough: 0.9, metal: 0, glow: 0 },
-  skin: { rough: 0.58, metal: 0, glow: 0.04 },
-  hair: { rough: 0.6, metal: 0, glow: 0 },
-  leather: { rough: 0.48, metal: 0, glow: 0 },
+  skin: { rough: 0.62, metal: 0, glow: 0.03, scatter: 1 },
+  hair: { rough: 0.42, metal: 0, glow: 0 },
+  leather: { rough: 0.34, metal: 0, glow: 0 },
   rubber: { rough: 0.68, metal: 0, glow: 0 },
   plastic: { rough: 0.32, metal: 0, glow: 0 },
   enamel: { rough: 0.22, metal: 0, glow: 0.05 },
-  metal: { rough: 0.3, metal: 0.9, glow: 0 },
-  brass: { rough: 0.32, metal: 0.95, glow: 0 },
+  metal: { rough: 0.26, metal: 1, glow: 0.04 },
+  brass: { rough: 0.28, metal: 1, glow: 0.04 },
   glass: { rough: 0.06, metal: 0.4, glow: 0.12 },
   eye: { rough: 0.14, metal: 0, glow: 0.12 },
   sparkle: { rough: 0.2, metal: 0, glow: 1 },
@@ -355,13 +357,13 @@ export class SculptBuilder {
     const count = g.getAttribute('position').count;
     const c = new THREE.Color(color);
     const colors = new Float32Array(count * 3);
-    const finishes = new Float32Array(count * 3);
+    const finishes = new Float32Array(count * 4);
     for (let i = 0; i < count; i++) {
       colors.set([c.r, c.g, c.b], i * 3);
-      finishes.set([finish.rough, finish.metal, finish.glow], i * 3);
+      finishes.set([finish.rough, finish.metal, finish.glow, finish.scatter ?? 0], i * 4);
     }
     g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    g.setAttribute('finish', new THREE.BufferAttribute(finishes, 3));
+    g.setAttribute('finish', new THREE.BufferAttribute(finishes, 4));
     this.parts.push(g);
     return this;
   }
@@ -518,6 +520,110 @@ export class SculptBuilder {
   }
 }
 
+/** Hemisphere directions (+z up), cosine-weighted, for the crease bake. */
+const CREASE_RAYS = Array.from({ length: 14 }, (_, i) => {
+  const u = (i + 0.5) / 14;
+  const a = i * 2.39996;
+  const r = Math.sqrt(u);
+  return new THREE.Vector3(r * Math.cos(a), r * Math.sin(a), Math.sqrt(1 - u));
+});
+/** Voxels along the longest side of a part for the crease bake. */
+const CREASE_GRID = 56;
+/** How far (in voxels) a crease looks for a neighbour, and how dark it gets. */
+const CREASE_REACH = 5;
+const CREASE_DARK = 0.42;
+
+/**
+ * Bakes a cheap ambient occlusion into the vertex colors: points with other
+ * surfaces close above them (under a strap, round a collar, between locks of
+ * hair) get darker, which breaks up the flat fills. Self-lit pieces stay lit.
+ */
+export function bakeCreases(geometry: THREE.BufferGeometry): void {
+  if (!['position', 'normal', 'color', 'finish'].every((name) => geometry.hasAttribute(name)))
+    return;
+  const position = geometry.getAttribute('position');
+  const normal = geometry.getAttribute('normal');
+  const color = geometry.getAttribute('color');
+  const finish = geometry.getAttribute('finish');
+  geometry.computeBoundingBox();
+  const box = geometry.boundingBox;
+  if (!box) return;
+  const size = box.getSize(new THREE.Vector3());
+  const cell = Math.max(size.x, size.y, size.z, 1e-3) / CREASE_GRID;
+  const pad = CREASE_REACH + 2;
+  const nx = Math.ceil(size.x / cell) + pad * 2;
+  const ny = Math.ceil(size.y / cell) + pad * 2;
+  const nz = Math.ceil(size.z / cell) + pad * 2;
+  const grid = new Uint8Array(nx * ny * nz);
+  const ox = box.min.x - pad * cell;
+  const oy = box.min.y - pad * cell;
+  const oz = box.min.z - pad * cell;
+  const voxel = (x: number, y: number, z: number): number => {
+    const i = Math.floor((x - ox) / cell);
+    const j = Math.floor((y - oy) / cell);
+    const k = Math.floor((z - oz) / cell);
+    if (i < 0 || j < 0 || k < 0 || i >= nx || j >= ny || k >= nz) return -1;
+    return (k * ny + j) * nx + i;
+  };
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  const p = new THREE.Vector3();
+  const index = geometry.index;
+  const triangles = (index?.count ?? position.count) / 3;
+  for (let t = 0; t < triangles; t++) {
+    const at = (k: number) => (index ? index.getX(t * 3 + k) : t * 3 + k);
+    a.fromBufferAttribute(position, at(0));
+    b.fromBufferAttribute(position, at(1));
+    c.fromBufferAttribute(position, at(2));
+    const edge = Math.max(a.distanceTo(b), b.distanceTo(c), c.distanceTo(a));
+    const n = Math.max(1, Math.min(24, Math.ceil(edge / cell)));
+    for (let u = 0; u <= n; u++) {
+      for (let v = 0; v <= n - u; v++) {
+        p.copy(a)
+          .multiplyScalar((n - u - v) / n)
+          .addScaledVector(b, u / n)
+          .addScaledVector(c, v / n);
+        const g = voxel(p.x, p.y, p.z);
+        if (g >= 0) grid[g] = 1;
+      }
+    }
+  }
+  const nrm = new THREE.Vector3();
+  const tx = new THREE.Vector3();
+  const ty = new THREE.Vector3();
+  const dir = new THREE.Vector3();
+  const tint = new THREE.Color();
+  for (let i = 0; i < position.count; i++) {
+    if (finish.getZ(i) > 0.5) continue;
+    p.fromBufferAttribute(position, i);
+    nrm.fromBufferAttribute(normal, i).normalize();
+    tx.set(Math.abs(nrm.x) < 0.9 ? 1 : 0, Math.abs(nrm.x) < 0.9 ? 0 : 1, 0)
+      .cross(nrm)
+      .normalize();
+    ty.copy(nrm).cross(tx);
+    let blocked = 0;
+    for (const r of CREASE_RAYS) {
+      dir.copy(tx).multiplyScalar(r.x).addScaledVector(ty, r.y).addScaledVector(nrm, r.z);
+      for (let step = 1.6; step <= CREASE_REACH; step += 0.9) {
+        const g = voxel(
+          p.x + (dir.x * step + nrm.x * 0.6) * cell,
+          p.y + (dir.y * step + nrm.y * 0.6) * cell,
+          p.z + (dir.z * step + nrm.z * 0.6) * cell,
+        );
+        if (g >= 0 && grid[g]) {
+          blocked += 1 - ((step - 1.6) / (CREASE_REACH - 1.6)) * 0.6;
+          break;
+        }
+      }
+    }
+    const dark = 1 - CREASE_DARK * Math.min(1, blocked / CREASE_RAYS.length) ** 0.8;
+    tint.fromBufferAttribute(color, i).multiplyScalar(dark);
+    color.setXYZ(i, tint.r, tint.g, tint.b);
+  }
+  color.needsUpdate = true;
+}
+
 /** Triangles drawn for a geometry. */
 export function triangleCount(geometry: THREE.BufferGeometry): number {
   return (geometry.index?.count ?? geometry.getAttribute('position').count) / 3;
@@ -525,6 +631,9 @@ export function triangleCount(geometry: THREE.BufferGeometry): number {
 
 /** How strongly edges facing away from the camera catch a soft studio rim. */
 const RIM = 0.32;
+/** Warm fake-subsurface light on skin: in its shadowed side, and at its edges. */
+const SCATTER = 0.22;
+const SCATTER_RIM = 0.35;
 
 /**
  * The one material every developer draws with: vertex colors, per-vertex
@@ -541,11 +650,14 @@ export function sculptMaterial(): THREE.MeshStandardMaterial {
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
-        '#include <common>\nattribute vec3 finish;\nvarying vec3 vFinish;',
+        '#include <common>\nattribute vec4 finish;\nvarying vec4 vFinish;',
       )
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFinish = finish;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vFinish;')
+      .replace(
+        '#include <common>',
+        '#include <common>\nvarying vec4 vFinish;\nconst vec3 SCATTER_TINT = vec3(1.0, 0.42, 0.3);',
+      )
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = vFinish.x;')
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = vFinish.y;')
       .replace(
@@ -556,9 +668,12 @@ export function sculptMaterial(): THREE.MeshStandardMaterial {
         '#include <opaque_fragment>',
         `float sculptRim = pow(1.0 - saturate(dot(normal, normalize(vViewPosition))), 3.0);
 outgoingLight += diffuseColor.rgb * sculptRim * ${RIM.toFixed(3)} * (1.0 - vFinish.y);
+// Skin: light bleeding warm through the turned-away side and the edges.
+float sculptLit = saturate(dot(outgoingLight, vec3(0.333)) / max(dot(diffuseColor.rgb, vec3(0.333)), 1e-3));
+outgoingLight += diffuseColor.rgb * SCATTER_TINT * vFinish.w * (${SCATTER.toFixed(3)} * (1.0 - sculptLit) + ${SCATTER_RIM.toFixed(3)} * sculptRim);
 #include <opaque_fragment>`,
       );
   };
-  material.customProgramCacheKey = () => 'sculpt-finish-v1';
+  material.customProgramCacheKey = () => 'sculpt-finish-v2';
   return material;
 }
