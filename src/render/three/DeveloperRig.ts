@@ -86,6 +86,8 @@ export interface DeveloperRig {
   root: THREE.Group;
   torso: THREE.Group;
   head: THREE.Group;
+  /** The head's two faces: the role's own, and a shocked one while stumbling. */
+  face: { mesh: THREE.Mesh; calm: THREE.BufferGeometry; shocked: THREE.BufferGeometry };
   waist: THREE.Mesh;
   arms: [Arm, Arm];
   legs: [Leg, Leg];
@@ -125,7 +127,15 @@ export function createDeveloperRig(
   torso.add(head);
   head.position.y = NECK_Y;
   torso.add(mesh(outfit.torso));
-  head.add(mesh(buildHead(roleId, { skin, hair, hairstyle }, color)));
+  const calm = buildHead(roleId, { skin, hair, hairstyle }, color);
+  const face = {
+    mesh: mesh(calm),
+    calm,
+    shocked: buildHead(roleId, { skin, hair, hairstyle }, color, true),
+  };
+  geometries.push(face.shocked);
+  bakeCreases(face.shocked);
+  head.add(face.mesh);
 
   const swings = outfit.swings.map((part): Swing => {
     const made = mesh(part.geometry);
@@ -179,6 +189,7 @@ export function createDeveloperRig(
     root,
     torso,
     head,
+    face,
     waist,
     arms: [makeArm(-1), makeArm(1)],
     legs: [makeLeg(-1), makeLeg(1)],
@@ -285,7 +296,7 @@ export function poseDeveloperRig(c: DeveloperRig, pose: Pose): void {
   const hold = carrying ? 0.1 : 1;
   const crouch = 0.06 * wind + 0.03 * dash * hold + 0.035 * thrust + 0.02 * stumble;
   const lift = stepBob - crouch;
-  const forward = (0.03 * dash + 0.05 * thrust) * hold - 0.04 * stumble + 0.04 * release;
+  const forward = (0.03 * dash + 0.05 * thrust) * hold - 0.07 * stumble + 0.04 * release;
   const tilt =
     0.1 * walk * (1 - dash) * hold +
     0.18 * typing +
@@ -312,14 +323,15 @@ export function poseDeveloperRig(c: DeveloperRig, pose: Pose): void {
   // The head stays level and keeps looking where they are going (or at the throw's target).
   const look = new THREE.Quaternion().setFromEuler(
     new THREE.Euler(
-      0.1 + pose.nod * c.nod + tilt * 0.25 - 0.06 * stumble,
+      0.1 + pose.nod * c.nod + tilt * 0.25 - 0.32 * stumble,
       twist * 0.15,
-      roll * 0.4,
+      roll * 0.4 + 0.22 * stumble,
       'YXZ',
     ),
   );
   c.head.quaternion.copy(c.torso.quaternion).invert().multiply(look);
   c.head.scale.set(1 / squash.x, 1 / squash.y, 1 / squash.x);
+  c.face.mesh.geometry = stumble > 0.25 ? c.face.shocked : c.face.calm;
 
   // Hanging pieces stay roughly plumb, bounce with the walk, stream back on a dash and never swing into the body.
   const bounce = run * (0.5 + 0.5 * Math.sin(s * 2));
@@ -405,15 +417,16 @@ export function poseDeveloperRig(c: DeveloperRig, pose: Pose): void {
         pole.lerp(new THREE.Vector3(sign * 0.6, -1, 0), release);
         palm.lerp(new THREE.Vector3(0, -0.6, 1), release);
       }
-      // Knocked flying: arms thrown out for balance.
+      // Knocked flying: arms flung wide and up, fingers splayed, windmilling for balance.
       if (stumble > 0) {
         blend(
           hand,
-          new THREE.Vector3(sign * 0.46, 0.8 + lift + sign * pose.roll * 0.3, 0.02 + forward),
+          new THREE.Vector3(sign * 0.56, 0.98 + lift + sign * pose.roll * 0.2, -0.02 + forward),
           stumble,
         );
-        pole.lerp(new THREE.Vector3(sign, -0.6, -0.4), stumble);
-        palm.lerp(new THREE.Vector3(0, -1, 0.2), stumble);
+        pole.lerp(new THREE.Vector3(sign, -0.9, -0.3), stumble);
+        palm.lerp(new THREE.Vector3(0, 0.2, 1), stumble);
+        fingersUp = Math.max(fingersUp, 0.5 * stumble);
       }
     }
     const elbow = elbowAt(shoulder, hand, pole, slack);
@@ -444,9 +457,11 @@ export function poseDeveloperRig(c: DeveloperRig, pose: Pose): void {
     const push = Math.max(thrust, release);
     z += (sign < 0 ? 0.2 : -0.2) * push;
     if (sign > 0) pitch += 0.45 * push;
-    // Stumble: one foot steps back to catch the fall.
-    z += (sign > 0 ? -0.16 : 0.03) * stumble;
-    const foot = new THREE.Vector3(x, raise + soleRise(leg.hull, pitch) + 1e-5, z);
+    // Stumble: hopping back, one foot reaching back on its toes to catch the fall, the other kicked up.
+    z += (sign > 0 ? -0.18 : 0.06) * stumble;
+    pitch += (sign > 0 ? 0.3 : -0.25) * stumble;
+    const hop = sign < 0 ? 0.07 * stumble : 0;
+    const foot = new THREE.Vector3(x, raise + hop + soleRise(leg.hull, pitch) + 1e-5, z);
     leg.shoe.position.copy(foot);
     leg.shoe.rotation.set(pitch, sign * 0.12 * wind, 0, 'YXZ');
     const hip = hips.clone().add(new THREE.Vector3(sign * 0.1, 0, 0).applyQuaternion(pelvis));

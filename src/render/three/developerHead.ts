@@ -151,7 +151,7 @@ function lockTaper(width: number, thick: number, tip = 0.22): SweepSize {
 
 // --- Faces -------------------------------------------------------------------
 
-type MouthShape = 'grin' | 'smirk' | 'sleepy' | 'skeptic' | 'gritted';
+type MouthShape = 'grin' | 'smirk' | 'sleepy' | 'skeptic' | 'gritted' | 'gasp';
 
 interface Expression {
   /** Upper lid closure per side [left, right], radians over the eye. */
@@ -164,6 +164,8 @@ interface Expression {
   mouth: MouthShape;
   /** A happy squint pushing up the lower lids. */
   squint: number;
+  /** Eyes popped wide: the lids may lift past the usual heavy-lidded minimum. */
+  wide?: boolean;
 }
 
 const EXPRESSIONS: Record<RoleId, Expression> = {
@@ -224,6 +226,20 @@ const EXPRESSIONS: Record<RoleId, Expression> = {
   },
 };
 
+/** Knocked flying: everyone's face the same "whoa!", eyes popped and brows up. */
+const SHOCKED: Expression = {
+  lid: [0.12, 0.12],
+  lidTilt: 0,
+  brows: [
+    [0.35, 0.36],
+    [0.35, 0.36],
+  ],
+  arch: 0.07,
+  mouth: 'gasp',
+  squint: 0,
+  wide: true,
+};
+
 const EYE_YAW = 0.36;
 const EYE_PITCH = -0.01;
 const LID_OPEN = 0.8;
@@ -274,7 +290,7 @@ function eye(b: SculptBuilder, sign: number, skin: number, e: Expression): void 
   b.sphere(0.005, 0xffffff, FINISH.sparkle, { at: at(local(gx + 0.012, -0.018, rz + 0.006)) }, 8);
   // Upper lid: a skin cap closing down over the eye, rimmed with a heavy lash line.
   // Every face keeps the top of the eye covered (no white above the iris).
-  const lid = Math.max(LID_MIN, e.lid[side]) * 1.1 - LID_OPEN;
+  const lid = Math.max(e.wide ? 0 : LID_MIN, e.lid[side]) * 1.1 - LID_OPEN;
   const tilt = new THREE.Quaternion().setFromEuler(new THREE.Euler(lid, 0, -sign * e.lidTilt));
   const lidFrame = frame.clone().multiply(tilt);
   const lr: V3 = [rx * 1.14, ry * 1.1, rz * 1.2];
@@ -408,6 +424,19 @@ function mouthShape(shape: MouthShape): Mouth {
         tongue: 0,
         offset: -0.008,
         closed: true,
+      };
+    }
+    case 'gasp': {
+      const w = 0.06;
+      const ring = round(w, 1);
+      return {
+        w,
+        top: (x) => 0.006 + 0.016 * ring(x),
+        bottom: (x) => 0.006 - 0.036 * ring(x),
+        upperTeeth: 0,
+        lowerTeeth: 0,
+        tongue: 0.01,
+        offset: 0,
       };
     }
     case 'gritted': {
@@ -578,8 +607,7 @@ function mouth(b: SculptBuilder, skin: number, shape: MouthShape): void {
   );
 }
 
-function face(b: SculptBuilder, role: RoleId, skin: number, hair: number): void {
-  const e = EXPRESSIONS[role];
+function face(b: SculptBuilder, e: Expression, skin: number, hair: number): void {
   for (const sign of [-1, 1]) {
     eye(b, sign, skin, e);
     brow(b, sign, hair, e);
@@ -1267,8 +1295,16 @@ export interface HeadLook {
   hairstyle: DeveloperHairstyle;
 }
 
-/** The whole head: skull and neck, face, hair and the role's head gear. */
-export function buildHead(role: RoleId, look: HeadLook, color: number): THREE.BufferGeometry {
+/**
+ * The whole head: skull and neck, face, hair and the role's head gear.
+ * `shocked` swaps the role's face for the stumble's "whoa!".
+ */
+export function buildHead(
+  role: RoleId,
+  look: HeadLook,
+  color: number,
+  shocked = false,
+): THREE.BufferGeometry {
   const b = new SculptBuilder();
   const skull = smooth(
     deform(new THREE.SphereGeometry(1, 36, 24), (v) => {
@@ -1277,7 +1313,7 @@ export function buildHead(role: RoleId, look: HeadLook, color: number): THREE.Bu
   );
   b.add(skull, look.skin, FINISH.skin);
   b.cylinder(0.078, 0.088, 0.16, look.skin, FINISH.skin, { at: [0, -0.04, -0.02] }, 20, true);
-  face(b, role, look.skin, look.hair);
+  face(b, shocked ? SHOCKED : EXPRESSIONS[role], look.skin, look.hair);
   hair(b, look.hairstyle, look.hair, role === 'frontend' ? BERET : null);
   gear(b, role, color, cut(look.hairstyle).crown);
   return b.build();
