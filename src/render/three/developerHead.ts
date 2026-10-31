@@ -982,7 +982,8 @@ interface Hat {
 const BERET_TILT = new THREE.Euler(-0.12, 0, 0.27);
 const BERET: Hat = { up: new THREE.Vector3(0, 1, 0).applyEuler(BERET_TILT), band: 0.2 };
 
-function gear(b: SculptBuilder, role: RoleId, color: number): void {
+/** Head gear for a role; `hair` is how thick the hair lies on the crown. */
+function gear(b: SculptBuilder, role: RoleId, color: number, hair: number): void {
   switch (role) {
     case 'frontend': {
       // A puffy beret pulled on over the crown, slouched down to the right,
@@ -1061,13 +1062,14 @@ function gear(b: SculptBuilder, role: RoleId, color: number): void {
       break;
     }
     case 'backend': {
-      // Big chunky over-ear headphones: a thick padded band and fat cups with glowing rings.
+      // Big chunky over-ear headphones: a thick padded band pressed onto the
+      // hair and fat cups with glowing rings.
       const dark = 0x2b2f38;
       const arc: THREE.Vector3[] = [];
       for (let k = 0; k <= 12; k++) {
         const a = -Math.PI / 2 + (k / 12) * Math.PI;
         const d = new THREE.Vector3(Math.sin(a), Math.cos(a), -0.08).normalize();
-        arc.push(skullPoint(d).addScaledVector(skullNormal(d), 0.1));
+        arc.push(skullPoint(d).addScaledVector(skullNormal(d), hair + 0.024));
       }
       b.sweep(arc, () => [0.04, 0.022] as const, dark, FINISH.plastic, {
         segments: 20,
@@ -1077,9 +1079,9 @@ function gear(b: SculptBuilder, role: RoleId, color: number): void {
       b.sweep(
         arc
           .slice(2, 11)
-          .map((p) => p.clone().addScaledVector(p.clone().sub(SKULL).normalize(), -0.026)),
-        () => [0.036, 0.022] as const,
-        0x5a3a2a,
+          .map((p) => p.clone().addScaledVector(p.clone().sub(SKULL).normalize(), -0.012)),
+        () => [0.034, 0.018] as const,
+        mix(dark, 0x000000, 0.3),
         FINISH.leather,
         { segments: 14, radial: 8, up: (p) => p.clone().sub(SKULL).normalize() },
       );
@@ -1277,6 +1279,6 @@ export function buildHead(role: RoleId, look: HeadLook, color: number): THREE.Bu
   b.cylinder(0.078, 0.088, 0.16, look.skin, FINISH.skin, { at: [0, -0.04, -0.02] }, 20, true);
   face(b, role, look.skin, look.hair);
   hair(b, look.hairstyle, look.hair, role === 'frontend' ? BERET : null);
-  gear(b, role, color);
+  gear(b, role, color, cut(look.hairstyle).crown);
   return b.build();
 }
