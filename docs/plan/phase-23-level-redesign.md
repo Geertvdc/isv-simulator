@@ -78,6 +78,8 @@ The sketch draws every tile type in its own color with a legend, spawns 1–4 nu
 
 `draft-shots` renders a draft in the actual game: it makes a temporary git worktree at `HEAD`, copies each draft over its live `maps/level-XX-*.txt` (with the stand-ins above, so future chars show as floor or wall), starts vite there and runs `scripts/screenshots.ts` for that level. It always removes the worktree afterwards. Runs share Chrome's debug port, so parallel runs wait on a lock (`/tmp/isv-draft-shots.lock`).
 
+Reorg levels have one draft per layout phase: `<level-id>.txt` is phase 1 and `<level-id>.phase2.txt`, `<level-id>.phase3.txt` are the later layouts, with `D` for a rolling desk (read as a counter). The sketch draws a panel per phase, the report prints a row per phase and checks that phases only differ in `=`, `D` and floor (same size, same stations, same number of desks), and `draft-shots` renders each later phase to `<level-id>-phaseN-3d.webp`.
+
 The report, per map (pure logic in `scripts/mapTools/`, tested):
 
 - **Size** and **floor** (walkable tiles; spawns, manager starts and meeting tiles count as floor).
@@ -495,42 +497,133 @@ The company outgrows one room: 3-1 is one big corporate floor with a real corner
 
 ### Chapter 4: Enterprise
 
-Layout gimmick: **Reorgs** (`=` partitions, rolling desks). Sketches: _not drawn yet_.
+Layout gimmick: **Reorgs** (`=` partitions, `D` rolling desks). Sketches: [back-to-back](images/level-redesign/back-to-back.svg), [synergy](images/level-redesign/synergy.svg), [the-reorg](images/level-redesign/the-reorg.svg). 3D renders: [back-to-back](images/level-redesign/back-to-back-3d.webp), [synergy](images/level-redesign/synergy-3d.webp) ([phase 2](images/level-redesign/synergy-phase2-3d.webp)), [the-reorg](images/level-redesign/the-reorg-3d.webp) ([phase 2](images/level-redesign/the-reorg-phase2-3d.webp), [phase 3](images/level-redesign/the-reorg-phase3-3d.webp)).
+
+A reorg changes the layout, so a reorg level has one draft per phase: `<id>.txt` is phase 1 (the layout at the start), `<id>.phase2.txt` and so on are later layouts (see [Tools](#tools)). Only partitions (`=`), rolling desks (`D`) and floor differ between phases: stations, walls, spawns and the meeting room never move. Each phase passes the reachability check on its own, so there is always an open route. Rolling desks pair up in reading order (the first `D` of phase 1 rolls to the first `D` of phase 2), and a ticket on a desk rolls with it. Each shift is telegraphed 3 s ahead (stripes on the partition and desk tiles that will change, and a countdown).
 
 #### 4-1 Back to Back (`back-to-back`)
 
 **Concept:** 20×10 large. HQ: long corridor with offices off it and a glass meeting room; calm meetings. Gimmick: hallway bumping. 1p / 4p: Corridor 2 wide.
 
-- **Draft:** `maps/drafts/back-to-back.txt`: _not drawn yet_
-- **Sketch:** _`images/level-redesign/back-to-back.svg` (current left, draft right) goes here_
-- **Report:** _row from `npm run level-report -- back-to-back --table` goes here_
-- **Intent:** _what the layout teaches and where players bump_
-- **Solo:** _the solo route and how long it is_
-- **4 players:** _how the team splits, the chokepoint and its bypass_
+- **Draft:** `maps/drafts/back-to-back.txt`
+
+  ```text
+  #B#KKII#    ##KK#B##
+  #......#    #......#
+  X..1...#    #...3..#
+  #..CC..######..CC..#
+  #...2..#mmmm#......#
+  #......#mmmm#..4...#
+  #.#C##.##.###.##C#.#
+  #..................#
+  #..................#
+  #####T##PSSP##T#####
+  ```
+
+- **Sketch:** ![4-1 Back to Back, current left, draft right](images/level-redesign/back-to-back.svg)
+- **3D render:** ![4-1 Back to Back draft in the game](images/level-redesign/back-to-back-3d.webp)
+- **Report:**
+
+  | Level                      | Size  | Floor | Stations             | Solo run | Loop | Chokepoints    | Reachable |
+  | -------------------------- | ----- | ----- | -------------------- | -------- | ---- | -------------- | --------- |
+  | 4-1 Back to Back (current) | 14×10 | 74    | I2 B2 K2 T2 P2 S2 X1 | 32       | 38   | none           | all       |
+  | 4-1 Back to Back (draft)   | 20×10 | 105   | I2 B2 K4 T2 P2 S2 X1 | 18       | 26   | detour 6,6 +12 | all       |
+
+- **Intent:** the first floor at HQ: two offices back to back along one long corridor, with a glass meeting room between them. The outline is a U: the void notch at the top (8–11, y0–2) is the lift lobby we don't see, and under it the meeting room (8–11, y4–5) opens onto the corridor through one door (9,6). Office A (left) has the inbox, two keyboards, the bug queue and the bin; office C (right) has two more keyboards and its own bug queue. The 2-wide corridor runs along the front, and every test bench, pipeline and the ship are in its front wall (T at 5 and 14, P at 8 and 11, S at 9–10). A player working a station blocks one lane, so the other lane is all that's left for traffic. Each office has a near door (6,6 and 13,6), a far door (1,6 and 18,6) and a hatch counter between them (3,6 and 16,6). Office C has no inbox, so the C team fetches features through the corridor and players meet head on. Meetings are calm (one invite every ~45 s, 25 s to get there) and teach the meeting room before reorgs arrive.
+- **Solo:** spawn 1 stands under the inbox and keyboards. Inbox → keyboard → out through the near door → test bench (5,9) → pipeline (8,9) → ship (9,9) → back: a 26-step lap (current 38; first ticket 18). Meetings pull the solo player into the room in the middle of the corridor, 4 steps from the ship.
+- **4 players:** spawns 1 and 2 in office A, 3 and 4 in office C. Natural split: A takes and codes, C codes too and tests/deploys from the right end, everyone ships in the middle. The chokepoint is A's near door (6,6): every A feature goes out through it and every returning player comes in through it (`detour 6,6 +12`). The bypass is the far door at 1,6 and the hatch (3,6), where a ticket can be put down for whoever is in the corridor. The meeting room door (9,6) is right above the ship, so an invited player cuts across the shipping lane.
 - **Review:** _human feedback from gate 1_
 
 #### 4-2 Synergy (`synergy`)
 
 **Concept:** 18×11 large. Meeting room up a corridor; partitions fold away / close on a schedule (opens a shortcut, then shuts it). Gimmick: **Reorg intro** (partitions). 1p / 4p: Always one open route.
 
-- **Draft:** `maps/drafts/synergy.txt`: _not drawn yet_
-- **Sketch:** _`images/level-redesign/synergy.svg` (current left, draft right) goes here_
-- **Report:** _row from `npm run level-report -- synergy --table` goes here_
-- **Intent:** _what the layout teaches and where players bump_
-- **Solo:** _the solo route and how long it is_
-- **4 players:** _how the team splits, the chokepoint and its bypass_
+- **Draft:** phase 1 `maps/drafts/synergy.txt` (partition closed), phase 2 `maps/drafts/synergy.phase2.txt` (partition folded away)
+
+  ```text
+     ############          ############
+     #...mmmm...#          #...mmmm...#
+     #M..mmmm...#          #M..mmmm...#
+     #..######..#          #..######..#
+  #BII..#KK#TT..#KK#    #BII..#KK#TT..#KK#
+  #........#.......#    #........#.......#
+  #.1......C.....3.#    #.1......C.....3.#
+  #........=.......#    #................#
+  #....2...C....4..#    #....2...C....4..#
+  X........#.......#    X........#.......#
+  ##########SSPP####    ##########SSPP####
+  ```
+
+- **Sketch:** ![4-2 Synergy, current left, draft phases right](images/level-redesign/synergy.svg)
+- **3D render:** ![4-2 Synergy draft phase 1 in the game](images/level-redesign/synergy-3d.webp) ![4-2 Synergy draft phase 2 in the game](images/level-redesign/synergy-phase2-3d.webp)
+- **Report:**
+
+  | Level                        | Size  | Floor | Stations             | Solo run | Loop | Chokepoints    | Reachable |
+  | ---------------------------- | ----- | ----- | -------------------- | -------- | ---- | -------------- | --------- |
+  | 4-2 Synergy (current)        | 14×10 | 82    | I2 B2 K2 T2 P2 S4 X1 | 23       | 36   | none           | all       |
+  | 4-2 Synergy (draft, phase 1) | 18×11 | 103   | I2 B1 K4 T2 P2 S2 X1 | 26       | 42   | none           | all       |
+  | 4-2 Synergy (draft, phase 2) | 18×11 | 104   | I2 B1 K4 T2 P2 S2 X1 | 20       | 30   | detour 9,7 +12 | all       |
+
+- **Intent:** a T-shaped floor: two rooms side by side at the front and, up two short 2-wide corridors (4–5 and 12–13, y3–4), the meeting hall across the top, where the manager starts. The dev room (left) has the inbox, bug queue, two keyboards and the bin; the ops room (right) has the test benches, two more keyboards, the pipelines and the ship. The wall between them (column 9) has two hatch counters (9,6 and 9,8) and between them one folding partition (9,7). Reorg schedule (3:00 round), telegraphed 3 s ahead:
+
+  | Time      | Phase | Partition 9,7          |
+  | --------- | ----- | ---------------------- |
+  | 0:00–0:45 | 1     | closed                 |
+  | 0:45–1:30 | 2     | folded away (shortcut) |
+  | 1:30–2:15 | 1     | closed                 |
+  | 2:15–3:00 | 2     | folded away (shortcut) |
+
+  With the partition closed, coded tickets go over the hatches or the long way: up a corridor, through the meeting hall (past the manager), down the other corridor. When it folds away, the 1-wide shortcut opens and everyone piles into it: the shortcut is the chokepoint, the hall is the bypass. Players bump in the shortcut and the manager shoves them in the hall. Meetings (every ~35 s) send a player up a corridor, and incidents come in at the dev room's bug queue.
+
+- **Solo:** spawn 1 is two steps from the inbox and the keyboards. Closed: 42-step lap round through the hall (current 36; first ticket 26). Open: 30-step lap through the shortcut (first ticket 20). Solo never needs the partition: the hall is always open, and the lap with it closed stays in today's range.
+- **4 players:** spawns 1 and 2 in the dev room, 3 and 4 in the ops room. Dev takes and codes, ops tests, deploys and ships; the hatches are the hand-off. When the shortcut opens, it's the only 1-wide spot on the map (`detour 9,7 +12`), with traffic both ways (fresh code right, empty hands back to the inbox). Meeting invites pull one player up a corridor at a time, so one room is short-handed for a while.
 - **Review:** _human feedback from gate 1_
 
 #### 4-3 The Reorg (`the-reorg`)
 
 **Concept:** 20×12 large. Whole floor reorganises twice per round: partitions slide, rolling desks move (with their tickets); everything on. Gimmick: Reorgs, finale. 1p / 4p: Telegraphed 3 s ahead.
 
-- **Draft:** `maps/drafts/the-reorg.txt`: _not drawn yet_
-- **Sketch:** _`images/level-redesign/the-reorg.svg` (current left, draft right) goes here_
-- **Report:** _row from `npm run level-report -- the-reorg --table` goes here_
-- **Intent:** _what the layout teaches and where players bump_
-- **Solo:** _the solo route and how long it is_
-- **4 players:** _how the team splits, the chokepoint and its bypass_
+- **Draft:** phase 1 "Silos" `maps/drafts/the-reorg.txt`, phase 2 "Matrix" `maps/drafts/the-reorg.phase2.txt`, phase 3 "Agile pods" `maps/drafts/the-reorg.phase3.txt`
+
+  ```text
+  Phase 1: Silos          Phase 2: Matrix         Phase 3: Agile pods
+  ##IIBKK#RR######        ##IIBKK#RR######        ##IIBKK#RR######
+  #.1............#        #.1............#        #.1............#
+  #.........=....##TT#    #..............##TT#    #.........=....##TT#
+  #...2.....D........#    #...2.....D........#    #...2.....=........#
+  K.........=....3...#    K..............3...#    K......D..=..D.3...#
+  K..CC.....=..CC....#    K..CC........CC....#    K..CC.....=..CC....#
+  #....D....=....D...#    #.====D===D=====D=.#    #..=======.======..#
+  #.........=........P    #..................P    #.........=........P
+  X.........D........P    X..................P    X......D..=..D.....P
+  #####mmmmM=...4....#    #####mmmmM....4....#    #####mmmmM=...4....#
+      #mmmm..........#        #mmmm..........#        #mmmm..........#
+      ########SS######        ########SS######        ########SS######
+  ```
+
+- **Sketch:** ![4-3 The Reorg, current left, draft phases right](images/level-redesign/the-reorg.svg)
+- **3D render:** ![4-3 The Reorg draft phase 1 in the game](images/level-redesign/the-reorg-3d.webp) ![4-3 The Reorg draft phase 2 in the game](images/level-redesign/the-reorg-phase2-3d.webp) ![4-3 The Reorg draft phase 3 in the game](images/level-redesign/the-reorg-phase3-3d.webp)
+- **Report:**
+
+  | Level                          | Size  | Floor | Stations                | Solo run | Loop | Chokepoints     | Reachable |
+  | ------------------------------ | ----- | ----- | ----------------------- | -------- | ---- | --------------- | --------- |
+  | 4-3 The Reorg (current)        | 14×10 | 82    | I2 B2 K4 T2 R2 P2 S2 X1 | 22       | 32   | none            | all       |
+  | 4-3 The Reorg (draft, phase 1) | 20×12 | 150   | I2 B1 K4 T2 R2 P2 S2 X1 | 30       | 48   | detour 10,1 +14 | all       |
+  | 4-3 The Reorg (draft, phase 2) | 20×12 | 143   | I2 B1 K4 T2 R2 P2 S2 X1 | 30       | 52   | detour 18,6 +32 | all       |
+  | 4-3 The Reorg (draft, phase 3) | 20×12 | 136   | I2 B1 K4 T2 R2 P2 S2 X1 | 30       | 50   | detour 10,1 +16 | all       |
+
+- **Intent:** the finale and the biggest floor of the chapter: a Z-shaped HQ floor (the corner office takes the top-right, the stairwell the bottom-left) with every station on the outer walls, so nothing you need ever moves. The dev side is top-left (inbox, bug queue, four keyboards, reviews, bin), the ops side right and bottom (test benches top-right, pipelines on the right wall, ship at the front), and the meeting room sits in the bottom-left corner with the manager at its door. Four fixed counters (3–4,5 and 13–14,5) give anchors that survive every reorg. The middle of the floor is partitions (`=`) and four rolling desks (`D`), and it reorganises twice per round (3:00), telegraphed 3 s ahead:
+
+  | Time      | Phase         | Layout                                                                                                                                                                                                                               |
+  | --------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+  | 0:00–1:00 | 1: Silos      | a vertical partition (column 10) splits dev from ops; one door at the top (10,1), one at the far front (10,10), two rolling desks in the wall as hatches (10,3 and 10,8)                                                             |
+  | 1:00–2:00 | 2: Matrix     | the vertical wall slides away and a horizontal one (row 6) closes: top half (code, review, test) and bottom half (deploy, ship, meeting); openings at both ends (1,6 and 18,6), three desks in the wall as hatches, one desk at 10,3 |
+  | 2:00–3:00 | 3: Agile pods | both walls come back as a cross with an open hub (10,6) and gaps at all four ends; the desks roll out to one island per pod (7,4, 13,4, 7,8, 13,8)                                                                                   |
+
+  Each phase has a different chokepoint: in Silos the top door (dev → ops handover, `detour 10,1 +14`), in Matrix the right-hand opening between test and deploy (`detour 18,6 +32`; the bypass is the far left opening or a throw over a desk hatch), in Pods the top door again with the hub as the bypass (`detour 10,1 +16`). Tickets left on a desk roll with it: a ticket put on the hatch at 10,8 in Silos ends up in the Matrix wall at 16,6, still reachable from both sides. Everything else is on too: reviews (30% of features, two players), incidents through the bug queue, meetings and the manager.
+
+- **Solo:** spawn 1 stands under the inbox, next to the keyboards. The lap is 48 steps in Silos, 52 in Matrix and 50 in Pods (first ticket 30 in every phase), long but in the range of today's longest levels (Demo Day 52), and solo has no reviews. Every phase has a walkable lap: the doors and openings never all close, and the shift warning gives 3 s to step out of a closing partition.
+- **4 players:** spawns 1 and 2 on the dev side, 3 near the test benches and 4 near the ship. In Silos the team splits dev/ops along the wall and hands over through the desk hatches; in Matrix it splits top/bottom and the right-hand opening jams; in Pods everyone meets in the hub. The reorg reshuffles who stands where, so the team has to re-plan twice per round. For review: the floor is big (136–150 tiles); if it feels empty with 2 players in greybox, the stairwell notch can grow by a column.
 - **Review:** _human feedback from gate 1_
 
 ### Chapter 5: Big Tech
