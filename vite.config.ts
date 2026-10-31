@@ -12,5 +12,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts', 'server/**/*.test.ts'],
+    // The character rig tests build and pose many full models; CI runners are several times
+    // slower than a dev laptop, so the 5s default fails there while passing locally.
+    testTimeout: 30_000,
   },
 });
