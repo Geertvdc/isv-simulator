@@ -1088,10 +1088,77 @@ function qa(color: number): Outfit {
 
 // --- Platform: headset (on the head), hi-vis vest, a loaded tool belt ----------
 
+/** The platform engineer's shirt and the hi-vis vest over it (its outer surface). */
+const platformBody = (): Profile => bodyProfile(1.02, -0.23);
+const platformVest = (): Profile =>
+  smoothProfile(
+    [
+      [0.218, -0.2],
+      [0.226, -0.08],
+      [0.224, 0.01],
+      [0.252, 0.135],
+      [0.242, 0.225],
+      [0.18, 0.28],
+    ],
+    14,
+  );
+
+/**
+ * The platform engineer's orange cable coil, in torso space: its loops slung
+ * over the left shoulder along the strap line, flat across the chest and the
+ * back, tucked under the belt by the buckle, with the blue plug clipped on the
+ * front. It stays inside the shoulders and in from the sides, out of every arm's way.
+ */
+export function platformCable(): THREE.BufferGeometry {
+  const b = new SculptBuilder();
+  const P = platformBody();
+  const vest = platformVest();
+  const orange = 0xff8a1f;
+  const tube = 0.014;
+  // The sash's centre line on the front (and, mirrored, the back): belt by the buckle to the shoulder.
+  const line: [number, number][] = [
+    [-0.075, -0.14],
+    [-0.02, -0.04],
+    [0.045, 0.07],
+    [0.095, 0.17],
+    [0.12, 0.235],
+  ];
+  const onBody = (x: number, y: number, back: boolean, out: number): THREE.Vector3 => {
+    const r = Math.max(profileRadius(P, y), profileRadius(vest, y));
+    const phi = Math.asin(Math.max(-1, Math.min(1, x / r)));
+    return surf(r === profileRadius(vest, y) ? vest : P, y, back ? Math.PI - phi : phi, out);
+  };
+  for (let k = 0; k < 3; k++) {
+    const d = (k - 1) * 0.03;
+    const out = tube + 0.001 + 0.003 * (k % 2);
+    // Each strand dives under the belt's top edge, so no cut end shows.
+    const side = (back: boolean) => [
+      onBody(-0.085 + d * 0.86, -0.198, back, 0.004),
+      ...line.map(([x, y]) => onBody(x + d * 0.86, y - d * 0.5, back, out)),
+    ];
+    const top = new THREE.Vector3(0.135 + d * 0.95, 0.318 + tube + 0.004 * (k % 2), 0);
+    const path = [...side(false), top, ...side(true).reverse()];
+    b.sweep(path, tube, k === 1 ? 0xf07a12 : orange, FINISH.rubber, {
+      segments: 40,
+      radial: 6,
+    });
+  }
+  // The plug end, lying along the strands on the chest.
+  const plug = onBody(0.01, 0.0, false, 2 * tube + 0.014);
+  const n = new THREE.Vector3(plug.x, 0, plug.z / DEPTH).normalize();
+  b.box(0.05, 0.034, 0.024, 0.006, 0x2a6ad8, FINISH.plastic, {
+    at: v3(plug),
+    quat: facing(n).multiply(
+      new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), 1.06),
+    ),
+  });
+  return b.build();
+}
+
 function platform(color: number): Outfit {
   const b = new SculptBuilder();
   const navy = 0x2c3a4f;
-  const P = bodyProfile(1.02, -0.23);
+  const P = platformBody();
   body(b, P, navy, FINISH.cloth);
   shoulders(b, 0.27, 0.094, navy, FINISH.cloth);
   // Shirt collar and button placket.
@@ -1110,17 +1177,7 @@ function platform(color: number): Outfit {
   }
   band(b, P, 0.305, 0.01, [0.02, 0.012], shade(navy, 0.08), FINISH.cloth);
   // The vest: open at the front, deep armholes, reflective strips round it and over the shoulders.
-  const vest = smoothProfile(
-    [
-      [0.218, -0.2],
-      [0.226, -0.08],
-      [0.224, 0.01],
-      [0.252, 0.135],
-      [0.242, 0.225],
-      [0.18, 0.28],
-    ],
-    14,
-  );
+  const vest = platformVest();
   const gap = 0.32;
   b.shell(
     vest,
@@ -1357,37 +1414,7 @@ function platform(color: number): Outfit {
     [8, 18],
   );
   wrench.box(0.018, 0.055, 0.032, 0.006, 0xe23b3b, FINISH.rubber, { at: [0, -0.06, 0] });
-  // A big orange cable coil slung bandolier-style over the left shoulder and across the chest.
-  const orange = 0xff8a1f;
-  for (let k = 0; k < 3; k++) {
-    const loop: THREE.Vector3[] = [];
-    for (let i = 0; i < 36; i++) {
-      const phi = (i / 36) * Math.PI * 2 + 0.05 * k;
-      const y = 0.06 - 0.024 * k + 0.2 * Math.sin(phi - 0.6);
-      const r = Math.max(profileRadius(P, y), profileRadius(vest, y)) + 0.034 + 0.006 * (k % 2);
-      loop.push(new THREE.Vector3(r * Math.sin(phi), y, r * Math.cos(phi) * DEPTH));
-    }
-    b.sweep(loop, 0.016, k === 1 ? 0xf07a12 : orange, FINISH.rubber, {
-      closed: true,
-      segments: 40,
-      radial: 6,
-    });
-  }
-  const low = surf(P, -0.14, -Math.PI / 2, 0.05);
-  b.sweep(
-    [
-      [low.x, low.y + 0.02, low.z],
-      [low.x - 0.01, low.y - 0.05, low.z + 0.03],
-      [low.x + 0.01, low.y - 0.1, low.z + 0.05],
-    ],
-    0.012,
-    orange,
-    FINISH.rubber,
-    { segments: 10, radial: 6 },
-  );
-  b.box(0.034, 0.05, 0.026, 0.006, 0x2a6ad8, FINISH.plastic, {
-    at: [low.x + 0.01, low.y - 0.13, low.z + 0.05],
-  });
+  b.merge(platformCable());
 
   const hipR = surf(P, -0.2, -1.55, 0.06);
   return {

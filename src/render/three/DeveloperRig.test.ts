@@ -4,6 +4,7 @@ import { STUDY_ACTIONS, studyFrame } from '../../modelSheet/studyScenes';
 import { ROLE_IDS } from '../../sim/roles';
 import { applyPose, createDeveloper, disposeCharacter } from './Characters';
 import { DEVELOPER_TOP, DEVELOPER_HAIRSTYLES, developerAppearance } from './DeveloperRig';
+import { platformCable } from './developerOutfit';
 import { kitMaterials } from './kit';
 import { carryGrip, carryPoint } from './layout';
 import { ticketModel } from './ticketModels';
@@ -220,6 +221,44 @@ it('provides every hairstyle for every role with a shared face, outfit, ownershi
     });
     crew.forEach(disposeCharacter);
   }
+  for (const m of [materials.body, materials.glow, materials.glass]) m.dispose();
+});
+
+it('keeps the platform cable coil clear of both arms and hands in every action', () => {
+  const materials = kitMaterials();
+  const c = createDeveloper(1, materials, 'platform', developerAppearance(1));
+  const rig = c.rig;
+  if (!rig) throw new Error('Missing production rig');
+  const cable = new THREE.Mesh(platformCable());
+  rig.torso.add(cable);
+  const samples: [string, number, ReturnType<typeof studyFrame>['input']][] = [];
+  for (const action of STUDY_ACTIONS) {
+    for (let time = 0; time < 2600; time += 53) {
+      samples.push([action, time, studyFrame(action, time).input]);
+    }
+  }
+  for (let sample = 0; sample <= 40; sample++) {
+    const input = studyFrame('carry', 900).input;
+    input.windUp = sample / 40;
+    samples.push(['wind-up', sample, input]);
+  }
+  for (const [action, time, input] of samples) {
+    applyPose(c, playerPose(input, time));
+    c.root.updateMatrixWorld(true);
+    for (const [side, arm] of rig.arms.entries()) {
+      for (const part of [arm.upper, arm.elbow, arm.lower, arm.hand]) {
+        part.geometry.computeBoundingBox();
+        const bounds = part.geometry.boundingBox;
+        if (!bounds) throw new Error('Missing arm bounds');
+        expect(
+          intersectsMesh(bounds, cable, part.matrixWorld),
+          `${action} at ${String(time)}: arm ${String(side)}`,
+        ).toBe(false);
+      }
+    }
+  }
+  cable.geometry.dispose();
+  disposeCharacter(c);
   for (const m of [materials.body, materials.glow, materials.glass]) m.dispose();
 });
 
