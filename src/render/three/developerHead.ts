@@ -637,6 +637,18 @@ interface HairCut {
   edge: number;
   /** Side part: lifts the hairline on one side (+ = viewer's left). */
   part: number;
+  /** The whorl `[yaw, pitch]` the big locks flow out from. */
+  whorl: [number, number];
+  /** How many big locks fan out of the whorl, and how far they curl (radians per radian out). */
+  count: number;
+  twist: number;
+  /** Depth of the grooves between locks, as a fraction of the shell. */
+  groove: number;
+  /** How far lock ends dip below the hairline (radians), by heading round the head (0 = face). */
+  tips: (heading: number) => number;
+  /** Extra volume swelling the shell: `height` at `[yaw, pitch]`, falling off over `radius` radians. */
+  quiff?: { at: [number, number]; height: number; radius: number };
+  /** Separate locks on top of the shell: a swoop, curtains, a ponytail. */
   locks: Lock[];
 }
 
@@ -654,115 +666,70 @@ function fan(count: number, make: (k: number, t: number) => Lock): Lock[] {
   return Array.from({ length: count }, (_, k) => make(k, count === 1 ? 0.5 : k / (count - 1)));
 }
 
+/** A bump of `height` centred on `heading` (radians round the head), `width` wide. */
+function around(heading: number, width: number, height: number): (h: number) => number {
+  return (h) => {
+    const d = Math.atan2(Math.sin(h - heading), Math.cos(h - heading));
+    return height * Math.exp(-((d / width) ** 2));
+  };
+}
+
 function cut(style: DeveloperHairstyle): HairCut {
   switch (style) {
     case 'swept':
-      // A big side-swept quiff: chunky locks from a left part over the crown to
-      // the right, layered rows behind that curl in at the nape.
+      // A side-swept quiff: big smooth locks curling out of a whorl at the back
+      // left, over the crown and down to a few tucked points at the nape, with
+      // broad swoops from the part across the forehead.
       return {
-        line: [0.42, 0.02, -0.8],
-        crown: 0.06,
-        edge: 0.022,
+        line: [0.42, 0.02, -0.72],
+        crown: 0.052,
+        edge: 0.03,
         part: 0.06,
+        whorl: [-2.5, 1.0],
+        count: 7,
+        twist: 0.3,
+        groove: 1,
+        tips: around(Math.PI, 0.9, 0.17),
+        quiff: { at: [0.2, 0.78], height: 0.055, radius: 0.5 },
         locks: [
-          ...fan(4, (k, t) => ({
-            path: [
-              [-0.6 + t * 0.2, 1.15 - t * 0.12, 0.03],
-              [-0.12 + t * 0.25, 1.0 - t * 0.22, 0.085 + 0.012 * (k % 2)],
-              [0.42 + t * 0.32, 0.66 - t * 0.28, 0.08],
-              [0.78 + t * 0.35, 0.36 - t * 0.2, 0.04],
-              [0.92 + t * 0.32, 0.22 - t * 0.16, 0.012],
-            ],
-            width: 0.095,
-            thick: 0.05,
-          })),
-          // The swoop over the forehead.
           {
             path: [
-              [-0.3, 0.88, 0.06],
-              [0.05, 0.74, 0.11],
-              [0.4, 0.5, 0.09],
-              [0.62, 0.36, 0.04],
-              [0.68, 0.27, 0.012],
+              [-0.35, 0.98, 0.05],
+              [0.1, 0.8, 0.085],
+              [0.45, 0.55, 0.06],
+              [0.68, 0.36, 0.028],
+              [0.76, 0.26, 0.006],
             ],
-            width: 0.095,
+            width: 0.09,
             thick: 0.055,
+            tip: 0.2,
           },
-          {
-            path: [
-              [-0.62, 0.84, 0.05],
-              [-0.47, 0.62, 0.08],
-              [-0.3, 0.46, 0.05],
-              [-0.24, 0.4, 0.015],
-            ],
-            width: 0.07,
-            thick: 0.04,
-          },
-          // Behind: an upper and a lower row, offset so they overlap like shingles,
-          // each lock flicking sideways at the tip.
-          ...fan(5, (k, t) => ({
-            path: [
-              [Math.PI - 1.15 + t * 2.3, 1.15, 0.035],
-              [Math.PI - 1.1 + t * 2.2, 0.7, 0.07 + 0.01 * (k % 2)],
-              [Math.PI - 1.05 + t * 2.1, 0.25, 0.06],
-              [Math.PI - 1.0 + t * 2.0 + 0.1 * (t - 0.5), 0.02, 0.025],
-            ],
-            width: 0.1,
-            thick: 0.032,
-            tip: 0.1,
-          })),
-          ...fan(4, (_, t) => ({
-            path: [
-              [Math.PI - 0.85 + t * 1.7, 0.45, 0.03],
-              [Math.PI - 0.82 + t * 1.64, 0.0, 0.05],
-              [Math.PI - 0.8 + t * 1.6, -0.3, 0.035],
-              [Math.PI - 0.78 + t * 1.56 + 0.15 * (t - 0.5), -0.42, 0.012],
-            ],
-            width: 0.095,
-            thick: 0.03,
-            tip: 0.1,
-          })),
-          ...[-1, 1].map((s) => ({
-            path: [
-              [s * 1.15, 0.75, 0.04] as V3,
-              [s * 1.32, 0.4, 0.07] as V3,
-              [s * 1.42, 0.08, 0.04] as V3,
-              [s * 1.38, -0.02, 0.012] as V3,
-            ],
-            width: 0.08,
-            thick: 0.04,
-          })),
         ],
       };
     case 'cropped':
-      // Short and textured: a fade at the sides, chunky tufts on top.
+      // Short and textured: a fade at the sides, small locks off the crown and a
+      // little pointed fringe.
       return {
         line: [0.45, 0.12, -0.55],
-        crown: 0.035,
-        edge: 0.008,
+        crown: 0.042,
+        edge: 0.01,
         part: 0,
-        locks: [
-          ...fan(5, (k, t) => ({
-            path: [
-              [-0.62 + t * 1.24, 1.2, 0.03],
-              [-0.52 + t * 1.04, 0.9, 0.065 + (k % 2) * 0.012],
-              [-0.44 + t * 0.88, 0.6, 0.055],
-              [-0.4 + t * 0.8, 0.5, 0.015],
-            ],
-            width: 0.075,
-            thick: 0.04,
-          })),
-          ...fan(5, (k, t) => ({
-            path: [
-              [Math.PI * 0.55 + t * Math.PI * 0.9, 1.3, 0.03],
-              [Math.PI * 0.58 + t * Math.PI * 0.84, 1.0, 0.06 + (k % 2) * 0.01],
-              [Math.PI * 0.6 + t * Math.PI * 0.8, 0.72, 0.045],
-              [Math.PI * 0.6 + t * Math.PI * 0.8, 0.62, 0.012],
-            ],
-            width: 0.085,
-            thick: 0.035,
-          })),
-        ],
+        whorl: [Math.PI, 1.15],
+        count: 11,
+        twist: 0.35,
+        groove: 0.65,
+        tips: around(0, 0.7, 0.09),
+        locks: fan(2, (_, t) => ({
+          path: [
+            [-0.4 + t * 0.55, 1.0, 0.03],
+            [-0.22 + t * 0.5, 0.75, 0.06],
+            [-0.05 + t * 0.45, 0.55, 0.045],
+            [0.05 + t * 0.45, 0.5, 0.012],
+          ],
+          width: 0.13,
+          thick: 0.038,
+          tip: 0.2,
+        })),
       };
     case 'long':
       // A middle part, curtains framing the face, and length down to the shoulders.
@@ -771,6 +738,11 @@ function cut(style: DeveloperHairstyle): HairCut {
         crown: 0.042,
         edge: 0.03,
         part: 0,
+        whorl: [0, 1.4],
+        count: 12,
+        twist: 0,
+        groove: 0.4,
+        tips: around(Math.PI, 0.9, 0.12),
         locks: [
           ...[-1, 1].flatMap((s) => [
             {
@@ -820,46 +792,28 @@ function cut(style: DeveloperHairstyle): HairCut {
         ],
       };
     case 'tied':
-      // Pulled back into a high ponytail: combed ridges and the tail itself.
+      // Combed back into a high ponytail: fine ridges all running into the tie.
       return {
         line: [0.4, 0.05, -0.75],
         crown: 0.03,
         edge: 0.016,
         part: 0,
-        locks: [
-          ...fan(5, (_, t) => ({
-            path: [
-              [-0.55 + t * 1.1, 0.45, 0.012],
-              [-0.45 + t * 0.9, 0.95, 0.032],
-              [Math.PI - 0.6 + (1 - t) * 1.2, 1.15, 0.035],
-              [Math.PI - 0.15 + (1 - t) * 0.3, 0.72, 0.03],
-            ],
-            width: 0.05,
-            thick: 0.018,
-          })),
-          ...[-1, 1].map((s) => ({
-            path: [
-              [s * 1.05, 0.15, 0.012] as V3,
-              [s * 1.5, 0.55, 0.03] as V3,
-              [s * 2.4, 0.75, 0.03] as V3,
-              [s * 2.95, 0.72, 0.03] as V3,
-            ],
-            width: 0.05,
-            thick: 0.018,
-          })),
-          // The ponytail.
-          ...fan(3, (k, t) => ({
-            path: [
-              { at: [0, 0.4, -0.25] as V3 },
-              { at: [(t - 0.5) * 0.06, 0.36, -0.3] as V3 },
-              { at: [(t - 0.5) * 0.1, 0.24, -0.305 + (k % 2) * 0.01] as V3 },
-              { at: [(t - 0.5) * 0.12, 0.09, -0.335] as V3 },
-              { at: [(t - 0.5) * 0.07 + 0.02, -0.04, -0.29] as V3 },
-            ],
-            width: 0.06,
-            thick: 0.036,
-          })),
-        ],
+        whorl: [Math.PI, 0.6],
+        count: 16,
+        twist: 0,
+        groove: 0.45,
+        tips: () => 0,
+        locks: fan(3, (k, t) => ({
+          path: [
+            { at: [0, 0.4, -0.25] as V3 },
+            { at: [(t - 0.5) * 0.06, 0.36, -0.3] as V3 },
+            { at: [(t - 0.5) * 0.1, 0.24, -0.305 + (k % 2) * 0.01] as V3 },
+            { at: [(t - 0.5) * 0.12, 0.09, -0.335] as V3 },
+            { at: [(t - 0.5) * 0.07 + 0.02, -0.04, -0.29] as V3 },
+          ],
+          width: 0.06,
+          thick: 0.036,
+        })),
       };
   }
 }
@@ -885,8 +839,23 @@ function smoothstep(a: number, b: number, x: number): number {
 }
 
 /**
- * A glossy band round the hair (the studio key's reflection), lighter where the
- * surface faces up and out, and darker in the gaps between locks.
+ * How far `d` sits from the middle of a big lock: 1 on a lock's spine, 0 in
+ * the groove between two, with the locks curling out of the whorl.
+ */
+function lockRidge(cutting: HairCut, d: THREE.Vector3): { ridge: number; out: number } {
+  const w = direction(...cutting.whorl);
+  const u = new THREE.Vector3(0, 1, 0).cross(w);
+  if (u.lengthSq() < 1e-6) u.set(1, 0, 0);
+  u.normalize();
+  const v = w.clone().cross(u);
+  const out = Math.acos(Math.max(-1, Math.min(1, d.dot(w))));
+  const spin = Math.atan2(d.dot(v), d.dot(u)) + cutting.twist * out;
+  return { ridge: Math.abs(Math.cos((cutting.count * spin) / 2)), out };
+}
+
+/**
+ * One soft glossy band round the hair (the studio key's reflection), lighter
+ * where the surface faces up and out, and a little darker down in the grooves.
  */
 function shine(geometry: THREE.BufferGeometry, base: number): THREE.BufferGeometry {
   const position = geometry.getAttribute('position');
@@ -895,24 +864,85 @@ function shine(geometry: THREE.BufferGeometry, base: number): THREE.BufferGeomet
   const p = new THREE.Vector3();
   const n = new THREE.Vector3();
   const c = new THREE.Color();
-  const bright = new THREE.Color(mix(base, 0xfff4e0, 0.2));
-  const deep = new THREE.Color(mix(base, 0x000000, 0.35));
+  const bright = new THREE.Color(mix(base, 0xfff4e0, 0.22));
+  const deep = new THREE.Color(mix(base, 0x000000, 0.3));
   for (let i = 0; i < position.count; i++) {
     p.fromBufferAttribute(position, i).sub(SKULL);
     n.fromBufferAttribute(normal, i);
     const d = p.clone().normalize();
     const pitch = Math.asin(Math.max(-1, Math.min(1, d.y)));
-    const band = Math.exp(-(((pitch - 0.62) / 0.16) ** 2)) * Math.max(0, n.dot(d));
-    // Gaps between locks face sideways to the skull: shade them.
-    const gap = 1 - Math.max(0, n.dot(d));
+    const facingOut = Math.max(0, n.dot(d));
+    const band = Math.exp(-(((pitch - 0.7) / 0.22) ** 2)) * facingOut ** 2;
     c.fromBufferAttribute(color, i);
-    c.lerp(deep, gap * 0.5).lerp(bright, band * 0.55);
+    c.lerp(deep, smoothstep(0.02, 0.25, 1 - facingOut) * 0.6).lerp(bright, band * 0.5);
     color.setXYZ(i, c.r, c.g, c.b);
   }
   return geometry;
 }
 
-/** Hair: a scalp shell that sinks under the skin past the hairline, plus locks. */
+/** Columns round the head and rows from the hairline up to the crown of the hair shell. */
+const SHELL_COLUMNS = 72;
+const SHELL_ROWS = 26;
+
+/**
+ * The scalp shell, gridded from the hairline up so its edge follows the line
+ * cleanly: a rolled edge tucked under the skin, big locks bulging between
+ * grooves that curl out of the whorl, and lock ends dipping below the line as
+ * points. Under a hat (`cap`) it lies flat on the crown.
+ */
+function hairShell(cutting: HairCut, cap: number | null): THREE.BufferGeometry {
+  const positions: number[] = [];
+  const index: number[] = [];
+  const p = new THREE.Vector3();
+  for (let c = 0; c <= SHELL_COLUMNS; c++) {
+    const heading = (c / SHELL_COLUMNS) * Math.PI * 2;
+    const base = hairline(cutting, direction(heading, 0));
+    const line =
+      base - cutting.tips(heading) * lockRidge(cutting, direction(heading, base)).ridge ** 6;
+    for (let k = 0; k <= SHELL_ROWS; k++) {
+      const u = Math.max(0, (k - 1) / (SHELL_ROWS - 1));
+      const pitch = k === 0 ? line - 0.05 : line + (Math.PI / 2 - line) * u ** 1.25;
+      const d = direction(heading, Math.min(pitch, Math.PI / 2 - 1e-4));
+      let t = -0.01;
+      if (k > 0) {
+        const { ridge, out } = lockRidge(cutting, d);
+        const roll = Math.sin(Math.min(1, (pitch - line) / 0.12) * (Math.PI / 2));
+        const top = smoothstep(-0.4, 0.9, pitch);
+        const hat = cap === null ? 1 : 1 - 0.8 * smoothstep(cap - 0.15, cap + 0.1, pitch);
+        const swell = cutting.quiff
+          ? cutting.quiff.height *
+            Math.exp(-((d.angleTo(direction(...cutting.quiff.at)) / cutting.quiff.radius) ** 2))
+          : 0;
+        const grooved = 1 - cutting.groove * smoothstep(0.1, 0.55, out) * (1 - Math.sqrt(ridge));
+        t =
+          (cutting.edge + (cutting.crown - cutting.edge) * top + swell) *
+          (0.3 + 0.7 * roll) *
+          grooved *
+          hat;
+      }
+      skullPoint(d, p).addScaledVector(skullNormal(d), t);
+      positions.push(p.x, p.y, p.z);
+    }
+  }
+  const stride = SHELL_ROWS + 1;
+  for (let c = 0; c < SHELL_COLUMNS; c++) {
+    for (let k = 0; k < SHELL_ROWS; k++) {
+      const a = c * stride + k;
+      index.push(a, a + stride, a + 1, a + stride, a + stride + 1, a + 1);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  g.setIndex(index);
+  return smooth(g);
+}
+
+/**
+ * Hair: a scalp shell sculpted into a few big smooth locks (grooves curling
+ * out of a whorl, the lock ends dipping below the hairline as tucked points),
+ * sinking under the skin past the hairline; plus a few swept locks on top.
+ * Under a hat (`cap`) the shell lies flat on the crown.
+ */
 function hair(
   b: SculptBuilder,
   style: DeveloperHairstyle,
@@ -920,21 +950,9 @@ function hair(
   cap: number | null,
 ): void {
   const cutting = cut(style);
-  const shell = smooth(
-    deform(new THREE.SphereGeometry(1, 36, 24), (v) => {
-      const d = v.clone().normalize();
-      const pitch = Math.asin(Math.max(-1, Math.min(1, d.y)));
-      const line = hairline(cutting, d);
-      const h = smoothstep(line - 0.04, line + 0.1, pitch);
-      const top = smoothstep(0.2, 1.2, pitch);
-      const t = h * (cutting.edge + (cutting.crown - cutting.edge) * top) - 0.012 * (1 - h);
-      skullPoint(d, v).addScaledVector(skullNormal(d), t);
-    }),
-  );
+  const shell = hairShell(cutting, cap);
   const h = new SculptBuilder();
   h.add(shell, color, FINISH.hair);
-  // Locks are a shade lighter on top, catching the light like sculpted hair.
-  const light = mix(color, 0xffffff, 0.05);
   for (const lock of cutting.locks) {
     const points = lock.path.flatMap((p) => {
       if (!isSkullPoint(p)) return [new THREE.Vector3(...p.at)];
@@ -943,9 +961,9 @@ function hair(
       return [onSkull(yaw, pitch, out)];
     });
     if (points.length < 2) continue;
-    h.sweep(points, lockTaper(lock.width, lock.thick, lock.tip), light, FINISH.hair, {
-      segments: 9,
-      radial: 6,
+    h.sweep(points, lockTaper(lock.width, lock.thick, lock.tip), color, FINISH.hair, {
+      segments: 14,
+      radial: 10,
       up: (p) => p.clone().sub(SKULL).normalize(),
     });
   }
