@@ -240,6 +240,23 @@ it('gasps while knocked flying and gets its own face back after', () => {
   for (const m of [materials.body, materials.glow, materials.glass]) m.dispose();
 });
 
+it('types with flat hands apart, tapping in turn', () => {
+  const materials = kitMaterials();
+  const c = createDeveloper(1, materials, 'backend', developerAppearance(1));
+  const rig = c.rig;
+  if (!rig) throw new Error('Missing production rig');
+  const heights = [10, 65].map((time) => {
+    applyPose(c, playerPose(studyFrame('work', time).input, time));
+    const [left, right] = rig.arms;
+    expect(right.hand.position.x - left.hand.position.x).toBeGreaterThan(0.35);
+    for (const arm of rig.arms) expect(arm.hand.geometry).toBe(arm.type);
+    return left.hand.position.y - right.hand.position.y;
+  });
+  expect(heights[0]).not.toBeCloseTo(heights[1] ?? 0);
+  disposeCharacter(c);
+  for (const m of [materials.body, materials.glow, materials.glass]) m.dispose();
+});
+
 it('defaults to a varied crew without a gender field', () => {
   expect([1, 2, 3, 4].map((id) => developerAppearance(id).hairstyle)).toEqual(DEVELOPER_HAIRSTYLES);
   expect(Object.keys(developerAppearance(1)).sort()).toEqual(['hair', 'hairstyle', 'skin']);
