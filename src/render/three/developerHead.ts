@@ -1046,47 +1046,16 @@ function gear(b: SculptBuilder, role: RoleId, color: number, hair: number): void
         at: seat(0.02, 0.27, -0.012),
         rot: hatRot,
       });
-      const ear = onSkull(1.5, 0.12, 0.05);
-      const pencil = new THREE.Euler(0.15, 0, 1.35);
-      b.cylinder(
-        0.021,
-        0.021,
-        0.17,
-        0xf2c12e,
-        FINISH.plastic,
-        {
-          at: [ear.x, ear.y, ear.z],
-          rot: [pencil.x, pencil.y, pencil.z],
-        },
-        6,
-      );
-      const along = new THREE.Vector3(0, 1, 0).applyEuler(pencil);
-      const tipAt = new THREE.Vector3(ear.x, ear.y, ear.z).addScaledVector(along, -0.1);
-      b.cylinder(
-        0.021,
-        0.003,
-        0.045,
-        0xe8c9a0,
-        FINISH.cloth,
-        {
-          at: [tipAt.x, tipAt.y, tipAt.z],
-          rot: [pencil.x + Math.PI, pencil.y, pencil.z],
-        },
-        6,
-      );
-      const end = new THREE.Vector3(ear.x, ear.y, ear.z).addScaledVector(along, 0.095);
-      b.cylinder(
-        0.022,
-        0.022,
-        0.03,
-        0xff8aa8,
-        FINISH.rubber,
-        {
-          at: [end.x, end.y, end.z],
-          rot: [pencil.x, pencil.y, pencil.z],
-        },
-        8,
-      );
+      // Resting on top of the left ear, tucked against the hair and running
+      // front to back along the side of the head: the point forward, the
+      // eraser behind.
+      const rest = onSkull(1.52, 0.14, 0.045);
+      const back = new THREE.Vector3(0.06, 0.2, -1).normalize();
+      const along = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), back);
+      const on = (k: number): V3 => rest.clone().addScaledVector(back, k).toArray();
+      b.cylinder(0.021, 0.021, 0.17, 0xf2c12e, FINISH.plastic, { at: on(0), quat: along }, 6);
+      b.cylinder(0.021, 0.003, 0.045, 0xe8c9a0, FINISH.cloth, { at: on(-0.1), quat: along }, 6);
+      b.cylinder(0.022, 0.022, 0.03, 0xff8aa8, FINISH.rubber, { at: on(0.095), quat: along }, 8);
       break;
     }
     case 'backend': {
