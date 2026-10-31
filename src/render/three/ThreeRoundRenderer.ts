@@ -108,8 +108,8 @@ export class ThreeRoundRenderer implements RoundRenderer {
     this.surroundings.destroy();
     for (const geometry of Object.values(this.shared)) geometry.dispose();
     for (const geometry of this.ticketGeometries.values()) geometry.dispose();
-    const { body, glow, glass } = this.materials;
-    for (const material of [body, glow, glass]) material.dispose();
+    const { body, glow, glass, character } = this.materials;
+    for (const material of [body, glow, glass, character]) material.dispose();
     this.stage.forget(this.world);
     if (this.world.background instanceof THREE.Texture) this.world.background.dispose();
     disposeTree(this.world);

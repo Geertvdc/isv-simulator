@@ -364,8 +364,8 @@ export class Surroundings {
 
   destroy(): void {
     for (const g of this.geometries) g.dispose();
-    const { body, glow, glass } = this.materials;
-    for (const m of [body, glow, glass]) m.dispose();
+    const { body, glow, glass, character } = this.materials;
+    for (const m of [body, glow, glass, character]) m.dispose();
     for (const extra of this.extras) for (const g of extra.character.geometries) g.dispose();
   }
 

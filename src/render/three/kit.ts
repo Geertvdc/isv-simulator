@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { sculptMaterial } from './sculpt';
 
 /**
  * A tiny kit for building models in code: rounded boxes, cylinders, spheres
@@ -159,6 +160,8 @@ export interface KitMaterials {
   body: THREE.MeshStandardMaterial;
   glow: THREE.MeshBasicMaterial;
   glass: THREE.MeshStandardMaterial;
+  /** The developers' sculpted look: per-vertex roughness, metalness and glow. */
+  character: THREE.MeshStandardMaterial;
 }
 
 /**
@@ -186,6 +189,7 @@ export function kitMaterials(): KitMaterials {
       opacity: 0.3,
       depthWrite: false,
     }),
+    character: sculptMaterial(),
   };
 }
 

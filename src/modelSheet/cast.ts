@@ -224,7 +224,9 @@ window.addEventListener('pagehide', () => {
   stage.forget(scene);
   disposeTree(scene);
   for (const geometry of [folder.body, folder.glow, folder.glass]) geometry?.dispose();
-  for (const material of [materials.body, materials.glow, materials.glass]) material.dispose();
+  for (const material of [materials.body, materials.glow, materials.glass, materials.character]) {
+    material.dispose();
+  }
   if (scene.background instanceof THREE.Texture) scene.background.dispose();
   stage.renderer.dispose();
 });
