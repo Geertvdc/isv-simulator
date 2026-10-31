@@ -29,11 +29,11 @@ const WEBBING = 0x2a363e;
 
 type Profile = [number, number][];
 
-/** A body profile `[radius, y]` (hem to neck), `scale`d wider. */
-function bodyProfile(scale: number, hem = -0.23): Profile {
+/** A body profile `[radius, y]` (hem to neck), `scale`d wider; long tops `flare` at the hem to clear the thighs. */
+function bodyProfile(scale: number, hem = -0.23, flare = 0.185): Profile {
   return smoothProfile(
     [
-      [0.185 * scale, hem],
+      [flare * scale, hem],
       [0.2 * scale, hem + 0.06],
       [0.206 * scale, -0.06],
       [0.214 * scale, 0.05],
@@ -592,7 +592,7 @@ function frontend(color: number, skin: number): Outfit {
 
 function backend(color: number, skin: number): Outfit {
   const b = new SculptBuilder();
-  const P = bodyProfile(1.09, -0.27);
+  const P = bodyProfile(1.09, -0.27, 0.215);
   const knit = FINISH.knit;
   body(b, P, color, knit);
   shoulders(b, 0.26, 0.098, color, knit);
@@ -776,9 +776,9 @@ function qa(color: number): Outfit {
   // The lab coat: open at the front, flaring past the hips.
   const coat = smoothProfile(
     [
-      [0.26, -0.4],
-      [0.235, -0.26],
-      [0.215, -0.1],
+      [0.345, -0.4],
+      [0.272, -0.27],
+      [0.222, -0.1],
       [0.222, 0.05],
       [0.232, 0.15],
       [0.215, 0.235],
@@ -787,7 +787,7 @@ function qa(color: number): Outfit {
     ],
     24,
   );
-  const gap = 0.3;
+  const gap = 0.36;
   b.shell(
     coat,
     0.014,

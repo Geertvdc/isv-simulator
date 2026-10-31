@@ -201,6 +201,7 @@ stage.renderer.setAnimationLoop((now: number) => {
     applyPose(actor.character, playerPose(frame.input, time));
     actor.ticket.visible = frame.ticket !== null;
     if (frame.ticket) actor.ticket.position.set(frame.ticket.x, frame.ticket.y, frame.ticket.z);
+    actor.ticket.rotation.y = frame.ticketYaw;
   }
   parent.style.filter = gray ? 'grayscale(1)' : '';
   stage.render(scene, delta);

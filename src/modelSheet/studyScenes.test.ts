@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { studyTicketTarget } from '../render/three/CharacterStudies';
+import { carryPoint } from '../render/three/layout';
 import { STUDY_ACTIONS, studyFrame } from './studyScenes';
 
 describe('isolated study action loops', () => {
@@ -22,7 +23,7 @@ describe('isolated study action loops', () => {
     }
     const release = studyFrame('throw', 1600);
     expect(release.input.carrying).toBe(false);
-    expect(release.ticket?.y).toBeCloseTo(1.3);
+    expect(release.ticket?.y).toBeCloseTo(carryPoint(1).height);
     expect(studyFrame('throw', 2300).ticket?.z).toBeGreaterThan(release.ticket?.z ?? 0);
   });
 });

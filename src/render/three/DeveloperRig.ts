@@ -18,6 +18,7 @@ import {
 } from './developerLimbs';
 import { type SwingPart, buildOutfit } from './developerOutfit';
 import type { KitMaterials } from './kit';
+import { carryPoint } from './layout';
 import { PALETTE } from './look';
 import { COLOR } from './palette';
 import type { Pose } from './pose';
@@ -181,25 +182,49 @@ function segment(mesh: THREE.Mesh, from: THREE.Vector3, to: THREE.Vector3): void
   mesh.scale.y = delta.length();
 }
 
-/** Elastic two-segment arms keep exact wrist anchors through the common throw arc. */
-function elbowAt(shoulder: THREE.Vector3, hand: THREE.Vector3, sign: number): THREE.Vector3 {
+/** Upper arm and forearm length: arms only stretch past this when a hold needs it. */
+const ARM = 0.235;
+/** Thigh and shin: the knees bend whenever the hips are nearer the feet than this. */
+const THIGH = 0.175;
+const SHIN = 0.16;
+
+/** Something perpendicular to `axis`, leaning toward `pole` (or straight down if they line up). */
+function across(axis: THREE.Vector3, pole: THREE.Vector3): THREE.Vector3 {
+  const out = pole.clone().addScaledVector(axis, -pole.dot(axis));
+  if (out.lengthSq() < 1e-6) out.set(0, -1, 0).addScaledVector(axis, -axis.y);
+  if (out.lengthSq() < 1e-6) out.set(1, 0, 0);
+  return out.normalize();
+}
+
+/** The elbow between `shoulder` and `hand`, bending toward `pole`; arms stretch rather than miss a hold. */
+function elbowAt(shoulder: THREE.Vector3, hand: THREE.Vector3, pole: THREE.Vector3): THREE.Vector3 {
   const axis = hand.clone().sub(shoulder);
   const distance = axis.length();
   if (distance > 1.12) throw new Error('Developer hand target exceeds arm reach');
   axis.normalize();
-  const out = new THREE.Vector3(sign, 0, -0.3);
-  out.addScaledVector(axis, -out.dot(axis)).normalize();
-  const length = Math.max(0.24, distance / 2 + 0.025);
+  const length = Math.max(ARM, distance / 2 + 0.008);
   return shoulder
     .clone()
     .add(hand)
     .multiplyScalar(0.5)
-    .addScaledVector(out, Math.sqrt(length ** 2 - (distance / 2) ** 2));
+    .addScaledVector(across(axis, pole), Math.sqrt(length ** 2 - (distance / 2) ** 2));
 }
 
-/** Turns a hand along its forearm with the palm toward `palm` (inward, or down to type). */
-function orientHand(hand: THREE.Mesh, elbow: THREE.Vector3, palm: THREE.Vector3): void {
-  const y = hand.position.clone().sub(elbow).normalize();
+/** The knee between `hip` and `ankle` (two-bone, bending toward `pole`; straight when stretched). */
+function kneeAt(hip: THREE.Vector3, ankle: THREE.Vector3, pole: THREE.Vector3): THREE.Vector3 {
+  const axis = ankle.clone().sub(hip);
+  const d = axis.length();
+  axis.normalize();
+  if (d >= THIGH + SHIN - 1e-4)
+    return hip.clone().addScaledVector(axis, (d * THIGH) / (THIGH + SHIN));
+  const along = (THIGH ** 2 - SHIN ** 2 + d ** 2) / (2 * d);
+  const out = Math.sqrt(Math.max(0, THIGH ** 2 - along ** 2));
+  return hip.clone().addScaledVector(axis, along).addScaledVector(across(axis, pole), out);
+}
+
+/** Turns a hand: fingers along `along`, palm toward `palm`. */
+function orientHand(hand: THREE.Mesh, along: THREE.Vector3, palm: THREE.Vector3): void {
+  const y = along.clone().normalize();
   const z = palm.clone().addScaledVector(y, -palm.dot(y));
   if (z.lengthSq() < 1e-6) z.set(0, 0, 1).addScaledVector(y, -y.z);
   z.normalize();
@@ -211,86 +236,196 @@ function clampSwing(a: number): number {
   return Math.max(-SWING_LIMIT, Math.min(SWING_LIMIT, a));
 }
 
+function blend(a: THREE.Vector3, b: THREE.Vector3, t: number): THREE.Vector3 {
+  return t <= 0 ? a : a.lerp(b, Math.min(1, t));
+}
+
+/**
+ * Poses a developer from the shared `pose`. Developers read the same targets
+ * as everyone (exact carry grips, typing taps), but move their whole body:
+ * a real stride with knees, counter-swinging arms, a wind-up that turns the
+ * shoulders away from the throw, a sprinting dash and a two-handed shove.
+ */
 export function poseDeveloperRig(c: DeveloperRig, pose: Pose): void {
   const wind = pose.windUp;
-  const duck = Math.sin(Math.PI * wind);
-  const bend = duck * 1.15;
-  // The study's leftward duck clears the actual folder/tab envelope without moving the ticket.
-  c.torso.position.set(
-    -0.19 * Math.sin(bend),
-    0.36 + 0.19 * Math.cos(bend) + pose.bob,
-    -0.3 * duck - Math.max(0, pose.squash.x - 1) * 0.7,
-  );
-  const tilt = pose.lean * 0.5 + wind * 0.5;
-  const twist = Math.sin(pose.stride) * 0.07 * pose.walk * (1 - wind);
-  c.torso.rotation.set(tilt, twist, pose.roll + bend);
-  c.torso.scale.set(pose.squash.x, pose.squash.y, pose.squash.x);
-  // Walk sway and stumbles roll the body about the hem, so the hem never sweeps into the legs.
-  const pivot = new THREE.Vector3(0, -0.2, 0).multiply(c.torso.scale);
-  const unrolled = new THREE.Quaternion().setFromEuler(new THREE.Euler(tilt, twist, bend));
-  c.torso.position
-    .add(pivot.clone().applyQuaternion(unrolled))
-    .sub(pivot.applyQuaternion(c.torso.quaternion));
-  c.head.scale.set(1 / pose.squash.x, 1 / pose.squash.y, 1 / pose.squash.x);
-  c.head.rotation.set(0.12 + pose.nod * c.nod, -twist * 0.8, 0);
+  const walk = pose.walk;
+  const s = pose.stride;
+  const dash = pose.dash;
+  const carrying = pose.carrying;
+  const typing = carrying ? 0 : Math.min(1, Math.max(0, pose.nod / 0.25));
+  const thrust = carrying ? 0 : pose.thrust;
+  const stumble = pose.stumble;
+  const release = carrying ? 0 : pose.release;
+  const turn = carrying ? carryPoint(wind).yaw : 0;
 
-  // Hanging pieces stay roughly plumb, bounce with the walk and never swing into the body.
-  const roll = pose.roll + bend;
-  const bounce = pose.walk * (0.5 + 0.5 * Math.sin(pose.stride * 2));
-  for (const s of c.swings) {
-    if (s.hang === 'front') {
-      s.mesh.rotation.set(clampSwing(Math.min(0, -tilt - bounce * s.amp)), 0, clampSwing(-roll));
-    } else if (s.hang === 'back') {
-      s.mesh.rotation.set(clampSwing(Math.max(0, -tilt + bounce * s.amp)), 0, clampSwing(-roll));
-    } else {
-      const sway = -roll + bounce * s.amp * 0.5;
-      s.mesh.rotation.set(
-        clampSwing(-tilt + Math.sin(pose.stride) * pose.walk * s.amp),
+  // The body: highest as the legs pass, lowest at heel strike; sunk into bent knees for effort.
+  const run = Math.max(walk, dash);
+  const stepBob = run * (0.03 * Math.abs(Math.cos(s)) - 0.022) * (1 + dash * 0.4);
+  // Hands full: stay upright and tall so the chest and hair never run into the folder.
+  const hold = carrying ? 0.1 : 1;
+  const crouch = 0.045 * wind + 0.03 * dash * hold + 0.035 * thrust + 0.02 * stumble;
+  const lift = stepBob - crouch;
+  const forward = (0.03 * dash + 0.05 * thrust) * hold - 0.04 * stumble + 0.04 * release;
+  const tilt =
+    0.1 * walk * (1 - dash) * hold +
+    0.18 * typing +
+    0.5 * dash * hold +
+    0.26 * thrust +
+    0.3 * release -
+    0.3 * stumble -
+    0.28 * wind;
+  const roll = pose.roll * 0.7 * (1 - 0.85 * wind);
+  // Shoulders counter the hips on a walk; a wind-up turns them most of the way round.
+  // A throw's follow-through unwinds them past square, the other way.
+  const twist = -Math.sin(s) * 0.12 * walk * (1 - dash * 0.5) * hold + turn * 0.95 - 0.45 * release;
+  const pelvisYaw = Math.sin(s) * 0.07 * walk + turn * 0.4 - 0.2 * release;
+  const pelvis = new THREE.Quaternion().setFromAxisAngle(UP, pelvisYaw);
+
+  const hips = new THREE.Vector3(0, 0.4 + lift, forward);
+  c.torso.rotation.set(tilt, twist, roll, 'XZY');
+  c.torso.position
+    .copy(hips)
+    .add(new THREE.Vector3(0, 0.15, 0).applyQuaternion(c.torso.quaternion));
+  const squash = dash > 0 ? { x: 1, y: 1 } : pose.squash;
+  c.torso.scale.set(squash.x, squash.y, squash.x);
+  // The head stays level and keeps looking where they are going (or at the throw's target).
+  const look = new THREE.Quaternion().setFromEuler(
+    new THREE.Euler(
+      0.1 + pose.nod * c.nod + tilt * 0.25 - 0.06 * stumble,
+      twist * 0.15,
+      roll * 0.4,
+      'YXZ',
+    ),
+  );
+  c.head.quaternion.copy(c.torso.quaternion).invert().multiply(look);
+  c.head.scale.set(1 / squash.x, 1 / squash.y, 1 / squash.x);
+
+  // Hanging pieces stay roughly plumb, bounce with the walk, stream back on a dash and never swing into the body.
+  const bounce = run * (0.5 + 0.5 * Math.sin(s * 2));
+  for (const sw of c.swings) {
+    if (sw.hang === 'front') {
+      sw.mesh.rotation.set(
+        clampSwing(Math.min(0, -tilt * (1 - 0.7 * dash) - bounce * sw.amp)),
         0,
-        clampSwing(s.side > 0 ? Math.max(0, sway) : Math.min(0, sway)),
+        clampSwing(-roll),
+      );
+    } else if (sw.hang === 'back') {
+      sw.mesh.rotation.set(
+        clampSwing(Math.max(0, -tilt + bounce * sw.amp + 0.6 * dash)),
+        0,
+        clampSwing(-roll),
+      );
+    } else {
+      const sway = -roll + bounce * sw.amp * 0.5;
+      sw.mesh.rotation.set(
+        clampSwing(-tilt + Math.sin(s) * walk * sw.amp + 0.5 * dash),
+        0,
+        clampSwing(sw.side > 0 ? Math.max(0, sway) : Math.min(0, sway)),
       );
     }
   }
 
   c.root.updateMatrixWorld(true);
-  const base = new THREE.Vector3(0, 0.36 + pose.bob, 0);
+  const base = new THREE.Vector3(0, 0.36 + lift, forward);
   const waistTop = c.root.worldToLocal(c.torso.localToWorld(new THREE.Vector3(0, -0.1, 0)));
   c.waist.position.copy(base);
   c.waist.quaternion.setFromUnitVectors(UP, waistTop.sub(base).normalize());
-  c.waist.scale.set(pose.squash.x, 1, pose.squash.x);
+  c.waist.scale.set(1, 1, 1);
 
-  const typing = Math.min(1, Math.max(0, pose.nod / 0.25));
+  const chest = new THREE.Vector3(Math.sin(turn), 0, Math.cos(turn));
   c.arms.forEach((arm, i) => {
     const sign = i === 0 ? -1 : 1;
-    const target = i === 0 ? pose.leftHand : pose.rightHand;
-    const hand = new THREE.Vector3(target.x, target.y + pose.bob, target.z);
     const shoulder = c.root.worldToLocal(arm.shoulder.getWorldPosition(new THREE.Vector3()));
-    const elbow = elbowAt(shoulder, hand, sign);
+    const target = i === 0 ? pose.leftHand : pose.rightHand;
+    let hand: THREE.Vector3;
+    let pole: THREE.Vector3;
+    let palm: THREE.Vector3;
+    let fingersUp = 0;
+    if (carrying) {
+      // Exactly on the ticket's short side, elbows out and down, palms in.
+      hand = new THREE.Vector3(target.x, target.y + pose.bob, target.z);
+      pole = new THREE.Vector3(sign * 0.9, -1, -0.25).applyQuaternion(
+        new THREE.Quaternion().setFromAxisAngle(UP, turn),
+      );
+      palm = new THREE.Vector3(-sign * chest.z, 0, sign * chest.x);
+    } else {
+      // Hanging relaxed just ahead of the thighs, swinging against the legs.
+      const swing = Math.sin(s) * walk * -sign;
+      hand = new THREE.Vector3(
+        sign * (0.34 - 0.02 * walk),
+        0.37 + lift + Math.abs(Math.sin(s)) * 0.05 * walk,
+        0.08 + swing * 0.2 + forward,
+      );
+      pole = new THREE.Vector3(sign * 0.35, -0.3, -1);
+      palm = new THREE.Vector3(-sign, 0, 0.25);
+      // Sprinting: arms swept back, still pumping a little.
+      blend(hand, new THREE.Vector3(sign * 0.3, 0.6 + lift, -0.36 + forward + swing * 0.08), dash);
+      if (dash > 0) pole.lerp(new THREE.Vector3(sign * 0.4, 0.4, -0.6), dash);
+      // Typing: upper arms by the ribs, forearms out to the keys, palms down.
+      if (typing > 0) {
+        blend(hand, new THREE.Vector3(sign * 0.15, target.y + pose.bob, 0.39), typing);
+        pole.lerp(new THREE.Vector3(sign * 0.35, -1, -0.35), typing);
+        palm.lerp(new THREE.Vector3(0, -1, 0.05), typing);
+      }
+      // Shoving: both arms punched out, palms forward.
+      if (thrust > 0) {
+        blend(hand, new THREE.Vector3(sign * 0.19, 0.74 + lift, 0.52 + forward), thrust);
+        pole.lerp(new THREE.Vector3(sign * 0.7, -1, 0), thrust);
+        palm.lerp(new THREE.Vector3(0, 0, 1), thrust);
+        fingersUp = thrust * 0.85;
+      }
+      // Just let go of a throw: both arms flung out after it, across the body.
+      if (release > 0) {
+        blend(hand, new THREE.Vector3(sign * 0.13 - 0.08, 0.68 + lift, 0.5 + forward), release);
+        pole.lerp(new THREE.Vector3(sign * 0.6, -1, 0), release);
+        palm.lerp(new THREE.Vector3(0, -0.6, 1), release);
+      }
+      // Knocked flying: arms thrown out for balance.
+      if (stumble > 0) {
+        blend(
+          hand,
+          new THREE.Vector3(sign * 0.46, 0.8 + lift + sign * pose.roll * 0.3, 0.02 + forward),
+          stumble,
+        );
+        pole.lerp(new THREE.Vector3(sign, -0.6, -0.4), stumble);
+        palm.lerp(new THREE.Vector3(0, -1, 0.2), stumble);
+      }
+    }
+    const elbow = elbowAt(shoulder, hand, pole);
     segment(arm.upper, shoulder, elbow);
     segment(arm.lower, elbow, hand);
     arm.elbow.position.copy(elbow);
     arm.elbow.quaternion.copy(arm.upper.quaternion);
     arm.hand.position.copy(hand);
-    const palm = new THREE.Vector3(-sign * (1 - typing), -typing, 0.15 * (1 - typing));
-    orientHand(arm.hand, elbow, palm);
+    const along = hand.clone().sub(elbow).normalize();
+    if (fingersUp > 0) along.lerp(new THREE.Vector3(0, 1, 0.25).normalize(), fingersUp);
+    orientHand(arm.hand, along, palm);
   });
+
   c.legs.forEach((leg, i) => {
     const sign = i === 0 ? -1 : 1;
-    const stride = pose.stride + i * Math.PI;
-    const swing = Math.sin(stride) * pose.walk;
-    const lift = Math.max(0, Math.cos(stride)) * 0.09 * pose.walk;
-    // Heel strike in front, toe-off behind.
-    const pitch = -0.28 * swing;
-    const foot = new THREE.Vector3(
-      sign * 0.13,
-      lift + soleRise(leg.hull, pitch) + 1e-5,
-      swing * 0.16,
-    );
+    const stride = s + i * Math.PI;
+    const swing = Math.sin(stride) * run;
+    const raise = Math.max(0, Math.cos(stride)) * (0.1 + 0.05 * dash) * run;
+    // Heel strike in front; toe-off behind (heel high on a sprint).
+    let pitch = swing > 0 ? -0.3 * swing : -(0.3 + 0.5 * dash) * swing;
+    let x = sign * 0.13;
+    let z = swing * (0.22 + 0.06 * dash) - 0.06 * dash + forward;
+    // Wind-up: lead foot forward, back foot planted behind and out.
+    x += sign * 0.04 * wind;
+    z += -sign * 0.13 * wind;
+    // Shove: lead (left) foot steps in, back foot pushes off on its toes.
+    const push = Math.max(thrust, release);
+    z += (sign < 0 ? 0.2 : -0.2) * push;
+    if (sign > 0) pitch += 0.45 * push;
+    // Stumble: one foot steps back to catch the fall.
+    z += (sign > 0 ? -0.16 : 0.03) * stumble;
+    const foot = new THREE.Vector3(x, raise + soleRise(leg.hull, pitch) + 1e-5, z);
     leg.shoe.position.copy(foot);
-    leg.shoe.rotation.set(pitch, 0, 0);
-    const hip = new THREE.Vector3(sign * 0.1, 0.4 + pose.bob, 0);
-    const knee = new THREE.Vector3(sign * 0.13, 0.23 + lift, swing * 0.08 + 0.025);
+    leg.shoe.rotation.set(pitch, sign * 0.12 * wind, 0, 'YXZ');
+    const hip = hips.clone().add(new THREE.Vector3(sign * 0.1, 0, 0).applyQuaternion(pelvis));
     const ankle = foot.clone().add(new THREE.Vector3(0, 0.1, 0.1 * Math.sin(pitch)));
+    const knee = kneeAt(hip, ankle, new THREE.Vector3(sign * 0.15, 0, 1).applyQuaternion(pelvis));
     segment(leg.upper, hip, knee);
     leg.knee.position.copy(knee);
     segment(leg.lower, knee, ankle);
