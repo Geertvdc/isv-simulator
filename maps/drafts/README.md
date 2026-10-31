@@ -21,4 +21,5 @@ npm run sketch -- <level-id>        # current and draft side by side -> docs/pla
 npm run sketch -- --drafts          # every draft here
 npm run level-report -- <level-id>  # numbers for the current map and its draft
 npm run level-report -- --drafts --table
+npm run draft-shots -- <level-id>   # draft in the real 3D game -> docs/plan/images/level-redesign/<level-id>-3d.webp
 ```

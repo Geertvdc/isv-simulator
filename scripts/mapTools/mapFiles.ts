@@ -19,11 +19,16 @@ export const LEVEL_IDS: readonly string[] = LEVELS.map((l) => l.id);
 
 /** `maps/level-NN-*.txt` for a campaign level: files are numbered in campaign order. */
 export function currentMapPath(id: string): string | null {
+  const file = levelMapFile(id, readdirSync(MAPS_DIR));
+  return file ? join(MAPS_DIR, file) : null;
+}
+
+/** Which of `files` (names in `maps/`) is the campaign level's map, or `null`. */
+export function levelMapFile(id: string, files: readonly string[]): string | null {
   const index = LEVEL_IDS.indexOf(id);
   if (index < 0) return null;
   const prefix = `level-${String(index + 1).padStart(2, '0')}-`;
-  const file = readdirSync(MAPS_DIR).find((f) => f.startsWith(prefix) && f.endsWith('.txt'));
-  return file ? join(MAPS_DIR, file) : null;
+  return files.find((f) => f.startsWith(prefix) && f.endsWith('.txt')) ?? null;
 }
 
 /** `maps/drafts/<id>.txt`, whether it exists or not. */

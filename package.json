@@ -18,6 +18,7 @@
     "sfx": "vite-node scripts/sfx.ts",
     "sketch": "vite-node scripts/mapSketch.ts --",
     "level-report": "vite-node scripts/levelReport.ts --",
+    "draft-shots": "vite-node scripts/draftShots.ts --",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
