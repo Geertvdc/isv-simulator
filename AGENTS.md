@@ -42,6 +42,7 @@ docs/plan/   phase specs
 
 ## Conventions
 
+- New worktrees get `node_modules` from the setup script in `.github/github-app.yml` (`npm ci`). If `node_modules` is missing (for example "vite: command not found"), run `npm ci` before anything else; it is not a code bug.
 - Tests sit next to code: `foo.ts` + `foo.test.ts`.
 - Every sim feature gets tests. A phase is done only when `npm run check` (typecheck, lint, test) passes and the manual checks in the phase file work.
 - Small commits per step.
