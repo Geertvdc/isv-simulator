@@ -16,11 +16,14 @@ function intersectsMesh(box: THREE.Box3, mesh: THREE.Object3D): boolean {
   if (!box.intersectsBox(new THREE.Box3().setFromObject(mesh, true))) return false;
   const positions: unknown = mesh.geometry.getAttribute('position');
   if (!(positions instanceof THREE.BufferAttribute)) throw new Error('Missing model vertices');
+  const index = mesh.geometry.index;
+  const vertex = (i: number) => (index ? index.getX(i) : i);
+  const count = index ? index.count : positions.count;
   const triangle = new THREE.Triangle();
-  for (let i = 0; i < positions.count; i += 3) {
-    triangle.a.fromBufferAttribute(positions, i).applyMatrix4(mesh.matrixWorld);
-    triangle.b.fromBufferAttribute(positions, i + 1).applyMatrix4(mesh.matrixWorld);
-    triangle.c.fromBufferAttribute(positions, i + 2).applyMatrix4(mesh.matrixWorld);
+  for (let i = 0; i < count; i += 3) {
+    triangle.a.fromBufferAttribute(positions, vertex(i)).applyMatrix4(mesh.matrixWorld);
+    triangle.b.fromBufferAttribute(positions, vertex(i + 1)).applyMatrix4(mesh.matrixWorld);
+    triangle.c.fromBufferAttribute(positions, vertex(i + 2)).applyMatrix4(mesh.matrixWorld);
     if (box.intersectsTriangle(triangle)) return true;
   }
   return false;
