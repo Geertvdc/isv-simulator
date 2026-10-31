@@ -6,6 +6,7 @@
  *
  *   npm run draft-shots -- <level-id> [<level-id> …]
  *   npm run draft-shots -- --drafts      every draft
+ *   (reorg phases `<id>.phaseN.txt` render too, as `<id>-phaseN-3d.webp`)
  *
  * Works in a throwaway git worktree (detached at HEAD, `node_modules`
  * symlinked in): copies each draft over its live `maps/level-NN-*.txt`, with
@@ -30,9 +31,15 @@ import {
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { levelShotName, renderFileName, shotIds } from './mapTools/draftShots';
+import { levelShotName, phasePasses, renderFileName, shotIds } from './mapTools/draftShots';
 import { toStandIns } from './mapTools/mapChars';
-import { SKETCH_DIR, currentMapPath, draftIds, draftMapPath } from './mapTools/mapFiles';
+import {
+  type DraftPhase,
+  SKETCH_DIR,
+  currentMapPath,
+  draftIds,
+  draftPhases,
+} from './mapTools/mapFiles';
 
 // A fixed path (not `os.tmpdir()`) so every checkout and session agrees on it.
 const LOCK_DIR = '/tmp/isv-draft-shots.lock';
@@ -140,24 +147,27 @@ function freePort(): Promise<number> {
   });
 }
 
-/** A detached worktree at HEAD with the drafts in place of the live maps. */
-function makeWorktree(ids: readonly string[]): string {
+/** A detached worktree at HEAD. */
+function makeWorktree(): string {
   workDir = mkdtempSync(join(tmpdir(), 'isv-draft-shots-'));
   const dir = join(workDir, 'worktree');
   execFileSync('git', ['worktree', 'add', '--detach', dir, 'HEAD'], { stdio: 'ignore' });
   worktree = dir;
   symlinkSync(resolve('node_modules'), join(dir, 'node_modules'), 'dir');
-  for (const id of ids) {
-    const live = currentMapPath(id);
-    if (!live) throw new Error(`No live map file for ${id}`);
-    // Drafts come from this checkout, so uncommitted edits are rendered too.
-    const draft = readFileSync(draftMapPath(id), 'utf8');
-    writeFileSync(join(dir, live), toStandIns(draft));
-  }
   return dir;
 }
 
-async function startVite(dir: string, port: number): Promise<string> {
+/** Copies drafts (one phase each) over their live maps in the worktree. */
+function placeDrafts(dir: string, drafts: readonly { id: string; draft: DraftPhase }[]): void {
+  for (const { id, draft } of drafts) {
+    const live = currentMapPath(id);
+    if (!live) throw new Error(`No live map file for ${id}`);
+    // Drafts come from this checkout, so uncommitted edits are rendered too.
+    writeFileSync(join(dir, live), toStandIns(readFileSync(draft.path, 'utf8')));
+  }
+}
+
+async function startVite(dir: string, port: number): Promise<{ base: string; vite: ChildProcess }> {
   const base = `http://localhost:${port}`;
   const child = spawn(
     join(dir, 'node_modules', '.bin', 'vite'),
@@ -169,7 +179,7 @@ async function startVite(dir: string, port: number): Promise<string> {
   while (Date.now() < until) {
     if (child.exitCode !== null) throw new Error(`vite exited with code ${child.exitCode}`);
     try {
-      if ((await fetch(base)).ok) return base;
+      if ((await fetch(base)).ok) return { base, vite: child };
     } catch {
       // Not listening yet.
     }
@@ -190,7 +200,13 @@ function run(command: string, args: readonly string[], cwd: string): Promise<num
   });
 }
 
-async function shoot(dir: string, base: string, id: string, out: string): Promise<string> {
+async function shoot(
+  dir: string,
+  base: string,
+  id: string,
+  phase: number,
+  out: string,
+): Promise<string> {
   const code = await run(
     join(dir, 'node_modules', '.bin', 'vite-node'),
     [
@@ -205,7 +221,7 @@ async function shoot(dir: string, base: string, id: string, out: string): Promis
   const shot = join(out, `${levelShotName(id)}.webp`);
   if (code !== 0 || !existsSync(shot)) throw new Error(`screenshot of ${id} failed`);
   mkdirSync(SKETCH_DIR, { recursive: true });
-  const target = join(SKETCH_DIR, renderFileName(id));
+  const target = join(SKETCH_DIR, renderFileName(id, phase));
   copyFileSync(shot, target);
   return target;
 }
@@ -219,10 +235,19 @@ async function main(): Promise<void> {
     return;
   }
   await acquireLock();
-  const dir = makeWorktree(request.ids);
-  const base = await startVite(dir, await freePort());
+  const dir = makeWorktree();
   const out = join(workDir ?? dir, 'shots');
-  for (const id of request.ids) console.log(`wrote ${await shoot(dir, base, id, out)}`);
+  const passes = phasePasses(new Map(request.ids.map((id) => [id, draftPhases(id)])));
+  // A fresh vite per pass, so it can't serve a cached map from the pass before.
+  for (const pass of passes) {
+    placeDrafts(dir, pass);
+    const { base, vite } = await startVite(dir, await freePort());
+    for (const { id, draft } of pass) {
+      console.log(`wrote ${await shoot(dir, base, id, draft.phase, out)}`);
+    }
+    stopGroup(vite);
+    children.delete(vite);
+  }
 }
 
 try {

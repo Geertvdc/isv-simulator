@@ -38,6 +38,7 @@ type Look =
   | { kind: 'robotRoute' }
   | { kind: 'lift'; express?: boolean }
   | { kind: 'partition' }
+  | { kind: 'rolling' }
   | { kind: 'unknown' };
 
 interface CharInfo {
@@ -93,10 +94,12 @@ const CHARS: Readonly<Record<string, CharInfo>> = {
     name: `${FUTURE_CHARS.l?.name ?? 'express lift'} *`,
   },
   H: { look: block('#6d4c41', 'H'), name: `${FUTURE_CHARS.H?.name ?? 'mail chute'} *` },
+  // Enterprise
+  D: { look: { kind: 'rolling' }, name: `${FUTURE_CHARS.D?.name ?? 'rolling desk'} *` },
 };
 
 /** Legend order: `CHARS` keys can't give it, digit keys come first in an object. */
-const LEGEND_ORDER = '.# ~CIBKTRPSXWG><v^1234Mm_o%rL=lH'.split('');
+const LEGEND_ORDER = '.# ~CIBKTRPSXWG><v^1234Mm_o%rL=lHD'.split('');
 
 const UNKNOWN: CharInfo = { look: { kind: 'unknown' }, name: 'unknown char' };
 
@@ -234,6 +237,21 @@ function cellSvg(look: Look, x: number, y: number, t: number): string {
           t - 2 * inset,
           `fill="#9aa0ab" stroke="${WALL}" stroke-width="2" stroke-dasharray="${t * 0.15} ${t * 0.1}"`,
         )
+      );
+    case 'rolling':
+      // A counter with a dashed outline and two castors: it moves on a reorg.
+      return (
+        floor +
+        rect(
+          x + inset,
+          y + inset,
+          t - 2 * inset,
+          t - 2 * inset - t * 0.12,
+          `rx="${inset * 1.5}" fill="#bc8f5a" stroke="${INK}" stroke-width="1.5" stroke-dasharray="${t * 0.15} ${t * 0.08}"`,
+        ) +
+        `<circle cx="${x + t * 0.28}" cy="${y + t * 0.84}" r="${t * 0.08}" fill="${INK}"/>` +
+        `<circle cx="${x + t * 0.72}" cy="${y + t * 0.84}" r="${t * 0.08}" fill="${INK}"/>` +
+        label(cx, cy - t * 0.05, t * 0.44, 'D', `font-weight="bold" fill="#ffffff"`)
       );
     case 'unknown':
       return rect(x, y, t, t, 'fill="#ff00ff"') + label(cx, cy, t * 0.5, '?', 'fill="#ffffff"');

@@ -36,17 +36,57 @@ export function draftMapPath(id: string): string {
   return join(DRAFTS_DIR, `${id}.txt`);
 }
 
+/** `<id>.phase<N>.txt`: a later layout phase of a draft (reorgs), N from 2. */
+const PHASE_FILE = /^(.+)\.phase(\d+)\.txt$/;
+
 /** Level ids with a draft in `maps/drafts/`, in campaign order (unknown ids last). */
 export function draftIds(): string[] {
   if (!existsSync(DRAFTS_DIR)) return [];
-  const ids = readdirSync(DRAFTS_DIR)
-    .filter((f) => f.endsWith('.txt'))
+  return draftIdsIn(readdirSync(DRAFTS_DIR));
+}
+
+/** The level ids with a draft among `files` (names in `maps/drafts/`); phase files don't count. */
+export function draftIdsIn(files: readonly string[]): string[] {
+  const ids = files
+    .filter((f) => f.endsWith('.txt') && !PHASE_FILE.test(f))
     .map((f) => f.slice(0, -'.txt'.length));
   const order = (id: string): number => {
     const i = LEVEL_IDS.indexOf(id);
     return i < 0 ? LEVEL_IDS.length : i;
   };
   return ids.sort((a, b) => order(a) - order(b) || a.localeCompare(b));
+}
+
+export interface DraftPhase {
+  /** 1 for the main draft, the layout at the start of the level. */
+  phase: number;
+  path: string;
+}
+
+/**
+ * A draft's layout phases, in order: the main draft `<id>.txt` is phase 1,
+ * `<id>.phase2.txt` and on are the layouts after each reorg. Empty without a draft.
+ */
+export function draftPhases(id: string): DraftPhase[] {
+  if (!existsSync(DRAFTS_DIR)) return [];
+  return draftPhasesIn(id, readdirSync(DRAFTS_DIR)).map(({ phase, file }) => ({
+    phase,
+    path: join(DRAFTS_DIR, file),
+  }));
+}
+
+/** `draftPhases` over file names in `maps/drafts/`. */
+export function draftPhasesIn(
+  id: string,
+  files: readonly string[],
+): { phase: number; file: string }[] {
+  if (!files.includes(`${id}.txt`)) return [];
+  const later = files.flatMap((file) => {
+    const match = PHASE_FILE.exec(file);
+    const phase = Number(match?.[2]);
+    return match?.[1] === id && phase >= 2 ? [{ phase, file }] : [];
+  });
+  return [{ phase: 1, file: `${id}.txt` }, ...later.sort((a, b) => a.phase - b.phase)];
 }
 
 /** `1-3 Down the Hall` for a campaign level id, or the id itself. */

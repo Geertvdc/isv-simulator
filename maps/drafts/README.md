@@ -16,7 +16,9 @@ Sketches of the redesigned campaign maps, for review on paper before anything is
   | `=`  | partition (Enterprise: reorgs)                               | wall `#`         |
   | `l`  | express lift cabin (Scale-Up: lifts, skips floors)           | floor `.`        |
   | `H`  | mail chute hatch (Scale-Up: one-way drop to the floor below) | counter `C`      |
+  | `D`  | rolling desk (Enterprise: reorgs)                            | counter `C`      |
 
+- Reorg levels change layout during the round: `<level-id>.txt` is phase 1 (the layout at the start), `<level-id>.phase2.txt`, `.phase3.txt` the layouts after each reorg. Same size; only partitions `=` and rolling desks `D` move (onto and off floor), everything else stays put. Rolling desks pair up in reading order (the first `D` in phase 1 rolls to the first `D` in phase 2). The tools draw, report and render every phase, and flag a phase that moves anything else.
 - The game never loads these files (not until the greybox step of phase 23).
 
 ## Tools
