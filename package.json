@@ -16,6 +16,8 @@
     "verify:online": "vite-node scripts/verifyOnline.ts",
     "verify:prediction": "vite-node scripts/verifyPrediction.ts",
     "sfx": "vite-node scripts/sfx.ts",
+    "sketch": "vite-node scripts/mapSketch.ts --",
+    "level-report": "vite-node scripts/levelReport.ts --",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
