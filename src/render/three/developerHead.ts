@@ -888,9 +888,9 @@ const SHELL_ROWS = 26;
  * The scalp shell, gridded from the hairline up so its edge follows the line
  * cleanly: a rolled edge tucked under the skin, big locks bulging between
  * grooves that curl out of the whorl, and lock ends dipping below the line as
- * points. Under a hat (`cap`) it lies flat on the crown.
+ * points. Under a hat it lies flat on the crown.
  */
-function hairShell(cutting: HairCut, cap: number | null): THREE.BufferGeometry {
+function hairShell(cutting: HairCut, hat: Hat | null): THREE.BufferGeometry {
   const positions: number[] = [];
   const index: number[] = [];
   const p = new THREE.Vector3();
@@ -908,7 +908,8 @@ function hairShell(cutting: HairCut, cap: number | null): THREE.BufferGeometry {
         const { ridge, out } = lockRidge(cutting, d);
         const roll = Math.sin(Math.min(1, (pitch - line) / 0.12) * (Math.PI / 2));
         const top = smoothstep(-0.4, 0.9, pitch);
-        const hat = cap === null ? 1 : 1 - 0.8 * smoothstep(cap - 0.15, cap + 0.1, pitch);
+        const flat =
+          hat === null ? 1 : 1 - 0.8 * smoothstep(hat.band + 0.03, hat.band + 0.13, d.dot(hat.up));
         const swell = cutting.quiff
           ? cutting.quiff.height *
             Math.exp(-((d.angleTo(direction(...cutting.quiff.at)) / cutting.quiff.radius) ** 2))
@@ -918,7 +919,7 @@ function hairShell(cutting: HairCut, cap: number | null): THREE.BufferGeometry {
           (cutting.edge + (cutting.crown - cutting.edge) * top + swell) *
           (0.3 + 0.7 * roll) *
           grooved *
-          hat;
+          flat;
       }
       skullPoint(d, p).addScaledVector(skullNormal(d), t);
       positions.push(p.x, p.y, p.z);
@@ -941,26 +942,22 @@ function hairShell(cutting: HairCut, cap: number | null): THREE.BufferGeometry {
  * Hair: a scalp shell sculpted into a few big smooth locks (grooves curling
  * out of a whorl, the lock ends dipping below the hairline as tucked points),
  * sinking under the skin past the hairline; plus a few swept locks on top.
- * Under a hat (`cap`) the shell lies flat on the crown.
+ * Under a hat the shell lies flat on the crown and its locks are left off.
  */
-function hair(
-  b: SculptBuilder,
-  style: DeveloperHairstyle,
-  color: number,
-  cap: number | null,
-): void {
+function hair(b: SculptBuilder, style: DeveloperHairstyle, color: number, hat: Hat | null): void {
   const cutting = cut(style);
-  const shell = hairShell(cutting, cap);
+  const shell = hairShell(cutting, hat);
   const h = new SculptBuilder();
   h.add(shell, color, FINISH.hair);
   for (const lock of cutting.locks) {
-    const points = lock.path.flatMap((p) => {
-      if (!isSkullPoint(p)) return [new THREE.Vector3(...p.at)];
-      const [yaw, pitch, out] = p;
-      if (cap !== null && pitch > cap) return [];
-      return [onSkull(yaw, pitch, out)];
-    });
-    if (points.length < 2) continue;
+    // A lock running out from under a hat would be cut to a stub: leave it off.
+    const hidden = lock.path.some(
+      (p) => hat !== null && isSkullPoint(p) && direction(p[0], p[1]).dot(hat.up) > hat.band,
+    );
+    if (hidden) continue;
+    const points = lock.path.map((p) =>
+      isSkullPoint(p) ? onSkull(p[0], p[1], p[2]) : new THREE.Vector3(...p.at),
+    );
     h.sweep(points, lockTaper(lock.width, lock.thick, lock.tip), color, FINISH.hair, {
       segments: 14,
       radial: 10,
@@ -975,8 +972,15 @@ function hair(
 
 // --- Head gear -----------------------------------------------------------------
 
-/** Pitch above which a hat hides the hair (locks there are left off). */
-const BERET_CAP = 0.5;
+/** A hat over the hair: directions from the skull center past `band` along `up` are under it. */
+interface Hat {
+  up: THREE.Vector3;
+  band: number;
+}
+
+/** The beret's slouch: tipped back a little and down over the right ear. */
+const BERET_TILT = new THREE.Euler(-0.12, 0, 0.27);
+const BERET: Hat = { up: new THREE.Vector3(0, 1, 0).applyEuler(BERET_TILT), band: 0.2 };
 
 function gear(b: SculptBuilder, role: RoleId, color: number): void {
   switch (role) {
@@ -986,31 +990,32 @@ function gear(b: SculptBuilder, role: RoleId, color: number): void {
       const beret = 0x3a3352;
       const crown = latheGeometry(
         [
-          [0.262, -0.02],
-          [0.272, 0.0],
-          [0.302, 0.028],
-          [0.36, 0.064],
-          [0.382, 0.098],
-          [0.366, 0.132],
-          [0.312, 0.168],
-          [0.22, 0.206],
-          [0.11, 0.232],
-          [0.001, 0.24],
+          [0.262, -0.026],
+          [0.272, -0.004],
+          [0.29, 0.024],
+          [0.308, 0.056],
+          [0.304, 0.086],
+          [0.272, 0.118],
+          [0.208, 0.15],
+          [0.118, 0.172],
+          [0.001, 0.18],
         ],
         40,
       );
       // Puffed out over the right, dented in a little on the left.
       deform(crown, (v) => {
-        const k = 1 + 0.09 * Math.cos(Math.atan2(v.z, -v.x));
-        v.set(v.x * k, v.y * (1 + 0.08 * Math.max(0, -v.x / 0.3)), v.z * 0.94 * k);
+        const k = 1 + 0.07 * Math.cos(Math.atan2(v.z, -v.x));
+        v.set(v.x * k, v.y * (1 + 0.1 * Math.max(0, -v.x / 0.3)), v.z * 0.95 * k);
       });
-      b.add(smooth(crown), beret, FINISH.knit, {
-        at: [-0.008, 0.292, -0.012],
-        rot: [-0.1, 0, 0.24],
-      });
+      // Tilted about the middle of the skull, so the band stays seated all round.
+      const tilt = BERET_TILT;
+      const seat = (x: number, y: number, z: number): V3 =>
+        new THREE.Vector3(x, y, z).applyEuler(tilt).add(SKULL).toArray();
+      const hatRot: V3 = [tilt.x, tilt.y, tilt.z];
+      b.add(smooth(crown), beret, FINISH.knit, { at: seat(0, 0.072, -0.012), rot: hatRot });
       b.cylinder(0.009, 0.014, 0.036, beret, FINISH.knit, {
-        at: [0.05, 0.535, -0.04],
-        rot: [-0.1, 0, 0.24],
+        at: seat(0.02, 0.27, -0.012),
+        rot: hatRot,
       });
       const ear = onSkull(1.5, 0.12, 0.05);
       const pencil = new THREE.Euler(0.15, 0, 1.35);
@@ -1271,7 +1276,7 @@ export function buildHead(role: RoleId, look: HeadLook, color: number): THREE.Bu
   b.add(skull, look.skin, FINISH.skin);
   b.cylinder(0.078, 0.088, 0.16, look.skin, FINISH.skin, { at: [0, -0.04, -0.02] }, 20, true);
   face(b, role, look.skin, look.hair);
-  hair(b, look.hairstyle, look.hair, role === 'frontend' ? BERET_CAP : null);
+  hair(b, look.hairstyle, look.hair, role === 'frontend' ? BERET : null);
   gear(b, role, color);
   return b.build();
 }
