@@ -331,19 +331,20 @@ function generalist(color: number, skin: number): Outfit {
     FINISH.cloth,
   );
   b.box(0.035, 0.03, 0.016, 0.005, 0xff8a3d, FINISH.plastic, { at: v3(surf(P, 0.145, 0, 0.03)) });
-  // The pack: a big rounded body in a plum that clashes with every player color, a front
-  // pocket, a laptop poking out above the shoulders and stickers.
+  // The pack: a big rounded body in a plum that clashes with every player color, wider
+  // than the back and riding high, a front pocket, and a sticker-covered laptop
+  // sticking up out of it, tipped back so its lid shows over the head from the camera.
   const pack = 0x5b3f9e;
-  b.box(0.38, 0.5, 0.21, 0.09, pack, FINISH.cloth, { at: [0, 0.12, -0.275], rot: [-0.06, 0, 0] });
-  b.box(0.28, 0.2, 0.09, 0.04, shade(pack, 0.12), FINISH.cloth, {
-    at: [0, -0.02, -0.383],
+  b.box(0.5, 0.52, 0.22, 0.1, pack, FINISH.cloth, { at: [0, 0.19, -0.285], rot: [-0.06, 0, 0] });
+  b.box(0.3, 0.2, 0.09, 0.04, shade(pack, 0.12), FINISH.cloth, {
+    at: [0, 0.03, -0.398],
     rot: [-0.06, 0, 0],
   });
   b.sweep(
     [
-      [-0.12, 0.07, -0.428],
-      [0, 0.088, -0.433],
-      [0.12, 0.07, -0.428],
+      [-0.13, 0.12, -0.443],
+      [0, 0.138, -0.448],
+      [0.13, 0.12, -0.443],
     ],
     0.006,
     0xc9ccd2,
@@ -351,7 +352,7 @@ function generalist(color: number, skin: number): Outfit {
     { segments: 10, radial: 6 },
   );
   b.box(0.018, 0.05, 0.008, 0.003, 0xff8a3d, FINISH.plastic, {
-    at: [0.1, 0.05, -0.436],
+    at: [0.11, 0.1, -0.451],
     rot: [-0.1, 0, 0],
   });
   b.torus(
@@ -359,29 +360,26 @@ function generalist(color: number, skin: number): Outfit {
     0.012,
     WEBBING,
     FINISH.cloth,
-    { at: [0, 0.37, -0.25], rot: [0, 0, 0] },
+    { at: [0, 0.45, -0.25], rot: [0, 0, 0] },
     Math.PI,
     [8, 16],
   );
-  b.box(0.3, 0.21, 0.022, 0.012, 0xc5cbd3, FINISH.metal, {
-    at: [0.015, 0.36, -0.33],
-    rot: [-0.2, 0, 0.05],
-  });
-  b.box(0.29, 0.012, 0.024, 0.005, 0x3a3f4a, FINISH.plastic, {
-    at: [0.015, 0.468, -0.307],
-    rot: [-0.2, 0, 0.05],
-  });
+  const laptop = new SculptBuilder()
+    .box(0.34, 0.27, 0.024, 0.012, 0xc5cbd3, FINISH.metal)
+    .box(0.33, 0.012, 0.026, 0.005, 0x3a3f4a, FINISH.plastic, { at: [0, -0.127, 0.004] });
   const stickers: [number, number, number, number, 'disc' | 'tile'][] = [
-    [-0.08, 0.3, 0.035, 0xff6b8a, 'disc'],
-    [0.07, 0.25, 0.028, 0xffd23f, 'tile'],
-    [0.09, 0.32, 0.02, 0x3ad0e0, 'disc'],
+    [-0.09, 0.03, 0.042, 0xff6b8a, 'disc'],
+    [0.06, -0.035, 0.032, 0xffd23f, 'tile'],
+    [0.1, 0.06, 0.026, 0x3ad0e0, 'disc'],
+    [-0.01, 0.075, 0.022, 0x8bd450, 'tile'],
   ];
   for (const [x, y, r, c, kind] of stickers) {
-    const at: V3 = [x + 0.015, y + 0.085, -0.341 - (y - 0.275) * 0.2];
+    const at: V3 = [x, y, -0.013];
     if (kind === 'disc')
-      b.cylinder(r, r, 0.004, c, FINISH.enamel, { at, rot: [Math.PI / 2 - 0.2, 0, 0] }, 20);
-    else b.box(r * 2, r * 2, 0.004, 0.006, c, FINISH.enamel, { at, rot: [-0.2, 0, 0.3] });
+      laptop.cylinder(r, r, 0.004, c, FINISH.enamel, { at, rot: [Math.PI / 2, 0, 0] }, 20);
+    else laptop.box(r * 2, r * 2, 0.004, 0.006, c, FINISH.enamel, { at, rot: [0, 0, 0.3] });
   }
+  b.merge(laptop.build(), { at: [-0.21, 0.53, -0.37], rot: [0.3, 0, -0.25] });
   const packStickers: [number, number, number, number][] = [
     [-0.08, -0.05, 0.03, 0xffd23f],
     [0.07, 0.0, 0.025, 0xff6b8a],
@@ -394,12 +392,12 @@ function generalist(color: number, skin: number): Outfit {
       0.004,
       c,
       FINISH.enamel,
-      { at: [x, y, -0.428 - (y + 0.02) * 0.06], rot: [Math.PI / 2 - 0.06, 0, 0] },
+      { at: [x, y + 0.05, -0.443 - (y + 0.02) * 0.06], rot: [Math.PI / 2 - 0.06, 0, 0] },
       20,
     );
   }
   b.box(0.05, 0.03, 0.004, 0.004, 0xfdfdf6, FINISH.enamel, {
-    at: [-0.1, 0.26, -0.39],
+    at: [-0.14, 0.32, -0.405],
     rot: [-0.06, 0, -0.2],
   });
 
