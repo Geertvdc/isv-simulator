@@ -53,21 +53,69 @@ export interface ArmLook {
   hands: Hands;
 }
 
-/** A unit-long open tube from y −0.5 (radius `a`) to y +0.5 (radius `b`), swelling `belly` in the middle. */
-function tube(a: number, b: number, belly = 0, z = 1): THREE.BufferGeometry {
-  const profile: [number, number][] = [];
-  for (let k = 0; k <= 8; k++) {
-    const t = k / 8;
-    profile.push([a + (b - a) * t + belly * Math.sin(Math.PI * t), t - 0.5]);
+/** How deep a fold bites into a sleeve or trouser leg, as a fraction of its radius. */
+const FOLD_DEPTH = 0.11;
+/** Half-width of a fold along a unit-long tube. */
+const FOLD_WIDTH = 0.024;
+
+/**
+ * A unit-long open tube from y −0.5 (radius `a`) to y +0.5 (radius `b`),
+ * swelling `belly` (most at `peak` along it). `folds` (0 bottom to 1 top)
+ * pinch in soft, wavy wrinkles where the cloth bunches at a joint.
+ */
+function tube(
+  a: number,
+  b: number,
+  belly = 0,
+  z = 1,
+  folds: readonly number[] = [],
+  peak = 0.5,
+): THREE.BufferGeometry {
+  const rows = new Set<number>();
+  for (let k = 0; k <= 8; k++) rows.add(k / 8);
+  for (const f of folds) {
+    for (let k = -2; k <= 2; k++) rows.add(Math.min(1, Math.max(0, f + k * FOLD_WIDTH)));
   }
+  const bend = Math.log(0.5) / Math.log(peak);
+  const profile = [...rows]
+    .sort((x, y) => x - y)
+    .map((t): [number, number] => [
+      a + (b - a) * t + belly * Math.sin(Math.PI * t ** bend),
+      t - 0.5,
+    ]);
   const g = latheGeometry(profile, 20);
   g.scale(1, 1, z);
-  return g;
+  if (folds.length === 0) return g;
+  deform(g, (v) => {
+    const t = v.y + 0.5;
+    const around = Math.atan2(v.x, v.z);
+    let k = 1;
+    folds.forEach((f, i) => {
+      // Each wrinkle runs a little askew and fades out on one side.
+      const at = f + 0.03 * Math.sin(around + i * 2.1);
+      const fade = 0.55 + 0.45 * Math.sin(2 * around + i * 1.7);
+      k -= FOLD_DEPTH * fade * Math.exp(-(((t - at) / FOLD_WIDTH) ** 2));
+    });
+    v.x *= k;
+    v.z *= k;
+  });
+  return smooth(g);
+}
+
+/** Wrinkles where a sleeve or trouser leg bunches at its joint (skin has none). */
+function foldsAt(finish: Finish, ...at: number[]): number[] {
+  return finish === FINISH.skin ? [] : at;
 }
 
 export function upperArm(look: ArmLook): THREE.BufferGeometry {
   const [r0, r1] = look.upper.r;
-  return new SculptBuilder().add(tube(r0, r1, 0.006), look.upper.color, look.upper.finish).build();
+  return new SculptBuilder()
+    .add(
+      tube(r0, r1, 0.006, 1, foldsAt(look.upper.finish, 0.8, 0.9)),
+      look.upper.color,
+      look.upper.finish,
+    )
+    .build();
 }
 
 /** The elbow, built along the upper arm (+y toward the elbow). */
@@ -101,10 +149,15 @@ export function elbow(look: ArmLook): THREE.BufferGeometry {
   return b.build();
 }
 
+/** The forearm, swelling just below the elbow and tapering to the wrist. */
 export function lowerArm(look: ArmLook): THREE.BufferGeometry {
   const [r0, r1] = [look.lower.r[1], look.lower.r[2]];
   return new SculptBuilder()
-    .add(tube(r0, r1, 0.004, 0.92), look.lower.color, look.lower.finish)
+    .add(
+      tube(r0, r1, 0.006, 0.92, foldsAt(look.lower.finish, 0.12), 0.3),
+      look.lower.color,
+      look.lower.finish,
+    )
     .build();
 }
 
@@ -355,7 +408,11 @@ export function pelvis(look: LegLook): THREE.BufferGeometry {
 }
 
 export function thigh(look: LegLook, sign: number): THREE.BufferGeometry {
-  const b = new SculptBuilder().add(tube(0.088, 0.079, 0.008), look.trousers, look.finish);
+  const b = new SculptBuilder().add(
+    tube(0.088, 0.079, 0.008, 1, [0.84, 0.93]),
+    look.trousers,
+    look.finish,
+  );
   if (look.cargo) {
     b.box(0.05, 0.42, 0.09, 0.012, shade(look.trousers, -0.08), look.finish, {
       at: [sign * 0.082, 0.02, 0],
@@ -374,7 +431,11 @@ export function knee(look: LegLook): THREE.BufferGeometry {
 
 /** Shin: from the knee (y −0.5) to the ankle (y +0.5), with the hem over the shoe. */
 export function shin(look: LegLook): THREE.BufferGeometry {
-  const b = new SculptBuilder().add(tube(0.078, 0.074, 0.004), look.trousers, look.finish);
+  const b = new SculptBuilder().add(
+    tube(0.078, 0.074, 0.004, 1, [0.1]),
+    look.trousers,
+    look.finish,
+  );
   if (look.cuff !== null) {
     b.add(
       latheGeometry(
