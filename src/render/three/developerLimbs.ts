@@ -1,6 +1,14 @@
 import * as THREE from 'three';
 import type { RoleId } from '../../sim/roles';
-import { FINISH, type Finish, SculptBuilder, latheGeometry } from './sculpt';
+import {
+  FINISH,
+  type Finish,
+  SculptBuilder,
+  type V3,
+  deform,
+  latheGeometry,
+  smooth,
+} from './sculpt';
 
 /**
  * The developers' limbs: sleeves and trouser legs built a unit long (the rig
@@ -100,32 +108,51 @@ export function lowerArm(look: ArmLook): THREE.BufferGeometry {
     .build();
 }
 
-export function hand(look: ArmLook, sign: number): THREE.BufferGeometry {
+/** Hands are drawn big and chunky, cartoon style. */
+const HAND_SCALE = 1.2;
+
+/**
+ * A hand: relaxed and curled, or (`grip`) clamped round the edge of a held
+ * folder, the palm against the edge (~0.04 out from the wrist, see
+ * `CARRY_HALF_GAP`), fingers under it and the thumb on top (the folder's
+ * middle at x 0 in hand space).
+ */
+export function hand(look: ArmLook, sign: number, grip = false): THREE.BufferGeometry {
   const b = new SculptBuilder();
   const h = look.hands;
-  const p = h.puff;
   const thumb = -sign;
+  const f = grip ? grippingHand(h, thumb) : relaxedHand(h, thumb);
+  b.merge(f.build(), { scale: [HAND_SCALE, HAND_SCALE, HAND_SCALE] });
+  cuffAndWatch(b, h, sign);
+  return b.build();
+}
+
+function relaxedHand(h: Hands, thumb: number): SculptBuilder {
+  const f = new SculptBuilder();
+  const p = h.puff;
   // Palm and the back of the hand.
-  b.ellipsoid([0.057 + p, 0.06 + p, 0.036 + p], h.color, h.finish, { at: [0, 0.058, 0] }, [20, 14]);
-  b.ellipsoid(
-    [0.05 + p, 0.032, 0.034 + p],
+  f.ellipsoid([0.057 + p, 0.06 + p, 0.036 + p], h.color, h.finish, { at: [0, 0.058, 0] }, [16, 12]);
+  f.ellipsoid([0.05 + p, 0.032, 0.034 + p], h.color, h.finish, { at: [0, 0.012, -0.002] }, [12, 8]);
+  // The ball of the thumb, bulging out of the palm.
+  f.ellipsoid(
+    [0.026 + p, 0.04 + p, 0.026 + p],
     h.color,
     h.finish,
-    { at: [0, 0.012, -0.002] },
-    [16, 10],
+    { at: [thumb * 0.034, 0.04, 0.016], rot: [0, 0, thumb * 0.5] },
+    [12, 8],
   );
-  // Four curled fingers, the middle one longest.
+  // Four thick curled fingers, the middle one longest.
   const fingers = [
     { x: 0.036, length: 0.066 },
     { x: 0.012, length: 0.072 },
     { x: -0.012, length: 0.068 },
     { x: -0.035, length: 0.056 },
   ];
-  for (const f of fingers) {
-    const x = thumb * f.x;
-    const L = f.length;
-    const r = 0.0195 + p * 0.8;
-    b.sweep(
+  for (const g of fingers) {
+    const x = thumb * g.x;
+    const L = g.length;
+    const r = 0.0215 + p * 0.8;
+    f.sweep(
       [
         [x, 0.088, 0.003],
         [x * 1.04, 0.088 + L * 0.5, 0.012],
@@ -139,17 +166,17 @@ export function hand(look: ArmLook, sign: number): THREE.BufferGeometry {
       },
       h.color,
       h.finish,
-      { segments: 10, radial: 8 },
+      { segments: 8, radial: 7 },
     );
   }
-  // The thumb, out to the side and curling in over the palm.
-  const tr = 0.022 + p * 0.8;
-  b.sweep(
+  // The thumb: set well apart, out to the side and curling in over the palm.
+  const tr = 0.025 + p * 0.8;
+  f.sweep(
     [
-      [thumb * 0.04, 0.03, 0.008],
-      [thumb * 0.066, 0.058, 0.026],
-      [thumb * 0.07, 0.086, 0.042],
-      [thumb * 0.056, 0.102, 0.054],
+      [thumb * 0.046, 0.034, 0.014],
+      [thumb * 0.08, 0.06, 0.032],
+      [thumb * 0.086, 0.09, 0.05],
+      [thumb * 0.07, 0.108, 0.064],
     ],
     (t) => {
       const k =
@@ -158,24 +185,102 @@ export function hand(look: ArmLook, sign: number): THREE.BufferGeometry {
     },
     h.color,
     h.finish,
-    { segments: 10, radial: 8 },
+    { segments: 8, radial: 7 },
   );
+  return f;
+}
+
+/** Fingertip-rounded thickness along a finger or thumb of radius `r`. */
+function digit(r: number, knuckle: number): (t: number) => readonly [number, number] {
+  return (t) => {
+    const k =
+      t < knuckle
+        ? 1 - 0.1 * t
+        : 0.9 * Math.sqrt(Math.max(0.05, 1 - ((t - knuckle) / (1 - knuckle)) ** 2));
+    return [r * k, r * k * 0.94] as const;
+  };
+}
+
+function grippingHand(h: Hands, thumb: number): SculptBuilder {
+  const f = new SculptBuilder();
+  const p = h.puff;
+  const down = -thumb;
+  // The palm, flat against the folder's edge.
+  f.ellipsoid(
+    [0.06 + p, 0.058 + p, 0.034 + p],
+    h.color,
+    h.finish,
+    { at: [0, 0.06, -0.002] },
+    [16, 12],
+  );
+  f.ellipsoid([0.05 + p, 0.03, 0.032 + p], h.color, h.finish, { at: [0, 0.014, -0.004] }, [12, 8]);
+  // Four fingers hooked under the folder, side by side along it.
+  const fingers = [
+    { y: 0.026, reach: 0.092 },
+    { y: 0.052, reach: 0.104 },
+    { y: 0.078, reach: 0.1 },
+    { y: 0.102, reach: 0.086 },
+  ];
+  for (const g of fingers) {
+    const L = g.reach;
+    f.sweep(
+      [
+        [down * 0.046, g.y, 0.004],
+        [down * 0.058, g.y + 0.004, 0.032],
+        [down * 0.058, g.y + 0.006, L * 0.7],
+        [down * 0.053, g.y + 0.006, L],
+      ],
+      digit(0.0215 + p * 0.8, 0.82),
+      h.color,
+      h.finish,
+      { segments: 8, radial: 7 },
+    );
+  }
+  // The thumb over the top, pressing the folder down.
+  f.ellipsoid(
+    [0.026 + p, 0.04 + p, 0.026 + p],
+    h.color,
+    h.finish,
+    { at: [thumb * 0.034, 0.036, 0.004] },
+    [12, 8],
+  );
+  f.sweep(
+    [
+      [thumb * 0.046, 0.034, 0.006],
+      [thumb * 0.06, 0.058, 0.036],
+      [thumb * 0.06, 0.068, 0.07],
+      [thumb * 0.056, 0.07, 0.092],
+    ],
+    digit(0.025 + p * 0.8, 0.8),
+    h.color,
+    h.finish,
+    { segments: 8, radial: 7 },
+  );
+  return f;
+}
+
+function cuffAndWatch(b: SculptBuilder, h: Hands, sign: number): void {
   if (h.cuff) {
     const c = h.cuff;
-    b.add(
-      latheGeometry(
-        [
-          [c.r - 0.008, -c.length],
-          [c.r, -c.length + 0.006],
-          [c.r + c.flare * 0.6, -c.length * 0.4],
-          [c.r + c.flare, -0.004],
-          [c.r + c.flare - 0.01, 0.004],
-        ],
-        24,
-      ),
-      c.color,
-      c.finish,
+    const knit = c.finish === FINISH.knit;
+    const cuff = latheGeometry(
+      [
+        [c.r - 0.008, -c.length],
+        [c.r, -c.length + 0.006],
+        [c.r + c.flare * 0.6, -c.length * 0.4],
+        [c.r + c.flare, -0.004],
+        [c.r + c.flare - 0.01, 0.004],
+      ],
+      knit ? 48 : 24,
     );
+    // Knitted cuffs get raised ribs running along the arm.
+    if (knit) {
+      deform(cuff, (v) => {
+        const rib = 1 + 0.025 * (1 + Math.cos(Math.atan2(v.z, v.x) * 16));
+        v.set(v.x * rib, v.y, v.z * rib);
+      });
+    }
+    b.add(knit ? smooth(cuff) : cuff, c.color, c.finish);
   }
   if (h.watch && sign < 0) {
     b.torus(
@@ -206,7 +311,6 @@ export function hand(look: ArmLook, sign: number): THREE.BufferGeometry {
       16,
     );
   }
-  return b.build();
 }
 
 // --- Legs --------------------------------------------------------------------------
@@ -387,7 +491,7 @@ export function shoe(look: LegLook, role: RoleId, sign: number): THREE.BufferGeo
     boot: 0xb07a3e,
   }[s];
   const finish = s === 'oxford' || s === 'boot' ? FINISH.leather : FINISH.cloth;
-  const soleH = s === 'boot' ? 0.05 : s === 'oxford' ? 0.03 : 0.04;
+  const soleH = s === 'boot' ? 0.06 : s === 'oxford' ? 0.04 : 0.052;
   b.add(soleSlab(soleH, 0.01), sole, FINISH.rubber);
   if (s === 'sneaker' || s === 'hightop' || s === 'canvas') {
     // A colored stripe running round the sole.
@@ -408,7 +512,7 @@ export function shoe(look: LegLook, role: RoleId, sign: number): THREE.BufferGeo
       () => [0.0045, 0.0075] as const,
       s === 'canvas' ? shade(look.trim, -0.1) : look.trim,
       FINISH.rubber,
-      { closed: true, segments: 64, radial: 4, up: () => new THREE.Vector3(0, 1, 0) },
+      { closed: true, segments: 44, radial: 4, up: () => new THREE.Vector3(0, 1, 0) },
     );
   }
   const y0 = soleH - 0.004;
@@ -455,9 +559,11 @@ export function shoe(look: LegLook, role: RoleId, sign: number): THREE.BufferGeo
     // A shaft up over the ankle, wide enough to tuck the trousers into.
     // Boots take the trousers tucked in; a high-top hides under a turned-up hem.
     const boot = s === 'boot' || look.cuff === null;
-    const shaft = boot ? 0.2 : 0.13;
-    const r = boot ? 0.09 : 0.076;
-    const base = top(heelZ) - 0.03;
+    const shaft = boot ? 0.2 : 0.12;
+    const r = boot ? 0.09 : 0.07;
+    // A high-top's shaft is centred under the shin so its trim hides in the hem.
+    const z = boot ? heelZ : -0.012;
+    const base = top(z) - 0.03;
     b.add(
       latheGeometry(
         [
@@ -470,14 +576,14 @@ export function shoe(look: LegLook, role: RoleId, sign: number): THREE.BufferGeo
       ),
       upper,
       finish,
-      { at: [0, 0, heelZ] },
+      { at: [0, 0, z] },
     );
     b.torus(
       r + 0.004,
-      0.012,
+      boot ? 0.012 : 0.01,
       s === 'boot' ? 0x6a4630 : look.trim,
       finish,
-      { at: [0, shaft, heelZ], rot: [Math.PI / 2, 0, 0] },
+      { at: [0, shaft, z], rot: [Math.PI / 2, 0, 0] },
       Math.PI * 2,
       [8, 24],
     );
@@ -522,7 +628,41 @@ export function shoe(look: LegLook, role: RoleId, sign: number): THREE.BufferGeo
       { segments: 6, radial: 6 },
     );
   }
-  return b.build();
+  return heroic(b.build());
+}
+
+/** Shoes are drawn big, cartoon style: scaled up, the toe springing up off the floor. */
+const SHOE_SCALE: V3 = [1.16, 1.12, 1.2];
+const TOE_SPRING = 0.035;
+
+function heroic(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  const p = g.getAttribute('position');
+  const n = g.getAttribute('normal');
+  const start = 0.08;
+  const span = SHOE_SHIFT + SHOE_LENGTH + 0.012 - start;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    const t = Math.max(0, (p.getZ(i) - start) / span);
+    p.setY(i, p.getY(i) + TOE_SPRING * t * t);
+    // Bend the normal with the surface (inverse transpose of the shear).
+    v.fromBufferAttribute(n, i);
+    v.z -= ((2 * TOE_SPRING * t) / span) * v.y;
+    v.normalize();
+    n.setXYZ(i, v.x, v.y, v.z);
+  }
+  // The foot grows; the ankle shaft above it stays slim enough to sit under the trousers.
+  for (let i = 0; i < p.count; i++) {
+    const y = p.getY(i);
+    const k = Math.min(1, Math.max(0, (y - 0.07) / 0.05));
+    const sx = SHOE_SCALE[0] + (1 - SHOE_SCALE[0]) * k;
+    const sz = SHOE_SCALE[2] + (1.06 - SHOE_SCALE[2]) * k;
+    p.setXYZ(i, p.getX(i) * sx, y * SHOE_SCALE[1], p.getZ(i) * sz);
+    v.fromBufferAttribute(n, i);
+    v.set(v.x / sx, v.y / SHOE_SCALE[1], v.z / sz).normalize();
+    n.setXYZ(i, v.x, v.y, v.z);
+  }
+  g.computeBoundingBox();
+  return g;
 }
 
 /** The lower convex hull of a shoe's side view (`[y, z]`), to keep a pitched shoe on the floor. */

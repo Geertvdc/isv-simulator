@@ -8,6 +8,7 @@ import {
   type V3,
   deform,
   facing,
+  latheGeometry,
   smooth,
 } from './sculpt';
 
@@ -32,7 +33,7 @@ const LASH = 0x2a1c16;
 const IRIS = 0x5a3a24;
 const WHITE = 0xfbf8f2;
 const TEETH = 0xfaf6ea;
-const MOUTH = 0x4a1c20;
+const MOUTH = 0x3e1418;
 const TONGUE = 0xd8646a;
 
 /** The skull's surface point in unit direction `d` (head space). */
@@ -141,10 +142,10 @@ function mix(a: number, b: number, k: number): number {
 }
 
 /** A tapering lock: full at the root, fattest a third along, to a point. */
-function lockTaper(width: number, thick: number, tip = 0.08): SweepSize {
+function lockTaper(width: number, thick: number, tip = 0.22): SweepSize {
   return (t: number) => {
-    const k = t < 0.3 ? 0.8 + (t / 0.3) * 0.2 : 1 - ((t - 0.3) / 0.7) ** 1.4 * (1 - tip);
-    return [width * k, thick * Math.max(0.35, k)] as const;
+    const k = t < 0.3 ? 0.8 + (t / 0.3) * 0.2 : 1 - ((t - 0.3) / 0.7) ** 2 * (1 - tip);
+    return [width * k, thick * Math.max(0.45, k)] as const;
   };
 }
 
@@ -200,7 +201,7 @@ const EXPRESSIONS: Record<RoleId, Expression> = {
     squint: 0,
   },
   qa: {
-    lid: [0.42, 0.06],
+    lid: [0.42, 0.22],
     lidTilt: -0.05,
     brows: [
       [0.19, 0.22],
@@ -226,6 +227,8 @@ const EXPRESSIONS: Record<RoleId, Expression> = {
 const EYE_YAW = 0.36;
 const EYE_PITCH = -0.01;
 const LID_OPEN = 0.8;
+/** The least an upper lid ever covers: a relaxed, heavy-lidded look. */
+const LID_MIN = 0.28;
 
 function eye(b: SculptBuilder, sign: number, skin: number, e: Expression): void {
   const side = sign < 0 ? 0 : 1;
@@ -234,32 +237,47 @@ function eye(b: SculptBuilder, sign: number, skin: number, e: Expression): void 
     .add(new THREE.Vector3(0, 0, 0.9))
     .normalize();
   const frame = facing(n);
-  const center = surface.clone().addScaledVector(n, -0.012);
+  // Sunk into the socket: the skull hides the eyeball's rim, only the front shows.
+  const center = surface.clone().addScaledVector(n, -0.027);
   const local = (x: number, y: number, z: number) =>
     new THREE.Vector3(x, y, z).applyQuaternion(frame).add(center);
   const at = (v: THREE.Vector3): V3 => [v.x, v.y, v.z];
-  const rx = 0.056;
-  const ry = 0.07;
+  const rx = 0.05;
+  const ry = 0.062;
   const rz = 0.04;
+  // A soft shadow under the brow ridge.
+  b.ellipsoid(
+    [rx * 1.25, ry * 0.5, 0.01],
+    mix(skin, 0x5a2a1a, 0.14),
+    FINISH.skin,
+    { at: at(local(0, ry * 0.85, 0.022)), quat: frame },
+    [12, 8],
+  );
   b.ellipsoid([rx, ry, rz], WHITE, FINISH.eye, { at: at(center), quat: frame }, [20, 14]);
   // Looking a touch toward the camera's middle.
   const gx = -sign * 0.004;
-  b.ellipsoid([0.037, 0.045, 0.012], IRIS, FINISH.eye, {
-    at: at(local(gx, -0.004, rz - 0.004)),
-    quat: frame,
-  });
-  b.ellipsoid([0.021, 0.026, 0.008], INK, FINISH.eye, {
-    at: at(local(gx, -0.004, rz + 0.004)),
-    quat: frame,
-  });
-  b.sphere(0.0115, 0xffffff, FINISH.sparkle, { at: at(local(gx - 0.013, 0.014, rz + 0.008)) }, 10);
-  b.sphere(0.005, 0xffffff, FINISH.sparkle, { at: at(local(gx + 0.012, -0.016, rz + 0.006)) }, 8);
-  // Upper lid: a skin cap closing down over the eye, rimmed with a lash line.
-  // At closure 0 the lid sits folded back above the eye, leaving it wide open.
-  const lid = e.lid[side] * 1.1 - LID_OPEN;
+  b.ellipsoid(
+    [0.036, 0.043, 0.012],
+    IRIS,
+    FINISH.eye,
+    { at: at(local(gx, -0.006, rz - 0.004)), quat: frame },
+    [16, 10],
+  );
+  b.ellipsoid(
+    [0.02, 0.025, 0.008],
+    INK,
+    FINISH.eye,
+    { at: at(local(gx, -0.006, rz + 0.004)), quat: frame },
+    [14, 8],
+  );
+  b.sphere(0.0115, 0xffffff, FINISH.sparkle, { at: at(local(gx - 0.013, 0.01, rz + 0.008)) }, 10);
+  b.sphere(0.005, 0xffffff, FINISH.sparkle, { at: at(local(gx + 0.012, -0.018, rz + 0.006)) }, 8);
+  // Upper lid: a skin cap closing down over the eye, rimmed with a heavy lash line.
+  // Every face keeps the top of the eye covered (no white above the iris).
+  const lid = Math.max(LID_MIN, e.lid[side]) * 1.1 - LID_OPEN;
   const tilt = new THREE.Quaternion().setFromEuler(new THREE.Euler(lid, 0, -sign * e.lidTilt));
   const lidFrame = frame.clone().multiply(tilt);
-  const lr: V3 = [rx * 1.12, ry * 1.1, rz * 1.18];
+  const lr: V3 = [rx * 1.14, ry * 1.1, rz * 1.2];
   b.cap(lr, Math.PI / 2, skin, FINISH.skin, { at: at(center), quat: lidFrame }, [24, 8]);
   const lash: THREE.Vector3[] = [];
   for (let k = 0; k <= 10; k++) {
@@ -276,7 +294,7 @@ function eye(b: SculptBuilder, sign: number, skin: number, e: Expression): void 
     lash,
     (t) => {
       const o = outerFirst ? 1 - t : t;
-      const k = 0.003 + 0.0032 * o ** 2;
+      const k = 0.0042 + 0.0036 * o ** 2;
       return [k, k * 0.8] as const;
     },
     LASH,
@@ -320,6 +338,8 @@ interface Mouth {
   lowerTeeth: number;
   tongue: number;
   offset: number;
+  /** A closed, calm smirk: lips pressed together, no teeth. */
+  closed?: boolean;
 }
 
 function mouthShape(shape: MouthShape): Mouth {
@@ -374,20 +394,20 @@ function mouthShape(shape: MouthShape): Mouth {
       };
     }
     case 'skeptic': {
-      const w = 0.085;
+      const w = 0.08;
       const top: Curve = (x) => {
         const u = (2 * x) / w;
-        return -0.012 * u + 0.004 * Math.sin(u * Math.PI);
+        return -0.011 * u + 0.006 * u * u;
       };
-      const d = round(w, 0.012);
       return {
         w,
         top,
-        bottom: (x) => top(x) - d(x),
-        upperTeeth: 0.007,
+        bottom: top,
+        upperTeeth: 0,
         lowerTeeth: 0,
         tongue: 0,
         offset: -0.008,
+        closed: true,
       };
     }
     case 'gritted': {
@@ -414,48 +434,102 @@ function mouth(b: SculptBuilder, skin: number, shape: MouthShape): void {
   const yaw = m.offset / FACE_R;
   const x0 = -m.w / 2;
   const x1 = m.w / 2;
+  const lip = mix(skin, 0x8a3a30, 0.4);
+  const along = (curve: Curve, dy: number, out: number, n = 14): V3[] =>
+    Array.from({ length: n + 1 }, (_, k) => {
+      const x = x0 + ((x1 - x0) * k) / n;
+      return [yaw + x / FACE_R, MOUTH_PITCH + (curve(x) + dy) / FACE_R, out] as V3;
+    });
+  if (m.closed) {
+    // Lips pressed together: a dark crease, a full lower lip and a dimple.
+    skullSweep(
+      b,
+      along(m.top, 0, 0.002),
+      (t) => [0.0028 + 0.0012 * Math.sin(Math.PI * t), 0.0022] as const,
+      mix(skin, MOUTH, 0.65),
+      FINISH.skin,
+      18,
+      6,
+    );
+    skullSweep(
+      b,
+      along(m.top, -0.0075, 0.0015, 10).slice(2, -2),
+      (t) => [0.0065 * Math.sin(Math.PI * t) + 0.002, 0.0045] as const,
+      lip,
+      FINISH.skin,
+      12,
+      8,
+    );
+    const corner = onSkull(yaw + x0 / FACE_R, MOUTH_PITCH + (m.top(x0) + 0.002) / FACE_R, 0.001);
+    b.sphere(
+      0.0055,
+      mix(skin, MOUTH, 0.35),
+      FINISH.skin,
+      { at: [corner.x, corner.y, corner.z] },
+      8,
+    );
+    return;
+  }
+  // The open mouth: a dark cavity, deepest under the teeth.
   decal(b, yaw, MOUTH_PITCH, x0, x1, m.bottom, m.top, 0.0015, MOUTH, FINISH.skin, 20, 4);
-  const teeth = (count: number, height: number, upper: boolean) => {
-    const tw = (x1 - x0) / count;
-    for (let k = 0; k < count; k++) {
-      const a = x0 + k * tw + 0.0018;
-      const c = x0 + (k + 1) * tw - 0.0018;
-      const inset = (x: number) => Math.max(0, 1 - Math.abs((2 * x) / m.w) ** 6);
-      if (upper) {
-        decal(
-          b,
-          yaw,
-          MOUTH_PITCH,
-          a,
-          c,
-          (x) => Math.max(m.bottom(x), m.top(x) - height * inset(x)),
-          m.top,
-          0.003,
-          TEETH,
-          FINISH.enamel,
-          3,
-          2,
-        );
-      } else {
-        decal(
-          b,
-          yaw,
-          MOUTH_PITCH,
-          a,
-          c,
-          m.bottom,
-          (x) => Math.min(m.top(x), m.bottom(x) + height * inset(x)),
-          0.003,
-          TEETH,
-          FINISH.enamel,
-          3,
-          2,
-        );
-      }
+  decal(
+    b,
+    yaw,
+    MOUTH_PITCH,
+    x0 * 0.8,
+    x1 * 0.8,
+    (x) => m.top(x) - (m.top(x) - m.bottom(x)) * 0.55,
+    m.top,
+    0.0019,
+    mix(MOUTH, 0x000000, 0.45),
+    FINISH.skin,
+    16,
+    3,
+  );
+  // Teeth: one bar per row, split by faint lines rather than a grid of tiles.
+  const inset = (x: number) => Math.max(0, 1 - Math.abs((2 * x) / m.w) ** 6);
+  const teeth = (height: number, upper: boolean) => {
+    const edge = (x: number) =>
+      upper
+        ? Math.max(m.bottom(x), m.top(x) - height * inset(x))
+        : Math.min(m.top(x), m.bottom(x) + height * inset(x));
+    const [lo, hi] = upper ? [edge, m.top] : [m.bottom, edge];
+    decal(
+      b,
+      yaw,
+      MOUTH_PITCH,
+      x0,
+      x1,
+      lo,
+      hi,
+      0.003,
+      upper ? TEETH : mix(TEETH, 0xa89a88, 0.35),
+      FINISH.enamel,
+      24,
+      2,
+    );
+    if (!upper) return;
+    for (const f of [-0.5, -0.17, 0.17, 0.5]) {
+      const x = f * m.w * 0.5;
+      const half = 0.0007;
+      decal(
+        b,
+        yaw,
+        MOUTH_PITCH,
+        x - half,
+        x + half,
+        (u) => edge(u),
+        (u) => edge(u) + (m.top(u) - edge(u)) * 0.6,
+        0.0033,
+        mix(TEETH, 0x9a8a78, 0.45),
+        FINISH.enamel,
+        1,
+        1,
+      );
     }
   };
-  if (m.upperTeeth > 0) teeth(6, m.upperTeeth, true);
-  if (m.lowerTeeth > 0) teeth(6, m.lowerTeeth, false);
+  if (m.upperTeeth > 0) teeth(m.upperTeeth, true);
+  if (m.lowerTeeth > 0) teeth(m.lowerTeeth, false);
   if (m.tongue > 0) {
     const tw = m.w * 0.28;
     decal(
@@ -477,7 +551,7 @@ function mouth(b: SculptBuilder, skin: number, shape: MouthShape): void {
       3,
     );
   }
-  // Lips: a soft rim all round.
+  // Lips: a soft rim, thin on top and fuller below.
   const rim: V3[] = [];
   const n = 14;
   for (let k = 0; k <= n; k++) {
@@ -486,9 +560,22 @@ function mouth(b: SculptBuilder, skin: number, shape: MouthShape): void {
   }
   for (let k = n - 1; k > 0; k--) {
     const x = x0 + ((x1 - x0) * k) / n;
-    rim.push([yaw + x / FACE_R, MOUTH_PITCH + m.bottom(x) / FACE_R, 0.002]);
+    rim.push([yaw + x / FACE_R, MOUTH_PITCH + (m.bottom(x) - 0.002) / FACE_R, 0.002]);
   }
-  skullSweep(b, rim, 0.0055, mix(skin, 0x6a2a24, 0.45), FINISH.skin, 40, 6, true);
+  skullSweep(
+    b,
+    rim,
+    (t) => {
+      const lower = Math.max(0, -Math.sin(2 * Math.PI * t));
+      const r = 0.004 + 0.0045 * lower;
+      return [r, r * 0.85] as const;
+    },
+    lip,
+    FINISH.skin,
+    40,
+    6,
+    true,
+  );
 }
 
 function face(b: SculptBuilder, role: RoleId, skin: number, hair: number): void {
@@ -498,14 +585,23 @@ function face(b: SculptBuilder, role: RoleId, skin: number, hair: number): void 
     brow(b, sign, hair, e);
     // Ears, with a darker dish inside.
     const ear = onSkull(sign * 1.52, -0.06, -0.01);
-    b.ellipsoid([0.032, 0.062, 0.048], skin, FINISH.skin, {
-      at: [ear.x, ear.y, ear.z],
-      rot: [0, sign * 0.4, sign * -0.12],
-    });
-    b.ellipsoid([0.016, 0.04, 0.028], mix(skin, 0x6a3020, 0.3), FINISH.skin, {
-      at: [ear.x + sign * 0.019, ear.y - 0.002, ear.z + 0.006],
-      rot: [0, sign * 0.4, sign * -0.12],
-    });
+    b.ellipsoid(
+      [0.032, 0.062, 0.048],
+      skin,
+      FINISH.skin,
+      { at: [ear.x, ear.y, ear.z], rot: [0, sign * 0.4, sign * -0.12] },
+      [16, 10],
+    );
+    b.ellipsoid(
+      [0.016, 0.04, 0.028],
+      mix(skin, 0x6a3020, 0.3),
+      FINISH.skin,
+      {
+        at: [ear.x + sign * 0.019, ear.y - 0.002, ear.z + 0.006],
+        rot: [0, sign * 0.4, sign * -0.12],
+      },
+      [12, 8],
+    );
     // Rosy cheeks.
     decal(
       b,
@@ -549,6 +645,8 @@ interface Lock {
   path: (V3 | { at: V3 })[];
   width: number;
   thick: number;
+  /** Tip width as a fraction of the lock's (rounder tips are chunkier). */
+  tip?: number;
 }
 
 /** Locks fanning over the crown: `count` from `yaw0` to `yaw1`, each made by `make`. */
@@ -559,88 +657,110 @@ function fan(count: number, make: (k: number, t: number) => Lock): Lock[] {
 function cut(style: DeveloperHairstyle): HairCut {
   switch (style) {
     case 'swept':
-      // A big side-swept quiff: locks from a left part over the crown to the right.
+      // A big side-swept quiff: chunky locks from a left part over the crown to
+      // the right, layered rows behind that curl in at the nape.
       return {
         line: [0.42, 0.02, -0.8],
-        crown: 0.055,
+        crown: 0.06,
         edge: 0.022,
         part: 0.06,
         locks: [
-          ...fan(5, (k, t) => ({
+          ...fan(4, (k, t) => ({
             path: [
-              [-0.55 + t * 0.15, 1.1 - t * 0.12, 0.03],
-              [-0.1 + t * 0.2, 0.95 - t * 0.2, 0.06 + 0.01 * k],
-              [0.4 + t * 0.3, 0.62 - t * 0.28, 0.06],
-              [0.75 + t * 0.35, 0.32 - t * 0.2, 0.03],
+              [-0.6 + t * 0.2, 1.15 - t * 0.12, 0.03],
+              [-0.12 + t * 0.25, 1.0 - t * 0.22, 0.085 + 0.012 * (k % 2)],
+              [0.42 + t * 0.32, 0.66 - t * 0.28, 0.08],
+              [0.78 + t * 0.35, 0.36 - t * 0.2, 0.04],
+              [0.92 + t * 0.32, 0.22 - t * 0.16, 0.012],
             ],
-            width: 0.06,
-            thick: 0.03,
+            width: 0.095,
+            thick: 0.05,
           })),
           // The swoop over the forehead.
           {
             path: [
-              [-0.3, 0.85, 0.05],
-              [0.05, 0.72, 0.09],
-              [0.38, 0.5, 0.075],
-              [0.6, 0.38, 0.035],
+              [-0.3, 0.88, 0.06],
+              [0.05, 0.74, 0.11],
+              [0.4, 0.5, 0.09],
+              [0.62, 0.36, 0.04],
+              [0.68, 0.27, 0.012],
             ],
-            width: 0.075,
-            thick: 0.045,
+            width: 0.095,
+            thick: 0.055,
           },
           {
             path: [
-              [-0.6, 0.8, 0.04],
-              [-0.45, 0.6, 0.065],
-              [-0.25, 0.47, 0.045],
+              [-0.62, 0.84, 0.05],
+              [-0.47, 0.62, 0.08],
+              [-0.3, 0.46, 0.05],
+              [-0.24, 0.4, 0.015],
             ],
-            width: 0.05,
-            thick: 0.03,
+            width: 0.07,
+            thick: 0.04,
           },
-          ...fan(5, (_, t) => ({
+          // Behind: an upper and a lower row, offset so they overlap like shingles,
+          // each lock flicking sideways at the tip.
+          ...fan(5, (k, t) => ({
             path: [
-              [Math.PI - 1.1 + t * 2.2, 0.75, 0.03],
-              [Math.PI - 1.05 + t * 2.1, 0.25, 0.045],
-              [Math.PI - 1.0 + t * 2.0, -0.35, 0.03],
+              [Math.PI - 1.15 + t * 2.3, 1.15, 0.035],
+              [Math.PI - 1.1 + t * 2.2, 0.7, 0.07 + 0.01 * (k % 2)],
+              [Math.PI - 1.05 + t * 2.1, 0.25, 0.06],
+              [Math.PI - 1.0 + t * 2.0 + 0.1 * (t - 0.5), 0.02, 0.025],
             ],
-            width: 0.065,
-            thick: 0.025,
+            width: 0.1,
+            thick: 0.032,
+            tip: 0.1,
+          })),
+          ...fan(4, (_, t) => ({
+            path: [
+              [Math.PI - 0.85 + t * 1.7, 0.45, 0.03],
+              [Math.PI - 0.82 + t * 1.64, 0.0, 0.05],
+              [Math.PI - 0.8 + t * 1.6, -0.3, 0.035],
+              [Math.PI - 0.78 + t * 1.56 + 0.15 * (t - 0.5), -0.42, 0.012],
+            ],
+            width: 0.095,
+            thick: 0.03,
+            tip: 0.1,
           })),
           ...[-1, 1].map((s) => ({
             path: [
-              [s * 1.2, 0.6, 0.03] as V3,
-              [s * 1.35, 0.25, 0.04] as V3,
-              [s * 1.4, 0.0, 0.02] as V3,
+              [s * 1.15, 0.75, 0.04] as V3,
+              [s * 1.32, 0.4, 0.07] as V3,
+              [s * 1.42, 0.08, 0.04] as V3,
+              [s * 1.38, -0.02, 0.012] as V3,
             ],
-            width: 0.055,
-            thick: 0.022,
+            width: 0.08,
+            thick: 0.04,
           })),
         ],
       };
     case 'cropped':
-      // Short and textured: a fade at the sides, tufts on top.
+      // Short and textured: a fade at the sides, chunky tufts on top.
       return {
         line: [0.45, 0.12, -0.55],
-        crown: 0.03,
+        crown: 0.035,
         edge: 0.008,
         part: 0,
         locks: [
           ...fan(5, (k, t) => ({
             path: [
-              [-0.6 + t * 1.2, 1.15, 0.02],
-              [-0.5 + t * 1.0, 0.85, 0.045 + (k % 2) * 0.008],
-              [-0.42 + t * 0.84, 0.55, 0.03],
+              [-0.62 + t * 1.24, 1.2, 0.03],
+              [-0.52 + t * 1.04, 0.9, 0.065 + (k % 2) * 0.012],
+              [-0.44 + t * 0.88, 0.6, 0.055],
+              [-0.4 + t * 0.8, 0.5, 0.015],
             ],
-            width: 0.055,
-            thick: 0.024,
+            width: 0.075,
+            thick: 0.04,
           })),
-          ...fan(4, (k, t) => ({
+          ...fan(5, (k, t) => ({
             path: [
-              [Math.PI * 0.55 + t * Math.PI * 0.9, 1.25, 0.02],
-              [Math.PI * 0.6 + t * Math.PI * 0.8, 0.95, 0.04 + (k % 2) * 0.006],
-              [Math.PI * 0.62 + t * Math.PI * 0.76, 0.7, 0.025],
+              [Math.PI * 0.55 + t * Math.PI * 0.9, 1.3, 0.03],
+              [Math.PI * 0.58 + t * Math.PI * 0.84, 1.0, 0.06 + (k % 2) * 0.01],
+              [Math.PI * 0.6 + t * Math.PI * 0.8, 0.72, 0.045],
+              [Math.PI * 0.6 + t * Math.PI * 0.8, 0.62, 0.012],
             ],
-            width: 0.06,
-            thick: 0.02,
+            width: 0.085,
+            thick: 0.035,
           })),
         ],
       };
@@ -764,6 +884,34 @@ function smoothstep(a: number, b: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
+/**
+ * A glossy band round the hair (the studio key's reflection), lighter where the
+ * surface faces up and out, and darker in the gaps between locks.
+ */
+function shine(geometry: THREE.BufferGeometry, base: number): THREE.BufferGeometry {
+  const position = geometry.getAttribute('position');
+  const normal = geometry.getAttribute('normal');
+  const color = geometry.getAttribute('color');
+  const p = new THREE.Vector3();
+  const n = new THREE.Vector3();
+  const c = new THREE.Color();
+  const bright = new THREE.Color(mix(base, 0xfff4e0, 0.2));
+  const deep = new THREE.Color(mix(base, 0x000000, 0.35));
+  for (let i = 0; i < position.count; i++) {
+    p.fromBufferAttribute(position, i).sub(SKULL);
+    n.fromBufferAttribute(normal, i);
+    const d = p.clone().normalize();
+    const pitch = Math.asin(Math.max(-1, Math.min(1, d.y)));
+    const band = Math.exp(-(((pitch - 0.62) / 0.16) ** 2)) * Math.max(0, n.dot(d));
+    // Gaps between locks face sideways to the skull: shade them.
+    const gap = 1 - Math.max(0, n.dot(d));
+    c.fromBufferAttribute(color, i);
+    c.lerp(deep, gap * 0.5).lerp(bright, band * 0.55);
+    color.setXYZ(i, c.r, c.g, c.b);
+  }
+  return geometry;
+}
+
 /** Hair: a scalp shell that sinks under the skin past the hairline, plus locks. */
 function hair(
   b: SculptBuilder,
@@ -773,7 +921,7 @@ function hair(
 ): void {
   const cutting = cut(style);
   const shell = smooth(
-    deform(new THREE.SphereGeometry(1, 40, 28), (v) => {
+    deform(new THREE.SphereGeometry(1, 36, 24), (v) => {
       const d = v.clone().normalize();
       const pitch = Math.asin(Math.max(-1, Math.min(1, d.y)));
       const line = hairline(cutting, d);
@@ -783,9 +931,10 @@ function hair(
       skullPoint(d, v).addScaledVector(skullNormal(d), t);
     }),
   );
-  b.add(shell, color, FINISH.hair);
+  const h = new SculptBuilder();
+  h.add(shell, color, FINISH.hair);
   // Locks are a shade lighter on top, catching the light like sculpted hair.
-  const light = mix(color, 0xffffff, 0.035);
+  const light = mix(color, 0xffffff, 0.05);
   for (const lock of cutting.locks) {
     const points = lock.path.flatMap((p) => {
       if (!isSkullPoint(p)) return [new THREE.Vector3(...p.at)];
@@ -794,12 +943,13 @@ function hair(
       return [onSkull(yaw, pitch, out)];
     });
     if (points.length < 2) continue;
-    b.sweep(points, lockTaper(lock.width, lock.thick), light, FINISH.hair, {
-      segments: 11,
-      radial: 8,
+    h.sweep(points, lockTaper(lock.width, lock.thick, lock.tip), light, FINISH.hair, {
+      segments: 9,
+      radial: 6,
       up: (p) => p.clone().sub(SKULL).normalize(),
     });
   }
+  b.merge(shine(h.build(), color));
   if (style === 'tied') {
     b.torus(0.032, 0.013, 0xff7a6a, FINISH.plastic, { at: [0, 0.395, -0.28], rot: [0.5, 0, 0] });
   }
@@ -808,32 +958,48 @@ function hair(
 // --- Head gear -----------------------------------------------------------------
 
 /** Pitch above which a hat hides the hair (locks there are left off). */
-const BERET_CAP = 0.62;
+const BERET_CAP = 0.5;
 
 function gear(b: SculptBuilder, role: RoleId, color: number): void {
   switch (role) {
     case 'frontend': {
-      // A slouchy beret, tipped to the right, and a pencil behind the ear.
-      const beret = 0x2c2a3a;
-      const tilt: V3 = [-0.12, 0, -0.22];
-      b.torus(0.205, 0.022, mix(beret, 0x000000, 0.25), FINISH.knit, {
-        at: [0.01, 0.39, -0.01],
-        rot: [Math.PI / 2 + tilt[0], 0, tilt[2]],
+      // A puffy beret pulled on over the crown, slouched down to the right,
+      // its soft crown overhanging the band; a pencil behind the ear.
+      const beret = 0x3a3352;
+      const crown = latheGeometry(
+        [
+          [0.262, -0.02],
+          [0.272, 0.0],
+          [0.302, 0.028],
+          [0.36, 0.064],
+          [0.382, 0.098],
+          [0.366, 0.132],
+          [0.312, 0.168],
+          [0.22, 0.206],
+          [0.11, 0.232],
+          [0.001, 0.24],
+        ],
+        40,
+      );
+      // Puffed out over the right, dented in a little on the left.
+      deform(crown, (v) => {
+        const k = 1 + 0.09 * Math.cos(Math.atan2(v.z, -v.x));
+        v.set(v.x * k, v.y * (1 + 0.08 * Math.max(0, -v.x / 0.3)), v.z * 0.94 * k);
       });
-      b.ellipsoid([0.255, 0.075, 0.245], beret, FINISH.knit, {
-        at: [0.04, 0.45, -0.015],
-        rot: tilt,
+      b.add(smooth(crown), beret, FINISH.knit, {
+        at: [-0.008, 0.292, -0.012],
+        rot: [-0.1, 0, 0.24],
       });
-      b.cylinder(0.008, 0.014, 0.04, beret, FINISH.knit, {
-        at: [0.055, 0.525, -0.01],
-        rot: tilt,
+      b.cylinder(0.009, 0.014, 0.036, beret, FINISH.knit, {
+        at: [0.05, 0.535, -0.04],
+        rot: [-0.1, 0, 0.24],
       });
       const ear = onSkull(1.5, 0.12, 0.05);
       const pencil = new THREE.Euler(0.15, 0, 1.35);
       b.cylinder(
-        0.011,
-        0.011,
-        0.15,
+        0.021,
+        0.021,
+        0.17,
         0xf2c12e,
         FINISH.plastic,
         {
@@ -843,11 +1009,11 @@ function gear(b: SculptBuilder, role: RoleId, color: number): void {
         6,
       );
       const along = new THREE.Vector3(0, 1, 0).applyEuler(pencil);
-      const tipAt = new THREE.Vector3(ear.x, ear.y, ear.z).addScaledVector(along, -0.09);
+      const tipAt = new THREE.Vector3(ear.x, ear.y, ear.z).addScaledVector(along, -0.1);
       b.cylinder(
-        0.011,
-        0.001,
-        0.03,
+        0.021,
+        0.003,
+        0.045,
         0xe8c9a0,
         FINISH.cloth,
         {
@@ -856,11 +1022,11 @@ function gear(b: SculptBuilder, role: RoleId, color: number): void {
         },
         6,
       );
-      const end = new THREE.Vector3(ear.x, ear.y, ear.z).addScaledVector(along, 0.085);
+      const end = new THREE.Vector3(ear.x, ear.y, ear.z).addScaledVector(along, 0.095);
       b.cylinder(
-        0.0115,
-        0.0115,
-        0.02,
+        0.022,
+        0.022,
+        0.03,
         0xff8aa8,
         FINISH.rubber,
         {
@@ -872,73 +1038,73 @@ function gear(b: SculptBuilder, role: RoleId, color: number): void {
       break;
     }
     case 'backend': {
-      // Big over-ear headphones with glowing rings.
+      // Big chunky over-ear headphones: a thick padded band and fat cups with glowing rings.
       const dark = 0x2b2f38;
       const arc: THREE.Vector3[] = [];
       for (let k = 0; k <= 12; k++) {
         const a = -Math.PI / 2 + (k / 12) * Math.PI;
         const d = new THREE.Vector3(Math.sin(a), Math.cos(a), -0.08).normalize();
-        arc.push(skullPoint(d).addScaledVector(skullNormal(d), 0.075));
+        arc.push(skullPoint(d).addScaledVector(skullNormal(d), 0.1));
       }
-      b.sweep(arc, () => [0.032, 0.014] as const, dark, FINISH.plastic, {
-        segments: 24,
+      b.sweep(arc, () => [0.04, 0.022] as const, dark, FINISH.plastic, {
+        segments: 20,
         radial: 10,
         up: (p) => p.clone().sub(SKULL).normalize(),
       });
       b.sweep(
         arc
-          .slice(3, 10)
-          .map((p) => p.clone().addScaledVector(p.clone().sub(SKULL).normalize(), -0.012)),
-        0.022,
+          .slice(2, 11)
+          .map((p) => p.clone().addScaledVector(p.clone().sub(SKULL).normalize(), -0.026)),
+        () => [0.036, 0.022] as const,
         0x5a3a2a,
         FINISH.leather,
-        { segments: 14, radial: 8 },
+        { segments: 14, radial: 8, up: (p) => p.clone().sub(SKULL).normalize() },
       );
       for (const s of [-1, 1]) {
-        const at = new THREE.Vector3(s * 0.285, 0.2, -0.01);
+        const at = new THREE.Vector3(s * 0.31, 0.2, -0.01);
         const rot: V3 = [0, 0, (s * Math.PI) / 2];
-        b.cylinder(0.1, 0.1, 0.07, dark, FINISH.plastic, { at: [at.x, at.y, at.z], rot }, 28);
-        b.torus(0.088, 0.024, mix(dark, 0x000000, 0.3), FINISH.leather, {
-          at: [at.x - s * 0.04, at.y, at.z],
+        b.cylinder(0.135, 0.13, 0.1, dark, FINISH.plastic, { at: [at.x, at.y, at.z], rot }, 24);
+        b.torus(0.115, 0.036, mix(dark, 0x000000, 0.3), FINISH.leather, {
+          at: [at.x - s * 0.055, at.y, at.z],
           rot: [0, (s * Math.PI) / 2, 0],
         });
-        b.torus(0.072, 0.007, 0x35e0ff, FINISH.led, {
-          at: [at.x + s * 0.037, at.y, at.z],
+        b.torus(0.1, 0.009, 0x35e0ff, FINISH.led, {
+          at: [at.x + s * 0.052, at.y, at.z],
           rot: [0, (s * Math.PI) / 2, 0],
         });
         b.cylinder(
-          0.05,
-          0.06,
-          0.02,
+          0.07,
+          0.085,
+          0.024,
           mix(color, 0x000000, 0.1),
           FINISH.plastic,
           {
-            at: [at.x + s * 0.042, at.y, at.z],
+            at: [at.x + s * 0.058, at.y, at.z],
             rot,
           },
           24,
         );
-        b.cylinder(0.02, 0.026, 0.07, dark, FINISH.plastic, {
-          at: [s * 0.29, 0.31, -0.01],
+        // The yoke from the cup up into the band.
+        b.cylinder(0.024, 0.03, 0.09, dark, FINISH.metal, {
+          at: [s * 0.325, 0.34, -0.01],
         });
       }
       break;
     }
     case 'qa': {
-      // Safety goggles pushed up on the forehead.
+      // Safety goggles pushed up on the forehead, a thick strap hugging the hair round the back.
       const strap: THREE.Vector3[] = [];
-      for (let k = 0; k < 24; k++) {
-        const a = (k / 24) * Math.PI * 2;
+      for (let k = 0; k < 32; k++) {
+        const a = (k / 32) * Math.PI * 2;
+        const front = ((1 + Math.cos(a)) / 2) ** 2;
         const d = new THREE.Vector3(
           Math.sin(a),
-          0.62 - (0.45 * (1 - Math.cos(a))) / 2,
+          0.66 - 0.36 * (1 - front),
           Math.cos(a),
         ).normalize();
-        strap.push(
-          skullPoint(d).addScaledVector(skullNormal(d), 0.05 + 0.05 * ((1 + Math.cos(a)) / 2) ** 2),
-        );
+        strap.push(skullPoint(d).addScaledVector(skullNormal(d), 0.03 + 0.072 * front));
       }
-      b.sweep(strap, () => [0.024, 0.008] as const, 0x3a2f2a, FINISH.leather, {
+      b.sweep(strap, () => [0.034, 0.014] as const, 0x3a2f2a, FINISH.leather, {
         closed: true,
         segments: 48,
         radial: 6,
@@ -1006,11 +1172,11 @@ function gear(b: SculptBuilder, role: RoleId, color: number): void {
         radial: 8,
         up: (p) => p.clone().sub(SKULL).normalize(),
       });
-      const cup = new THREE.Vector3(-0.275, 0.21, 0.01);
+      const cup = new THREE.Vector3(-0.28, 0.21, 0.01);
       b.cylinder(
-        0.075,
-        0.08,
-        0.06,
+        0.088,
+        0.092,
+        0.07,
         dark,
         FINISH.plastic,
         {
@@ -1031,32 +1197,37 @@ function gear(b: SculptBuilder, role: RoleId, color: number): void {
         },
         20,
       );
+      // Single-ear: just a small temple pad on the far side.
       b.cylinder(
-        0.045,
-        0.045,
-        0.06,
+        0.04,
+        0.04,
+        0.018,
         dark,
-        FINISH.plastic,
+        FINISH.rubber,
         {
-          at: [0.255, 0.21, 0.01],
+          at: [0.245, 0.21, 0.01],
           rot: [0, 0, Math.PI / 2],
         },
         16,
       );
-      const mouthAt = onSkull(-0.2, -0.43, 0.05);
+      // A long boom swinging round to sit right in front of the mouth.
+      const mouthAt = onSkull(0.02, -0.47, 0.085);
       b.sweep(
         [
-          [cup.x - 0.01, cup.y - 0.03, cup.z + 0.05],
-          [-0.25, 0.08, 0.15],
-          [-0.17, 0.05, 0.22],
-          [mouthAt.x, mouthAt.y, mouthAt.z],
+          [cup.x - 0.02, cup.y - 0.02, cup.z + 0.05],
+          [-0.29, 0.08, 0.16],
+          [-0.22, 0.02, 0.26],
+          [-0.1, 0.0, mouthAt.z + 0.01],
+          [mouthAt.x - 0.03, mouthAt.y, mouthAt.z],
         ],
-        0.009,
+        0.011,
         dark,
         FINISH.plastic,
-        { segments: 16, radial: 6 },
+        { segments: 20, radial: 6 },
       );
-      b.sphere(0.024, 0x1a1c22, FINISH.knit, { at: [mouthAt.x, mouthAt.y, mouthAt.z + 0.008] }, 12);
+      b.ellipsoid([0.038, 0.03, 0.03], 0x1a1c22, FINISH.knit, {
+        at: [mouthAt.x, mouthAt.y, mouthAt.z + 0.005],
+      });
       b.sphere(0.008, 0xff4a3a, FINISH.led, { at: [cup.x - 0.047, cup.y + 0.03, cup.z] }, 8);
       break;
     }
@@ -1075,7 +1246,7 @@ export interface HeadLook {
 export function buildHead(role: RoleId, look: HeadLook, color: number): THREE.BufferGeometry {
   const b = new SculptBuilder();
   const skull = smooth(
-    deform(new THREE.SphereGeometry(1, 40, 28), (v) => {
+    deform(new THREE.SphereGeometry(1, 36, 24), (v) => {
       skullPoint(v.clone().normalize(), v);
     }),
   );

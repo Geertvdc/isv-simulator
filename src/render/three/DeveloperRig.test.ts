@@ -188,7 +188,6 @@ it('provides every hairstyle for every role with a shared face, outfit, ownershi
     const first = crew[0];
     if (!first) throw new Error('Missing hairstyle comparison');
     const heads = new Set<string>();
-    const skin = new THREE.Color(developerAppearance(1).skin);
     const faces: number[][] = [];
     for (const [i, c] of crew.entries()) {
       expect(c.rig?.hairstyle).toBe(DEVELOPER_HAIRSTYLES[i]);
@@ -199,16 +198,13 @@ it('provides every hairstyle for every role with a shared face, outfit, ownershi
         first.geometries[0]?.getAttribute('color').array,
       );
       const positions = c.geometries[1]?.getAttribute('position');
-      const colors = c.geometries[1]?.getAttribute('color');
-      if (!positions || !colors) throw new Error('Missing head geometry');
+      const finishes = c.geometries[1]?.getAttribute('finish');
+      if (!positions || !finishes) throw new Error('Missing head geometry');
       heads.add(JSON.stringify(Array.from(positions.array)));
+      // Skin is the only finish that scatters light; the baked creases tint it per hairstyle.
       const face: number[] = [];
       for (let vertex = 0; vertex < positions.count; vertex++) {
-        if (
-          Math.abs(colors.getX(vertex) - skin.r) < 1e-6 &&
-          Math.abs(colors.getY(vertex) - skin.g) < 1e-6 &&
-          Math.abs(colors.getZ(vertex) - skin.b) < 1e-6
-        ) {
+        if (finishes.getW(vertex) > 0.5) {
           face.push(positions.getX(vertex), positions.getY(vertex), positions.getZ(vertex));
         }
       }

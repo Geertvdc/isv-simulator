@@ -47,6 +47,9 @@ try {
       `lineup&action=${action}&time=${time}`,
     ]),
     ['lineup-rear-gray', 'lineup&action=idle&time=900&rear&gray'],
+    ['lineup-faces', 'lineup&action=idle&time=900&faces'],
+    ['lineup-faces-side', 'lineup&action=idle&time=900&faces&side'],
+    ['lineup-faces-rear', 'lineup&action=idle&time=900&faces&rear'],
   ];
   for (const [name, query] of sheets) {
     if (!wanted(name)) continue;

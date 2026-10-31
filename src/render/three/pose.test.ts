@@ -50,7 +50,7 @@ describe('playerPose', () => {
 
   it('holds a carried ticket out front at carry height', () => {
     const p = playerPose({ ...still, carrying: true }, 0);
-    expect(p.leftHand.y).toBeCloseTo(CARRY_HEIGHT + 0.03);
+    expect(p.leftHand.y).toBeCloseTo(CARRY_HEIGHT + CARD_SIZE.thickness / 2);
     expect(p.leftHand.z).toBeGreaterThan(0.3);
     expect(p.leftHand.x).toBeLessThan(0);
     expect(p.rightHand.x).toBeGreaterThan(0);

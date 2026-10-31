@@ -2,7 +2,8 @@
  * Dev-only model sheet for the production developers: one role turned round
  * (front, three-quarter, side, back) or the whole crew in a row, on a plain
  * studio backdrop. `?turnaround&role=<role>` or `?turnaround&lineup`, plus
- * `&action=<action>&time=<ms>&still`, `&rear` and `&gray` for the lineup.
+ * `&action=<action>&time=<ms>&still`, `&rear`, `&gray` and `&faces` (a head close-up)
+ * for the lineup.
  */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
@@ -31,8 +32,9 @@ if (!Number.isFinite(time)) throw new Error('Invalid pose time');
 const paused = params.has('still');
 const rear = params.has('rear');
 const gray = params.has('gray');
+const faces = lineup && params.has('faces');
 const SCENE_BACKDROP = 0x4a4a4a;
-const SPACING = lineup ? 1.12 : 1.18;
+const SPACING = faces ? 0.6 : lineup ? 1.12 : 1.18;
 
 document.body.classList.add('study-page');
 document.title = lineup ? 'Developer line-up' : `${ROLE_LABELS[role]} turnaround`;
@@ -128,7 +130,8 @@ if (lineup) {
       ...developerAppearance(id),
       hairstyle: DEVELOPER_HAIRSTYLES[i % DEVELOPER_HAIRSTYLES.length] ?? 'swept',
     });
-    place(character, (i - 2) * SPACING, -0.55, ROLE_LABELS[r]);
+    const yaw = faces ? (params.has('side') ? -1.3 : -0.25) : -0.55;
+    place(character, (i - 2) * SPACING, yaw, ROLE_LABELS[r]);
   });
 } else {
   const views: [string, number][] = [
@@ -146,7 +149,7 @@ const title = document.createElement('div');
 title.style.cssText = 'position:absolute;left:24px;top:18px;font-size:20px;color:#f0f0f0';
 const first = actors[0];
 title.textContent = lineup
-  ? `Developer line-up · ${action}${rear ? ' · rear' : ''}`
+  ? `Developer line-up · ${action}${rear ? ' · rear' : ''}${faces ? ' · faces' : ''}`
   : `${ROLE_LABELS[role]} · ${action} · ${first ? Math.round(triangles(first.character)) : 0} triangles`;
 labels.append(title);
 const tags = actors.map((actor) => {
@@ -165,10 +168,10 @@ function resize(): void {
   camera.aspect = aspect;
   const count = actors.length;
   const halfWidth = (count * SPACING) / 2 + 0.05;
-  const halfHeight = 0.98;
+  const halfHeight = faces ? 0.3 : 0.98;
   const tan = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
   const distance = Math.max(halfHeight / tan, halfWidth / (tan * aspect));
-  const target = new THREE.Vector3(0, 0.74, 0);
+  const target = new THREE.Vector3(0, faces ? 1.12 : 0.74, 0);
   const pitch = 0.1;
   camera.position.set(0, target.y + Math.sin(pitch) * distance, Math.cos(pitch) * distance);
   camera.lookAt(target);

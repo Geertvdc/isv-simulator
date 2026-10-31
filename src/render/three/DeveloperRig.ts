@@ -22,6 +22,7 @@ import { carryPoint } from './layout';
 import { PALETTE } from './look';
 import { COLOR } from './palette';
 import type { Pose } from './pose';
+import { bakeCreases } from './sculpt';
 
 export { DEVELOPER_HAIRSTYLES, type DeveloperHairstyle };
 
@@ -35,7 +36,7 @@ const UP = new THREE.Vector3(0, 1, 0);
 const SKINS = [COLOR.skinLight, COLOR.skinDeep, COLOR.skinTan, COLOR.skinWarm] as const;
 const HAIRS = [COLOR.hairDark, 0x171c23, 0x885030, 0x493834] as const;
 /** The neck on the torso. */
-const NECK_Y = 0.31;
+const NECK_Y = 0.325;
 /** Torso swing pieces never rock further than this. */
 const SWING_LIMIT = 0.9;
 
@@ -59,6 +60,9 @@ interface Arm {
   lower: THREE.Mesh;
   elbow: THREE.Mesh;
   hand: THREE.Mesh;
+  /** The hand's two shapes: hanging relaxed, or clamped round a carried folder's edge. */
+  open: THREE.BufferGeometry;
+  grip: THREE.BufferGeometry;
   shoulder: THREE.Object3D;
 }
 interface Leg {
@@ -109,7 +113,10 @@ export function createDeveloperRig(
   const head = new THREE.Group();
   const geometries: THREE.BufferGeometry[] = [];
   const mesh = (geometry: THREE.BufferGeometry): THREE.Mesh => {
-    if (!geometries.includes(geometry)) geometries.push(geometry);
+    if (!geometries.includes(geometry)) {
+      geometries.push(geometry);
+      bakeCreases(geometry);
+    }
     const made = new THREE.Mesh(geometry, materials.character);
     made.castShadow = made.receiveShadow = true;
     return made;
@@ -136,11 +143,17 @@ export function createDeveloperRig(
     const shoulder = new THREE.Object3D();
     shoulder.position.set(sign * outfit.shoulder, 0.16, 0);
     torso.add(shoulder);
+    const open = handGeometry(outfit.arm, sign);
+    const grip = handGeometry(outfit.arm, sign, true);
+    geometries.push(grip);
+    bakeCreases(grip);
     const arm = {
       upper: mesh(upper),
       lower: mesh(lowerGeometry),
       elbow: mesh(joint),
-      hand: mesh(handGeometry(outfit.arm, sign)),
+      hand: mesh(open),
+      open,
+      grip,
       shoulder,
     };
     root.add(arm.upper, arm.lower, arm.elbow, arm.hand);
@@ -342,7 +355,7 @@ export function poseDeveloperRig(c: DeveloperRig, pose: Pose): void {
     let palm: THREE.Vector3;
     let fingersUp = 0;
     if (carrying) {
-      // Exactly on the ticket's short side, elbows out and down, palms in.
+      // Clamped round the ticket's short side, elbows out and down, palms in.
       hand = new THREE.Vector3(target.x, target.y + pose.bob, target.z);
       pole = new THREE.Vector3(sign * 0.9, -1, -0.25).applyQuaternion(
         new THREE.Quaternion().setFromAxisAngle(UP, turn),
@@ -397,6 +410,7 @@ export function poseDeveloperRig(c: DeveloperRig, pose: Pose): void {
     arm.elbow.position.copy(elbow);
     arm.elbow.quaternion.copy(arm.upper.quaternion);
     arm.hand.position.copy(hand);
+    arm.hand.geometry = carrying ? arm.grip : arm.open;
     const along = hand.clone().sub(elbow).normalize();
     if (fingersUp > 0) along.lerp(new THREE.Vector3(0, 1, 0.25).normalize(), fingersUp);
     orientHand(arm.hand, along, palm);

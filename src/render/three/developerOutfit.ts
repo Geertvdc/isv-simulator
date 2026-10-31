@@ -6,9 +6,11 @@ import {
   type Finish,
   SculptBuilder,
   type V3,
+  deform,
   facing,
   profileRadius,
   shellGeometry,
+  smooth,
   smoothProfile,
 } from './sculpt';
 
@@ -29,18 +31,22 @@ const WEBBING = 0x2a363e;
 
 type Profile = [number, number][];
 
-/** A body profile `[radius, y]` (hem to neck), `scale`d wider; long tops `flare` at the hem to clear the thighs. */
+/**
+ * A body profile `[radius, y]` (hem to neck), `scale`d wider: soft belly, a
+ * slightly narrower waist, a barrel chest under broad shoulders. Long tops
+ * `flare` at the hem to clear the thighs.
+ */
 function bodyProfile(scale: number, hem = -0.23, flare = 0.185): Profile {
   return smoothProfile(
     [
       [flare * scale, hem],
       [0.2 * scale, hem + 0.06],
-      [0.206 * scale, -0.06],
-      [0.214 * scale, 0.05],
-      [0.224 * scale, 0.15],
-      [0.206 * scale, 0.235],
-      [0.15 * scale, 0.287],
-      [0.098, 0.312],
+      [0.211 * scale, -0.08],
+      [0.205 * scale, 0.01],
+      [0.234 * scale, 0.135],
+      [0.224 * scale, 0.225],
+      [0.162 * scale, 0.283],
+      [0.1, 0.31],
       [0.075, 0.32],
     ],
     28,
@@ -87,12 +93,32 @@ function band(
   b.sweep(points, () => size, color, finish, {
     closed,
     segments: closed ? 36 : 28,
-    radial: 8,
+    radial: 6,
     up: outward,
   });
 }
 
 /** A strip lying on the body through `[x, y]` points on the front (z > 0) or back. */
+/** A knitted rib band round the profile at `y`: `h` tall, with raised ribs. */
+function ribbed(
+  b: SculptBuilder,
+  profile: Profile,
+  y: number,
+  h: number,
+  out: number,
+  color: number,
+  ribs = 56,
+): void {
+  const r = profileRadius(profile, y) + out;
+  const ring = deform(new THREE.CylinderGeometry(1, 1, h, ribs * 3, 2), (v) => {
+    const a = Math.atan2(v.z, v.x);
+    const edge = 1 - 0.35 * Math.abs(v.y / (h / 2)) ** 3;
+    const k = r * (1 + (0.018 * Math.cos(a * ribs) + 0.008) * edge);
+    v.set(v.x * k, v.y + y, v.z * k * DEPTH);
+  });
+  b.add(smooth(ring), color, FINISH.knit);
+}
+
 function strip(
   b: SculptBuilder,
   profile: Profile,
@@ -109,8 +135,8 @@ function strip(
     return surf(profile, y, back ? Math.PI - phi : phi, out);
   });
   b.sweep(path, typeof size === 'function' ? size : () => size, color, finish, {
-    segments: Math.max(8, points.length * 6),
-    radial: 8,
+    segments: Math.max(8, points.length * 5),
+    radial: 6,
     up: outward,
   });
 }
@@ -163,7 +189,7 @@ function panel(
 
 /** Shoulder caps, in the sleeve's color. */
 function shoulders(b: SculptBuilder, x: number, r: number, color: number, finish: Finish): void {
-  for (const s of [-1, 1]) b.sphere(r, color, finish, { at: [s * (x - 0.035), 0.165, 0] }, 20);
+  for (const s of [-1, 1]) b.sphere(r, color, finish, { at: [s * (x - 0.035), 0.172, 0] }, 16);
 }
 
 /** A piece that swings from `pivot` (torso space); its geometry is built around the pivot. */
@@ -192,7 +218,7 @@ function generalist(color: number, skin: number): Outfit {
   const b = new SculptBuilder();
   const P = bodyProfile(1);
   body(b, P, color, FINISH.cloth);
-  shoulders(b, 0.24, 0.088, color, FINISH.cloth);
+  shoulders(b, 0.26, 0.09, color, FINISH.cloth);
   const dark = shade(color, -0.12);
   // Shirt collar, placket and buttons, a chest pocket.
   band(b, P, 0.3, 0.012, [0.024, 0.012], dark, FINISH.cloth);
@@ -280,13 +306,13 @@ function generalist(color: number, skin: number): Outfit {
       v3(surf(P, 0.24, Math.PI - s * 0.75, 0.024)),
       [s * 0.12, 0.17, -0.2],
     ];
-    b.sweep(pts, () => [0.03, 0.008] as const, WEBBING, FINISH.cloth, {
+    b.sweep(pts, () => [0.044, 0.014] as const, WEBBING, FINISH.cloth, {
       segments: 30,
       radial: 8,
       up: outward,
     });
-    b.box(0.05, 0.03, 0.014, 0.004, 0x9aa3ad, FINISH.metal, {
-      at: v3(surf(P, 0.0, s * 0.62, 0.024)),
+    b.box(0.062, 0.036, 0.016, 0.005, 0x9aa3ad, FINISH.metal, {
+      at: v3(surf(P, 0.0, s * 0.62, 0.03)),
       quat: facing(new THREE.Vector3(Math.sin(s * 0.62), 0, Math.cos(s * 0.62) / DEPTH)),
     });
   }
@@ -300,23 +326,24 @@ function generalist(color: number, skin: number): Outfit {
     ],
     false,
     0.022,
-    [0.012, 0.005],
+    [0.016, 0.007],
     WEBBING,
     FINISH.cloth,
   );
   b.box(0.035, 0.03, 0.016, 0.005, 0xff8a3d, FINISH.plastic, { at: v3(surf(P, 0.145, 0, 0.03)) });
-  // The pack: a big rounded body, a front pocket, a laptop poking out and stickers.
-  const pack = 0x35525e;
-  b.box(0.36, 0.42, 0.2, 0.085, pack, FINISH.cloth, { at: [0, 0.07, -0.27], rot: [-0.06, 0, 0] });
+  // The pack: a big rounded body in a plum that clashes with every player color, a front
+  // pocket, a laptop poking out above the shoulders and stickers.
+  const pack = 0x5b3f9e;
+  b.box(0.38, 0.5, 0.21, 0.09, pack, FINISH.cloth, { at: [0, 0.12, -0.275], rot: [-0.06, 0, 0] });
   b.box(0.28, 0.2, 0.09, 0.04, shade(pack, 0.12), FINISH.cloth, {
-    at: [0, -0.02, -0.375],
+    at: [0, -0.02, -0.383],
     rot: [-0.06, 0, 0],
   });
   b.sweep(
     [
-      [-0.12, 0.07, -0.42],
-      [0, 0.088, -0.425],
-      [0.12, 0.07, -0.42],
+      [-0.12, 0.07, -0.428],
+      [0, 0.088, -0.433],
+      [0.12, 0.07, -0.428],
     ],
     0.006,
     0xc9ccd2,
@@ -324,7 +351,7 @@ function generalist(color: number, skin: number): Outfit {
     { segments: 10, radial: 6 },
   );
   b.box(0.018, 0.05, 0.008, 0.003, 0xff8a3d, FINISH.plastic, {
-    at: [0.1, 0.05, -0.428],
+    at: [0.1, 0.05, -0.436],
     rot: [-0.1, 0, 0],
   });
   b.torus(
@@ -332,16 +359,16 @@ function generalist(color: number, skin: number): Outfit {
     0.012,
     WEBBING,
     FINISH.cloth,
-    { at: [0, 0.29, -0.23], rot: [0, 0, 0] },
+    { at: [0, 0.37, -0.25], rot: [0, 0, 0] },
     Math.PI,
     [8, 16],
   );
   b.box(0.3, 0.21, 0.022, 0.012, 0xc5cbd3, FINISH.metal, {
-    at: [0.015, 0.275, -0.31],
+    at: [0.015, 0.36, -0.33],
     rot: [-0.2, 0, 0.05],
   });
   b.box(0.29, 0.012, 0.024, 0.005, 0x3a3f4a, FINISH.plastic, {
-    at: [0.015, 0.383, -0.287],
+    at: [0.015, 0.468, -0.307],
     rot: [-0.2, 0, 0.05],
   });
   const stickers: [number, number, number, number, 'disc' | 'tile'][] = [
@@ -350,7 +377,7 @@ function generalist(color: number, skin: number): Outfit {
     [0.09, 0.32, 0.02, 0x3ad0e0, 'disc'],
   ];
   for (const [x, y, r, c, kind] of stickers) {
-    const at: V3 = [x + 0.015, y, -0.321 - (y - 0.275) * 0.2];
+    const at: V3 = [x + 0.015, y + 0.085, -0.341 - (y - 0.275) * 0.2];
     if (kind === 'disc')
       b.cylinder(r, r, 0.004, c, FINISH.enamel, { at, rot: [Math.PI / 2 - 0.2, 0, 0] }, 20);
     else b.box(r * 2, r * 2, 0.004, 0.006, c, FINISH.enamel, { at, rot: [-0.2, 0, 0.3] });
@@ -367,12 +394,12 @@ function generalist(color: number, skin: number): Outfit {
       0.004,
       c,
       FINISH.enamel,
-      { at: [x, y, -0.42 - (y + 0.02) * 0.06], rot: [Math.PI / 2 - 0.06, 0, 0] },
+      { at: [x, y, -0.428 - (y + 0.02) * 0.06], rot: [Math.PI / 2 - 0.06, 0, 0] },
       20,
     );
   }
   b.box(0.05, 0.03, 0.004, 0.004, 0xfdfdf6, FINISH.enamel, {
-    at: [-0.1, 0.2, -0.373],
+    at: [-0.1, 0.26, -0.39],
     rot: [-0.06, 0, -0.2],
   });
 
@@ -389,8 +416,8 @@ function generalist(color: number, skin: number): Outfit {
   const clip = surf(P, 0.06, 0, 0.026);
   return {
     torso: b.build(),
-    swings: [{ geometry: badge, pivot: v3(clip), hang: 'front', amp: 0.25 }],
-    shoulder: 0.24,
+    swings: [{ geometry: badge.scale(1.4, 1.4, 1.4), pivot: v3(clip), hang: 'front', amp: 0.25 }],
+    shoulder: 0.26,
     nod: 1,
     arm: {
       upper: { color, finish: FINISH.cloth, r: [0.074, 0.068, 0.06] },
@@ -415,32 +442,42 @@ function frontend(color: number, skin: number): Outfit {
   const b = new SculptBuilder();
   const P = bodyProfile(1.05, -0.22);
   body(b, P, color, SATIN);
-  shoulders(b, 0.25, 0.09, CREAM, FINISH.cloth);
-  // Ribbed hem and collar with a stripe, a zip and a raglan seam.
+  shoulders(b, 0.27, 0.092, CREAM, FINISH.cloth);
+  // Ribbed knit hem and collar with a stripe, and a zip with a chunky pull.
   const rib = CHARCOAL;
-  for (const [y, size] of [
-    [-0.205, [0.026, 0.016]],
-    [-0.168, [0.007, 0.017]],
-  ] as const) {
-    band(b, P, y, 0.004, size, y < -0.19 ? rib : shade(color, 0.35), FINISH.knit);
-  }
-  band(b, P, -0.15, 0.004, [0.008, 0.012], rib, FINISH.knit);
-  band(b, P, 0.3, 0.012, [0.026, 0.016], rib, FINISH.knit);
+  ribbed(b, P, -0.198, 0.05, 0.006, rib);
+  band(b, P, -0.163, 0.006, [0.007, 0.012], shade(color, 0.35), FINISH.knit);
+  band(b, P, -0.148, 0.004, [0.006, 0.01], rib, FINISH.knit);
+  ribbed(b, P, 0.272, 0.05, 0.03, rib, 48);
   strip(
     b,
     P,
     [
-      [0, 0.29],
+      [0, 0.25],
       [0, 0.05],
-      [0, -0.21],
+      [0, -0.17],
     ],
     false,
     0.004,
-    [0.006, 0.005],
+    [0.012, 0.006],
     0xb8bec8,
     FINISH.metal,
   );
-  b.box(0.014, 0.03, 0.006, 0.003, 0xb8bec8, FINISH.metal, { at: v3(surf(P, 0.17, 0.03, 0.012)) });
+  const pull = surf(P, 0.17, 0, 0.012);
+  b.box(0.02, 0.022, 0.01, 0.004, 0xb8bec8, FINISH.metal, { at: v3(pull) });
+  b.torus(
+    0.012,
+    0.004,
+    0xb8bec8,
+    FINISH.metal,
+    { at: [pull.x, pull.y - 0.02, pull.z + 0.006], rot: [0, 0, 0] },
+    Math.PI * 2,
+    [6, 12],
+  );
+  b.box(0.026, 0.05, 0.01, 0.006, 0xe84393, FINISH.rubber, {
+    at: [pull.x, pull.y - 0.055, pull.z + 0.012],
+    rot: [-0.18, 0, 0],
+  });
   // Color-block: a cream yoke over the shoulders, front and back.
   for (const back of [false, true]) {
     panel(
@@ -490,13 +527,12 @@ function frontend(color: number, skin: number): Outfit {
       up: (p) => new THREE.Vector3(p.x, 0, p.z).normalize(),
     });
   };
-  loop(0.322, 0.125, 0.115, -0.02);
-  loop(0.285, 0.15, 0.14, -0.035);
+  loop(0.318, 0.13, 0.12, -0.03);
   b.ellipsoid(
     [0.05, 0.045, 0.04],
     shade(scarf, 0.06),
     FINISH.knit,
-    { at: [-0.06, 0.255, 0.15] },
+    { at: [-0.06, 0.275, 0.135] },
     [16, 12],
   );
   const tail = new SculptBuilder();
@@ -523,7 +559,7 @@ function frontend(color: number, skin: number): Outfit {
       6,
     );
   }
-  // Swatch fan on the right hip: cards fanned round a brass pin.
+  // A big swatch fan on the right hip: cards fanned round a brass pin.
   const fan = new SculptBuilder();
   const swatches = [0xe84393, 0xff9f43, 0xfeca57, 0x1dd1a1, 0x54a0ff, 0x8e6cf0];
   swatches.forEach((c, k) => {
@@ -561,10 +597,15 @@ function frontend(color: number, skin: number): Outfit {
   return {
     torso: b.build(),
     swings: [
-      { geometry: tail.build(), pivot: [-0.07, 0.25, 0.19], hang: 'front', amp: 0.04 },
-      { geometry: fan.build(), pivot: [0.248, -0.16, 0.05], hang: 'side', amp: 0.3 },
+      { geometry: tail.build(), pivot: [-0.07, 0.27, 0.17], hang: 'front', amp: 0.04 },
+      {
+        geometry: fan.build().scale(2.2, 2.2, 2.2),
+        pivot: [0.25, -0.16, -0.03],
+        hang: 'side',
+        amp: 0.3,
+      },
     ],
-    shoulder: 0.25,
+    shoulder: 0.27,
     nod: 1.15,
     arm: {
       upper: { color: CREAM, finish: FINISH.cloth, r: [0.076, 0.068, 0.062] },
@@ -595,9 +636,9 @@ function backend(color: number, skin: number): Outfit {
   const P = bodyProfile(1.09, -0.27, 0.215);
   const knit = FINISH.knit;
   body(b, P, color, knit);
-  shoulders(b, 0.26, 0.098, color, knit);
+  shoulders(b, 0.28, 0.1, color, knit);
   const rib = shade(color, -0.14);
-  band(b, P, -0.25, 0.006, [0.03, 0.02], rib, knit);
+  ribbed(b, P, -0.235, 0.055, 0.008, rib);
   // Kangaroo pocket: a raised panel with darker openings at the sides.
   panel(b, P, -0.2, -0.03, -0.62, 0.62, 0.002, 0.012, shade(color, 0.04), knit);
   band(b, P, -0.03, 0.014, [0.008, 0.008], rib, knit, -0.6, 0.6);
@@ -626,7 +667,7 @@ function backend(color: number, skin: number): Outfit {
       new THREE.Vector3(Math.sin(a) * 0.15, 0.3 - Math.max(0, front) * 0.05, front * 0.13 - 0.01),
     );
   }
-  b.sweep(roll, (t) => [0.05 + Math.sin(Math.PI * t) * 0.02, 0.04] as const, color, knit, {
+  b.sweep(roll, (t) => [0.062 + Math.sin(Math.PI * t) * 0.026, 0.05] as const, color, knit, {
     segments: 36,
     radial: 12,
     up: (p) => new THREE.Vector3(p.x, 0, p.z).normalize(),
@@ -686,10 +727,12 @@ function backend(color: number, skin: number): Outfit {
       { at: [0, 0, surf(P, 0.11, 0, 0.01).z] },
     );
   }
-  // The thermos in a strap holster on the back-right hip.
+  // The thermos in a strap holster on the front-right hip.
   const steel = 0xb9c1cb;
-  const tx = -0.24;
-  const tz = -0.12;
+  const hip = surf(P, -0.12, -0.9, 0.066);
+  const tx = hip.x;
+  const tz = hip.z;
+  const ty = -0.13;
   b.lathe(
     [
       [0.001, -0.2],
@@ -701,23 +744,23 @@ function backend(color: number, skin: number): Outfit {
     ],
     steel,
     FINISH.metal,
-    { at: [tx, 0, tz] },
+    { at: [tx, ty, tz] },
     24,
   );
-  b.cylinder(0.046, 0.046, 0.06, 0x2a3a4a, FINISH.plastic, { at: [tx, 0.09, tz] }, 24);
-  b.cylinder(0.05, 0.05, 0.012, 0x1c2630, FINISH.plastic, { at: [tx, 0.125, tz] }, 24);
+  b.cylinder(0.046, 0.046, 0.06, 0x2a3a4a, FINISH.plastic, { at: [tx, ty + 0.09, tz] }, 24);
+  b.cylinder(0.05, 0.05, 0.012, 0x1c2630, FINISH.plastic, { at: [tx, ty + 0.125, tz] }, 24);
   b.torus(
     0.03,
     0.008,
     0x1c2630,
     FINISH.plastic,
-    { at: [tx, 0.135, tz], rot: [0, Math.PI / 2, 0] },
+    { at: [tx, ty + 0.135, tz], rot: [0, Math.PI / 2, 0] },
     Math.PI,
     [6, 12],
   );
-  b.cylinder(0.06, 0.06, 0.03, 0xff8a3d, FINISH.rubber, { at: [tx, -0.06, tz] }, 24);
+  b.cylinder(0.06, 0.06, 0.03, 0xff8a3d, FINISH.rubber, { at: [tx, ty - 0.06, tz] }, 24);
   b.box(0.04, 0.05, 0.004, 0.006, 0xfdfdf6, FINISH.enamel, {
-    at: [tx - 0.04, -0.12, tz + 0.03],
+    at: [tx - 0.04, ty - 0.12, tz + 0.03],
     rot: [0, -0.9, 0],
   });
   b.torus(
@@ -725,7 +768,7 @@ function backend(color: number, skin: number): Outfit {
     0.008,
     CHARCOAL,
     FINISH.cloth,
-    { at: [tx, -0.02, tz], rot: [Math.PI / 2, 0, 0] },
+    { at: [tx, ty - 0.02, tz], rot: [Math.PI / 2, 0, 0] },
     Math.PI * 2,
     [6, 24],
   );
@@ -734,14 +777,14 @@ function backend(color: number, skin: number): Outfit {
     0.008,
     CHARCOAL,
     FINISH.cloth,
-    { at: [tx, -0.14, tz], rot: [Math.PI / 2, 0, 0] },
+    { at: [tx, ty - 0.14, tz], rot: [Math.PI / 2, 0, 0] },
     Math.PI * 2,
     [6, 24],
   );
   return {
     torso: b.build(),
     swings: [],
-    shoulder: 0.26,
+    shoulder: 0.28,
     nod: 0.8,
     arm: {
       upper: { color, finish: knit, r: [0.086, 0.078, 0.07] },
@@ -778,14 +821,14 @@ function qa(color: number): Outfit {
     [
       [0.345, -0.4],
       [0.272, -0.27],
-      [0.222, -0.1],
-      [0.222, 0.05],
-      [0.232, 0.15],
-      [0.215, 0.235],
-      [0.16, 0.29],
-      [0.11, 0.315],
+      [0.224, -0.1],
+      [0.22, 0.01],
+      [0.244, 0.135],
+      [0.234, 0.225],
+      [0.172, 0.285],
+      [0.115, 0.312],
     ],
-    24,
+    16,
   );
   const gap = 0.36;
   b.shell(
@@ -798,7 +841,7 @@ function qa(color: number): Outfit {
     gap,
     Math.PI * 2 - gap * 2,
   );
-  shoulders(b, 0.235, 0.092, COAT, FINISH.cloth);
+  shoulders(b, 0.255, 0.094, COAT, FINISH.cloth);
   // Collar standing up at the back, lapels folded down the front.
   b.shell(
     [
@@ -919,18 +962,30 @@ function qa(color: number): Outfit {
     }
   }
   b.merge(badge, { at: v3(badgeAt), quat: q });
-  // The back belt tab in the player's color, with two buttons; a center vent.
+  // A back yoke and a wide belt tab in the player's color, with two buttons; a center vent.
+  panel(b, coat, 0.12, 0.272, Math.PI - 1.0, Math.PI + 1.0, 0.012, 0.008, color, FINISH.cloth);
+  band(
+    b,
+    coat,
+    0.12,
+    0.022,
+    [0.006, 0.008],
+    shade(color, -0.25),
+    FINISH.cloth,
+    Math.PI - 1.0,
+    Math.PI + 1.0,
+  );
   strip(
     b,
     coat,
     [
-      [-0.13, -0.08],
+      [-0.15, -0.08],
       [0, -0.08],
-      [0.13, -0.08],
+      [0.15, -0.08],
     ],
     true,
     0.014,
-    [0.03, 0.007],
+    [0.05, 0.008],
     color,
     FINISH.cloth,
   );
@@ -1001,7 +1056,7 @@ function qa(color: number): Outfit {
   return {
     torso: b.build(),
     swings: [{ geometry: mag.build(), pivot: [0.255, -0.18, 0.02], hang: 'side', amp: 0.35 }],
-    shoulder: 0.235,
+    shoulder: 0.255,
     nod: 1.3,
     arm: {
       upper: { color: COAT, finish: FINISH.cloth, r: [0.075, 0.066, 0.06] },
@@ -1032,7 +1087,7 @@ function platform(color: number): Outfit {
   const navy = 0x2c3a4f;
   const P = bodyProfile(1.02, -0.23);
   body(b, P, navy, FINISH.cloth);
-  shoulders(b, 0.25, 0.092, navy, FINISH.cloth);
+  shoulders(b, 0.27, 0.094, navy, FINISH.cloth);
   // Shirt collar and button placket.
   for (const s of [-1, 1]) {
     b.sweep(
@@ -1052,13 +1107,13 @@ function platform(color: number): Outfit {
   const vest = smoothProfile(
     [
       [0.218, -0.2],
-      [0.222, -0.06],
-      [0.23, 0.05],
-      [0.238, 0.15],
-      [0.218, 0.235],
-      [0.17, 0.28],
+      [0.226, -0.08],
+      [0.224, 0.01],
+      [0.252, 0.135],
+      [0.242, 0.225],
+      [0.18, 0.28],
     ],
-    20,
+    14,
   );
   const gap = 0.32;
   b.shell(
@@ -1067,7 +1122,7 @@ function platform(color: number): Outfit {
     color,
     FINISH.cloth,
     { scale: [1, 1, DEPTH] },
-    36,
+    32,
     gap,
     Math.PI * 2 - gap * 2,
   );
@@ -1296,42 +1351,43 @@ function platform(color: number): Outfit {
     [8, 18],
   );
   wrench.box(0.018, 0.055, 0.032, 0.006, 0xe23b3b, FINISH.rubber, { at: [0, -0.06, 0] });
-  // The orange cable coil hanging from the left hip.
-  const coil = new SculptBuilder();
-  coil.box(0.016, 0.03, 0.03, 0.004, CHARCOAL, FINISH.plastic, { at: [0, -0.01, 0] });
-  for (let k = 0; k < 4; k++) {
-    coil.torus(
-      0.06 - k * 0.002,
-      0.011,
-      k % 2 ? 0xff8a1f : 0xf07a12,
-      FINISH.rubber,
-      { at: [0.004 * (k - 1.5) * 2, -0.08, 0.003 * k], rot: [0, Math.PI / 2, 0.15 * (k - 1.5)] },
-      Math.PI * 2,
-      [6, 20],
-    );
+  // A big orange cable coil slung bandolier-style over the left shoulder and across the chest.
+  const orange = 0xff8a1f;
+  for (let k = 0; k < 3; k++) {
+    const loop: THREE.Vector3[] = [];
+    for (let i = 0; i < 36; i++) {
+      const phi = (i / 36) * Math.PI * 2 + 0.05 * k;
+      const y = 0.06 - 0.024 * k + 0.2 * Math.sin(phi - 0.6);
+      const r = Math.max(profileRadius(P, y), profileRadius(vest, y)) + 0.034 + 0.006 * (k % 2);
+      loop.push(new THREE.Vector3(r * Math.sin(phi), y, r * Math.cos(phi) * DEPTH));
+    }
+    b.sweep(loop, 0.016, k === 1 ? 0xf07a12 : orange, FINISH.rubber, {
+      closed: true,
+      segments: 40,
+      radial: 6,
+    });
   }
-  coil.sweep(
+  const low = surf(P, -0.14, -Math.PI / 2, 0.05);
+  b.sweep(
     [
-      [0, -0.14, 0.03],
-      [0.005, -0.18, 0.05],
-      [0, -0.2, 0.04],
+      [low.x, low.y + 0.02, low.z],
+      [low.x - 0.01, low.y - 0.05, low.z + 0.03],
+      [low.x + 0.01, low.y - 0.1, low.z + 0.05],
     ],
-    0.009,
-    0xff8a1f,
+    0.012,
+    orange,
     FINISH.rubber,
-    { segments: 8, radial: 6 },
+    { segments: 10, radial: 6 },
   );
-  coil.box(0.02, 0.03, 0.016, 0.004, 0x2a6ad8, FINISH.plastic, { at: [0, -0.215, 0.04] });
+  b.box(0.034, 0.05, 0.026, 0.006, 0x2a6ad8, FINISH.plastic, {
+    at: [low.x + 0.01, low.y - 0.13, low.z + 0.05],
+  });
 
   const hipR = surf(P, -0.2, -1.55, 0.06);
-  const hipL = surf(P, -0.2, 1.75, 0.06);
   return {
     torso: b.build(),
-    swings: [
-      { geometry: wrench.build(), pivot: v3(hipR), hang: 'side', amp: 0.35 },
-      { geometry: coil.build(), pivot: v3(hipL), hang: 'side', amp: 0.25 },
-    ],
-    shoulder: 0.25,
+    swings: [{ geometry: wrench.build(), pivot: v3(hipR), hang: 'side', amp: 0.35 }],
+    shoulder: 0.27,
     nod: 0.9,
     arm: {
       upper: { color: navy, finish: FINISH.cloth, r: [0.078, 0.07, 0.064] },
