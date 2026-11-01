@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { getTile, isWorkSurface, parseLevelMap } from '../../sim/level';
-import { parseDraftMap } from '../../sim/draftMap';
-import { GARAGE } from '../../sim/levels';
-import draftText from '../../../maps/drafts/garage.txt?raw';
+import { getTile, isWorkSurface, parseLevelMap } from '../../../sim/level';
+import { parseDraftMap } from '../../../sim/draftMap';
+import { GARAGE } from '../../../sim/levels';
+import draftText from '../../../../maps/drafts/garage.txt?raw';
 import { SLAB_WEAR, garageRoom } from './garageRoom';
-import { WALL_DECO_MODELS } from './roomModels';
+import { WALL_DECO_MODELS } from '../roomModels';
 
 describe('garageRoom', () => {
   const shipped = GARAGE.map;

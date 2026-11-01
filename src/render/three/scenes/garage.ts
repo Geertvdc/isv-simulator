@@ -1,6 +1,6 @@
 import type { LevelMap } from '../../../sim/level';
 import { firstGroup, tileHash } from '../../mapShape';
-import { garageRoom } from '../garageRoom';
+import { garageRoom } from '../rooms/garageRoom';
 import { gridToWorld } from '../../projection';
 import { bushes, hoop, kennel, shed, tires, tree } from '../setDressing/garage';
 import type { SetPiece } from '../setDressing/shared';

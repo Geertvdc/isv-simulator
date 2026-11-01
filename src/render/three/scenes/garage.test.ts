@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { CAMERA_FIT_PADDING, CAMERA_HUD_BOTTOM } from '../../../sim/balance';
 import { type LevelMap, getTile, parseLevelMap } from '../../../sim/level';
 import { fitCamera3d, projectPoint } from '../../projection';
-import { garageRoom } from '../garageRoom';
+import { garageRoom } from '../rooms/garageRoom';
 import { WALL_HEIGHT, levelBox } from '../layout';
 import { garageScene } from './garage';
 import type { ScenePiece } from './types';

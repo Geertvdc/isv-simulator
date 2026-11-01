@@ -11,6 +11,7 @@ import { type PoseInput, playerPose } from '../render/three/pose';
 import { createLights, dressScene } from '../render/three/look';
 import { STATION_MODELS, type StationModel } from '../render/three/stationModels';
 import { WALL_DECO_MODELS, floorModel, wallModel } from '../render/three/roomModels';
+import { ROOMS, floorDressing } from '../render/three/rooms';
 import { ticketModel } from '../render/three/ticketModels';
 import { VIEW3D_PITCH } from '../render/projection';
 import { STATION_HEIGHT } from '../render/three/layout';
@@ -122,14 +123,16 @@ const entries: Entry[] = [
     },
   ]),
   ...people,
-  ...WALL_THEMES.flatMap((theme): Entry[] => [
-    [`wall ${theme}`, () => wallModel(theme, 'wall')],
-    [`wall-front ${theme}`, () => wallModel(theme, 'wall-front')],
-    [`wall-inner ${theme}`, () => wallModel(theme, 'wall-inner')],
-  ]),
+  // As a level builds them: the theme's room dressing first (`rooms/`), else the plain model.
+  ...WALL_THEMES.flatMap((theme): Entry[] =>
+    (['wall', 'wall-front', 'wall-inner'] as const).map((piece): Entry => [
+      `${piece} ${theme}`,
+      () => ROOMS[theme]?.wall?.model(piece, 0) ?? wallModel(theme, piece),
+    ]),
+  ),
   ...FLOOR_THEMES.map((theme): [string, () => Model] => [
     `floor ${theme}`,
-    () => floorModel(theme),
+    () => floorDressing(theme, undefined)?.model(0) ?? floorModel(theme),
   ]),
   ...Object.entries(WALL_DECO_MODELS).map(([name, make]): Entry => [
     `deco ${name}`,

@@ -5,7 +5,7 @@ import { FRONT_WALL_HEIGHT, SLAB_DEPTH, STATION_HEIGHT, WALL_HEIGHT } from './la
 import { FLOOR_COLORS, PALETTE, WALL_COLORS } from './look';
 import { COLOR } from './palette';
 import { type WallPiece, tileHash } from '../mapShape';
-import { SLAB_WEAR } from './garageRoom';
+import { SLAB_WEAR } from './rooms/garageRoom';
 
 /**
  * The room round the stations, built in code like the rest of the office
