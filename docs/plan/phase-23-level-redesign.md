@@ -216,91 +216,128 @@ Layout gimmick: no new code: the founder's house (rooms, serving hatch, hallway)
 
 ### Chapter 2: Startup
 
-Layout gimmick: **Spills** (`_` wet floor: players slide and overshoot). Sketches: [seed-round](images/level-redesign/seed-round.svg), [demo-day](images/level-redesign/demo-day.svg), [on-call](images/level-redesign/on-call.svg). 3D renders: [seed-round](images/level-redesign/seed-round-3d.webp), [demo-day](images/level-redesign/demo-day-3d.webp), [on-call](images/level-redesign/on-call-3d.webp). The sketches draw wet tiles glossy blue; the 3D renders show them as plain floor until spills are built, so each level below says where they are. The report reads `_` as floor too: its numbers are for walking, not for sliding.
+Layout gimmick: **Spills** (`_` wet floor: players slide and overshoot). From 2-2 on, the spills move: a **leaky tap** (`o`) floods a **spill zone** (`%`) during the round, and in 2-3 a **mop robot** drives a loop (`r`) and leaves a wet trail. 2-1 has no spills: it teaches incidents in a new building shape. Sketches: [seed-round](images/level-redesign/seed-round.svg), [demo-day](images/level-redesign/demo-day.svg), [on-call](images/level-redesign/on-call.svg). 3D renders: [seed-round](images/level-redesign/seed-round-3d.webp), [demo-day](images/level-redesign/demo-day-3d.webp), [on-call](images/level-redesign/on-call-3d.webp).
+
+The sketches draw wet tiles glossy blue, the spill zone as light blue with a dashed ring, the tap as a brown `o` block and the robot route as a ringed dot. The 3D renders use stand-ins until these are built: wet floor, spill zone and robot route show as plain floor, and the tap shows as a counter. Each level below says where they are. The report reads `_`, `%` and `r` as floor, so its numbers are for walking dry. Each level that has a spill zone also gets a "flooded" report row, with `%` read as wall: the routes if nobody wants to cross the wet floor.
+
+#### New mechanics (Startup)
+
+- **Leaky tap + spill zone** (`o` + `%`, first in 2-2). The tap is a solid tile, like a station. The `%` tiles round it are dry floor that the tap can flood.
+  - **Behaviour:** on a timer (level setting, about every 40 s), the tap starts leaking. The zone floods ring by ring outward from the tap (about one ring every 2 s, by path distance through `%` tiles) until every `%` tile is wet, and stays wet while the tap leaks. Any player can fix it: hold work at the tap for about 2 s, like a station. The flood stops, and the tiles dry back ring by ring from the outside (about 8 s for the zone). Then the timer starts again. Wet tiles behave exactly like `_`.
+  - **Telegraphing:** the tap drips and wobbles about 5 s before a leak, with a small "drip" sound. While it leaks, it shows a jet and a progress ring for the fix, like a station. Wet tiles get the same glossy puddle look as `_`; drying tiles fade.
+  - **Reuses:** station hold-work (the fix), incident-style timers in the level settings, spill traction (`_`). New: per-tile wet state in `GameState` (a plain list of tile indexes with a timer), and `getTraction` reads it.
+  - **Solo:** never forced through the zone: every level with a zone has a dry route round it (longer), and the tap is reachable from dry floor, so one player can fix it on the way past.
+  - **4 players:** someone has to decide: babysit the tap, re-route the team, or slide through and accept the bumps. "Who's on the tap?!" is the shout.
+  - **Bots:** wet tiles get a path cost (as `_`). Bots fix the tap only when idle or when it blocks their path.
+  - **Stand-in:** `o` = counter `C` (the 3D render shows a counter), `%` = floor.
+- **Mop robot** (`r` route, first in 2-3). An office cleaning robot drives a fixed loop in the night shift.
+  - **Behaviour:** the `r` tiles form one closed loop, each with exactly two `r` neighbours. The robot starts at a set tile and drives the loop in one direction (level setting), a bit slower than a player walks. Every tile it passes stays wet for about 6 s, so a wet trail follows it round. It shoves players in its way (the manager shove: `MANAGER_SHOVE_SPEED` and the bump cooldown in `balance.ts`), and a dash into it stops dead, as with the manager. It never stops for anyone.
+  - **Telegraphing:** a blinking orange light, a beam on the floor 2 tiles ahead and a shiny trail that fades.
+  - **Reuses:** manager movement on fixed tiles (no pathfinding) and its shove, spill traction for the trail.
+  - **Solo:** the robot is an obstacle with a timetable: wait a second or go the other way round. It never blocks a station: every station on the route also has an access tile off it.
+  - **4 players:** the trail moves, so "which way round is dry" keeps changing and the team has to call it.
+  - **Bots:** treat the robot like a manager (moving obstacle) and its trail like `_`.
+  - **Stand-in:** `r` = floor.
 
 #### 2-1 Seed Round (`seed-round`)
 
-**Concept:** 15×10 medium. Coworking loft, L-shaped, desk island in the middle, incidents. Gimmick: none new. 1p / 4p: Two pipelines.
+**Concept:** 15×11 medium. Coworking loft in a U round the building's stairwell, with the founders' office and the server closet as real rooms in the two arms. Gimmick: none new (incidents). 1p / 4p: Two pipelines, two ways round the pod.
 
 - **Draft:** `maps/drafts/seed-round.txt`
 
   ```text
-  ##II##BB#######
-  #..1..........#
-  #....KKKK.....X
-  #....CCCC...2.#
+  ###############
   #.............#
-  #######.CTTC..#
-        #.......P
-        S..3....P
-        S.....4.#
-        #########
+  #..2..KK......S
+  X.....KK...3..S
+  #.............#
+  #.##.##TT#....#
+  #..1.#   #.##.#
+  I....#   #....#
+  I....#   #....P
+  #..C.#   #..4.P
+  ######   ##BB##
   ```
 
 - **Sketch:** ![2-1 Seed Round, current left, draft right](images/level-redesign/seed-round.svg)
 - **3D render:** ![2-1 Seed Round draft in the game](images/level-redesign/seed-round-3d.webp)
 - **Report:**
 
-  | Level                    | Size  | Floor | Stations             | Solo run | Loop | Chokepoints    | Reachable |
-  | ------------------------ | ----- | ----- | -------------------- | -------- | ---- | -------------- | --------- |
-  | 2-1 Seed Round (current) | 14×10 | 76    | I2 B2 K4 T2 P2 S4 X1 | 23       | 30   | none           | all       |
-  | 2-1 Seed Round (draft)   | 15×10 | 68    | I2 B2 K4 T2 P2 S2 X1 | 22       | 32   | detour 7,5 +10 | all       |
+  | Level                    | Size  | Floor | Stations             | Solo run | Loop | Chokepoints            | Reachable |
+  | ------------------------ | ----- | ----- | -------------------- | -------- | ---- | ---------------------- | --------- |
+  | 2-1 Seed Round (current) | 14×10 | 76    | I2 B2 K4 T2 P2 S4 X1 | 23       | 30   | none                   | all       |
+  | 2-1 Seed Round (draft)   | 15×11 | 83    | I2 B2 K4 T2 P2 S2 X1 | 27       | 40   | detour 6,4–7,4 (2) +10 | all       |
 
-- **Intent:** a coworking loft in an L: a wide loft along the back (15×5) and a deploy corner below its right half (8×5); the front-left of the map is the building's stairwell, left empty. The loft has inbox and bug queue on the back wall and one desk island in the middle: four keyboards in a row with a counter strip in front of it to park tickets on when an incident freezes everything. A divider wall separates loft and deploy corner: the test benches sit in it (9,5–10,5), usable from both sides, with a counter either side as a pass-through. The divider leaves a 1-wide door on the left (7,5), right above the ship (a hatch in the deploy corner's left wall, 6,7–6,8), and a 2-wide opening on the right (12,5–13,5), right above the two pipelines. The work goes round clockwise: inbox → island → test benches → down the wide opening → pipelines → ship → up the narrow door → inbox. Incidents (the chapter's mechanic, nothing else new) skip the test: bug queue → keyboard → pipeline → ship, the same lap without the stop at the divider. Players bump in the door.
-- **Solo:** spawn 1 under the inbox, two steps from the island: 22 steps to ship the first ticket, a loop is 32 (current 30). The narrow door is the way back to the inbox; with it blocked the lap goes back up the wide opening (+10, the report's `detour 7,5`).
-- **4 players:** spawns 1 and 2 in the loft, 3 and 4 in the deploy corner. The loft pair takes tickets and codes at the island (room for four side by side); the deploy-corner pair tests from below, deploys and ships. Coded tickets go down through the door or over the divider counters, empty hands come back up the door: flows cross there. Bypasses: the 2-wide opening (a longer walk) and the pass-through counters. Two pipelines and two ship tiles, so the deploy corner never queues on one station.
+- **Intent:** a loft in a U. The stairwell (cols 6–8, rows 6–10) is a hole in the middle of the front; its balustrade carries the two test benches (7–8,5), facing the back. The back of the U is the open loft (rows 1–4): a desk pod of four keyboards in a 2×2 block (6–7,2–3) in the middle, the ship on the right wall (14,2–3), the bin on the left (0,3). The two arms are **real rooms** with walls and two 1-wide doors each:
+  - **Founders' office** (left arm, cols 1–4, rows 6–9): the inbox (0,7–8) is on its wall and the founders' desk (counter, 3,9) stands in it. Doors at (1,5) and (4,5). Every ticket starts here.
+  - **Server closet** (right arm, cols 10–13, rows 7–9): both pipelines (14,8–9) and the bug queue (11–12,10) are in here, so every deploy and every incident starts in the closet. Doors at (10,6) and (13,6).
+
+  The work goes round the pod: office → pod → tests at the balustrade → closet → ship → office. Incidents skip the tests: closet (bug) → pod → closet (deploy) → ship. The strip between the pod and the tests (6–7,4) is where code goes down and players come back: flows cross there. The bypass is round the back of the pod (+10, the report's `detour 6,4–7,4`).
+
+- **Solo:** spawn 1 in the office next to the inbox. First ship 27 steps, a loop is 40 (current 30). The loop is longer because the office and the closet are rooms with doors, not open corners. Every room has two doors, so solo never queues on a door.
+- **4 players:** spawn 1 in the office, 2 and 3 in the loft (left and right of the pod), 4 in the closet. A natural split: one on the inbox and the founders' desk, two at the pod, one in the closet on tests, deploys and bugs. The pod has room for four on all sides. Players bump in the strip in front of the tests and in the room doors. Two pipelines, so the closet never queues on one.
 - **Review:** _human feedback from gate 1_
 
 #### 2-2 Demo Day (`demo-day`)
 
-**Concept:** 18×10 large. Coworking floor + stage hall; a spilled-kombucha lane between them; counter wall with a gap. Gimmick: **Spills intro**. 1p / 4p: Dry detour exists.
+**Concept:** 19×11 large. Coworking room, a foyer with a leaking kombucha tap, and a hall with the stage behind it; the ship is the demo screen on the stage. Gimmick: **Spills intro + leaky tap** (new). 1p / 4p: Dry route over the stage always exists.
 
 - **Draft:** `maps/drafts/demo-day.txt`
 
   ```text
-         ###########
-         #.........#
-  #KK#BB##.........#
-  #..........RR....#
-  #.1....C.........#
-  I......C.....3...#
-  I..KK..C__..CC...P
-  #.2....___.......P
-  #......C__.....4.#
-  ###X######TT##SS##
+        #######SS####
+        #...........#
+  ##BBKK#...#.......#
+  #.1.......####..###
+  #.....#_o_#.......#
+  I.....#%_%#..RR...#
+  I.KK..#%%%#.......P
+  #.....%%%%.....3..P
+  #.2...#%%%#....4..#
+  ###X###%%%#....CC.#
+        ######TT#####
   ```
 
 - **Sketch:** ![2-2 Demo Day, current left, draft right](images/level-redesign/demo-day.svg)
 - **3D render:** ![2-2 Demo Day draft in the game](images/level-redesign/demo-day-3d.webp)
 - **Report:**
 
-  | Level                  | Size  | Floor | Stations                | Solo run | Loop | Chokepoints    | Reachable |
-  | ---------------------- | ----- | ----- | ----------------------- | -------- | ---- | -------------- | --------- |
-  | 2-2 Demo Day (current) | 14×10 | 85    | I2 B2 K4 T2 R1 P2 S4 X1 | 37       | 52   | none           | all       |
-  | 2-2 Demo Day (draft)   | 18×10 | 104   | I2 B2 K4 T2 R2 P2 S2 X1 | 23       | 36   | detour 7,7 +10 | all       |
+  | Level                            | Size  | Floor | Stations                | Solo run | Loop | Chokepoints       | Reachable |
+  | -------------------------------- | ----- | ----- | ----------------------- | -------- | ---- | ----------------- | --------- |
+  | 2-2 Demo Day (current)           | 14×10 | 85    | I2 B2 K4 T2 R1 P2 S4 X1 | 37       | 52   | none              | all       |
+  | 2-2 Demo Day (draft)             | 19×11 | 112   | I2 B2 K4 T2 R2 P2 S2 X1 | 34       | 48   | detour 10,7 +12   | all       |
+  | 2-2 Demo Day (draft, zone flood) | 19×11 | 97    | I2 B2 K4 T2 R2 P2 S2 X1 | 46       | 60   | cut 10,1; cut 6,3 | all       |
 
-- **Intent:** two rooms side by side: a coworking floor (left, 6×6: inbox, bug queue, four keyboards, bin) and a stage hall (right, 9×8, two rows deeper because of the stage at the back: review table on the stage, test benches and ship on the front wall, pipelines on the right). Between them stands the kombucha bar, a counter wall (column 7) with one gap near the front (7,7). Someone knocked the tap over: **the gap and the lane behind it are wet** (7,7, then 8,6–9,8: 7 tiles). The gap is the short way from the keyboards to the test benches and back from the ship, but it spits you onto the wet lane: you slide, overshoot the turn to the tests and bump into the bar or into each other. The **dry detour** is the 1-wide door at the back end of the bar (7,3): into the hall past the stage, then down column 10 or further right, which stays dry. That is +10 steps a loop (the report's `detour 7,7`), so the wet gap is a real temptation, not a trap. Reviews sit on the dry route anyway (keyboard → back door → stage → tests), which teaches the detour for free. Players bump in the gap and slide into each other on the lane.
-- **Solo:** spawn 1 between the inbox and the back keyboards: 23 steps to the first ship, a loop is 36 through the gap (current 52), 46 on the dry detour. Solo never needs the wet tiles, and no station is next to one: the tests (10,9–11,9) are used from dry floor.
-- **4 players:** spawns 1 and 2 on the coworking floor, 3 and 4 in the hall. The coworking pair codes and puts tickets on the bar: the two back counters (7,4–7,5) are dry on both sides, so hand-offs there are safe; the front counter (7,8) is reached from the wet lane on the hall side. The hall pair tests, deploys and ships, with a demo table (12,6–13,6) in the middle of the hall to park tickets. Reviews pull one player from each room to the stage. The chokepoint is the wet gap where coded tickets go right and empty hands go back left; the bypasses are the dry back door (also 1-wide, but on the quieter review route) and throwing over the bar.
+- **Intent:** three rooms in a row, all with walls and doors:
+  - **Coworking** (left, cols 1–5, rows 3–8): inbox (0,5–6), bug queue and two keyboards on the back wall (2–5,2), two more keyboards as an island (2–3,6), bin (3,9). Two doors to the foyer: the back door (6,3), dry, and the front door (6,7), in the spill zone.
+  - **Foyer** (cols 7–9, rows 1–9) with the kombucha bar: the **leaky tap** (8,4), three puddles that are always wet (`_` at 7,4, 9,4 and 8,5) and the **spill zone** (`%`) over the whole front of the foyer (rows 5–9 plus the coworking front door at 6,7: 15 tiles). The top of the foyer (rows 1–3) stays dry, and the tap can be fixed from there (8,3).
+  - **Hall** (cols 11–17, rows 4–9): one 1-wide main door from the foyer (10,7), review table (13–14,5), pipelines (18,6–7), test benches on the front wall (12–13,10), a demo table to park tickets (15–16,9).
+  - **Stage** (cols 11–17, rows 1–2), behind the hall: the ship is the demo screen on its back wall (13–14,0). Way in from the hall: steps (14–15,3). Way in from the foyer: a narrow **backstage door** (10,1).
+
+  The short lap goes coworking → front door → foyer → main door → tests → pipelines → steps → ship → backstage door → foyer top → back door → inbox. When the tap is dry, the front of the foyer is the fast way to the hall (and the puddles by the tap already make it slippery). When it leaks, the front floods: the front door and the main door are only reachable over wet floor. The team then either slides through (fast, bumpy), fixes the tap (someone runs to 8,3) or goes the dry way: back door → backstage door → stage → steps → hall. That dry way is the "zone flood" row: loop 60 instead of 48, and both the backstage door and the back door become cuts, with outbound tickets and returning players squeezing through the same 1-wide backstage door. The chokepoint when dry is the main door (detour +12 over the stage).
+
+- **Solo:** spawn 1 next to the back keyboards. First ship 34 steps, loop 48 (current 52), 60 on the dry way when the foyer floods. Solo is never forced onto wet floor, and the tap is on the dry return route (backstage → foyer top), so fixing it costs one stop.
+- **4 players:** spawns 1 and 2 in coworking, 3 and 4 in the hall. The coworking pair codes; the hall pair reviews, tests, deploys and ships. When the tap leaks, someone has to call it: one runs to the tap while the others re-route over the stage, or everyone slides. The backstage door is where the outbound and return flows meet when the foyer is wet.
 - **Review:** _human feedback from gate 1_
 
 #### 2-3 On Call (`on-call`)
 
-**Concept:** 18×11 large. Night shift: ring corridor round a server room, freshly mopped (wet) corridor sections; two ways round. Gimmick: Spills + long walks. 1p / 4p: Ring gives 4p two directions.
+**Concept:** 18×12 large. Night shift: an H of two rooms joined by two corridors round an enclosed server room, and a mop robot driving the ring. Gimmick: **Mop robot** (new). 1p / 4p: Ring gives two ways round; the robot decides which is dry.
 
 - **Draft:** `maps/drafts/on-call.txt`
 
   ```text
-  #BB#KK      ##TT##
-  #.....#######....#
-  I.1...___...#....#
-  I.....___.......3#
-  #.....####P##....#
-  #.KK..#######RR..C
-  #.2...#P#####....#
-  X........___.....#
-  #........___...4.#
-  #.....#######....#
+  #BBKK#      ##TT##
+  #....########....#
+  I.1.rrrrrrrrrr...#
+  I...r.......#r...#
+  #...r###.####r...#
+  #.KKr#P....##r...#
+  #.2.r##....P#rRR.#
+  #...r####.###r...#
+  X...r........r.3.#
+  #...rrrrrrrrrr.4.#
+  #....########....#
   ##SS##      ######
   ```
 
@@ -311,11 +348,17 @@ Layout gimmick: **Spills** (`_` wet floor: players slide and overshoot). Sketche
   | Level                 | Size  | Floor | Stations                | Solo run | Loop | Chokepoints                                                      | Reachable |
   | --------------------- | ----- | ----- | ----------------------- | -------- | ---- | ---------------------------------------------------------------- | --------- |
   | 2-3 On Call (current) | 14×10 | 71    | I2 B1 K2 T2 R1 P2 S2 X1 | 28       | 42   | detour 2,1 +38; detour 1,2–1,3 (2) +38; detour 12,2–12,6 (5) +22 | all       |
-  | 2-3 On Call (draft)   | 18×11 | 104   | I2 B2 K4 T2 R2 P2 S2 X1 | 38       | 44   | none                                                             | all       |
+  | 2-3 On Call (draft)   | 18×12 | 117   | I2 B2 K4 T2 R2 P2 S2 X1 | 41       | 50   | none                                                             | all       |
 
-- **Intent:** the night shift, an H-shaped floor: the on-call desks (left, 5×9: inbox, bug queue, four keyboards, bin, ship) and the ops room (right, 4×9: test benches, review table, a counter) joined by two 2-wide corridors that run round the server room in the middle. The server room is a solid block of racks with a pipeline on each side: one faces the back corridor (10,4), one the front corridor (7,6), so you can deploy whichever way round you go. The ops room has its own wall with a 1-wide door to the back corridor (12,3) and a 2-wide one to the front corridor (12,7–12,8). The cleaner has just been round: **one section of each corridor is freshly mopped** (back corridor 6,2–8,3, right outside the desks; front corridor 9,7–11,8, right outside the ops room: 12 wet tiles). Every way round crosses one wet section, and both pipelines face dry tiles. A feature is one lap of the ring: desks → back corridor (wet) → narrow door → tests → wide door → front corridor (wet) → pipeline → ship. An incident hotfix never leaves the desks' end: keyboard → front pipeline (5 steps from the desk island) → ship. Players bump in the narrow door and slide into each other on the mopped sections.
-- **Solo:** spawn 1 by the inbox: 38 steps to the first ship and a loop of 44 (current 42): the long walk is the point of the level. Either direction round works; the report shows no chokepoint because blocking the narrow door only costs +8 (under its 25% bar): the other half of the ring is the bypass.
-- **4 players:** spawns 1 and 2 at the desks, 3 and 4 in the ops room. The ring gives two directions: the natural lap is clockwise (out the back, home along the front), so a player who cuts back the short way meets the traffic head-on, usually on a wet section. The chokepoint is the narrow ops door (12,3) where coded tickets come in and testers head out; the bypass is the 2-wide front door, round the other way. Reviews pull a desk player round to the ops room; hotfixes pull nobody out of position, because the front pipeline is next to the desks.
+- **Intent:** an H of three rooms, all with walls and doors:
+  - **Desks room** (left, cols 1–4, rows 1–10): bug queue (1–2,0) and keyboards (3–4,0) on the back wall, a keyboard island (2–3,5), inbox (0,2–3), bin (0,8), ship (2–3,11) on the front wall. It opens onto both corridors with 2-wide openings.
+  - **Ops room** (right, cols 13–16, rows 1–10): test benches (14–15,0), review table (14–15,6). Doors: a 1-wide fire door at the top (12,2) and a 2-wide door at the bottom (12,8–9).
+  - **Server room** (middle, cols 6–11, rows 5–6): the two pipeline racks (6,5 and 11,6), free-standing so both can be used. Doors: top (8,4) and bottom (9,7), offset so the room is a shortcut between the corridors. Every deploy happens in here.
+
+  The corridors (top rows 2–3, bottom rows 8–9, both 2-wide) and the two room edges make a ring. The **mop robot** drives that ring: route `r` is the rectangle with corners (4,2), (13,2), (13,9) and (4,9), through the desks room (col 4, right past the island keyboards), both corridors, both ops doors and the ops room (col 13, past the review table). Its wet trail follows it, so one half of the ring is always wet and the dry half moves. All wetness here is dynamic (no fixed `_` tiles). Players choose: top or bottom, or cut through the server room, and the robot keeps changing the answer. The report shows no chokepoint because the ring is its own bypass.
+
+- **Solo:** spawn 1 by the inbox. First ship 41 steps, loop 50 (current 42; long walks are the theme). Every station on the robot's route also has an access tile off it (island keyboards from 3,4 or 3,6; review from 14,5, 14,7 or 16,6), so solo never has to stand in its way, only cross it.
+- **4 players:** spawns 1 and 2 in the desks room, 3 and 4 in the ops room. The desks pair takes, codes and ships; the ops pair tests and reviews; everyone deploys in the server room. Coded tickets go right, reviewed and tested ones come back left, and the robot sends both flows round whichever side is dry. The narrow spots are the fire door (12,2), the server room doors and wherever the robot is right now.
 - **Review:** _human feedback from gate 1_
 
 ### Chapter 3: Scale-Up
