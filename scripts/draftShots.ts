@@ -8,16 +8,16 @@
  *   npm run draft-shots -- --drafts      every draft
  *   (reorg phases `<id>.phaseN.txt` render too, as `<id>-phaseN-3d.webp`)
  *
- * Works in a throwaway git worktree (detached at HEAD, `node_modules`
- * symlinked in): copies each draft over its live `maps/level-NN-*.txt`, with
- * stand-ins for chars the game can't read yet, starts vite there on a free
- * port and takes the level's shot with `scripts/screenshots.ts`. The
+ * Starts vite in this checkout on a free port and takes the level's scene
+ * shot with `scripts/screenshots.ts`, loading the draft with the dev-only
+ * greybox loader (`?scene=level-<id>&draft=<id>[&phase=N]`, see
+ * `src/render/scene/draftLevel.ts`). Uncommitted draft edits render too. The
  * screenshot script always uses Chrome debug port 9333, so runs (from any
  * worktree) wait for each other on a lock dir. Needs Chrome, like
  * `npm run screenshots`.
  */
 
-import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
+import { type ChildProcess, spawn } from 'node:child_process';
 import {
   copyFileSync,
   existsSync,
@@ -25,21 +25,13 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
-  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { levelShotName, phasePasses, renderFileName, shotIds } from './mapTools/draftShots';
-import { toStandIns } from './mapTools/mapChars';
-import {
-  type DraftPhase,
-  SKETCH_DIR,
-  currentMapPath,
-  draftIds,
-  draftPhases,
-} from './mapTools/mapFiles';
+import { join } from 'node:path';
+import { draftQuery, levelShotName, renderFileName, shotIds } from './mapTools/draftShots';
+import { SKETCH_DIR, draftIds, draftPhases } from './mapTools/mapFiles';
 
 // A fixed path (not `os.tmpdir()`) so every checkout and session agrees on it.
 const LOCK_DIR = '/tmp/isv-draft-shots.lock';
@@ -53,7 +45,6 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // Children run in their own process group (detached) so cleanup can stop the
 // whole tree, including the headless Chrome that screenshots.ts starts.
 const children = new Set<ChildProcess>();
-let worktree: string | null = null;
 let workDir: string | null = null;
 let haveLock = false;
 
@@ -69,15 +60,6 @@ function stopGroup(child: ChildProcess): void {
 function cleanup(): void {
   for (const child of children) stopGroup(child);
   children.clear();
-  if (worktree) {
-    try {
-      execFileSync('git', ['worktree', 'remove', '--force', worktree], { stdio: 'ignore' });
-    } catch {
-      // Already gone; prune below forgets it.
-    }
-    execFileSync('git', ['worktree', 'prune'], { stdio: 'ignore' });
-    worktree = null;
-  }
   if (workDir) rmSync(workDir, { recursive: true, force: true });
   workDir = null;
   if (haveLock) rmSync(LOCK_DIR, { recursive: true, force: true });
@@ -131,7 +113,7 @@ async function acquireLock(): Promise<void> {
   }
 }
 
-// ---- Worktree, vite, screenshots ----
+// ---- Vite, screenshots ----
 
 function freePort(): Promise<number> {
   return new Promise((done, fail) => {
@@ -147,39 +129,19 @@ function freePort(): Promise<number> {
   });
 }
 
-/** A detached worktree at HEAD. */
-function makeWorktree(): string {
-  workDir = mkdtempSync(join(tmpdir(), 'isv-draft-shots-'));
-  const dir = join(workDir, 'worktree');
-  execFileSync('git', ['worktree', 'add', '--detach', dir, 'HEAD'], { stdio: 'ignore' });
-  worktree = dir;
-  symlinkSync(resolve('node_modules'), join(dir, 'node_modules'), 'dir');
-  return dir;
-}
-
-/** Copies drafts (one phase each) over their live maps in the worktree. */
-function placeDrafts(dir: string, drafts: readonly { id: string; draft: DraftPhase }[]): void {
-  for (const { id, draft } of drafts) {
-    const live = currentMapPath(id);
-    if (!live) throw new Error(`No live map file for ${id}`);
-    // Drafts come from this checkout, so uncommitted edits are rendered too.
-    writeFileSync(join(dir, live), toStandIns(readFileSync(draft.path, 'utf8')));
-  }
-}
-
-async function startVite(dir: string, port: number): Promise<{ base: string; vite: ChildProcess }> {
+async function startVite(port: number): Promise<string> {
   const base = `http://localhost:${port}`;
   const child = spawn(
-    join(dir, 'node_modules', '.bin', 'vite'),
+    join('node_modules', '.bin', 'vite'),
     ['--port', String(port), '--strictPort'],
-    { cwd: dir, env: { ...process.env, PORT: String(port) }, stdio: 'ignore', detached: true },
+    { env: { ...process.env, PORT: String(port) }, stdio: 'ignore', detached: true },
   );
   children.add(child);
   const until = Date.now() + VITE_READY_MS;
   while (Date.now() < until) {
     if (child.exitCode !== null) throw new Error(`vite exited with code ${child.exitCode}`);
     try {
-      if ((await fetch(base)).ok) return { base, vite: child };
+      if ((await fetch(base)).ok) return base;
     } catch {
       // Not listening yet.
     }
@@ -188,9 +150,9 @@ async function startVite(dir: string, port: number): Promise<{ base: string; vit
   throw new Error(`vite did not answer on ${base}`);
 }
 
-function run(command: string, args: readonly string[], cwd: string): Promise<number> {
+function run(command: string, args: readonly string[]): Promise<number> {
   return new Promise((done, fail) => {
-    const child = spawn(command, args, { cwd, stdio: 'inherit', detached: true });
+    const child = spawn(command, args, { stdio: 'inherit', detached: true });
     children.add(child);
     child.once('error', fail);
     child.once('exit', (code) => {
@@ -200,29 +162,21 @@ function run(command: string, args: readonly string[], cwd: string): Promise<num
   });
 }
 
-async function shoot(
-  dir: string,
-  base: string,
-  id: string,
-  phase: number,
-  out: string,
-): Promise<string> {
-  const code = await run(
-    join(dir, 'node_modules', '.bin', 'vite-node'),
-    [
-      'scripts/screenshots.ts',
-      '--',
-      `--base=${base}`,
-      `--only=${levelShotName(id)}`,
-      `--out=${out}`,
-    ],
-    dir,
-  );
+async function shoot(base: string, id: string, phase: number, out: string): Promise<string> {
+  const code = await run(join('node_modules', '.bin', 'vite-node'), [
+    'scripts/screenshots.ts',
+    '--',
+    `--base=${base}`,
+    `--only=${levelShotName(id)}`,
+    `--query=${draftQuery(id, phase)}`,
+    `--out=${out}`,
+  ]);
   const shot = join(out, `${levelShotName(id)}.webp`);
-  if (code !== 0 || !existsSync(shot)) throw new Error(`screenshot of ${id} failed`);
+  if (code !== 0 || !existsSync(shot)) throw new Error(`screenshot of ${id} phase ${phase} failed`);
   mkdirSync(SKETCH_DIR, { recursive: true });
   const target = join(SKETCH_DIR, renderFileName(id, phase));
   copyFileSync(shot, target);
+  rmSync(shot);
   return target;
 }
 
@@ -235,18 +189,12 @@ async function main(): Promise<void> {
     return;
   }
   await acquireLock();
-  const dir = makeWorktree();
-  const out = join(workDir ?? dir, 'shots');
-  const passes = phasePasses(new Map(request.ids.map((id) => [id, draftPhases(id)])));
-  // A fresh vite per pass, so it can't serve a cached map from the pass before.
-  for (const pass of passes) {
-    placeDrafts(dir, pass);
-    const { base, vite } = await startVite(dir, await freePort());
-    for (const { id, draft } of pass) {
-      console.log(`wrote ${await shoot(dir, base, id, draft.phase, out)}`);
+  workDir = mkdtempSync(join(tmpdir(), 'isv-draft-shots-'));
+  const base = await startVite(await freePort());
+  for (const id of request.ids) {
+    for (const { phase } of draftPhases(id)) {
+      console.log(`wrote ${await shoot(base, id, phase, workDir)}`);
     }
-    stopGroup(vite);
-    children.delete(vite);
   }
 }
 

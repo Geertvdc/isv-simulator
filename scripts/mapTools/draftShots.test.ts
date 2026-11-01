@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { levelShotName, phasePasses, renderFileName, shotIds } from './draftShots';
+import { draftPlayUrl, draftQuery, levelShotName, renderFileName, shotIds } from './draftShots';
 import { levelMapFile } from './mapFiles';
 
 describe('levelMapFile', () => {
@@ -47,20 +47,13 @@ describe('names', () => {
   });
 });
 
-describe('phasePasses', () => {
-  it('renders phase N of every level in pass N', () => {
-    const phases = new Map([
-      ['garage', [{ phase: 1 }]],
-      ['the-reorg', [{ phase: 1 }, { phase: 2 }, { phase: 3 }]],
-      ['synergy', [{ phase: 1 }, { phase: 2 }]],
-    ]);
-    const passes = phasePasses(phases).map((pass) =>
-      pass.map(({ id, draft }) => `${id}:${draft.phase}`),
+describe('draft URLs', () => {
+  it('load a draft and its later reorg phases', () => {
+    expect(draftQuery('garage')).toBe('draft=garage');
+    expect(draftQuery('the-reorg', 1)).toBe('draft=the-reorg');
+    expect(draftQuery('the-reorg', 3)).toBe('draft=the-reorg&phase=3');
+    expect(draftPlayUrl('http://localhost:5173/', 'synergy', 2)).toBe(
+      'http://localhost:5173/?draft=synergy&phase=2',
     );
-    expect(passes).toEqual([
-      ['garage:1', 'the-reorg:1', 'synergy:1'],
-      ['the-reorg:2', 'synergy:2'],
-      ['the-reorg:3'],
-    ]);
   });
 });
