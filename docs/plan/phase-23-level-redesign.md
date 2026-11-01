@@ -363,111 +363,134 @@ The sketches draw wet tiles glossy blue, the spill zone as light blue with a das
 
 ### Chapter 3: Scale-Up
 
-Layout gimmick: **Lifts** (`L` lift cabin). Sketches: [middle-management](images/level-redesign/middle-management.svg), [hypergrowth](images/level-redesign/hypergrowth.svg), [hot-desking](images/level-redesign/hot-desking.svg). 3D renders: [middle-management](images/level-redesign/middle-management-3d.webp), [hypergrowth](images/level-redesign/hypergrowth-3d.webp), [hot-desking](images/level-redesign/hot-desking-3d.webp).
+Layout gimmick: **Lifts** (`L` lift cabin, `l` express lift cabin), plus a **mail chute** (`H`). Sketches: [middle-management](images/level-redesign/middle-management.svg), [hypergrowth](images/level-redesign/hypergrowth.svg), [hot-desking](images/level-redesign/hot-desking.svg). 3D renders: [middle-management](images/level-redesign/middle-management-3d.webp), [hypergrowth](images/level-redesign/hypergrowth-3d.webp), [hot-desking](images/level-redesign/hot-desking-3d.webp).
 
-The lift isn't built yet, so the tools read `L` as floor and the two floors of 3-2 and 3-3 are only joined by their stairwell: the report's `cut` rows on those maps are the stairwell, as intended (with lifts built they become detours). The 3D renders show the cabins as plain floor next to the dark lift shaft. Which cabins pair up is listed per level. Walls line both sides of every shaft, so a ticket can't be thrown from one floor to the other (throws stop at walls): it rides the lift or goes by the stairs. The chapter's existing mechanic is the wandering manager (`M`); meetings (`m`) only start in Enterprise, so there are no meeting tiles here.
+The company outgrows one room: 3-1 is one big corporate floor with a real corner office and a meeting room, 3-2 splits the company over two floors, 3-3 over three. The floors are drawn side by side as separate islands with an empty shaft between them. None of the new parts are built yet, so the tools read `L` and `l` as floor and `H` as a counter: the floors are only joined by their stairwells, and the report's `cut` rows on 3-2 and 3-3 are those stairwells, as intended (with lifts built they become detours). The 3D renders show cabins as plain floor and hatches as counters. Throws stop at walls, so a ticket only changes floor by lift, by stairs or down the chute. The chapter's existing mechanic is the wandering manager (`M`). The meeting rooms (`m` floor, walls, doors, a table) are real rooms, but they stay quiet in this chapter: calendar invites only start in Enterprise.
+
+#### Scale-Up mechanics (spec for the build phase)
+
+- **Lift (`L`):** a cabin of 1 to 4 tiles on each floor it stops at; the level lists which cabins pair up. On a fixed cycle (doors open about 3 s, ride about 2 s) everyone standing in the cabin, with what they carry, moves to the paired cabin on the next floor, keeping their place in the cabin. Telegraph: a light above the doors and a door chime 1 s before departure; floor numbers over the doors. Managers ride too and take a place. Solo: never needs a second player; the stairs are always there. 4 players: the cabin is the queue. Bots: a path edge between paired cabins weighted by the expected wait. Stand-in: floor.
+- **Express lift (`l`):** like `L`, but it skips the middle floor and has a bigger cabin (2×2) with a longer cycle. Telegraph: amber cabin floor and an "E" over the doors. Solo: worth it only when it is about to leave. 4 players: takes the whole team in one go. Bots: same as `L`. Stand-in: floor.
+- **Lift breakdown:** a level setting, not a tile (for example `liftBreakdowns: [{ lift: 'express', at: 60, seconds: 20 }]`). The express goes out of order once or twice a round for about 20 s, telegraphed 5 s ahead (cabin lights flicker, an "Out of order" sign drops over the doors, a sad chime). People inside get out on the floor they are on. Everyone uses the local lift or the stairs meanwhile, so the local lift crowds and the stairwell fills. Never blocks solo: the local lift and the stairs keep working. Bots: drop the edge while it is broken. Stand-in: none (the setting is ignored).
+- **Mail chute (`H`):** a one-way pair of hatches, upstairs to downstairs. Put or throw a ticket on the top hatch; after about 2 s it slides out of the bottom hatch, where anyone picks it up. Only tickets fit, people take the lift. Telegraph: a down arrow on both hatches and a rattle while a ticket travels. Reuses counters and throwing. Solo: saves carrying the ticket down, but you still walk down to deploy or ship. 4 players: the floor above sends work down without anyone leaving. Bots: a ticket-only edge from top to bottom hatch. Stand-in: counter.
+- New chars: `l` and `H` are registered in `scripts/mapTools/mapChars.ts`; `!` stays reserved for Scale-Up but is unused (the breakdown is a setting).
 
 #### 3-1 Middle Management (`middle-management`)
 
-**Concept:** 18×11 large. Biggest single open floor so far, wide aisles, one manager. Gimmick: none new. 1p / 4p: Room for 4.
+**Concept:** 22×12 large. Biggest single floor so far, a corner office that sticks out of the building and a meeting room, one manager. Gimmick: none new (manager in real rooms). 1p / 4p: Wide side aisle for 4, one narrow aisle past the office door.
 
 - **Draft:** `maps/drafts/middle-management.txt`
 
   ```text
-    ##TT####KKK###
-   #..............#
-  #..2.............#
-  #....C######C....#
-  P....########....B
-  P....########.1..B
-  #....C######C....#
-  X................#
-  #.3.....CC.M..4..#
-   #......CC......#
-    ###SS####II###
+    ##II####KKK###TT####
+    #..................#
+    B..1...............#
+    B..................#
+  #########.######.....#
+  #.C.....#.#mmmm#.....#
+  #....M....#mCCm#.....P
+  #########.#.##.#.....P
+    #..................#
+    X..2.........4.....#
+    ##.......3........##
+     ##SS##############
   ```
 
+- **Rooms:** the manager's corner office (1–7,5–6) with a desk (2,5) and one door (8,6) onto the middle aisle; the meeting room (11–14,5–6) with a table (12–13,6) and two doors on the front side (11,7) and (14,7).
 - **Sketch:** ![3-1 Middle Management, current left, draft right](images/level-redesign/middle-management.svg)
 - **3D render:** ![3-1 Middle Management draft in the game](images/level-redesign/middle-management-3d.webp)
 - **Report:**
 
-  | Level                           | Size  | Floor | Stations             | Solo run | Loop | Chokepoints            | Reachable |
-  | ------------------------------- | ----- | ----- | -------------------- | -------- | ---- | ---------------------- | --------- |
-  | 3-1 Middle Management (current) | 14×10 | 74    | I2 B2 K2 T2 P2 S4 X1 | 26       | 32   | none                   | all       |
-  | 3-1 Middle Management (draft)   | 18×11 | 104   | I2 B2 K3 T2 P2 S2 X1 | 39       | 44   | detour 8,7–9,7 (2) +14 | all       |
+  | Level                           | Size  | Floor | Stations             | Solo run | Loop | Chokepoints                            | Reachable |
+  | ------------------------------- | ----- | ----- | -------------------- | -------- | ---- | -------------------------------------- | --------- |
+  | 3-1 Middle Management (current) | 14×10 | 74    | I2 B2 K2 T2 P2 S4 X1 | 26       | 32   | none                                   | all       |
+  | 3-1 Middle Management (draft)   | 22×12 | 152   | I2 B2 K3 T2 P2 S2 X1 | 39       | 54   | detour 9,4–9,5 (2) +14; detour 9,7 +14 | all       |
 
-- **Intent:** the first real office floor, the biggest single room so far (104 floor tiles), with cut-off corners like a tower floor. In the middle stands the building's core (5–12,3–6): the lift shafts, not in service yet (a teaser for 3-2), with a counter on each corner for hand-offs. The floor is a ring of wide aisles round the core: 2 wide at the back, 4 wide at the sides, 3 wide at the front. The work goes round it: inbox (front right) → keyboards (back right) → test benches (back left) → pipelines (left wall) → ship (front left) → back to the inbox along the front. The bug queue sits on the right wall by the keyboards, the bin on the left wall by the ship. A reception desk (2×2 counters, 8–9,8–9) stands in front of the core and leaves one 1-wide pinch (8,7–9,7) on the way back from the ship. The one manager starts right next to it: players can't push him and he likes to stop for a chat, so the pinch is where he is in the way.
-- **Solo:** spawn 1 on the right aisle between the inbox and the keyboards: the first ticket is 39 steps, a loop 44 (current 32): the floor is big, but every station is on the outer wall of the ring and the loop is one lap. When the manager stands in the pinch, the lap goes round the back of the core (+14).
-- **4 players:** spawn 1 by the keyboards, 4 by the inbox (the right side: take and code), 2 by the test benches and 3 by the pipelines (the left side: test, deploy, ship). The core's corner counters and the reception desk are the hand-off points between the two halves. The front lane carries the walk back from the ship to the inbox and right-side players bringing bug fixes over; they meet each other and the manager in the pinch. The bypass is the 2-wide back aisle round the core, and the corner counters take throws.
+- **Intent:** a corporate open floor, the biggest yet (152 tiles), split into a back half (inbox, bug queue, three keyboards, test benches) and a front half (pipelines on the right wall, ship and bin on the left) by a spine of rooms across the middle. The spine is the manager's corner office, which sticks out of the left side of the building, and the meeting room. Between them runs a 1-wide aisle (9,4–9,7), and the office door opens right onto it. On the right a 5-wide aisle (16–20,4–7) is the open way round. The work goes in a lap: inbox → keyboards → tests along the back, down the wide aisle to the pipelines, ship at the front-left, and back up to the inbox. The narrow aisle is the short way back. The one manager starts at his desk. He wanders out through his door into the narrow aisle and across the floor, and players can't push him.
+- **Solo:** spawn 1 under the inbox, by the keyboards: 39 steps to the first ship, a loop is 54 (current 32). The floor is big, but the loop is one lap. With the manager in the narrow aisle the way back goes round by the wide aisle (+14, the report's detours).
+- **4 players:** spawns 1 at the back; 2, 3 and 4 in the front half. The back pair (1 and one who goes up) takes and codes; the front pair tests from the back half and deploys and ships. The chokepoint is the narrow aisle by the office door, where empty hands going back meet coded tickets and the manager coming out of his office. The bypass is the 5-wide right aisle. The meeting-room table (reached from the front doors) is a parking spot.
 - **Review:** _human feedback from gate 1_
 
 #### 3-2 Hypergrowth (`hypergrowth`)
 
-**Concept:** 21×10 large. Two floors side by side (islands): ground (inbox, ship, pipelines) and first (keyboards, tests), one lift + a long 1-wide stairwell; manager rides. Gimmick: **Lifts intro**. 1p / 4p: Solo waits for the lift or takes stairs.
+**Concept:** 22×12 large. Two floors as separate islands: ground (inbox, bugs, pipelines, ship) and first floor (keyboards, tests). One lift, a long 1-wide stairwell, and a mail chute down; the manager rides. Gimmick: **Lifts intro + mail chute**. 1p / 4p: Solo waits for the lift or takes the stairs; the chute sends work down.
 
 - **Draft:** `maps/drafts/hypergrowth.txt`
 
   ```text
-  ##II#BB##   ##KK#KK##
-  #.......#   #.......#
-  P.1.....#   #.....3.T
-  P.....LL#   #LL.....T
-  #.....LL#   #LL..M..#
-  S.......X   #.......#
-  S..2....#####....4..#
-  #.#######...#######.#
-  #...................#
-  #####################
+              ##KK#KK###
+              #........#
+              #.....3..T
+  ##II#BB##   H........T
+  #.1...LL#   #LL......#
+  #.....LL#   #LL..M...#
+  X.......#   #.....4..#
+  #.......H   #........#
+  S.......#   ######.###
+  S.2.....##########.#
+  #..................#
+  ####PP##############
   ```
 
-- **Lift pairing:** one lift: the 2×2 cabin on the ground floor (6–7,3–4) ↔ the 2×2 cabin on the first floor (13–14,3–4), facing each other across the shaft. Up to 4 people (or 3 and the manager) fit.
+- **Lift pairing:** one lift: the ground cabin (6–7,4–5) ↔ the first-floor cabin (13–14,4–5), facing each other across the shaft. Holds 4 (or 3 and the manager).
+- **Mail chute:** the first-floor hatch (12,3, in the left wall, used from 13,3) → the ground hatch (8,7, in the right wall, used from 7,7).
 - **Sketch:** ![3-2 Hypergrowth, current left, draft right](images/level-redesign/hypergrowth.svg)
 - **3D render:** ![3-2 Hypergrowth draft in the game](images/level-redesign/hypergrowth-3d.webp)
 - **Report:** (stand-in: no lift, so the stairwell is the only way up)
 
-  | Level                     | Size  | Floor | Stations             | Solo run | Loop | Chokepoints                                           | Reachable |
-  | ------------------------- | ----- | ----- | -------------------- | -------- | ---- | ----------------------------------------------------- | --------- |
-  | 3-2 Hypergrowth (current) | 14×10 | 72    | I2 B2 K2 T2 P2 S4 X1 | 26       | 38   | none                                                  | all       |
-  | 3-2 Hypergrowth (draft)   | 21×10 | 108   | I2 B2 K4 T2 P2 S2 X1 | 68       | 72   | cut 1,7; cut 19,7; cut 2,8–8,8 (7); cut 12,8–18,8 (7) | all       |
+  | Level                     | Size  | Floor | Stations             | Solo run | Loop | Chokepoints                            | Reachable |
+  | ------------------------- | ----- | ----- | -------------------- | -------- | ---- | -------------------------------------- | --------- |
+  | 3-2 Hypergrowth (current) | 14×10 | 72    | I2 B2 K2 T2 P2 S4 X1 | 26       | 38   | none                                   | all       |
+  | 3-2 Hypergrowth (draft)   | 22×12 | 118   | I2 B2 K4 T2 P2 S2 X1 | 62       | 68   | cut 18,8–18,9 (2); cut 8,10–17,10 (10) | all       |
 
-- **Intent:** the company has rented a second floor. The two floors are drawn side by side with the lift shaft (dark, columns 9–11) between them. The ground floor (left) is the front of house: inbox and bug queue on the back wall, pipelines and ship on the left wall, the bin by the shaft. The first floor (right) is engineering: four keyboards on the back wall and the test benches on the right wall. Every feature changes floor twice: up to be coded and tested, down to be deployed and shipped. The lift is the fast way; the stairwell is the slow one: 1 wide, 18 long, along the front of the building from the ground floor's front-left door (1,7) to the first floor's front-right door (19,7), with a 3×2 landing under the shaft (9–11,7–8) where two people can pass. The manager starts upstairs and wanders both floors; he rides the lift too and takes a place in the cabin.
-- **Solo:** spawn 1 under the inbox, 4 steps from the cabin. A loop with the lift is about 38 steps plus two rides (measured with the cabins bridged); by the stairs it is the report's 72, so each stair trip is about 17 steps (~3.5 s) longer than stepping from cabin to cabin. The lift wins when it's there or coming, the stairs when it has just left; the lift cycle gets tuned in the lift phase so a wait costs about as much as the stairs. Nothing ever needs a second player in the cabin.
-- **4 players:** spawns 1 and 2 on the ground floor, 3 and 4 upstairs, so the team splits by floor: the ground pair takes tickets, deploys and ships, the first-floor pair codes and tests (four keyboards, so both can code at once). Tickets ride with someone in both directions. The chokepoint is the cabin itself (everyone queues for it, and the manager takes a place); the bypass is the stairwell, and its landing keeps people going opposite ways from jamming. For review: should a ticket dropped in the cabin ride on its own (a "send it up" trick)? The spec says only what players carry rides.
+- **Intent:** the company has rented the floor above. The ground floor (left, 7×7) is front of house: inbox and bug queue on the back wall, ship and bin on the left wall, pipelines on the front wall. The first floor (right, 8×7, higher up the screen) is engineering: four keyboards on the back wall and the test benches on the right. Between them is the empty shaft. The work goes up by the lift, gets coded and tested, then goes down the mail chute: the tester drops it on the hatch and it slides out by the ground floor's lift. The ground pair deploys and ships it. People still need the lift or the stairs: the stairwell is 1 wide and 13 steps long. It leaves the ground floor at the front-right, runs along the front of the building and turns up into the first floor's front door (18,8). The manager starts upstairs, wanders both floors and takes a place in the cabin.
+- **Solo:** spawn 1 under the inbox, 4 steps from the cabin. With the cabins bridged (a stand-in for the lift) the loop is 56 plus two rides; by the stairs it is the report's 68. The chute saves the solo player carrying the ticket down, but they walk down anyway to deploy. Nothing needs a second player.
+- **4 players:** spawns 1 and 2 on the ground floor, 3 and 4 upstairs, so the team splits by floor. Tickets go up in the lift, the chute brings them down, and nobody has to ride with a finished ticket. The chokepoint is the cabin (everyone going up queues, and the manager takes a place); the bypasses are the stairwell for people and the chute for tickets. Incidents still need a keyboard, so hotfixes go upstairs too.
 - **Review:** _human feedback from gate 1_
 
 #### 3-3 Hot Desking (`hot-desking`)
 
-**Concept:** 22×11 large. Two floors of desk rows, two lifts (express + local), two managers, reviews. Gimmick: Lifts + managers. 1p / 4p: Second lift relieves 4p queue.
+**Concept:** 22×12 large. Three floors: an express lift that skips a floor and a local lift that stops at every floor. The express breaks down for a stretch, a mail chute runs from the top floor to the ground, and the reviews happen in a meeting room. Two managers. Gimmick: **three floors, express lift, lift breakdown**. 1p / 4p: Local lift and stairs always work; the express takes the team.
 
 - **Draft:** `maps/drafts/hot-desking.txt`
 
   ```text
-  ######################
-  #....................#
-  #.#######..#########.#
-  #.....LL####LL.......#
-  I.....LL#  #LL....3..T
-  I.1.....#  #.........T
-  #..CKK..#  #...CKKC..#
-  B......L#  #L........#
-  B..2.M.L#  #L..RR..4.P
-  ##X#SS###  #...M.....P
-             ###########
+  ########   ###TT######
+  #.mmmm.#   #ll.......P
+  #.mRRm.#   #ll..4....P
+  #......#   #LL.......#
+  #.####.#   ###H####.##
+  #....ll#          #.#
+  I.1..ll#   ########.##
+  I......H   #L........#
+  B.....L#   #L..KK..3.#
+  B..2..L#####...KK..M.#
+  #..M.................#
+  ##SS#X################
   ```
 
-- **Lift pairing:** two lifts. **Express** (back): the 2×2 cabin on the ground floor (6–7,3–4) ↔ the 2×2 cabin on the first floor (12–13,3–4); holds 4, longer cycle. **Local** (front): the 1×2 cabin on the ground floor (7,7–8) ↔ the 1×2 cabin on the first floor (12,7–8); holds 2, short cycle.
+- **Floors:** ground (left, 1–6,5–10) with the review meeting room behind it (1–6,1–3); first floor (front right, 12–20,7–10); second floor (back right, 12–20,1–3).
+- **Lift pairing:** **express** (`l`, 2×2): ground (5–6,5–6) ↔ second floor (12–13,1–2), skipping the first. **Local** (`L`, holds 2): ground (6,8–9) ↔ first floor (12,7–8) ↔ second floor (12–13,3), one floor per ride.
+- **Mail chute:** the second-floor hatch (14,4, used from 14,3) → the ground hatch (7,7, used from 6,7), past the first floor.
+- **Breakdown:** the express is out of order for 20 s at about 1:00 and again at about 2:15, telegraphed 5 s ahead.
 - **Sketch:** ![3-3 Hot Desking, current left, draft right](images/level-redesign/hot-desking.svg)
 - **3D render:** ![3-3 Hot Desking draft in the game](images/level-redesign/hot-desking-3d.webp)
-- **Report:** (stand-in: no lifts, so the stairwell is the only way up)
+- **Report:** (stand-in: no lifts, so the stairs are the only way up)
 
-  | Level                     | Size  | Floor | Stations                | Solo run | Loop | Chokepoints                                           | Reachable |
-  | ------------------------- | ----- | ----- | ----------------------- | -------- | ---- | ----------------------------------------------------- | --------- |
-  | 3-3 Hot Desking (current) | 14×10 | 76    | I2 B2 K4 T2 R2 P2 S2 X1 | 23       | 34   | none                                                  | all       |
-  | 3-3 Hot Desking (draft)   | 22×11 | 120   | I2 B2 K4 T2 R2 P2 S2 X1 | 73       | 78   | cut 2,1–8,1 (7); cut 11,1–19,1 (9); cut 1,2; cut 20,2 | all       |
+  | Level                     | Size  | Floor | Stations                | Solo run | Loop | Chokepoints                           | Reachable |
+  | ------------------------- | ----- | ----- | ----------------------- | -------- | ---- | ------------------------------------- | --------- |
+  | 3-3 Hot Desking (current) | 14×10 | 76    | I2 B2 K4 T2 R2 P2 S2 X1 | 23       | 34   | none                                  | all       |
+  | 3-3 Hot Desking (draft)   | 22×12 | 121   | I2 B2 K4 T2 R2 P2 S2 X1 | 67       | 70   | cut 19,4–19,6 (3); cut 7,10–11,10 (5) | all       |
 
-- **Intent:** two floors again, now built round desk rows and with two lifts. The ground floor (left, smaller) is a lobby with a hot-desk row: inbox and bug queue on the left wall, two keyboards in a desk row in the middle (4–5,6, aisles 2 wide on both sides), ship and bin on the front wall. The first floor (right, bigger, one row deeper so the outline steps) has a second desk row with two more keyboards (16–17,6), a review desk with room on both sides (15–16,8), the test benches and the pipelines on the right wall. Keyboards on both floors are the hot desks: whoever is nearest codes. A feature goes inbox → code (either floor) → up → test (and review) → deploy → down → ship. The stairwell is at the back this time: 1 wide, 20 long, from the ground floor's back-left door (1,2) to the first floor's back-right door (20,2), with a landing behind the shaft (9–10,1–2). Two managers, one per floor, ride the lifts too: one in the local cabin fills half of it.
-- **Solo:** spawn 1 between the inbox and the ground-floor keyboards: take, code downstairs, local lift up, test, deploy, local lift down, ship. With the local lift that is about 42 steps plus two rides, with the express about 50, by the stairs the report's 78. Solo gets no reviews (they need two players), so the review desk is only a counter.
-- **4 players:** spawns 1 and 2 downstairs, 3 and 4 upstairs. The ground pair takes, codes and ships; the first-floor pair tests, reviews and deploys, and codes too when the ground keyboards are busy. A review needs two people at the desk, so with 2 players one of them rides up for every review. The chokepoint is the local lift: it is on the short route and holds two. The express is the bypass for the 4-player queue (holds the whole team, a few steps further), the stairwell the slow one, and the managers are what makes the cabins full at the wrong moment.
+- **Intent:** the company now fills three floors.
+  - **Ground floor:** a lobby with the inbox, bug queue, ship and bin. Behind it is the meeting room where reviews happen: walls, a door at each end (1,4) and (6,4), and a review table in the middle.
+  - **First floor:** the hot desks, one 2×2 keyboard island in the middle of the room: whoever is nearest codes.
+  - **Second floor:** test benches and pipelines.
+  - **The route:** a feature goes inbox → down the lobby to the first floor (local lift or the short bridge along the front, 7–11,10) → code → up one floor (local lift or the 1-wide stairs at 19,4–19,6) → test → deploy → down the chute to the lobby → ship. Reviews pull the ticket from the desks back to the ground-floor meeting room.
+  - **The lifts:** the express runs straight from the lobby to the second floor. It is the fast way back up after shipping, and it takes the whole team. The local lift stops everywhere, holds two and is the short hop between floors.
+  - **Breakdown and managers:** twice a round the express breaks down, so everyone crowds the local lift and the stairs. Two managers, one in the lobby and one at the desks, ride the lifts too.
+- **Solo:** spawn 1 by the inbox: take the ticket, cross the bridge to the desks and code, go up the stairs or the local lift, test and deploy. Drop the ticket down the chute, ride the express from the second floor straight down to the lobby, and ship. By the stairs that is the report's 70 a loop; the lifts and the chute shorten it. Solo gets no reviews (they need two players), so the meeting room is only a quiet room with a table. A breakdown takes away only one of the ways down; the local lift and the stairs still work.
+- **4 players:** spawns 1 and 2 in the lobby, 3 at the desks, 4 on the second floor: one or two per floor. The ground pair takes, ships and runs reviews in the meeting room. The desk player codes, and the top player tests, deploys and drops tickets down the chute. Chokepoints: the local lift (holds two, on every short route) and the narrow stairs up to the second floor. Bypasses: the express (only the whole way) and the chute for tickets. The breakdown moves the whole team onto the local lift and the stairs for 20 s, which is when the managers in the cabins hurt most.
 - **Review:** _human feedback from gate 1_
 
 ### Chapter 4: Enterprise
