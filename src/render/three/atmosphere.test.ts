@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { getTile, isSolid } from '../../sim/level';
 import { parseDraftMap } from '../../sim/draftMap';
-import { GARAGE, LEVELS } from '../../sim/levels';
+import { DOWN_THE_HALL, GARAGE, LEVELS, OPEN_PLAN } from '../../sim/levels';
 import draftText from '../../../maps/drafts/garage.txt?raw';
+import openPlanDraft from '../../../maps/drafts/open-plan.txt?raw';
+import scaleUpDraft from '../../../maps/drafts/scale-up.txt?raw';
 import { LEVEL_LOOKS } from '../mapLook';
 import { fitCamera3d, gridToWorld, projectPoint } from '../projection';
 import {
@@ -32,9 +34,17 @@ describe('atmosphereFor', () => {
     expect(atmosphereFor('toString')).toBe(DEFAULT_ATMOSPHERE);
   });
 
+  it('gives open-plan and scale-up their own light', () => {
+    expect(atmosphereFor('open-plan')).toBe(ATMOSPHERES['open-plan']);
+    expect(atmosphereFor('scale-up')).toBe(ATMOSPHERES['scale-up']);
+    expect(atmosphereFor('open-plan')).not.toBe(DEFAULT_ATMOSPHERE);
+    expect(atmosphereFor('scale-up')).not.toBe(DEFAULT_ATMOSPHERE);
+  });
+
   it('leaves every other level on the default', () => {
+    const lit = new Set([GARAGE.id, 'open-plan', 'scale-up']);
     for (const level of LEVELS) {
-      if (level.id === GARAGE.id) continue;
+      if (lit.has(level.id)) continue;
       expect(atmosphereFor(LEVEL_LOOKS[level.id]?.scene)).toBe(DEFAULT_ATMOSPHERE);
     }
   });
@@ -64,6 +74,47 @@ describe('sunPlacement', () => {
       // Low enough for long shadows, high enough not to swallow the floor by the back wall.
       expect(elevation).toBeGreaterThan(30);
       expect(elevation).toBeLessThan(50);
+    }
+  });
+});
+
+describe('morning and evening suns', () => {
+  const maps = [SHIPPED, DRAFT, { width: 16, height: 11 }, { width: 18, height: 12 }];
+  const elevationOf = (scene: string, map: { width: number; height: number }) => {
+    const { position: s, target: t } = sunPlacement(atmosphereFor(scene), map);
+    return {
+      s,
+      t,
+      elevation: Math.atan2(s.y, Math.hypot(s.x - t.x, s.z - t.z)) * (180 / Math.PI),
+    };
+  };
+
+  it('puts the Monday-morning sun high in the front right', () => {
+    for (const map of maps) {
+      const { s, t, elevation } = elevationOf('open-plan', map);
+      expect(s.x).toBeGreaterThan(t.x);
+      expect(s.z).toBeGreaterThan(t.z);
+      expect(elevation).toBeGreaterThan(50);
+      expect(elevation).toBeLessThan(70);
+    }
+  });
+
+  it('puts the evening sun low-ish in the west, still high enough for the back row', () => {
+    for (const map of maps) {
+      const { s, t, elevation } = elevationOf('scale-up', map);
+      expect(s.x).toBeLessThan(t.x);
+      expect(Math.abs(s.x - t.x)).toBeGreaterThan(Math.abs(s.z - t.z));
+      expect(elevation).toBeGreaterThan(35);
+      expect(elevation).toBeLessThan(50);
+    }
+  });
+
+  it('keeps vignettes gentle and lamps along the back wall only', () => {
+    for (const scene of ['open-plan', 'scale-up']) {
+      const a = atmosphereFor(scene);
+      expect(a.vignette?.opacity).toBeLessThanOrEqual(0.36);
+      expect(a.vignette?.inner).toBeCloseTo(0.7);
+      expect(a.lamps?.frontFrom).toBeGreaterThanOrEqual(12);
     }
   });
 });
@@ -131,6 +182,43 @@ describe('lampSpots', () => {
         expect((back[i] ?? 0) - (back[i - 1] ?? 0)).toBeGreaterThan(2.5);
       }
     }
+  });
+
+  it('hangs the open-plan and scale-up lamps along a back wall, on both maps each', () => {
+    const levels = {
+      'open-plan': [OPEN_PLAN.map, parseDraftMap(openPlanDraft)],
+      'scale-up': [DOWN_THE_HALL.map, parseDraftMap(scaleUpDraft)],
+    };
+    for (const [scene, pair] of Object.entries(levels)) {
+      for (const map of pair) {
+        const spots = lampSpots(atmosphereFor(scene), map);
+        expect(spots.length).toBeGreaterThanOrEqual(2);
+        for (const p of spots) {
+          const x = Math.round(p.x);
+          const y = Math.round(p.z);
+          const tile = getTile(map, x, y);
+          expect(tile).not.toBeNull();
+          expect(tile).not.toBe('wall');
+          expect(tile).not.toBe('void');
+          // A wall (or a station on the wall line) right behind it, in the top third.
+          const behind = getTile(map, x, y - 1);
+          expect(behind === null || isSolid(behind)).toBe(true);
+          expect(y).toBeLessThan(map.height * 0.35);
+        }
+      }
+    }
+  });
+
+  it('gives the second unit off the hallway its own row', () => {
+    const map = parseDraftMap(scaleUpDraft);
+    const spots = lampSpots(atmosphereFor('scale-up'), map);
+    // The right unit's back wall is a row lower than the left one's.
+    const right = spots.filter((p) => p.x > map.width / 2);
+    const left = spots.filter((p) => p.x < map.width / 2);
+    expect(right.length).toBeGreaterThan(0);
+    expect(left.length).toBeGreaterThan(0);
+    for (const p of right) expect(p.z).toBeCloseTo(1.5 + 0.55);
+    for (const p of left) expect(p.z).toBeCloseTo(0.5 + 0.55);
   });
 
   it('still places lamps from a size alone', () => {
