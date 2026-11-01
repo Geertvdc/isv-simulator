@@ -12,7 +12,7 @@ Read from the fixed front camera (top of screen = back of the level):
 
 - **Back (top of screen): the warehouse itself.** The level's back wall is the factory's wall: red brick with tall arched windows (warm light in the other tenants' windows), iron tie plates, a hoist beam, and faded painted lettering ("… & SONS BISCUIT WORKS"). Low enough never to hide a back-wall station.
 - **Front (bottom of screen): the quay, a thin strip.** Cobbles, an iron mooring bollard, the stone edge of the canal and dark water at the very bottom, with the bow of a moored narrowboat. The ship hatch is the loading-bay door; a courier's cargo bike waits at it. Everything low: the camera shows only about 1.2 tiles in front of the slab.
-- **The inbox** is the door from the shared entrance hall (pigeonholes, the post). On the shipped map it is on the **front** edge, on the draft on the **back** edge: place it from the inbox tiles.
+- **The inbox** is the door from the shared entrance hall (pigeonholes, the post). It is on the back edge on both maps; place it from the inbox tiles.
 - **Between the two rooms (the void tiles by the hallway): a courtyard light well.** Cobbles, a tree in a big planter, a picnic table, a cargo bike, string lights. This is where the maps differ most; it must fill whatever void shape the map has.
 - **Left: the yard.** A coffee van with a short queue (scene people, small and posed), stacked pallets, a skip.
 - **Right: the next warehouse.** Its brick end wall with a loading dock, pallets and kegs from the brewery, a bike rack.
@@ -35,7 +35,7 @@ Read from the fixed front camera (top of screen = back of the level):
 
 The rules in the [level-environment skill](../../.agents/skills/level-environment/SKILL.md) hold, plus:
 
-- **Both maps:** the shipped `maps/level-03-scale-up.txt` (16×9, one room with a void notch top right, inbox and ship both on the front edge) and the draft `maps/drafts/scale-up.txt` (20×9, two rooms joined by a hallway with void round it, `?draft=scale-up`). Place everything from the outline, the void tiles and the ship and inbox tiles.
+- **Both maps:** the shipped `maps/level-03-scale-up.txt` (14×10, one room with an inner wall, inbox at the back, ship on the **right** edge, no void) and the draft `maps/drafts/scale-up.txt` (21×9, two rooms joined by a hallway with void round it, inbox at the back, ship at the front, `?draft=scale-up`). Place everything from the outline, the void tiles and the ship and inbox tiles.
 - Other levels keep their look: the new wall and floor themes are used only by `scale-up`.
 
 ## Work split (round 1, both levels)
