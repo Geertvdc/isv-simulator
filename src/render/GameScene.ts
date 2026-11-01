@@ -108,6 +108,8 @@ export interface GameSceneOptions {
   /** `?demo`: a kiosk for a booth. Starts in the demo, and every menu goes back to it when left alone. */
   kiosk: boolean;
   practiceLevel?: Level;
+  /** `?draft=` with `?scene=`: a redesign draft shown in place of the scene's level of the same id. */
+  draftLevel?: Level;
   online: OnlineOptions | null;
   /** Draws the level and rounds: `createThreeRoundRenderer`, passed in by `main.ts`. */
   roundRenderer: RoundRendererFactory;
@@ -233,7 +235,7 @@ export class GameScene extends Phaser.Scene {
   create(data: SceneData = {}): void {
     this.mapLevelIndex = data.levelIndex ?? this.mapLevelIndex;
     // A scene may be on a lab level, outside the campaign.
-    const sceneLevel = this.options.scene ? levelById(this.options.scene.levelId) : undefined;
+    const sceneLevel = this.options.scene ? this.sceneLevel(this.options.scene) : undefined;
     const level = sceneLevel ?? this.options.practiceLevel ?? LEVELS[this.mapLevelIndex];
     if (!level) throw new Error(`No level ${this.mapLevelIndex}`);
     this.map = level.map;
@@ -561,6 +563,12 @@ export class GameScene extends Phaser.Scene {
     this.hints = demo ? [] : startHints(level.id, this.options.save);
   }
 
+  /** The scene's level, or the draft from `?draft=` standing in for it. */
+  private sceneLevel(scene: Scene): Level | undefined {
+    const draft = this.options.draftLevel;
+    return draft?.id === scene.levelId ? draft : levelById(scene.levelId);
+  }
+
   /** The scene from `?scene=` as a round already playing: no title, lobby or countdown. */
   private startScene(scene: Scene): void {
     const ids = Array.from({ length: scene.players }, (_, i) => i + 1);
@@ -570,7 +578,7 @@ export class GameScene extends Phaser.Scene {
     };
     this.flow.levelIndex = this.mapLevelIndex;
     this.flow.screen = 'playing';
-    this.loop = new GameLoop(sceneState(scene));
+    this.loop = new GameLoop(sceneState(scene, this.sceneLevel(scene)));
     this.sceneStartMs = this.time.now;
     window.isvScene = this.sceneHandle;
   }

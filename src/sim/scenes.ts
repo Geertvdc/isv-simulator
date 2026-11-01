@@ -194,9 +194,11 @@ export function pressOnce(id: PlayerId) {
 
 // ---- The game a scene starts from ----
 
-/** A fresh game of the scene's level with nothing arriving on its own; managers stand still. */
-export function sceneState(scene: Scene): GameState {
-  const level = levelById(scene.levelId);
+/**
+ * A fresh game of the scene's level (or `level`, a stand-in such as a
+ * redesign draft) with nothing arriving on its own; managers stand still.
+ */
+export function sceneState(scene: Scene, level = levelById(scene.levelId)): GameState {
   if (!level) throw new Error(`Scene ${scene.id}: no level ${scene.levelId}`);
   const ids = Array.from({ length: scene.players }, (_, i) => i + 1);
   const state = createGame(level, 1, ids, scene.roleByPlayer);
