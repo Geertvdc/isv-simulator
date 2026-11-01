@@ -134,16 +134,19 @@ interface SceneData {
 
 /** The first round's seed; every restart moves on to the next one. */
 const FIRST_SEED = 1;
-/** The level's look, with `?walls=` and `?floor=` overriding it to preview others. */
+/** The level's look, with `?walls=`, `?floor=` and `?scene=` overriding it to preview others. */
 function mapLook(levelId: string): MapLook {
   const params = new URLSearchParams(window.location.search);
   const look = LEVEL_LOOKS[levelId] ?? DEFAULT_LOOK;
+  const scene = params.get('scene');
   return {
     walls: WALL_THEMES.find((t) => t === params.get('walls')) ?? look.walls,
     floor: FLOOR_THEMES.find((t) => t === params.get('floor')) ?? look.floor,
     // `?setting=<chapter id>` previews another chapter's surroundings.
     setting:
       params.get('setting') ?? look.setting ?? chapterIdOf(LEVEL_IDS.indexOf(levelId)) ?? undefined,
+    // `?scene=<id>` previews a hand-built world on another level, `?scene=none` turns it off.
+    scene: scene === null ? look.scene : scene === 'none' ? undefined : scene,
   };
 }
 
