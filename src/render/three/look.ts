@@ -118,8 +118,8 @@ export const FLOOR_COLORS: Readonly<Record<FloorTheme, readonly [number, number]
   // A warm teal: blue carpet sank into the backdrop.
   carpet: [0x3f8a80, 0x3a8078],
   parquet: [COLOR.wood, 0xab7947],
-  // Sealed garage concrete, a little warm; the second is the expansion joints.
-  slab: [0x9d9c97, 0x5a5853],
+  // Sealed garage concrete, a touch cool; the second is the expansion joints, thin and pale.
+  slab: [0xa3a39f, 0x75736d],
 };
 
 /** Wall colors per theme: face and top. Caps stay darker than stations, so the eye goes to the stations. */
@@ -128,7 +128,7 @@ export const WALL_COLORS: Readonly<Record<WallTheme, { face: number; top: number
   wood: { face: 0x9a5a32, top: 0x6b4529 },
   glass: { face: COLOR.glassClear, top: 0x7d8c9a },
   // Painted cinder block over a grey-green dado, capped with concrete coping.
-  garage: { face: 0xb9b19f, top: 0x6f6a62 },
+  garage: { face: 0xc4c0b4, top: 0x8d8b86 },
 };
 
 /** Marks the room's warm lamps, which only `medium` and `high` quality light (see `Stage`). */

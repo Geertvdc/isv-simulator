@@ -1,9 +1,11 @@
+import * as THREE from 'three';
 import type { FloorTheme, WallTheme } from '../mapLook';
 import { type Model, ModelBuilder, tint } from './kit';
-import { FRONT_WALL_HEIGHT, STATION_HEIGHT, WALL_HEIGHT } from './layout';
+import { FRONT_WALL_HEIGHT, SLAB_DEPTH, STATION_HEIGHT, WALL_HEIGHT } from './layout';
 import { FLOOR_COLORS, PALETTE, WALL_COLORS } from './look';
 import { COLOR } from './palette';
 import { type WallPiece, tileHash } from '../mapShape';
+import { SLAB_WEAR } from './garageRoom';
 
 /**
  * The room round the stations, built in code like the rest of the office
@@ -430,19 +432,24 @@ export function floorModel(theme: FloorTheme, look = 0): Model {
 // ---- The garage (wall theme `garage`, floor theme `slab`) ----
 
 /** One course of cinder block, and the top of the grey-green dado painted along the bottom. */
-const BLOCK_COURSE = 0.19;
+const BLOCK_COURSE = 0.2;
+/** Head joints: blocks a third of a tile long, every other course offset by half a block. */
+const BLOCK_LENGTH = 1 / 3;
 const DADO_HEIGHT = 0.34;
 const DADO = 0x6c7c74;
 /** Paint on the block wears through to this. */
 const BARE_BLOCK = 0x8f8c84;
+/** How far the coping overhangs the block on every side. */
+const COPING_LIP = 0.03;
 /** Looks a garage wall comes in: clean, scuffed, chipped, water-stained. */
 export const GARAGE_WALL_LOOKS = 4;
 
 /**
  * A garage wall: painted cinder block in courses with staggered joints, a
- * grey-green dado along the bottom and a timber top plate. The courses and
- * joints run round the front and both sides, so side walls show them too;
- * `look` adds wear on the same faces.
+ * grey-green dado along the bottom and concrete coping on top with a lip.
+ * The courses and joints run round all four faces, so side walls and the
+ * outside show them too; `look` adds wear on the same faces and shades the
+ * coping stone a little, so a run of wall isn't one flat slab.
  */
 function garageWallModel(piece: WallPiece, look: number): Model {
   const h = piece === 'wall-front' ? FRONT_WALL_HEIGHT : WALL_HEIGHT;
@@ -453,55 +460,79 @@ function garageWallModel(piece: WallPiece, look: number): Model {
   const b = new ModelBuilder();
   b.box(1, body, 1, face, { at: [0, body / 2, 0] }, 0);
   b.box(1.006, dado, 1.006, DADO, { at: [0, dado / 2, 0] }, 0);
-  if (dado < body) b.box(1.01, 0.016, 1.01, tint(DADO, -0.3), { at: [0, dado, 0] }, 0);
-  const mortar = (y: number) => (y < dado ? tint(DADO, -0.22) : tint(face, -0.14));
-  // Bed joints all round, then head joints staggered course by course on the faces that show.
+  if (dado < body) b.box(1.012, 0.018, 1.012, tint(DADO, -0.3), { at: [0, dado, 0] }, 0);
+  const mortar = (y: number) => (y < dado ? tint(DADO, -0.2) : tint(face, -0.2));
+  // Bed joints all round, then head joints staggered course by course on all four faces.
   for (let y = BLOCK_COURSE; y < body - 0.03; y += BLOCK_COURSE) {
-    if (Math.abs(y - dado) > 0.02) b.box(1.012, 0.01, 1.012, mortar(y), { at: [0, y, 0] }, 0);
+    if (Math.abs(y - dado) > 0.03) b.box(1.014, 0.02, 1.014, mortar(y), { at: [0, y, 0] }, 0);
   }
   for (let i = 0, y0 = 0; y0 < body - 0.03; i++, y0 += BLOCK_COURSE) {
     const hh = Math.min(BLOCK_COURSE, body - y0);
     const mid = y0 + hh / 2;
-    for (const o of i % 2 ? [0] : [-0.495, 0.495]) {
-      b.box(0.01, hh, 0.01, mortar(mid), { at: [o, mid, 0.504] }, 0);
-      for (const s of [-1, 1]) b.box(0.01, hh, 0.01, mortar(mid), { at: [s * 0.504, mid, o] }, 0);
+    const shift = i % 2 ? BLOCK_LENGTH / 2 : 0;
+    for (let u = -0.5 + BLOCK_LENGTH - shift; u < 0.49; u += BLOCK_LENGTH) {
+      if (u < -0.49) continue;
+      for (const s of [-1, 1]) {
+        b.box(0.018, hh, 0.014, mortar(mid), { at: [u, mid, s * 0.503] }, 0);
+        b.box(0.014, hh, 0.018, mortar(mid), { at: [s * 0.503, mid, u] }, 0);
+      }
     }
   }
-  // Concrete coping on top, a little proud of the face, laid in stones.
-  b.box(1, cap, 1.03, top, { at: [0, h - cap / 2, 0] }, 0);
-  for (const x of [-0.495, 0.495])
-    b.box(0.01, 0.004, 1.03, tint(top, -0.3), { at: [x, h + 0.001, 0] }, 0);
-  for (const z of [-0.495, 0.495])
-    b.box(1, 0.004, 0.012, tint(top, -0.3), { at: [0, h + 0.001, z] }, 0);
-  b.box(1, 0.012, 0.012, tint(top, -0.4), { at: [0, h - cap, 0.512] }, 0);
-  // Wear on the front and both sides: one look each.
+  // Concrete coping on top, overhanging every face, a dark line in the shadow of its lip.
+  const w = 1 + COPING_LIP * 2;
+  b.box(1.03, 0.014, 1.03, tint(face, -0.45), { at: [0, body - 0.007, 0] }, 0);
+  b.box(w, cap, w, tint(top, -0.12), { at: [0, h - cap / 2, 0] }, 0);
+  // Each tile one stone in its own shade, a joint at its edges.
+  const stone = tint(top, [0, 0.05, -0.04, 0.025][look] ?? 0);
+  b.box(1, 0.004, 1, stone, { at: [0, h + 0.002, 0] }, 0);
+  b.box(0.014, 0.004, w, tint(top, -0.3), { at: [-0.5, h + 0.003, 0] }, 0);
+  b.box(w, 0.004, 0.014, tint(top, -0.3), { at: [0, h + 0.003, -0.5] }, 0);
+  // Weathering on the stone: grime flecks, and a chipped corner on some.
+  for (let i = 0; i < 4; i++) {
+    const hh = tileHash(i + 3, look + 17);
+    b.box(
+      0.03 + (hh % 5) * 0.012,
+      0.004,
+      0.025 + ((hh >> 3) % 4) * 0.01,
+      tint(top, -0.14),
+      {
+        at: [((hh >> 5) % 80) / 100 - 0.4, h + 0.0035, ((hh >> 11) % 80) / 100 - 0.4],
+        rot: [0, ((hh >> 7) % 6) * 0.5, 0],
+      },
+      0,
+    );
+  }
+  if (look % 2 === 1)
+    b.box(0.08, 0.004, 0.06, tint(top, -0.22), { at: [0.44, h + 0.0035, 0.45] }, 0);
+  // Wear on all four faces: one look each.
   const faces: [number, number, number][] = [
-    [0, 0.507, 0],
-    [-0.507, 0, Math.PI / 2],
-    [0.507, 0, Math.PI / 2],
+    [0, 0.51, 0],
+    [0, -0.51, 0],
+    [-0.51, 0, Math.PI / 2],
+    [0.51, 0, Math.PI / 2],
   ];
   for (const [fx, fz, turn] of faces) {
-    // Along the face: x on the front, z on the sides.
+    // Along the face: x on the front and back, z on the sides.
     const at = (u: number, y: number): [number, number, number] => (turn ? [fx, y, u] : [u, y, fz]);
     const rot: [number, number, number] = [0, turn, 0];
     if (look === 1) {
       // Scuffs on the dado: bikes, the mower, the founders' chairs.
-      for (const [u, y, w] of [
+      for (const [u, y, ww] of [
         [-0.22, 0.08, 0.2],
         [0.18, 0.13, 0.14],
         [0.3, 0.05, 0.1],
       ] as const)
-        if (y < dado) b.box(w, 0.035, 0.004, tint(DADO, -0.35), { at: at(u, y), rot }, 0);
+        if (y < dado) b.box(ww, 0.035, 0.004, tint(DADO, -0.35), { at: at(u, y), rot }, 0);
     } else if (look === 2 && body > dado + 0.2) {
       // Paint chipped off the block.
-      for (const [u, y, w, hh] of [
-        [-0.25, dado + 0.22, 0.09, 0.06],
-        [0.2, dado + 0.45, 0.06, 0.05],
+      for (const [u, y, ww, hh] of [
+        [-0.25, dado + 0.24, 0.09, 0.06],
+        [0.2, dado + 0.47, 0.06, 0.05],
         [0.05, dado + 0.1, 0.05, 0.035],
       ] as const)
-        b.box(w, hh, 0.004, BARE_BLOCK, { at: at(u, y), rot }, 0);
+        b.box(ww, hh, 0.004, BARE_BLOCK, { at: at(u, y), rot }, 0);
     } else if (look === 3 && body > dado + 0.2) {
-      // A water stain running down from the top plate.
+      // A water stain running down from under the coping.
       const len = body - dado - 0.1;
       b.box(0.14, len, 0.004, tint(face, -0.12), { at: at(0.12, body - len / 2), rot }, 0);
       b.box(0.07, 0.12, 0.004, tint(face, -0.12), { at: at(0.1, body - len - 0.05), rot }, 0);
@@ -512,151 +543,319 @@ function garageWallModel(piece: WallPiece, look: number): Model {
 
 /** Expansion joints are cut every this many tiles. */
 export const SLAB_JOINT_EVERY = 3;
-/** Wear a slab tile comes in: none, scuffs, a patch, a crack, paint spills. */
-export const SLAB_WEAR = 5;
 
 /**
- * The look of the slab tile at (x, y) for a hash `hash`: joint bits (1 on
- * its west edge, 2 on its north edge) and the wear in the rest, about half
- * the tiles bare.
+ * The look of the slab tile at (x, y) with wear `wear`: joint bits (1 on its
+ * west edge, 2 on its north edge) and the wear in the rest.
  */
-export function slabLook(x: number, y: number, hash: number): number {
+export function slabLook(x: number, y: number, wear: number): number {
   const joints = (x % SLAB_JOINT_EVERY === 0 ? 1 : 0) | (y % SLAB_JOINT_EVERY === 0 ? 2 : 0);
-  const roll = hash % 10;
-  const wear = roll < 5 ? 0 : 1 + ((roll - 5) % (SLAB_WEAR - 1));
   return joints | (wear << 2);
 }
 
 /**
- * A tile of a garage's sealed concrete slab, no grout: saw-cut expansion
- * joints on its west and north edges when `look` says so (see `slabLook`),
- * and wear on top: boot and tyre scuffs, an old patch, a hairline crack,
- * paint spilt from the shelf.
+ * A slab tile's brightness: each poured slab (between expansion joints) a
+ * shade lighter or darker, up to `SLAB_TONE`, and every tile on it a hair off that.
+ */
+export function slabTone(x: number, y: number, salt: number): number {
+  const sx = Math.floor(x / SLAB_JOINT_EVERY);
+  const sy = Math.floor(y / SLAB_JOINT_EVERY);
+  const slab = ((tileHash(sx + 40, sy + 40) ^ salt) >>> 0) % 1001;
+  const tile = (tileHash(x, y) >>> 5) % 101;
+  return 1 + (slab / 1000 - 0.5) * 2 * SLAB_TONE + (tile / 100 - 0.5) * 0.02;
+}
+const SLAB_TONE = 0.04;
+
+/**
+ * A tile of a garage's sealed concrete slab, no grout: thin saw-cut
+ * expansion joints on its west and north edges when `look` says so (see
+ * `slabLook`), and its wear on top (see `SLAB_WEAR`).
  */
 function slabFloorModel(look: number): Model {
   const [a, joint] = FLOOR_COLORS.slab;
   const b = new ModelBuilder();
   b.box(1, 0.012, 1, a, { at: [0, -0.006, 0] }, 0);
   // Decals lie just over the top, the joints a hair under the stains.
-  const mark = (w: number, d: number, color: number, x: number, z: number, turn = 0) =>
-    b.box(w, 0.002, d, color, { at: [x, 0.0005, z], rot: [0, turn, 0] }, 0);
-  if (look & 1) mark(0.028, 1, joint, -0.5, 0);
-  if (look & 2) mark(1, 0.028, joint, 0, -0.5);
+  const mark = (w: number, d: number, color: number, x: number, z: number, turn = 0, y = 0.0005) =>
+    b.box(w, 0.002, d, color, { at: [x, y, z], rot: [0, turn, 0] }, 0);
+  if (look & 1) mark(0.016, 1, joint, -0.5, 0);
+  if (look & 2) mark(1, 0.016, joint, 0, -0.5);
   switch (look >> 2) {
-    case 1:
+    case SLAB_WEAR.scuffs:
       for (const [x, z, w, turn] of [
         [-0.15, 0.1, 0.34, 0.4],
         [0.05, 0.18, 0.26, 0.5],
         [0.22, -0.2, 0.18, -0.9],
+        [-0.3, -0.25, 0.14, 1.2],
       ] as const)
-        mark(w, 0.025, tint(a, -0.2), x, z, turn);
+        mark(w, 0.022, tint(a, -0.16), x, z, turn, 0.001);
       break;
-    case 2:
-      mark(0.44, 0.32, tint(a, 0.08), 0.1, -0.05, 0.12);
+    case SLAB_WEAR.patch:
+      mark(0.44, 0.32, tint(a, 0.06), 0.1, -0.05, 0.12, 0.001);
+      mark(0.46, 0.012, tint(a, -0.2), 0.1, -0.05 - 0.16, 0.12, 0.0012);
       break;
-    case 3: {
-      // A hairline crack wandering across.
-      let [x, z] = [-0.42, -0.1];
+    case SLAB_WEAR.crack: {
+      let [x, z] = [-0.5, -0.12];
       for (const [dx, dz] of [
         [0.2, 0.08],
         [0.16, -0.06],
-        [0.22, 0.1],
-        [0.18, 0.04],
+        [0.14, 0.12],
+        [0.22, 0.04],
+        [0.18, 0.1],
+        [0.1, -0.04],
       ] as const) {
         mark(
           Math.hypot(dx, dz),
-          0.012,
-          tint(a, -0.42),
+          0.016,
+          tint(a, -0.45),
           x + dx / 2,
           z + dz / 2,
           -Math.atan2(dz, dx),
+          0.001,
         );
         x += dx;
         z += dz;
       }
+      // A short branch off it.
+      mark(0.18, 0.012, tint(a, -0.4), -0.06, 0.06, -1.1, 0.001);
       break;
     }
-    case 4:
+    case SLAB_WEAR.drips:
       for (const [x, z, r, color] of [
-        [0.18, 0.12, 0.07, COLOR.porcelain],
-        [0.28, 0.24, 0.03, COLOR.porcelain],
-        [-0.22, -0.18, 0.045, COLOR.dustyBlue],
+        [0.18, 0.12, 0.06, COLOR.porcelain],
+        [0.28, 0.24, 0.025, COLOR.porcelain],
+        [0.08, 0.3, 0.018, COLOR.porcelain],
+        [-0.22, -0.18, 0.04, COLOR.dustyBlue],
+        [-0.3, -0.06, 0.02, COLOR.dustyBlue],
       ] as const)
-        b.cylinder(r, r, 0.002, color, { at: [x, 0.0005, z] }, 14);
+        b.cylinder(r, r, 0.002, tint(color, -0.12), { at: [x, 0.001, z] }, 14);
+      // A boot print through the white.
+      mark(0.07, 0.15, tint(a, -0.14), 0.32, -0.02, 0.2, 0.001);
       break;
+    case SLAB_WEAR.tracks:
+    case SLAB_WEAR.tracksFaint: {
+      // Rubber worn into the sealer: soft-edged, a little apart from dead straight.
+      const strong = look >> 2 === SLAB_WEAR.tracks;
+      for (const [x, turn] of [
+        [-0.3, 0.03],
+        [0.3, -0.02],
+      ] as const) {
+        mark(0.2, 1, tint(a, strong ? -0.05 : -0.03), x, 0, turn, 0.001);
+        mark(0.12, 1, tint(a, strong ? -0.09 : -0.05), x, 0, turn, 0.0012);
+      }
+      break;
+    }
+    case SLAB_WEAR.drain: {
+      // A round cast-iron drain, the floor dished a shade darker round it.
+      b.cylinder(0.24, 0.24, 0.002, tint(a, -0.1), { at: [0, 0.001, 0] }, 24);
+      b.cylinder(0.13, 0.13, 0.004, 0x45464a, { at: [0, 0.002, 0] }, 20);
+      for (let i = -2; i <= 2; i++)
+        b.box(0.022, 0.004, 0.2 - Math.abs(i) * 0.03, 0x1f2023, { at: [i * 0.045, 0.0035, 0] }, 0);
+      break;
+    }
   }
   return b.build();
 }
 
 /**
- * The oil stain where the family car stood, about a tile and a half across:
- * a dark satin core in overlapping blots, a paler soaked ring round it, and
- * drips toward the door (+z).
+ * The oil stain where the family car stood, just inside the door: about a
+ * tile across, a translucent-looking dark core (the floor showing through
+ * it) in overlapping blots, a faint blue-violet sheen ring and drips toward
+ * the door (+z).
  */
 export function oilStainModel(): Model {
   const b = new ModelBuilder();
+  // The core is the floor under 45% of 0x2c2b30, mixed here, so it needs no transparent material.
+  const floor = FLOOR_COLORS.slab[0];
+  const oil = mix(floor, 0x2c2b30, 0.45);
   const blots: readonly [number, number, number][] = [
-    [0, 0, 0.34],
-    [0.3, 0.1, 0.24],
-    [-0.28, -0.04, 0.26],
-    [0.08, -0.24, 0.2],
-    [-0.1, 0.26, 0.18],
+    [0, 0, 0.24],
+    [0.2, 0.08, 0.16],
+    [-0.19, -0.03, 0.17],
+    [0.05, -0.17, 0.14],
+    [-0.07, 0.18, 0.12],
   ];
   for (const [x, z, r] of blots)
-    b.cylinder(r + 0.12, r + 0.12, 0.003, 0x5e5d5a, { at: [x, 0.0015, z] }, 24);
-  for (const [x, z, r] of blots) b.cylinder(r, r, 0.003, 0x262628, { at: [x, 0.003, z] }, 24);
+    b.cylinder(r + 0.05, r + 0.05, 0.002, mix(floor, 0x5a5878, 0.32), { at: [x, 0.001, z] }, 24);
+  for (const [x, z, r] of blots) b.cylinder(r, r, 0.002, oil, { at: [x, 0.002, z] }, 24);
+  b.cylinder(0.12, 0.12, 0.002, mix(floor, 0x2c2b30, 0.6), { at: [0.02, 0.0025, 0.0] }, 20);
   for (const [x, z, r] of [
-    [0.16, 0.62, 0.06],
-    [-0.24, 0.7, 0.04],
-    [0.02, 0.86, 0.03],
-    [0.5, -0.3, 0.05],
+    [0.12, 0.38, 0.04],
+    [-0.16, 0.42, 0.03],
+    [0.02, 0.48, 0.02],
   ] as const)
-    b.cylinder(r, r, 0.003, 0x2a2a2b, { at: [x, 0.003, z] }, 12);
+    b.cylinder(r, r, 0.002, oil, { at: [x, 0.002, z] }, 12);
   return b.build();
 }
 
+/** `a` mixed `t` of the way toward `b`, per channel. */
+function mix(a: number, b: number, t: number): number {
+  const ch = (shift: number) => {
+    const x = (a >> shift) & 0xff;
+    const y = (b >> shift) & 0xff;
+    return Math.round(x + (y - x) * t) << shift;
+  };
+  return ch(16) | ch(8) | ch(0);
+}
+
 /** The steel of the roll-up doors and their trim. */
-const DOOR_STEEL = 0xe0dcd0;
+const DOOR_STEEL = 0xe8e4da;
 const TRIM = 0xe2dccd;
+/** The dark timber header over a door, and the garage door's steel track. */
+const HEADER = 0x3a3634;
+const TRACK = 0x7d8084;
 
 /**
- * The bottom of a closed sectional garage door, standing in for a front
- * wall: ribbed white steel at the wall's outer face with a rubber seal, the
- * cut top showing the panel's edge. `handle` puts the lift handle at its +x
- * edge (the middle of a two-tile door).
+ * One tile of the closed sectional garage door, standing in for a front wall:
+ * its outside face fills the band the camera sees, from the wall's top down
+ * the foundation to the driveway, white steel panels with three ribs across,
+ * a dark header on top. The door's track runs back into the room from its
+ * outer edge, at wall-top height and inside its own tile. `first` is the
+ * door's left tile: the lift handle at its +x edge (the middle of a two-tile
+ * door) and its track at −x; the other tile has its track at +x.
  */
-export function garageDoorModel(handle: boolean): Model {
+export function garageDoorModel(first: boolean): Model {
   const b = new ModelBuilder();
-  const h = FRONT_WALL_HEIGHT + 0.14;
-  const z = 0.3;
-  b.box(1, h, 0.08, DOOR_STEEL, { at: [0, h / 2, z] }, 0);
-  b.box(1, 0.03, 0.09, 0x2b2b2b, { at: [0, 0.015, z] }, 0);
-  for (const y of [0.12, 0.24])
-    b.box(1, 0.014, 0.084, tint(DOOR_STEEL, -0.3), { at: [0, y, z] }, 0);
-  b.box(1, 0.012, 0.09, tint(DOOR_STEEL, 0.4), { at: [0, h - 0.006, z] }, 0);
-  // The track the door runs in, along its inner side.
-  b.box(1, 0.02, 0.05, COLOR.steel, { at: [0, 0.01, z - 0.12] }, 0);
-  if (handle) {
-    b.box(0.16, 0.035, 0.03, COLOR.graphite, { at: [0.5, 0.17, z + 0.055] }, 0);
-    b.box(0.08, 0.06, 0.012, COLOR.chrome, { at: [0.5, 0.17, z + 0.044] }, 0);
+  const top = FRONT_WALL_HEIGHT;
+  const bottom = -SLAB_DEPTH - 0.013;
+  const h = top - bottom;
+  const z = 0.47;
+  const face = z + 0.035;
+  b.box(1, h, 0.07, DOOR_STEEL, { at: [0, bottom + h / 2, z] }, 0);
+  // Three ribs make four sections; a raised panel in each, two per tile.
+  for (let i = 1; i < 4; i++) {
+    const y = bottom + (h * i) / 4;
+    b.box(1, 0.018, 0.012, tint(DOOR_STEEL, -0.32), { at: [0, y, face], rot: [0, 0, 0] }, 0);
+    b.box(1, 0.008, 0.014, tint(DOOR_STEEL, 0.25), { at: [0, y - 0.014, face] }, 0);
   }
+  for (let i = 0; i < 4; i++) {
+    const y = bottom + (h * (i + 0.5)) / 4;
+    for (const x of [-0.25, 0.25])
+      b.box(0.4, h / 4 - 0.07, 0.01, tint(DOOR_STEEL, -0.06), { at: [x, y, face + 0.002] }, 0);
+  }
+  b.box(1, 0.03, 0.08, 0x2b2b2b, { at: [0, bottom + 0.015, z] }, 0);
+  // The header over it, proud of the face, a lip of shadow under it.
+  b.box(1, 0.06, 0.12, HEADER, { at: [0, top + 0.03, z - 0.01] }, 0);
+  b.box(1, 0.012, 0.012, tint(HEADER, -0.4), { at: [0, top - 0.006, face + 0.01] }, 0);
+  if (first) {
+    b.box(0.18, 0.04, 0.03, COLOR.graphite, { at: [0.5, bottom + 0.16, face + 0.015] }, 0);
+    b.box(0.09, 0.07, 0.012, COLOR.chrome, { at: [0.5, bottom + 0.16, face + 0.006] }, 0);
+    b.box(0.04, 0.06, 0.012, 0x2b2b2b, { at: [0.5, bottom + 0.32, face + 0.006] }, 0);
+  }
+  // The track: up the door's outer edge and back into the room along the wall top.
+  const x = first ? -0.46 : 0.46;
+  b.box(0.04, top, 0.04, TRACK, { at: [x, top / 2, z - 0.06] }, 0);
+  b.box(0.04, 0.04, 0.9, TRACK, { at: [x, top + 0.02, -0.02] }, 0);
+  b.box(0.06, 0.06, 0.06, tint(TRACK, -0.3), { at: [x, top + 0.02, -0.46] }, 0);
   return b.build();
 }
 
 /**
  * One side of the open roll-up door at the ship hatch: a painted wooden jamb
  * with the door's steel track inside it and a bump guard in hazard stripes,
- * standing on the pier just beside the opening. Thin and only knee high on a
+ * standing on the pier just beside the opening, the track running back
+ * along the pier's top (never over the floor). Thin and only knee high on a
  * developer, so it hides nothing behind. Symmetric, so one model does both sides.
  */
 export function doorJambModel(): Model {
   const b = new ModelBuilder();
-  const h = 0.62;
+  const h = DOOR_JAMB_HEIGHT;
   const z = 0.3;
   b.box(0.12, h, 0.14, TRIM, { at: [0, h / 2, z] }, 0.012);
-  b.box(0.05, h + 0.02, 0.05, COLOR.steel, { at: [0, (h + 0.02) / 2, z - 0.1] }, 0);
+  b.box(0.05, h + 0.02, 0.05, TRACK, { at: [0, (h + 0.02) / 2, z - 0.1] }, 0);
   for (let i = 0; i < 6; i++)
     b.box(0.13, 0.05, 0.15, i % 2 ? COLOR.gold : PALETTE.ink, { at: [0, 0.2 + i * 0.05, z] }, 0);
+  b.box(0.05, 0.05, 0.7, TRACK, { at: [0, h - 0.005, z - 0.45] }, 0);
+  b.box(0.07, 0.07, 0.07, tint(TRACK, -0.3), { at: [0, h - 0.005, z - 0.79] }, 0);
+  return b.build();
+}
+/** How tall the open door's jambs stand, and the header between them. */
+const DOOR_JAMB_HEIGHT = 0.62;
+const DOOR_HEADER_HEIGHT = 0.54;
+
+/**
+ * Over the open roll-up door, `span` wide between the jambs' centers: a dark
+ * timber header on the jambs with the door rolled up on its drum above it,
+ * ribbed white steel in end brackets. Built round the opening's middle, at
+ * the jambs' line.
+ */
+export function doorHeaderModel(span: number): Model {
+  const b = new ModelBuilder();
+  // Low and just outside the wall line, so from the camera it passes in front of the station's face, never its top.
+  const y = DOOR_HEADER_HEIGHT;
+  const z = 0.62;
+  b.box(span + 0.14, 0.06, 0.12, HEADER, { at: [0, y + 0.03, z] }, 0.01);
+  // Brackets back to the jambs.
+  for (const s of [-1, 1])
+    b.box(0.08, 0.05, z - 0.3, HEADER, { at: [s * (span / 2), y + 0.025, (z + 0.3) / 2] }, 0);
+  const len = span - 0.1;
+  const r = 0.06;
+  const cy = y + 0.06 + r;
+  b.cylinder(r, r, len, DOOR_STEEL, { at: [0, cy, z - 0.02], rot: [0, 0, Math.PI / 2] }, 16);
+  for (let i = 1; i < 6; i++)
+    b.cylinder(
+      r + 0.004,
+      r + 0.004,
+      0.012,
+      tint(DOOR_STEEL, -0.3),
+      { at: [-len / 2 + (len * i) / 6, cy, z - 0.02], rot: [0, 0, Math.PI / 2] },
+      16,
+    );
+  for (const s of [-1, 1])
+    b.box(
+      0.04,
+      r * 2 + 0.04,
+      r * 2 + 0.04,
+      HEADER,
+      { at: [s * (len / 2 + 0.02), cy, z - 0.02] },
+      0,
+    );
+  return b.build();
+}
+
+/** Looks the garage's foundation comes in: damp rising to three heights, one with a rain streak. */
+export const FOUNDATION_LOOKS = 3;
+
+/**
+ * The poured concrete foundation under a garage tile, standing in for the
+ * diorama's wooden slab: grey, a pale arris at the floor's edge, damp
+ * darkening it from the ground up on every face, and on one look a streak
+ * where rain ran down.
+ */
+export function foundationModel(look: number): Model {
+  const b = new ModelBuilder();
+  const base = 0x6e6c68;
+  const top = -0.013;
+  const bottom = top - SLAB_DEPTH;
+  b.box(1.002, SLAB_DEPTH, 1.002, base, { at: [0, top - SLAB_DEPTH / 2, 0] }, 0);
+  const damp = [0.1, 0.16, 0.12][look] ?? 0.1;
+  for (const turn of [0, Math.PI / 2]) {
+    for (const s of [-1, 1]) {
+      const along = (u: number, y: number): [number, number, number] =>
+        turn ? [s * 0.503, y, u] : [u, y, s * 0.503];
+      const rot: [number, number, number] = [0, turn, 0];
+      b.box(1.004, 0.014, 0.004, 0x8c8a85, { at: along(0, top - 0.007), rot }, 0);
+      b.box(1.004, damp, 0.004, tint(base, -0.18), { at: along(0, bottom + damp / 2), rot }, 0);
+      // A ragged top to the damp: a couple of tongues reaching higher.
+      for (const [u, w, hh] of [
+        [-0.28 + look * 0.1, 0.18, 0.06],
+        [0.22 - look * 0.07, 0.12, 0.04],
+      ] as const)
+        b.box(w, hh, 0.004, tint(base, -0.18), { at: along(u, bottom + damp + hh / 2), rot }, 0);
+      if (look === 1)
+        b.box(
+          0.08,
+          SLAB_DEPTH - 0.06,
+          0.004,
+          tint(base, -0.1),
+          {
+            at: along(0.12, top - (SLAB_DEPTH - 0.06) / 2 - 0.014),
+            rot,
+          },
+          0,
+        );
+    }
+  }
   return b.build();
 }
 
@@ -774,15 +973,68 @@ export function bannerModel(width: number): Model {
   return b.build();
 }
 
+/** How far a lamp's flex runs up from the bulb to the wire it hangs from. */
+export const BULB_HANG = 0.26;
+
 /**
- * A bare bulb hanging on its flex from the rafters, built round the bulb (at
- * the origin) so it hangs where the room's warm lamps shine from. The bulb
- * draws in the glow layer, so it blooms.
+ * A bulb in a dark enamel shade on a short flex, built round the bulb (at
+ * the origin) so it hangs where the room's warm lamps shine from; the flex
+ * goes up `BULB_HANG` to the wire. The bulb and the shade's lit inside draw
+ * in the glow layer, so they bloom.
  */
 export function bulbModel(): Model {
   const b = new ModelBuilder();
-  b.led(0.055, 0xffd890, { at: [0, 0, 0] });
-  b.cylinder(0.03, 0.035, 0.07, COLOR.charcoal, { at: [0, 0.075, 0] }, 10);
-  b.cylinder(0.006, 0.006, 1.2, COLOR.charcoal, { at: [0, 0.71, 0] }, 4);
+  const enamel = 0x3a3f3a;
+  b.led(0.05, 0xffd890, { at: [0, -0.04, 0] });
+  // The shade: a shallow cone over the bulb; its lit inside shows from above as a warm rim round it.
+  b.cylinder(0.03, 0.1, 0.07, enamel, { at: [0, 0.055, 0] }, 16);
+  b.add(new THREE.CylinderGeometry(0.12, 0.12, 0.014, 16), 0xffc878, { at: [0, 0.018, 0] }, 'glow');
+  b.cylinder(0.02, 0.02, 0.04, COLOR.charcoal, { at: [0, 0.105, 0] }, 8);
+  b.cylinder(
+    0.005,
+    0.005,
+    BULB_HANG - 0.12,
+    COLOR.charcoal,
+    { at: [0, 0.12 + (BULB_HANG - 0.12) / 2, 0] },
+    4,
+  );
+  return b.build();
+}
+
+/**
+ * The wire the lamps hang from, strung wall to wall along a row of them:
+ * through `points` (x and height, in order, the walls at either end), sagging
+ * a little between each, at depth z = 0. A small hook where it meets each wall.
+ */
+export function lampWireModel(points: readonly [number, number][]): Model {
+  const b = new ModelBuilder();
+  const wire = COLOR.charcoal;
+  const sag = 0.06;
+  const steps = 5;
+  for (let i = 0; i + 1 < points.length; i++) {
+    const [x0, y0] = points[i] ?? [0, 0];
+    const [x1, y1] = points[i + 1] ?? [0, 0];
+    const at = (t: number): [number, number] => [
+      x0 + (x1 - x0) * t,
+      y0 + (y1 - y0) * t - sag * 4 * t * (1 - t),
+    ];
+    for (let k = 0; k < steps; k++) {
+      const [ax, ay] = at(k / steps);
+      const [bx, by] = at((k + 1) / steps);
+      b.box(
+        Math.hypot(bx - ax, by - ay) + 0.004,
+        0.01,
+        0.01,
+        wire,
+        {
+          at: [(ax + bx) / 2, (ay + by) / 2, 0],
+          rot: [0, 0, Math.atan2(by - ay, bx - ax)],
+        },
+        0,
+      );
+    }
+  }
+  for (const p of [points[0], points[points.length - 1]])
+    if (p) b.box(0.04, 0.05, 0.04, COLOR.graphite, { at: [p[0], p[1], 0] }, 0);
   return b.build();
 }
