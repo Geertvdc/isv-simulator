@@ -14,13 +14,18 @@ export interface MapLook {
   floor: FloorTheme;
   /** The chapter whose world surrounds the level; none for a bare slab. */
   setting?: string;
+  /**
+   * A hand-built world around this one level (`src/render/three/scenes/`),
+   * in place of the chapter's rows of props; none for the chapter's rows.
+   */
+  scene?: string;
 }
 
 export const DEFAULT_LOOK: MapLook = { walls: 'plaster', floor: 'concrete' };
 
 /** Map look per level id; levels not listed get `DEFAULT_LOOK`. */
 export const LEVEL_LOOKS: Readonly<Record<string, MapLook>> = {
-  garage: { walls: 'plaster', floor: 'concrete' },
+  garage: { walls: 'plaster', floor: 'concrete', scene: 'garage' },
   'open-plan': { walls: 'glass', floor: 'carpet' },
   'scale-up': { walls: 'wood', floor: 'parquet' },
   // Startup: a loft, warm wood.

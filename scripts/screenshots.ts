@@ -7,7 +7,7 @@
  *
  * Usage: start `npm run dev:online` (or `npm run dev` and skip the online
  * shots with `--only`), then
- *   npm run screenshots -- [--base=http://localhost:5173] [--server=http://localhost:2567] [--only=pipeline] [--skip=online]
+ *   npm run screenshots -- [--base=http://localhost:5173] [--server=http://localhost:2567] [--only=pipeline] [--skip=online] [--cdp=9333]
  * `--only` takes shots whose name contains the text, `--skip` leaves them
  * out. `--out=<dir>` writes them somewhere other than `docs/game/images/`. `--server` is the game
  * server the page talks to; a second room member joins it from here for the
@@ -36,7 +36,8 @@ const OUT = arg('out') ?? join(import.meta.dirname, '..', 'docs', 'game', 'image
 const WIDTH = Number(arg('width') ?? 1440);
 const HEIGHT = Number(arg('height') ?? 810);
 
-const PORT = 9333;
+/** Chrome's DevTools port: `--cdp=<port>` lets two runs work side by side. */
+const PORT = Number(arg('cdp') ?? 9333);
 
 const CHROME_PATHS = [
   process.env.CHROME,
