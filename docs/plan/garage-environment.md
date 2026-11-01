@@ -1,6 +1,10 @@
 # Garage environment pass
 
-**Status:** in progress. One level (`garage`, 1-1) gets a hand-built world, as a pilot for the other 15.
+**Status:** two rounds done (build, critic review, fixes). One level (`garage`, 1-1) gets a hand-built world, as a pilot for the other 15.
+
+| Before                                     | After                                     | After, redesign draft                           |
+| ------------------------------------------ | ----------------------------------------- | ----------------------------------------------- |
+| ![](images/garage-environment/before.webp) | ![](images/garage-environment/after.webp) | ![](images/garage-environment/after-draft.webp) |
 
 **Goal:** the world around the level tells a story, the way Overcooked 2 levels do, instead of rows of random props on a flat green plane. Render only (`src/render/`); the sim, maps and balance don't change.
 
@@ -46,12 +50,14 @@ Read from the fixed front camera (top of screen = back of the level):
 | **Room**  | `roomModels.ts`, `mapLook.ts` themes, `FLOOR_COLORS`/`WALL_COLORS` in `look.ts`, `setDressing/wallTops.ts`, `layout.ts`, `MapView.ts`, counters    | Garage walls and floor (material, wear, pegboard, door rails), roll-up door at the ship hatch, house door at the inbox, lights |
 | **Light** | `createLights` and light constants in `look.ts`, `stage.ts`, new `atmosphere.ts`, the lights line in `ThreeRoundRenderer.ts`, `WorldFx.ts`         | Per-scene light preset (golden hour), sky/background colour, edge falloff (fog or vignette), local warm lights                 |
 
-Round 2: a critic compares screenshots against the Overcooked references and this brief; its feedback is split into new chunks.
+Round 2: a critic compared screenshots against the Overcooked references and this brief (5.5/10 after round 1, from 3/10) and its feedback went into three chunks: room surfaces and counters (concrete coping, block coursing, worn slab, smaller oil stain by the door, quieter sawhorse counters, shaded bulbs, readable garage doors), outside composition (visible street, readable family car, house flush with the garage, smaller posed scene people, clustered yards, idle motion, a HUD-overlap test) and light (less brown, shorter shadows, lamps along the back wall).
+
+Left for later: the front wall's coping is still a wide flat strip (a thinner front wall is a `layout.ts` change), the closed garage door's face is small from this camera, and the basketball hoop is mostly off frame.
 
 ## Done when
 
-- [ ] The garage screenshot reads as "a garage at the back of a house on a suburban street" without explanation.
-- [ ] No flat empty ground and no dark void visible in the 1440×810 frame.
-- [ ] Stations and players read at a glance; nothing hides them.
-- [ ] Works on the shipped map and the `?draft=garage` map.
-- [ ] `npm run check` passes; other levels look as before.
+- [x] The garage screenshot reads as "a garage at the back of a house on a suburban street" without explanation.
+- [x] No flat empty ground and no dark void visible in the 1440×810 frame.
+- [x] Stations and players read at a glance; nothing hides them.
+- [x] Works on the shipped map and the `?draft=garage` map.
+- [x] `npm run check` passes; other levels look as before.
