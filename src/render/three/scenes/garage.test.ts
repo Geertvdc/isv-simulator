@@ -1,11 +1,14 @@
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
+import { CAMERA_FIT_PADDING, CAMERA_HUD_BOTTOM } from '../../../sim/balance';
 import { type LevelMap, getTile, parseLevelMap } from '../../../sim/level';
+import { fitCamera3d, projectPoint } from '../../projection';
 import { garageRoom } from '../garageRoom';
-import { WALL_HEIGHT } from '../layout';
+import { WALL_HEIGHT, levelBox } from '../layout';
 import { type ScenePiece, garageScene } from './garage';
-import { groundModel } from './ground';
+import { fence, hedge, sideGate } from '../setDressing/suburb';
+import { ROAD_LINE, groundModel } from './ground';
 
 const read = (path: string) =>
   parseLevelMap(readFileSync(new URL(`../../../../${path}`, import.meta.url), 'utf8'));
@@ -45,6 +48,24 @@ function onSlab(map: LevelMap, x: number, z: number, inset = 0.02): boolean {
   const tile = getTile(map, tx, tz);
   return tile !== null && tile !== 'void';
 }
+
+/** The screenshot size, and the camera framing `ThreeRoundRenderer.fit` uses for it. */
+const VIEW = { width: 1440, height: 810 };
+/** `HUD_TOP_3D` in `ThreeRoundRenderer` (kept in step by hand: it's private there). */
+const HUD_TOP = 0.1;
+
+/** Screen rectangles the HUD covers at 1440×810: (x0, y0, x1, y1). */
+const HUD_RECTS: Record<string, [number, number, number, number]> = {
+  orders: [0, 0, 460, 140],
+  legend: [0, 610, 220, 745],
+  score: [0, 755, 135, 810],
+  timer: [1320, 755, 1440, 810],
+  mute: [1370, 0, 1440, 60],
+  pause: [600, 765, 840, 810],
+};
+
+/** The property line (hedge, fences, gate) may run under the HUD; story props may not. */
+const BOUNDARY = new Set([fence, hedge, sideGate]);
 
 describe('garageScene', () => {
   for (const [name, map] of Object.entries(MAPS)) {
@@ -90,6 +111,30 @@ describe('garageScene', () => {
       expect(at.some((p) => p.z < -1)).toBe(true);
       expect(scene.ground.some((g) => g.kind === 'sidewalk' && g.z0 >= front)).toBe(true);
       expect(scene.pieces.length).toBeGreaterThan(30);
+    });
+
+    it(`keeps the story props out from under the HUD (${name})`, () => {
+      const pose = fitCamera3d(levelBox(map), VIEW, {
+        top: CAMERA_FIT_PADDING + VIEW.height * HUD_TOP,
+        right: CAMERA_FIT_PADDING,
+        bottom: CAMERA_FIT_PADDING + VIEW.height * CAMERA_HUD_BOTTOM,
+        left: CAMERA_FIT_PADDING,
+      });
+      // The street shows: the road's dashed line is inside the frame.
+      const road = scene.ground.find((g) => g.kind === 'road');
+      if (!road) throw new Error('no road');
+      const line = projectPoint(pose, { x: map.width / 2, y: GROUND, z: road.z0 + ROAD_LINE });
+      expect(line.y).toBeLessThan(VIEW.height - 4);
+      for (const p of scene.pieces) {
+        if (p.row !== 'near' || BOUNDARY.has(p.piece)) continue;
+        const shown = worldPoints(p).map((v) => projectPoint(pose, v));
+        for (const [hud, [x0, y0, x1, y1]] of Object.entries(HUD_RECTS)) {
+          const under = shown.filter((s) => s.x > x0 && s.x < x1 && s.y > y0 && s.y < y1);
+          expect(under.length, `${hud}: piece at ${p.at.x.toFixed(2)}, ${p.at.z.toFixed(2)}`).toBe(
+            0,
+          );
+        }
+      }
     });
 
     it(`builds its ground (${name})`, () => {

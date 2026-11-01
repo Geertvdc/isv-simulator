@@ -2,11 +2,12 @@ import type { LevelMap } from '../../../sim/level';
 import { firstGroup, tileHash } from '../../mapShape';
 import { garageRoom } from '../garageRoom';
 import { type Vec3, gridToWorld } from '../../projection';
-import { bike, bins, bushes, hoop, kennel, oldPCs, shed, tires, tree } from '../setDressing/garage';
+import { bushes, hoop, kennel, shed, tires, tree } from '../setDressing/garage';
 import type { SetPiece } from '../setDressing/shared';
 import {
   acUnit,
   bbq,
+  boxStack,
   catLoaf,
   dog,
   familyCar,
@@ -20,6 +21,7 @@ import {
   hydrant,
   lounger,
   mailbox,
+  monitorStack,
   mower,
   overflowingBin,
   parcels,
@@ -27,6 +29,7 @@ import {
   rainBarrel,
   sideGate,
   sprinkler,
+  tarpLump,
   toys,
   washingLine,
   wheelbarrow,
@@ -54,7 +57,8 @@ export type GroundKind =
   | 'patio'
   | 'soil'
   | 'stone'
-  | 'chalk';
+  | 'chalk'
+  | 'driveway';
 
 /** A patch of ground: a rectangle in world x and z, of one surface. */
 export interface GroundPatch {
@@ -78,7 +82,7 @@ export interface ScenePiece {
   row: 'near' | 'far';
 }
 
-export type ScenePose = 'idle' | 'chatting' | 'watering';
+export type ScenePose = 'idle' | 'chatting' | 'watering' | 'mowing';
 
 /** Someone in the scene, standing at `at` facing `yaw`. */
 export interface ScenePerson {
@@ -101,16 +105,35 @@ const GROUND = -0.463;
 /** How far the house runs out past the garage's left wall, and back from its front. */
 const HOUSE_LEFT = 2;
 const HOUSE_DEPTH = 4.2;
+/** The house's front stands this far behind the garage's back wall: hidden behind it, so no lawn shows between. */
+const HOUSE_GAP = 0.06;
+/** The neighbour's house is set back this far from our back wall line. */
+const NEIGHBOUR_BACK = 1;
 /** The side yard runs from the garage's left wall out to the hedge. */
 const HEDGE_OUT = 4;
 /** The fence on the right, between our strip and the neighbour's garden. */
 const FENCE_OUT = 1.25;
-/** The parking pad on the left, in front of the side yard, reaches this far back from the front. */
-const PAD_DEPTH = 3.7;
-/** In front: the driveway apron, then the sidewalk, the curb and the road. */
-const APRON = 0.3;
-const SIDEWALK = 0.75;
+/**
+ * The family car on the side pad: its middle this far behind the level's
+ * front, so the whole car stands above the player legend (bottom left), and
+ * this far out from the left wall. Nose in toward the house, turned a little:
+ * parked in a hurry.
+ */
+const CAR_BACK = 3.4;
+const CAR_OUT = 1.3;
+const CAR_TURN = 0.21;
+/** Half the car's footprint, turned, along z: where it starts and ends. */
+const CAR_HALF = 1.35;
+/** How high the car's roof is, for the cat. */
+const CAR_ROOF = 0.98;
+/** In front: the driveway apron, then the sidewalk, the curb and the road, all shallow so the road shows. */
+const APRON = 0.12;
+const SIDEWALK = 0.34;
 const CURB = 0.12;
+/** Scene people are smaller than the players and the office people, so nobody takes them for a player. */
+export const SCENE_PERSON_SCALE = 0.88;
+/** Someone pushing the mower stands this far behind it, holding its handle. */
+const MOWER_REACH = 1.02;
 /** Long grass every so often, more where nobody mowed. */
 const TUFT_STEP = 0.5;
 const TUFT_KEEP = 0.3;
@@ -134,14 +157,16 @@ export function garageScene(map: LevelMap): Scene {
   const F = height - 0.5;
   const ship = firstGroup(map, 'ship');
   const inbox = firstGroup(map, 'inbox');
-  const shipX1 = ship.length > 0 ? Math.max(...ship.map((p) => p.x)) : (width - 1) / 2;
+  const shipXs = ship.map((p) => p.x);
+  const shipX0 = ship.length > 0 ? Math.min(...shipXs) : (width - 1) / 2;
+  const shipX1 = ship.length > 0 ? Math.max(...shipXs) : (width - 1) / 2;
   const inboxX = inbox.length > 0 ? (inbox[0]?.x ?? 0) : 2;
 
   const pieces: ScenePiece[] = [];
   const ground: GroundPatch[] = [];
   const people: ScenePerson[] = [];
   let n = 0;
-  /** Puts `piece` with its center at (x, z), on the ground or `lift` above it. */
+  /** Puts `piece` with its center at (x, z), on the ground or `lift` above it, `size` times its size. */
   const put = (
     piece: SetPiece,
     x: number,
@@ -150,6 +175,7 @@ export function garageScene(map: LevelMap): Scene {
     variant = 0,
     row: ScenePiece['row'] = 'near',
     lift = 0,
+    size = 1,
   ) => {
     const i = n++;
     // A slight brightness and warmth change per prop, so repeats don't match.
@@ -160,7 +186,7 @@ export function garageScene(map: LevelMap): Scene {
       variant: variant % (piece.variants ?? 1),
       at: gridToWorld(x, z, GROUND + lift),
       yaw,
-      scale: [1, 1, 1],
+      scale: [size, size, size],
       tint: [bright * (1 + warm), bright, bright * (1 - warm)],
       row,
     });
@@ -173,6 +199,7 @@ export function garageScene(map: LevelMap): Scene {
     z1: number,
     stripes?: 'x' | 'z',
   ) => ground.push({ kind, x0, x1, z0, z1, ...(stripes ? { stripes } : {}) });
+  const stone = (x: number, z: number, r = 0.18) => patch('stone', x - r, x + r, z - r, z + r);
 
   // ---- Back: Mom's house, its wall right behind the garage's back wall ----
   const houseX0 = L - HOUSE_LEFT;
@@ -189,10 +216,11 @@ export function garageScene(map: LevelMap): Scene {
   const door = HOUSE_LEFT / 2 + 0.1;
   // The garage's house door opens into a hallway cut into the house behind the inbox.
   const hall = inbox.length > 0 && (inbox[0]?.y ?? 1) === 0 ? inboxX - houseX0 : undefined;
+  // The house model's front is its origin: it stands flush behind the back wall.
   put(
     house(houseW, HOUSE_DEPTH, 0, windows, door, hall),
     houseX0 + houseW / 2,
-    B - 0.02 - HOUSE_DEPTH / 2,
+    B - HOUSE_GAP,
     0,
     0,
     'far',
@@ -200,43 +228,58 @@ export function garageScene(map: LevelMap): Scene {
 
   // ---- Left: the side yard, from the garage wall out to the hedge ----
   const hedgeX = L - HEDGE_OUT;
-  const padZ0 = Math.max(B + 3, F - PAD_DEPTH);
+  // The car's place first: the yard is what's left behind it.
+  const carZ = F - CAR_BACK;
+  const carX = L - CAR_OUT;
+  const yardZ1 = carZ - CAR_HALF;
+  const padZ0 = yardZ1 - 0.45;
+  /** Whether something reaching to z + `reach` still fits in the yard, behind the car. */
+  const fits = (z: number, reach = 0.5) => z + reach < yardZ1;
   // The hedge down the property line, from the back fence to the sidewalk.
   for (let z = B + 0.5, i = 0; z < F + APRON; z += 1, i++)
     put(hedge, hedgeX, z, Math.PI / 2, i, 'near');
   // The back fence with the side gate, from the hedge to the house's corner.
   put(sideGate, hedgeX + 1.05, B - 0.05, 0, 0, 'near');
   for (let x = hedgeX + 2.05; x < houseX0 + 0.4; x += 1) put(fence, x, B - 0.05, 0, 1, 'near');
-  // By the back door: the downpipe's rain barrel, parcels on the step, the hose by the gate.
+  // By the back door: the downpipe's rain barrel, the hose reel by the gate.
   put(rainBarrel, houseX0 + 0.25, B + 0.35);
-  put(parcels, L - 0.45, B + 0.42, 0.3, 1);
   put(hoseReel, hedgeX + 2.1, B + 0.5, 0.4);
-  // Bin day was last week: the bins against the garage wall, pizza boxes everywhere.
-  put(overflowingBin, L - 0.36, B + 1.15, 0.15, 0);
-  put(overflowingBin, L - 0.36, B + 1.78, -0.1, 1);
-  put(pizzaPile, L - 1.05, B + 1.45, 0.4, 1);
-  put(bins, hedgeX + 0.95, B + 1.3, 1.2, 2);
-  // A bike against the wall and the mower, parked halfway through the lawn.
-  const yardZ1 = padZ0;
-  put(tires, L - 0.4, B + 2.45, 0.3, 1);
-  const bikeZ = B + 3.2;
-  if (bikeZ + 0.5 < yardZ1) put(bike, L - 0.5, bikeZ, Math.PI / 2 - 0.15, 1);
-  const mowerZ = Math.min(yardZ1 - 0.7, (bikeZ + yardZ1) / 2 + 0.2);
-  put(mower, L - 2.1, mowerZ, Math.PI + 0.25);
-  put(gnome, hedgeX + 0.65, B + 2.4, 0.5);
-  put(wheelbarrow, L - 2.85, mowerZ - 0.35, -0.6);
-  // Mom's washing line, out in the sun.
-  if (yardZ1 - B > 4.5) put(washingLine, hedgeX + 1.5, B + 3.3, 0.3, 0, 'far');
-  put(toys, L - 1.3, yardZ1 - 0.35, 0, 0);
-  // Stepping stones from the gate to the back door, then the lawn: mown at the back, long beyond the mower.
-  [
-    [hedgeX + 1.15, B + 0.55],
-    [hedgeX + 1.45, B + 1.05],
-    [hedgeX + 1.95, B + 1.25],
-  ].forEach(([x, z]) =>
-    patch('stone', (x ?? 0) - 0.2, (x ?? 0) + 0.2, (z ?? 0) - 0.16, (z ?? 0) + 0.16),
-  );
-  patch('mown', hedgeX + 0.4, L, B, mowerZ - 0.1, 'z');
+  // Everything piled up against the garage's outside wall: parcels, the bins (bin day was
+  // last week, pizza boxes spilling out), the founders' unpacked boxes, old monitors, a
+  // tarp over the old sofa, tyres. Tight to the wall, so the lawn beyond is open.
+  put(parcels, L - 0.42, B + 0.4, 0.3, 1);
+  put(overflowingBin, L - 0.36, B + 1.05, 0.15, 0);
+  put(overflowingBin, L - 0.36, B + 1.66, -0.1, 1);
+  put(pizzaPile, L - 0.98, B + 1.3, 0.4, 1);
+  put(pizzaPile, L - 0.9, B + 0.62, -0.3, 0);
+  if (fits(B + 2.4)) put(boxStack, L - 0.4, B + 2.35, Math.PI / 2, 1);
+  if (fits(B + 3.05)) put(monitorStack, L - 0.5, B + 3.0, Math.PI / 2 - 0.2, 1);
+  if (fits(B + 2.8)) put(tarpLump, L - 0.98, B + 2.75, Math.PI / 2 + 0.15);
+  if (fits(B + 3.7, 0.3)) put(tires, L - 0.45, B + 3.68, 0.3, 2);
+  if (fits(B + 3.55, 0.3)) put(boxStack, L - 1.0, B + 3.5, 1.2, 2);
+  // Mowing the lawn, pushing away from the wall: the far side's still long.
+  const mowerZ = Math.min(B + 3.75, yardZ1 - 0.75);
+  const mowerX = L - 1.5 - MOWER_REACH;
+  const mowYaw = -Math.PI / 2 + 0.3;
+  put(mower, mowerX, mowerZ, mowYaw);
+  people.push({
+    at: gridToWorld(
+      mowerX - Math.sin(mowYaw) * MOWER_REACH,
+      mowerZ - Math.cos(mowYaw) * MOWER_REACH,
+      GROUND,
+    ),
+    yaw: mowYaw,
+    pose: 'mowing',
+  });
+  // The gardening kit by the hedge, a gnome keeping watch, Mom's washing out in the sun.
+  if (fits(mowerZ + 0.75)) put(wheelbarrow, hedgeX + 0.75, mowerZ + 0.75, 0.5);
+  put(gnome, hedgeX + 0.62, B + 1.25, 0.5, 0, 'near', 0, 1.4);
+  if (yardZ1 - B > 4.5) put(washingLine, hedgeX + 1.55, B + 2.05, 0.3, 0, 'far');
+  // Stepping stones from the gate to the back door, then the lawn: mown up to the mower's row.
+  stone(hedgeX + 1.15, B + 0.55);
+  stone(hedgeX + 1.45, B + 1.05);
+  stone(hedgeX + 1.95, B + 1.25);
+  patch('mown', hedgeX + 0.4, L, B, mowerZ + 0.3, 'x');
   // Beyond the hedge, the other neighbour's trees.
   put(tree, hedgeX - 1.6, B + 0.8, 0.4, 0, 'far');
   put(bushes, hedgeX - 0.9, B + 2.6, 0, 3, 'far');
@@ -247,63 +290,70 @@ export function garageScene(map: LevelMap): Scene {
 
   // ---- Left front: the family car, evicted to the pad, the cat on its roof ----
   patch('concrete', hedgeX + 0.5, L, padZ0, F + APRON);
-  const carX = L - 1.15;
-  const carZ = Math.max(padZ0 + 1.35, F - 1.8);
-  put(familyCar, carX, carZ, -0.04, 0);
-  put(catLoaf, carX + 0.1, carZ - 0.55, 0.9, 0, 'near', 1.04);
-  put(bushes, hedgeX + 0.85, padZ0 + 0.45, 0.3, 1);
-  // The hoop at the back of the pad, facing it.
-  put(hoop, hedgeX + 0.9, padZ0 + 0.1, 0.25, 0);
+  put(familyCar, carX, carZ, Math.PI + CAR_TURN, 0);
+  put(catLoaf, carX + 0.12, carZ + 0.1, 2.3, 0, 'near', CAR_ROOF);
+  // The hoop against the hedge, facing the pad, the ball under the car.
+  put(hoop, hedgeX + 0.75, padZ0 + 0.6, Math.PI / 2 - 0.25, 0);
+  put(bushes, hedgeX + 0.85, F - 0.6, 0.3, 1);
 
   // ---- Front: the driveway apron, the sidewalk, the curb and the street ----
   // The apron runs across both garage doors: the open one and the closed one beside it.
-  const doors = [...ship.map((p) => p.x), ...garageRoom(map).door.map((p) => p.x)];
+  const doors = [...shipXs, ...garageRoom(map).door.map((p) => p.x)];
   const apronX1 = Math.min(R, (doors.length > 0 ? Math.max(...doors) : shipX1) + 1.2);
   patch('concrete', L, apronX1, F, F + APRON);
   patch('mown', apronX1, R + FENCE_OUT, F, F + APRON, 'x');
   const s0 = F + APRON;
   const s1 = s0 + SIDEWALK;
+  const road = s1 + CURB;
+  // The driveway from the open door straight down to the street, over a dropped curb.
+  const drive0 = shipX0 - 0.65;
+  const drive1 = shipX1 + 0.65;
   patch('sidewalk', L - 30, R + 30, s0, s1);
-  patch('curb', L - 30, R + 30, s1, s1 + CURB);
-  patch('road', L - 30, R + 30, s1 + CURB, s1 + 8);
-  // Chalk on the sidewalk: a hopscotch, right of the door.
-  const chalkX = Math.min(R - 1.4, apronX1 + 0.6);
-  patch('chalk', chalkX, chalkX + 1.6, s0 + 0.12, s1 - 0.12);
-  put(mailbox, L - 0.95, s1 - 0.2, 0.08);
-  put(hydrant, R + 0.85, s1 - 0.25);
+  patch('driveway', drive0, drive1, F, road);
+  patch('curb', L - 30, drive0, s1, road);
+  patch('curb', drive1, R + 30, s1, road);
+  patch('road', L - 30, R + 30, road, road + 8);
+  // Chalk on the sidewalk: a hopscotch, left of the driveway, clear of the score.
+  const chalkX1 = drive0 - 0.3;
+  const chalkX0 = Math.max(L + 1.6, chalkX1 - 1.6);
+  if (chalkX1 - chalkX0 > 0.8) patch('chalk', chalkX0, chalkX1, s0 + 0.04, s1 - 0.04);
+  // The mailbox at the curb on the right, the hydrant just left of the timer.
+  put(mailbox, R - 2.2, s1 - 0.13, -0.12);
+  put(hydrant, R - 0.35, s1 - 0.14, 0.4);
 
   // ---- Right: our narrow strip, the fence, the neighbour's garden ----
   const fenceX = R + FENCE_OUT;
   put(rainBarrel, houseX1 - 0.3, B + 0.35);
-  put(acUnit, R + 0.6, B + 1.15, 0.15);
-  put(oldPCs, R + 0.5, (B + F) / 2 + 0.3, -1.2, 1);
+  // The AC unit humming for the servers inside, boxes and old monitors piled by it; then
+  // a clear strip of lawn, and a bush by the front.
+  put(acUnit, R + 0.6, B + 1.0, 0.15);
+  // Out from the wall far enough that its top doesn't hide them.
+  put(boxStack, R + 0.7, B + 1.75, -Math.PI / 2, 0);
+  put(monitorStack, R + 0.68, B + 2.45, -Math.PI / 2 + 0.25, 0);
   put(bushes, R + 0.6, F - 1.1, 0.4, 0);
   patch('mown', R, fenceX, B, F, 'z');
   for (let z = B - 2.5, i = 0; z < F + APRON - 0.3; z += 1, i++)
     put(fence, fenceX, z, -Math.PI / 2, 0, 'near');
   // The neighbour's: a tidy striped lawn, a flower bed along the fence, the kennel, a tree.
-  patch('mown', fenceX, R + 12, B - 1.2, F + APRON, 'z');
+  patch('mown', fenceX, R + 12, B - NEIGHBOUR_BACK, F + APRON, 'z');
   for (let z = B + 2.2, i = 0; z < F - 0.6; z += 1, i++)
     put(flowerBed, fenceX + 0.5, z, -Math.PI / 2, i, 'near');
   patch('soil', fenceX + 0.12, fenceX + 0.9, B + 1.6, Math.max(B + 2.2, F - 1.1));
+  put(gnome, fenceX + 0.62, Math.max(B + 2.2, F - 0.85), -0.5, 0, 'near', 0, 1.5);
   put(kennel, fenceX + 1.0, B + 0.55, -0.35, 0);
   put(dog, fenceX + 1.25, B + 1.3, 0.6);
   put(tree, fenceX + 3.4, B + 0.4, 0.3, 0, 'far');
-  put(lounger, fenceX + 2.05, B + 2.0, -0.5);
+  put(lounger, fenceX + 2.3, B + 2.0, -0.5);
+  // A path of stepping stones from the lounger down to the front.
+  for (let k = 0, z = B + 3.0; z < F - 0.2; k++, z += 0.6)
+    stone(fenceX + 2.25 + Math.sin(k * 0.8) * 0.22, z, 0.17);
   // A tree at the front corner, out to the side where it hides nothing.
   put(tree, fenceX + 0.95, F - 0.3, 0.9, 3, 'far');
-  put(sprinkler, fenceX + 2.1, F - 1.6, 0);
+  put(sprinkler, fenceX + 3.2, Math.max(B + 3.2, F - 2.4), 0);
   put(toys, fenceX + 1.6, F - 0.4, 0.7, 1);
-  // The neighbour's house, set further back.
-  put(
-    house(10, HOUSE_DEPTH, 1, [1.6, 4.4]),
-    fenceX + 0.7 + 5,
-    B - 1.2 - HOUSE_DEPTH / 2,
-    0,
-    0,
-    'far',
-  );
-  patch('patio', fenceX + 0.7, fenceX + 4, B - 1.2, B - 0.2);
+  // The neighbour's house, set back.
+  put(house(10, HOUSE_DEPTH, 1, [1.6, 4.4]), fenceX + 0.7 + 5, B - NEIGHBOUR_BACK, 0, 0, 'far');
+  patch('patio', fenceX + 0.7, fenceX + 4, B - NEIGHBOUR_BACK, B - 0.1);
   // Watering the flowers, hose arcing over them.
   const waterZ = Math.min(B + 3.6, F - 1.6);
   people.push({
@@ -312,12 +362,6 @@ export function garageScene(map: LevelMap): Scene {
     pose: 'watering',
   });
   put(hoseSpray, fenceX + 1.3, waterZ, -Math.PI / 2, 0, 'far');
-  // Mom by the bins, on about the pizza boxes again.
-  people.push({
-    at: gridToWorld(L - 1.55, B + 2.05, GROUND),
-    yaw: Math.PI / 2 - 0.5,
-    pose: 'chatting',
-  });
 
   // ---- Void tiles inside the outline (a notch in the map): a little patio ----
   const voids = map.tiles.flatMap((t, i) =>
@@ -327,20 +371,23 @@ export function garageScene(map: LevelMap): Scene {
   const corner = [...voids].sort((a, b) => a.z - b.z || b.x - a.x)[0];
   if (corner) put(bbq, corner.x, corner.z - 0.1, 0.3);
 
-  return { ground, pieces, people, tufts: tufts(map, ground, pieces, mowerZ, L, hedgeX) };
+  return {
+    ground,
+    pieces,
+    people,
+    tufts: tufts(map, ground, pieces, { x0: hedgeX, x1: L, z0: mowerZ + 0.3, z1: yardZ1 }),
+  };
 }
 
 /**
  * Tufts of long grass, on a jittered grid over the lawns: never on paving,
- * the slab or under a prop. Thick past the mower, where the lawn's not done.
+ * the slab or under a prop. Thick in `long`, the bit the mower hasn't done yet.
  */
 function tufts(
   map: LevelMap,
   ground: readonly GroundPatch[],
   pieces: readonly ScenePiece[],
-  mowerZ: number,
-  L: number,
-  hedgeX: number,
+  long: { x0: number; x1: number; z0: number; z1: number },
 ): [number, number, number][] {
   const { width, height } = map;
   const out: [number, number, number][] = [];
@@ -355,9 +402,9 @@ function tufts(
       if (x > -0.7 && x < width - 0.3 && z > -0.7 && z < height - 0.3) continue;
       if (paved.some((g) => inside(g, x, z))) continue;
       if (pieces.some((p) => Math.hypot(p.at.x - x, p.at.z - z) < 0.45)) continue;
-      const long = x < L && x > hedgeX && z > mowerZ;
-      if (unit(gx, gz, 17) > (long ? TUFT_KEEP_LONG : TUFT_KEEP)) continue;
-      out.push([x, z, (long ? 1.3 : 0.8) + unit(gx, gz, 19) * 0.5]);
+      const unmown = x < long.x1 && x > long.x0 && z > long.z0 && z < long.z1;
+      if (unit(gx, gz, 17) > (unmown ? TUFT_KEEP_LONG : TUFT_KEEP)) continue;
+      out.push([x, z, (unmown ? 1.3 : 0.8) + unit(gx, gz, 19) * 0.5]);
     }
   }
   return out;

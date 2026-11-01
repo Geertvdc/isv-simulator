@@ -16,13 +16,19 @@ const MOWN = [0x6a8a4c, 0x5e7e44] as const;
 const CONCRETE = 0xa8a49a;
 const SIDEWALK = 0xb8b4aa;
 const CURB = 0xc4c0b6;
-const ROAD = 0x4a4c52;
-const LINE = 0xd8c87a;
+const ROAD = 0x3d3a3c;
+const LINE = 0xd9b343;
+/** The driveway: newer, paler concrete than the pad, with the car's tyre marks down it. */
+const DRIVEWAY = 0xd2ccbe;
+const TYRE = 0x9a948a;
 const PATIO = 0xb09a84;
 const SOIL = 0x5a4434;
 const STONE = 0x9a968a;
 const CHALK = [0xe8a0b8, 0x8ac8e8, 0xe8d88a, 0xa8e0a0] as const;
 const TUFT = 0x4e7a3a;
+
+/** How far out from the curb the road's dashed centre line runs. */
+export const ROAD_LINE = 0.18;
 
 /** How high each surface's top sits above the ground. */
 const TOP: Readonly<Record<GroundPatch['kind'], number>> = {
@@ -34,6 +40,7 @@ const TOP: Readonly<Record<GroundPatch['kind'], number>> = {
   concrete: 0.03,
   patio: 0.035,
   sidewalk: 0.05,
+  driveway: 0.056,
   chalk: 0.053,
   curb: 0.11,
 };
@@ -135,24 +142,46 @@ function surface(b: ModelBuilder, g: GroundPatch, salt: number): void {
       return;
     case 'road': {
       b.box(w, top, d, ROAD, { at: [cx, top / 2, cz] }, 0);
-      // A gutter along the curb, patched tar here and there, and the painted line.
-      b.box(w, 0.003, 0.25, tint(ROAD, 0.12), { at: [cx, top + 0.001, g.z0 + 0.125] }, 0);
+      // A gutter along the curb, patched tar here and there, and the dashed centre line
+      // close enough to the curb to show in the frame.
+      b.box(w, 0.003, 0.08, tint(ROAD, 0.1), { at: [cx, top + 0.001, g.z0 + 0.04] }, 0);
       for (let i = 0; i < w / 4; i++) {
         const x = g.x0 + i * 4 + shade(i, 0, salt) * 3;
         b.box(
           0.6 + shade(i, 1, salt),
           0.002,
-          0.4,
-          tint(ROAD, -0.15),
+          0.3,
+          tint(ROAD, -0.18),
           {
-            at: [x, top + 0.002, g.z0 + 0.6 + shade(i, 2, salt) * 1.2],
+            at: [x, top + 0.002, g.z0 + 0.45 + shade(i, 2, salt) * 1.2],
             rot: [0, shade(i, 3, salt), 0],
           },
           0,
         );
       }
-      for (let x = g.x0; x < g.x1; x += 1.6)
-        b.box(0.9, 0.003, 0.08, LINE, { at: [x + 0.45, top + 0.002, g.z0 + 2.4] }, 0);
+      for (let x = g.x0; x < g.x1; x += 1.4)
+        b.box(0.8, 0.003, 0.07, LINE, { at: [x + 0.4, top + 0.003, g.z0 + ROAD_LINE] }, 0);
+      return;
+    }
+    case 'driveway': {
+      // Poured in slabs, with two worn tyre tracks running down it.
+      slabs(b, g, DRIVEWAY, [w, 0.7], 0.03, 0.06, salt);
+      const track = Math.min(0.5, w * 0.3);
+      for (const s of [-1, 1])
+        for (let z = g.z0 + 0.04, k = 0; z < g.z1 - 0.08; z += 0.22, k++) {
+          // Faded and broken: short smudges, each a little off the line.
+          if (shade(k, s + 3, salt) < 0.25) continue;
+          const len = Math.min(0.16, g.z1 - z - 0.04);
+          const off = (shade(k, s, salt) - 0.5) * 0.04;
+          b.box(
+            0.09,
+            0.002,
+            len,
+            TYRE,
+            { at: [cx + s * track + off, top + 0.002, z + len / 2] },
+            0,
+          );
+        }
       return;
     }
     case 'soil':

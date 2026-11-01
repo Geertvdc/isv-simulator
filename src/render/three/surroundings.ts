@@ -8,8 +8,9 @@ import { type KitMaterials, type Model, kitMaterials } from './kit';
 import { SLAB_DEPTH } from './layout';
 import { matte } from './look';
 import { type Pose, type PoseInput, playerPose, strideHz } from './pose';
-import { type ScenePose, garageScene } from './scenes/garage';
+import { SCENE_PERSON_SCALE, type ScenePose, garageScene } from './scenes/garage';
 import { LAWN, groundModel } from './scenes/ground';
+import { catLoaf, dog, hoseSpray } from './setDressing/suburb';
 import { SETTINGS, type SeatPose, type SetPiece } from './setDressing';
 
 /**
@@ -255,6 +256,8 @@ export function placeSetPieces(
 export class Surroundings {
   readonly root = new THREE.Group();
   private readonly extras: Extra[] = [];
+  /** The scene's few living props (the dog, the cat, the hose's spray), moved in `update`. */
+  private readonly alive: Alive[] = [];
   private readonly geometries: THREE.BufferGeometry[] = [];
   /** The level's own number, so its people and props differ from the next level's. */
   private level = 0;
@@ -368,6 +371,9 @@ export class Surroundings {
       }
       applyPose(character, poseFor(extra, timeMs));
     }
+    const t = timeMs / 1000;
+    const watering = this.extras.find((e) => e.pose === 'watering');
+    for (const a of this.alive) moveAlive(a, t, watering?.phase ?? 0);
   }
 
   destroy(): void {
@@ -415,10 +421,35 @@ export class Surroundings {
     const surfaces = new THREE.Mesh(body, material);
     surfaces.receiveShadow = true;
     this.root.add(surfaces);
-    this.addProps(scene.pieces.map((p) => ({ ...p, side: 'front' as const })));
+    const living = (p: { piece: SetPiece }) => ALIVE.has(p.piece);
+    this.addProps(
+      scene.pieces.filter((p) => !living(p)).map((p) => ({ ...p, side: 'front' as const })),
+    );
+    for (const p of scene.pieces.filter(living)) this.addAlive(p);
     scene.people.forEach((p, i) => {
-      this.addExtra(i, p.at, p.yaw, p.pose);
+      // Smaller and greyer than the players, so they read as the neighbourhood, not a fifth player.
+      const { character } = this.addExtra(i, p.at, p.yaw, p.pose);
+      character.root.scale.setScalar(SCENE_PERSON_SCALE);
+      for (const g of character.geometries) desaturate(g, SCENE_PERSON_GREY);
     });
+  }
+
+  /** A living prop as its own mesh, so `update` can move it. */
+  private addAlive(p: Omit<Placement, 'side'>): void {
+    const model = p.piece.model(p.variant);
+    model.glow?.dispose();
+    model.glass?.dispose();
+    const body = model.body;
+    tintColors(body, p.tint);
+    this.geometries.push(body);
+    const mesh = new THREE.Mesh(body, this.materials.body);
+    put(mesh, p.at);
+    mesh.rotation.y = p.yaw;
+    mesh.scale.set(...p.scale);
+    mesh.castShadow = p.row === 'near';
+    mesh.receiveShadow = true;
+    this.root.add(mesh);
+    this.alive.push({ mesh, kind: ALIVE.get(p.piece) ?? 'breathe', yaw: p.yaw, scale: p.scale });
   }
 
   private addProps(placements: readonly Placement[]): void {
@@ -489,7 +520,7 @@ export class Surroundings {
     yaw: number,
     pose: Extra['pose'],
     walk?: Extra['walk'],
-  ): void {
+  ): Extra {
     const character = createExtra(n * 7 + 3 + (this.level % 61), this.materials);
     put(character.root, at);
     character.root.rotation.y = yaw;
@@ -500,6 +531,7 @@ export class Surroundings {
     const extra: Extra = { character, pose, phase: (n * 0.61) % 1, ...(walk ? { walk } : {}) };
     this.extras.push(extra);
     applyPose(character, poseFor(extra, 0));
+    return extra;
   }
 }
 
@@ -514,6 +546,41 @@ const STILL: PoseInput = {
   phase: 0,
   stride: 0,
 };
+
+/** How a living prop moves: breathing slowly, or (the hose's water) swaying with the hand. */
+type AliveKind = 'breathe' | 'purr' | 'spray';
+
+interface Alive {
+  mesh: THREE.Mesh;
+  kind: AliveKind;
+  yaw: number;
+  scale: [number, number, number];
+}
+
+/** The garage scene's living props. All stand well clear of the level (the cat is on the car). */
+const ALIVE = new Map<SetPiece, AliveKind>([
+  [dog, 'breathe'],
+  [catLoaf, 'purr'],
+  [hoseSpray, 'spray'],
+]);
+
+/** Moves living prop `a` to time `t` (seconds); `phase` is the waterer's, so the spray follows their hand. */
+function moveAlive(a: Alive, t: number, phase: number): void {
+  const [sx, sy, sz] = a.scale;
+  if (a.kind === 'spray') {
+    // The watering pose sways the nozzle at this rate (see `poseFor`); the arc flickers a little.
+    const sway = Math.sin((t + phase * 5) * 0.8);
+    a.mesh.rotation.y = a.yaw + sway * 0.2;
+    a.mesh.scale.set(sx, sy * (1 + Math.sin(t * 9) * 0.03), sz * (1 + Math.sin(t * 6.3) * 0.06));
+    return;
+  }
+  // Asleep in the sun: a slow breath, and now and then a twitch.
+  const rate = a.kind === 'purr' ? 1.6 : 2.2;
+  const breath = Math.sin(t * rate) * (a.kind === 'purr' ? 0.04 : 0.05);
+  const twitch = Math.max(0, Math.sin(t * 0.7) - 0.96) * 2;
+  a.mesh.scale.set(sx * (1 + breath * 0.4), sy * (1 + breath), sz);
+  a.mesh.rotation.y = a.yaw + Math.sin(t * 20) * twitch * 0.15;
+}
 
 /** What a background person is doing now. */
 function poseFor(extra: Extra, timeMs: number): Pose {
@@ -539,7 +606,35 @@ function poseFor(extra: Extra, timeMs: number): Pose {
     pose.rightHand = { x: 0.12 + Math.sin(t * 0.8) * 0.08, y: 0.62, z: 0.36 };
     pose.leftHand = { x: -0.1, y: 0.5, z: 0.28 };
   }
+  if (extra.pose === 'mowing') {
+    // Leaning into the mower's handle, both hands on the bar, plodding along.
+    const t = timeMs / 1000 + extra.phase * 3;
+    pose.lean = 0.16;
+    pose.bob = Math.abs(Math.sin(t * 3)) * 0.02;
+    pose.leftHand = { ...MOWER_GRIP, x: -MOWER_GRIP.x };
+    pose.rightHand = { ...MOWER_GRIP };
+  }
   return pose;
+}
+
+/**
+ * Where hands hold the mower's handle bar, in the (scaled) person's space: the
+ * bar's height and reach over the person's scale (`MOWER_HANDLE`, `MOWER_REACH`).
+ */
+const MOWER_GRIP = { x: 0.19, y: 0.6 / SCENE_PERSON_SCALE, z: 0.27 / SCENE_PERSON_SCALE } as const;
+/** How far scene people's colors fade toward grey. */
+const SCENE_PERSON_GREY = 0.3;
+
+/** Fades `g`'s vertex colors `amount` of the way to their grey. */
+function desaturate(g: THREE.BufferGeometry, amount: number): void {
+  const colors = g.getAttribute('color');
+  for (let i = 0; i < colors.count; i++) {
+    const r = colors.getX(i);
+    const gr = colors.getY(i);
+    const b = colors.getZ(i);
+    const l = r * 0.3 + gr * 0.59 + b * 0.11;
+    colors.setXYZ(i, r + (l - r) * amount, gr + (l - gr) * amount, b + (l - b) * amount);
+  }
 }
 
 /** Multiplies `g`'s vertex colors by `tint`. */

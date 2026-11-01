@@ -389,7 +389,10 @@ export const hoseReel = looks([1, 1], 1, (b) => {
     );
 });
 
-/** A push mower, its bag full: parked mid-job. */
+/** Where a push mower's handle bar is, in the mower's space: someone pushing it holds it there. */
+export const MOWER_HANDLE = { y: 0.6, z: -0.76 } as const;
+
+/** A push mower, its bag full, mid-job. */
 export const mower = looks([1, 1], 1, (b) => {
   b.box(0.5, 0.18, 0.55, 0xb84a3a, { at: [0, 0.18, 0] }, 0.05);
   b.cylinder(0.16, 0.18, 0.08, DARK, { at: [0, 0.3, 0.02] }, 12);
@@ -401,18 +404,27 @@ export const mower = looks([1, 1], 1, (b) => {
   ] as const)
     b.cylinder(0.08, 0.08, 0.05, INK, { at: [x, 0.08, z], rot: [0, 0, Math.PI / 2] }, 10);
   b.box(0.36, 0.28, 0.3, 0x4a5a3a, { at: [0, 0.25, -0.38] }, 0.06);
+  // The handle, raked back to waist height for whoever pushes it (see `MOWER_HANDLE`).
   for (const x of [-0.2, 0.2])
-    b.cylinder(0.02, 0.02, 0.8, DARK, { at: [x, 0.5, -0.45], rot: [-0.6, 0, 0] }, 6);
-  b.cylinder(0.025, 0.025, 0.46, DARK, { at: [0, 0.82, -0.68], rot: [0, 0, Math.PI / 2] }, 6);
+    b.cylinder(0.02, 0.02, 0.66, DARK, { at: [x, 0.39, -0.52], rot: [-0.85, 0, 0] }, 6);
+  b.cylinder(0.025, 0.025, 0.46, DARK, { at: [0, 0.6, -0.76], rot: [0, 0, Math.PI / 2] }, 6);
 });
 
-/** The mailbox at the curb, its flag up. */
+/**
+ * The mailbox at the curb, its flag up: a stubby post, so it stays low in
+ * front of the level (under 0.6) and never covers the floor.
+ */
 export const mailbox = looks([1, 1], 1, (b) => {
-  b.box(0.08, 0.7, 0.08, WOOD, { at: [0, 0.35, 0] }, 0);
-  b.box(0.24, 0.2, 0.4, 0x3a4a6a, { at: [0, 0.8, 0] }, 0.08);
-  b.box(0.2, 0.02, 0.01, WHITE, { at: [0, 0.8, 0.2] }, 0);
-  b.box(0.02, 0.16, 0.04, 0xc84a3a, { at: [0.13, 0.94, -0.05] }, 0);
-  b.box(0.02, 0.06, 0.1, 0xc84a3a, { at: [0.13, 1.0, -0.0] }, 0);
+  b.box(0.08, 0.34, 0.08, WOOD, { at: [0, 0.17, 0] }, 0);
+  b.box(0.18, 0.04, 0.3, WOOD_DARK, { at: [0, 0.33, 0] }, 0);
+  // A galvanized box with a round top, the family name on its side, the red flag up.
+  const tin = 0x9aa2aa;
+  b.box(0.3, 0.12, 0.48, tin, { at: [0, 0.37, 0] }, 0.02);
+  b.cylinder(0.15, 0.15, 0.48, tint(tin, 0.08), { at: [0, 0.43, 0], rot: [Math.PI / 2, 0, 0] }, 12);
+  b.box(0.26, 0.2, 0.01, tint(tin, -0.25), { at: [0, 0.4, 0.245] }, 0.01);
+  b.box(0.01, 0.05, 0.26, WHITE, { at: [-0.152, 0.38, 0] }, 0);
+  b.box(0.02, 0.14, 0.04, 0xc84a3a, { at: [0.16, 0.46, -0.12] }, 0);
+  b.box(0.02, 0.06, 0.12, 0xc84a3a, { at: [0.16, 0.51, -0.06] }, 0);
 });
 
 /** A fire hydrant. */
@@ -424,25 +436,32 @@ export const hydrant = looks([1, 1], 1, (b) => {
   b.cylinder(0.14, 0.14, 0.04, tint(red, -0.2), { at: [0, 0.02, 0] }, 12);
 });
 
-/** A flower bed, one tile: soil edged with stone, and a mix of blooms. */
-export const flowerBed = looks([1, 0.7], 3, (b, v) => {
+/** Blooms in muted garden colors (a clump is one color, so the bed reads as planting, not confetti). */
+const BLOOMS = [0xb87a80, 0xd0aa6c, 0x9488b4, 0xd8d0bc, 0xc08a6a] as const;
+
+/**
+ * A flower bed, one tile: soil edged with stone, leafy mounds all along and
+ * one clump of three or four blooms of one color; look 2 is leaves only.
+ */
+export const flowerBed = looks([1, 0.7], 4, (b, v) => {
   b.box(1, 0.08, 0.66, 0x5a4434, { at: [0, 0.04, 0] }, 0.02);
   b.box(1, 0.1, 0.06, COLOR.cement, { at: [0, 0.05, 0.33] }, 0);
-  const colors = nth(
-    [
-      [0xd86a7a, COLOR.blossom, 0xe8a04a],
-      [0x9a7ad8, 0xe8e0c8, 0xd86a9a],
-      [0xe8c04a, 0xd8704a, COLOR.blossom],
-    ],
-    v,
-  );
-  for (let i = 0; i < 5; i++) {
-    const x = -0.38 + i * 0.19;
-    const z = ((i + v) % 2) * 0.22 - 0.11;
-    const h = 0.18 + ((i * 3 + v) % 4) * 0.05;
-    b.sphere(0.12, i % 2 ? LEAF : LEAF_DARK, { at: [x, 0.12, z] }, [1, 0.7, 1]);
+  for (let i = 0; i < 4; i++) {
+    const x = -0.36 + i * 0.24;
+    const z = ((i + v) % 2) * 0.16 - 0.08;
+    b.sphere(0.14, i % 2 ? LEAF_DARK : tint(LEAF, -0.12), { at: [x, 0.12, z] }, [1, 0.65, 1]);
+  }
+  if (v === 2) return;
+  const color = nth(BLOOMS, v * 2 + 1);
+  const cx = [-0.2, 0.18, 0, 0.26][v] ?? 0;
+  const n = 3 + (v % 2);
+  for (let i = 0; i < n; i++) {
+    const a = i * 2.2 + v;
+    const x = cx + Math.cos(a) * 0.09;
+    const z = Math.sin(a) * 0.09 - 0.02;
+    const h = 0.18 + ((i * 3 + v) % 3) * 0.05;
     b.cylinder(0.01, 0.01, h, LEAF_DARK, { at: [x, 0.08 + h / 2, z] }, 4);
-    b.sphere(0.06, nth(colors, i), { at: [x, 0.1 + h, z] });
+    b.sphere(0.06, i === 1 ? tint(color, 0.08) : color, { at: [x, 0.1 + h, z] });
   }
 });
 
@@ -527,40 +546,58 @@ export const bbq = looks([1, 1], 1, (b) => {
 });
 
 /**
- * The family car, evicted to the driveway: a dusty-blue estate seen mostly
- * from above, so its hood, dark windscreen and roof rails carry the shape.
+ * The family car, evicted to the side pad: a dusty-red hatchback built to
+ * read from above. Dark glass with a pale glint fore and aft, a lighter roof,
+ * wheels poking out past the body, red tail lights on the rear corners where
+ * the camera sees them, and the mirrors sticking out. Its nose is +z.
  */
 export const familyCar = looks([1.5, 2.7], 1, (b) => {
-  const paint = 0x8aa2bc;
-  const glass = 0x34404e;
-  // The body: a low tub, a hood sloping to the nose, a cabin over the back.
-  b.box(1.46, 0.42, 2.66, paint, { at: [0, 0.4, 0] }, 0.16);
-  b.box(1.38, 0.1, 0.8, tint(paint, 0.08), { at: [0, 0.62, 0.86], rot: [0.08, 0, 0] }, 0.05);
-  b.box(1.28, 0.4, 1.6, paint, { at: [0, 0.8, -0.42] }, 0.12);
-  b.box(1.2, 0.04, 1.3, tint(paint, 0.15), { at: [0, 1.01, -0.48] }, 0);
-  // Dark windows: the raked windscreen, down both sides and the back.
-  b.box(1.14, 0.03, 0.46, glass, { at: [0, 0.83, 0.46], rot: [-0.85, 0, 0] }, 0);
-  for (const x of [-0.645, 0.645]) b.box(0.02, 0.24, 1.3, glass, { at: [x, 0.84, -0.4] }, 0);
-  b.box(1.08, 0.24, 0.02, glass, { at: [0, 0.84, -1.225] }, 0);
-  // Roof rails, mirrors, bumpers, plate, lights.
-  for (const x of [-0.55, 0.55]) {
-    b.box(0.05, 0.05, 1.3, DARK, { at: [x, 1.06, -0.5] }, 0);
-    b.box(0.14, 0.08, 0.08, paint, { at: [x * 1.38, 0.74, 0.38] }, 0.02);
-  }
-  b.box(1.5, 0.12, 0.12, DARK, { at: [0, 0.28, 1.33] }, 0.04);
-  b.box(1.5, 0.12, 0.12, DARK, { at: [0, 0.28, -1.33] }, 0.04);
-  b.box(0.36, 0.1, 0.02, WHITE, { at: [0, 0.4, 1.34] }, 0);
-  for (const [x, z] of [
-    [-0.72, 0.85],
-    [0.72, 0.85],
-    [-0.72, -0.85],
-    [0.72, -0.85],
+  const paint = 0x9c4a42;
+  const glass = 0x2b3644;
+  const glint = 0x9fb3c8;
+  const lid = tint(paint, 0.07);
+  // The body, the hood and the boot lid, the cabin over the middle.
+  b.box(1.36, 0.38, 2.7, paint, { at: [0, 0.42, 0] }, 0.14);
+  b.box(1.24, 0.05, 0.84, lid, { at: [0, 0.62, 0.88], rot: [0.07, 0, 0] }, 0.03);
+  b.box(1.24, 0.05, 0.44, lid, { at: [0, 0.62, -1.1] }, 0.03);
+  b.box(1.2, 0.36, 1.3, paint, { at: [0, 0.77, -0.2] }, 0.1);
+  b.box(1.02, 0.04, 0.86, tint(paint, 0.2), { at: [0, 0.96, -0.22] }, 0.02);
+  // The windscreen raked down to the hood, the rear window down to the boot: glass with a glint.
+  for (const [z, y, len, rot, w] of [
+    [0.58, 0.78, 0.5, 0.79, 1.1],
+    [-0.95, 0.79, 0.42, -0.93, 1.06],
   ] as const) {
-    b.cylinder(0.24, 0.24, 0.18, INK, { at: [x, 0.24, z], rot: [0, 0, Math.PI / 2] }, 16);
-    b.cylinder(0.12, 0.12, 0.19, STEEL, { at: [x, 0.24, z], rot: [0, 0, Math.PI / 2] }, 12);
+    b.box(w, 0.03, len, glass, { at: [0, y, z], rot: [rot, 0, 0] }, 0);
+    const n: [number, number] = [Math.cos(rot) * 0.012, Math.sin(rot) * 0.012];
+    b.box(0.12, 0.03, len * 0.86, glint, { at: [0.3, y + n[0], z + n[1]], rot: [rot, 0, 0] }, 0);
+    b.box(0.05, 0.03, len * 0.86, glint, { at: [0.12, y + n[0], z + n[1]], rot: [rot, 0, 0] }, 0);
   }
-  b.ledPair(0.07, COLOR.headlight, [0.52, 0.46, 1.3]);
-  b.ledPair(0.06, COLOR.tailLight, [0.56, 0.5, -1.32]);
+  for (const x of [-0.605, 0.605]) b.box(0.02, 0.2, 1.0, glass, { at: [x, 0.8, -0.22] }, 0);
+  // Mirrors out the sides, bumpers, the plate.
+  for (const s of [-1, 1]) {
+    b.box(0.17, 0.08, 0.09, paint, { at: [s * 0.72, 0.74, 0.4] }, 0.02);
+    b.box(0.13, 0.06, 0.01, glass, { at: [s * 0.74, 0.74, 0.35] }, 0);
+  }
+  b.box(1.4, 0.12, 0.12, DARK, { at: [0, 0.3, 1.36] }, 0.04);
+  b.box(1.4, 0.12, 0.12, DARK, { at: [0, 0.3, -1.36] }, 0.04);
+  b.box(0.36, 0.1, 0.02, WHITE, { at: [0, 0.42, -1.37] }, 0);
+  // Wheels, poking out past the body so they show from above.
+  for (const [x, z] of [
+    [-0.66, 0.88],
+    [0.66, 0.88],
+    [-0.66, -0.88],
+    [0.66, -0.88],
+  ] as const) {
+    b.cylinder(0.23, 0.23, 0.2, INK, { at: [x, 0.23, z], rot: [0, 0, Math.PI / 2] }, 16);
+    b.cylinder(0.11, 0.11, 0.21, STEEL, { at: [x, 0.23, z], rot: [0, 0, Math.PI / 2] }, 12);
+  }
+  // Pale headlights on the nose's corners, red tail lights wrapping over the back ones.
+  for (const s of [-1, 1]) {
+    b.box(0.3, 0.07, 0.06, 0xece4c8, { at: [s * 0.44, 0.56, 1.33] }, 0.01);
+    b.box(0.26, 0.12, 0.05, 0xc23b32, { at: [s * 0.47, 0.54, -1.34] }, 0.01);
+    b.box(0.24, 0.02, 0.14, 0xc23b32, { at: [s * 0.47, 0.615, -1.28] }, 0);
+  }
+  b.ledPair(0.05, COLOR.headlight, [0.44, 0.56, 1.36]);
 });
 
 /** A wheelbarrow of soil and a spade, left by the lawn. */
@@ -619,6 +656,94 @@ export const gnome = looks([1, 1], 1, (b) => {
   b.sphere(0.06, COLOR.skinWarm, { at: [0, 0.21, 0] });
   b.cone(0.05, 0.08, WHITE, { at: [0, 0.17, 0.04] }, 8);
   b.cone(0.065, 0.16, 0xc84a3a, { at: [0, 0.32, 0] }, 10);
+});
+
+/**
+ * Cardboard boxes stacked against a wall, two or three high: the founders'
+ * kit, shipped in and never unpacked. Look 1 is the tall stack.
+ */
+export const boxStack = looks([1, 1], 3, (b, v) => {
+  // Columns of [width, height, depth, turn] from the bottom up, at x offsets.
+  const stacks: [number, [number, number, number, number][]][][] = [
+    [
+      [
+        -0.16,
+        [
+          [0.5, 0.34, 0.42, 0],
+          [0.42, 0.28, 0.36, 0.2],
+        ],
+      ],
+      [0.3, [[0.36, 0.3, 0.34, -0.1]]],
+    ],
+    [
+      [
+        0,
+        [
+          [0.56, 0.36, 0.44, 0],
+          [0.46, 0.3, 0.4, 0.15],
+          [0.36, 0.26, 0.32, -0.12],
+        ],
+      ],
+      [0.42, [[0.3, 0.22, 0.3, 0.3]]],
+    ],
+    [
+      [
+        -0.1,
+        [
+          [0.6, 0.3, 0.46, 0.05],
+          [0.3, 0.24, 0.3, 0.4],
+        ],
+      ],
+      [
+        0.36,
+        [
+          [0.3, 0.26, 0.3, -0.2],
+          [0.26, 0.2, 0.26, 0.1],
+        ],
+      ],
+    ],
+  ];
+  nth(stacks, v).forEach(([x, boxes], col) => {
+    let y = 0;
+    boxes.forEach(([w, h, d, turn], k) => {
+      const c = (k + col) % 2 ? CARDBOARD : tint(CARDBOARD, -0.12);
+      b.box(w, h, d, c, { at: [x, y + h / 2, 0], rot: [0, turn, 0] }, 0.02);
+      b.box(w + 0.005, 0.02, 0.07, 0xc8c0a8, { at: [x, y + h, 0], rot: [0, turn, 0] }, 0);
+      y += h;
+    });
+  });
+});
+
+/** Old CRT monitors stacked by the wall, cables trailing: the last startup's kit. */
+export const monitorStack = looks([1, 1], 2, (b, v) => {
+  const beige = [0xc8bea4, 0xb8b09a, 0xd0c8b0] as const;
+  let y = 0;
+  for (let i = 0; i < 2 + v; i++) {
+    const c = nth(beige, i + v);
+    const turn = ((i * 5 + v) % 3) * 0.15 - 0.15;
+    b.box(0.42, 0.32, 0.36, c, { at: [0, y + 0.16, -0.04], rot: [0, turn, 0] }, 0.04);
+    b.box(0.32, 0.24, 0.02, 0x3a4048, {
+      at: [Math.sin(turn) * 0.19, y + 0.17, Math.cos(turn) * 0.19 - 0.04],
+      rot: [0, turn, 0],
+    });
+    y += 0.32;
+  }
+  b.cylinder(0.015, 0.015, 0.5, DARK, { at: [0.25, 0.02, 0.2], rot: [Math.PI / 2, 0, 0.6] }, 5);
+});
+
+/** A blue tarp tied over a lump (the old sofa, probably), bricks on its corners. */
+export const tarpLump = looks([1, 1], 1, (b) => {
+  const tarp = 0x4a6a8a;
+  b.sphere(0.42, tarp, { at: [0, 0.12, 0] }, [1.3, 0.75, 0.9]);
+  b.box(0.9, 0.26, 0.6, tint(tarp, -0.06), { at: [0, 0.13, 0] }, 0.12);
+  b.box(1.0, 0.03, 0.66, tint(tarp, -0.14), { at: [0, 0.015, 0] }, 0.02);
+  b.box(0.03, 0.4, 0.02, 0xc8b47e, { at: [0.15, 0.2, 0.31], rot: [0, 0, 0.05] }, 0);
+  for (const [x, z] of [
+    [-0.46, 0.3],
+    [0.48, -0.28],
+    [0.44, 0.31],
+  ] as const)
+    b.box(0.16, 0.08, 0.1, 0x9a5a48, { at: [x, 0.05, z], rot: [0, x * 1.3, 0] }, 0.01);
 });
 
 /** A rain barrel under the downpipe. */
