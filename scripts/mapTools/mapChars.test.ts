@@ -37,6 +37,13 @@ describe('future map chars', () => {
   it('are counted', () => {
     expect(countFutureChars(DRAFT)).toEqual({ _: 1, L: 1, '=': 1 });
   });
+
+  it('read the Scale-Up express lift as floor and the mail chute hatch as a counter', () => {
+    expect(toStandIns('lH')).toBe('.C');
+    const map = parseDraftMap(['#I##K#', '#1lH2#', '#3..4#', '#S##T#'].join('\n'));
+    expect(map.tiles[1 * map.width + 2]).toBe('floor');
+    expect(map.tiles[1 * map.width + 3]).toBe('counter');
+  });
 });
 
 describe('mapRows', () => {

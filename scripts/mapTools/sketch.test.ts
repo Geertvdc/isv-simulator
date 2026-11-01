@@ -73,4 +73,20 @@ describe('renderSketchSvg', () => {
     expect(svg).toContain('does not parse');
     expect(svg).not.toContain('not in the game yet');
   });
+
+  it('names the stand-ins of the future chars it shows', () => {
+    const svg = renderSketchSvg([{ title: 'Draft', text: '#lH_#' }]);
+    expect(svg).toContain('express lift cabin as floor');
+    expect(svg).toContain('mail chute hatch as counter');
+    expect(svg).toContain('wet floor as floor');
+  });
+});
+
+describe('Scale-Up chars', () => {
+  it('draw the express lift apart from the lift, and the chute hatch as a block', () => {
+    expect(drawMap('l').svg).toContain('>E</text>');
+    expect(drawMap('L').svg).toContain('>L</text>');
+    expect(drawMap('H').svg).toContain('>H</text>');
+    expect(drawMap('lH').svg).not.toContain('#ff00ff');
+  });
 });

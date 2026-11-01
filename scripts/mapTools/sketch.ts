@@ -36,7 +36,7 @@ type Look =
   | { kind: 'wet' }
   | { kind: 'spillZone' }
   | { kind: 'robotRoute' }
-  | { kind: 'lift' }
+  | { kind: 'lift'; express?: boolean }
   | { kind: 'partition' }
   | { kind: 'unknown' };
 
@@ -87,10 +87,16 @@ const CHARS: Readonly<Record<string, CharInfo>> = {
   r: { look: { kind: 'robotRoute' }, name: `${FUTURE_CHARS.r?.name ?? 'mop robot route'} *` },
   L: { look: { kind: 'lift' }, name: `${FUTURE_CHARS.L?.name ?? 'lift'} *` },
   '=': { look: { kind: 'partition' }, name: `${FUTURE_CHARS['=']?.name ?? 'partition'} *` },
+  // Scale-Up
+  l: {
+    look: { kind: 'lift', express: true },
+    name: `${FUTURE_CHARS.l?.name ?? 'express lift'} *`,
+  },
+  H: { look: block('#6d4c41', 'H'), name: `${FUTURE_CHARS.H?.name ?? 'mail chute'} *` },
 };
 
 /** Legend order: `CHARS` keys can't give it, digit keys come first in an object. */
-const LEGEND_ORDER = '.# ~CIBKTRPSXWG><v^1234Mm_o%rL='.split('');
+const LEGEND_ORDER = '.# ~CIBKTRPSXWG><v^1234Mm_o%rL=lH'.split('');
 
 const UNKNOWN: CharInfo = { look: { kind: 'unknown' }, name: 'unknown char' };
 
@@ -214,9 +220,9 @@ function cellSvg(look: Look, x: number, y: number, t: number): string {
           y + inset,
           t - 2 * inset,
           t - 2 * inset,
-          `fill="#cfd8dc" stroke="#263238" stroke-width="${Math.max(2, t * 0.09)}"`,
+          `fill="${look.express ? '#ffca28' : '#cfd8dc'}" stroke="#263238" stroke-width="${Math.max(2, t * 0.09)}"`,
         ) +
-        label(cx, cy, t * 0.5, 'L', 'font-weight="bold" fill="#263238"')
+        label(cx, cy, t * 0.5, look.express ? 'E' : 'L', 'font-weight="bold" fill="#263238"')
       );
     case 'partition':
       return (
@@ -363,8 +369,15 @@ export function renderSketchSvg(panels: readonly SketchPanel[], heading = ''): s
   const hasFuture = legend.some((e) => FUTURE_CHARS[e.char]);
   const footnoteTop = legendTop + legendRows * LEGEND_ROW + 6;
   if (hasFuture) {
+    const standIns = legend
+      .flatMap((e) => {
+        const future = FUTURE_CHARS[e.char];
+        if (!future) return [];
+        return [`${future.name.replace(/ \(.*\)$/, '')} as ${charInfo(future.standIn).name}`];
+      })
+      .join(', ');
     parts.push(
-      `<text x="${MARGIN}" y="${footnoteTop + 6}" font-size="12" ${FONT} fill="#616161">* not in the game yet: tools read wet floor and lifts as floor, partitions as wall</text>`,
+      `<text x="${MARGIN}" y="${footnoteTop + 6}" font-size="12" ${FONT} fill="#616161">${escapeXml(`* not in the game yet, the tools read: ${standIns}`)}</text>`,
     );
   }
 
