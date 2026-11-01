@@ -1,12 +1,15 @@
 /// <reference types="node" />
 
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 /**
  * Headless tuning run: bots play a level with fixed seeds and we print how it
  * went. Use `--role-lab --players=4 [runs=30] [firstSeed=1]` for paired role trials,
  * or `--role-bench [runs=30] [firstSeed=1] [--json=/path/to/results.json]`.
  * `--level=all` runs every campaign level and prints one line per level.
+ * `--drafts [runs=5] [firstSeed=1] [--level=<id>] [--bots=1,2,3,4]` plays every
+ * level redesign draft (`maps/drafts/`, phase 23, each reorg phase for the whole
+ * round) and its current map with 1 to 4 bots and prints a markdown table.
  */
 
 import { PIPELINE_BUILD_TICKS, TICKS_PER_SECOND, WORK_RATE } from '../src/sim/balance';
@@ -14,12 +17,23 @@ import type { BotAssignmentPolicy } from '../src/sim/bot';
 import { runBots, type BotRunSummary } from '../src/sim/botRun';
 import { type Level, LEVELS, levelById, settingsForPlayers } from '../src/sim/levels';
 import { isRoleId, roleWorkRate, type RoleId } from '../src/sim/roles';
+import { draftLevel } from '../src/sim/draftMap';
+import {
+  type DraftSimRow,
+  type RunScore,
+  LOW_SCORE_SHARE,
+  draftFailed,
+  draftSimTable,
+} from './mapTools/draftSim';
+import { draftIds, draftPhases, levelLabel } from './mapTools/mapFiles';
 
 const args = process.argv.slice(2);
 const skipTests = args.includes('--skip-tests');
 const roleLab = args.includes('--role-lab');
 const roleBench = args.includes('--role-bench');
-const levelId = args.find((a) => a.startsWith('--level='))?.slice('--level='.length) ?? 'garage';
+const drafts = args.includes('--drafts');
+const levelArg = args.find((a) => a.startsWith('--level='))?.slice('--level='.length);
+const levelId = levelArg ?? 'garage';
 const policyArg = args.find((a) => a.startsWith('--policy='))?.slice('--policy='.length);
 if (policyArg !== undefined && policyArg !== 'role-neutral' && policyArg !== 'role-aware') {
   throw new Error(`Unknown assignment policy '${policyArg}'`);
@@ -567,7 +581,67 @@ function runRoleBench(): void {
   }
 }
 
-if (roleBench) {
+function runScores(level: Level, botCount: number, seeds: readonly number[]): RunScore[] {
+  return seeds.map((seed) => {
+    const r = runBots(level, seed, botCount, { skipTests });
+    return { score: r.result.score, stars: r.result.stars, shipped: r.shipped };
+  });
+}
+
+function runDrafts(): void {
+  const runCount = positional[0] ?? 5;
+  const seedStart = positional[1] ?? 1;
+  const botCounts = (
+    args.find((a) => a.startsWith('--bots='))?.slice('--bots='.length) ?? '1,2,3,4'
+  )
+    .split(',')
+    .map(Number);
+  if (!Number.isInteger(runCount) || runCount <= 0 || !Number.isInteger(seedStart)) {
+    throw new Error('--drafts needs a positive run count and an integer first seed');
+  }
+  if (botCounts.some((n) => !Number.isInteger(n) || n < 1 || n > 4)) {
+    throw new Error('--bots takes bot counts from 1 to 4, like --bots=2,4');
+  }
+  const ids = draftIds().filter((id) => levelArg === undefined || id === levelArg);
+  if (ids.length === 0) throw new Error(`No drafts${levelArg ? ` for '${levelArg}'` : ''}`);
+  const seeds = Array.from({ length: runCount }, (_, i) => seedStart + i);
+  console.log(
+    `Drafts: ${runCount} run(s) per row from seed ${seedStart}${skipTests ? ', skipping tests' : ''}; ` +
+      'future chars as stand-ins, the level’s current settings. Later reorg phases play the whole round.\n',
+  );
+  const rows: DraftSimRow[] = [];
+  for (const id of ids) {
+    const level = levelById(id);
+    if (!level) throw new Error(`No level '${id}'`);
+    const current = botCounts.map((bots) => runScores(level, bots, seeds));
+    for (const { phase, path } of draftPhases(id)) {
+      botCounts.forEach((bots, i) => {
+        let draft: DraftSimRow['draft'];
+        try {
+          draft = runScores(draftLevel(level, readFileSync(path, 'utf8')), bots, seeds);
+        } catch (e) {
+          draft = { error: e instanceof Error ? e.message : String(e) };
+        }
+        rows.push({ level: levelLabel(id), phase, bots, current: current[i] ?? [], draft });
+      });
+    }
+  }
+  console.log(draftSimTable(rows));
+  console.log(
+    `\nok: bots ship every run. low: under ${LOW_SCORE_SHARE * 100}% of the current map's average. ` +
+      'stuck: runs where bots shipped nothing. error: the sim threw.',
+  );
+  const failed = rows.filter(draftFailed);
+  console.log(
+    failed.length === 0
+      ? '\nBots finished every draft.'
+      : `\nBots couldn't finish ${failed.length} row(s): ${failed.map((r) => `${r.level} phase ${r.phase} ×${r.bots}`).join(', ')}`,
+  );
+}
+
+if (drafts) {
+  runDrafts();
+} else if (roleBench) {
   runRoleBench();
 } else if (roleLab) {
   runRoleLab();
