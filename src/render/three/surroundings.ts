@@ -8,6 +8,8 @@ import { type KitMaterials, type Model, kitMaterials } from './kit';
 import { SLAB_DEPTH } from './layout';
 import { matte } from './look';
 import { type Pose, type PoseInput, playerPose, strideHz } from './pose';
+import { type ScenePose, garageScene } from './scenes/garage';
+import { LAWN, groundModel } from './scenes/ground';
 import { SETTINGS, type SeatPose, type SetPiece } from './setDressing';
 
 /**
@@ -64,13 +66,13 @@ export interface Placement {
   /** Multiplies its colors: red, green, blue. */
   tint: [number, number, number];
   row: Row;
-  side: 'left' | 'right' | 'back';
+  side: 'left' | 'right' | 'back' | 'front';
 }
 
 /** A background person and what they do. */
 interface Extra {
   character: Character;
-  pose: SeatPose | 'walking';
+  pose: SeatPose | ScenePose | 'walking';
   phase: number;
   /** Walkers pace back and forth along x between these, at `z`. */
   walk?: { from: number; to: number; z: number };
@@ -262,8 +264,14 @@ export class Surroundings {
    * that glow softly instead of blooming, so nothing out here outshines the office.
    */
   private readonly materials: KitMaterials = dimmedMaterials();
+  /** A hand-built scene's ground: vertex colors, rougher than the props. */
+  private groundMaterial: THREE.Material | null = null;
 
-  constructor(map: LevelMap, setting: string | undefined) {
+  constructor(map: LevelMap, setting: string | undefined, scene?: string) {
+    if (scene === 'garage') {
+      this.buildGarage(map);
+      return;
+    }
     const s = setting === undefined ? undefined : SETTINGS[setting];
     if (!s) return;
     const { width, height } = map;
@@ -364,9 +372,53 @@ export class Surroundings {
 
   destroy(): void {
     for (const g of this.geometries) g.dispose();
+    this.groundMaterial?.dispose();
     const { body, glow, glass, character } = this.materials;
     for (const m of [body, glow, glass, character]) m.dispose();
     for (const extra of this.extras) for (const g of extra.character.geometries) g.dispose();
+  }
+
+  /**
+   * The garage level's hand-built world (`scenes/garage.ts`) in place of the
+   * chapter's rows: a lawn out to the horizon, the scene's ground surfaces
+   * merged into one mesh, its props merged like the rows', and its people.
+   */
+  private buildGarage(map: LevelMap): void {
+    const scene = garageScene(map);
+    this.level = levelSalt(map);
+    const material = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.95,
+      metalness: 0,
+    });
+    material.color.setScalar(GROUND_DIM);
+    this.groundMaterial = material;
+    // The lawn, one big plane under it all; the level's slab stands on it.
+    const lawn = new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE).rotateX(-Math.PI / 2);
+    lawn.setAttribute(
+      'color',
+      new THREE.Float32BufferAttribute(
+        Array.from({ length: lawn.getAttribute('position').count }, () =>
+          new THREE.Color(LAWN).toArray(),
+        ).flat(),
+        3,
+      ),
+    );
+    this.geometries.push(lawn);
+    const plane = new THREE.Mesh(lawn, material);
+    put(plane, gridToWorld((map.width - 1) / 2, (map.height - 1) / 2, GROUND_Y - 0.002));
+    plane.receiveShadow = true;
+    this.root.add(plane);
+    const { body } = groundModel(scene);
+    body.translate(0, GROUND_Y, 0);
+    this.geometries.push(body);
+    const surfaces = new THREE.Mesh(body, material);
+    surfaces.receiveShadow = true;
+    this.root.add(surfaces);
+    this.addProps(scene.pieces.map((p) => ({ ...p, side: 'front' as const })));
+    scene.people.forEach((p, i) => {
+      this.addExtra(i, p.at, p.yaw, p.pose);
+    });
   }
 
   private addProps(placements: readonly Placement[]): void {
@@ -481,6 +533,12 @@ function poseFor(extra: Extra, timeMs: number): Pose {
     pose.nod = Math.sin(t * 2.3) * 0.12;
     pose.rightHand = { x: 0.36, y: 0.6 + Math.max(0, Math.sin(t * 3.1)) * 0.15, z: 0.25 };
   }
+  if (extra.pose === 'watering') {
+    // The hose nozzle held out in front, swaying slowly over the flowers.
+    const t = timeMs / 1000 + extra.phase * 5;
+    pose.rightHand = { x: 0.12 + Math.sin(t * 0.8) * 0.08, y: 0.62, z: 0.36 };
+    pose.leftHand = { x: -0.1, y: 0.5, z: 0.28 };
+  }
   return pose;
 }
 
@@ -497,6 +555,8 @@ function put(obj: THREE.Object3D, p: Vec3): void {
   obj.position.set(p.x, p.y, p.z);
 }
 
+/** A hand-built scene's ground, a little darker than its colors, so the office floor stays brightest. */
+const GROUND_DIM = 0.82;
 /** How much darker the world outside is than the office. */
 const DIM = 0.66;
 /** Screens outside glow at this, well under the bloom threshold. */
