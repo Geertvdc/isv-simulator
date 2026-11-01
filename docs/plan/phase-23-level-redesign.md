@@ -1,6 +1,6 @@
 # Phase 23: Level redesign
 
-**Status:** in progress. Layer 1 (this file, `maps/drafts/`, the sketch and report tools) is in; layer 2 has the Garage drafts, waiting for review; the other chapters come in the next layers. Nothing in the game changes until the greybox step.
+**Status:** in progress. Gate 1 (this file, the drafts in `maps/drafts/`, the sketch, report and render tools) is approved. Gate 2a's greybox loader is in: dev builds play any draft with `?draft=<level-id>` and `npm run sim -- --drafts` reports how bots do on them (see [Tools](#tools) and [Greybox bot report](#greybox-bot-report)); the couch test is next. The shipped game doesn't change until the rollout.
 
 **Goal:** levels that differ in size and shape (small rooms, big halls, two rooms joined by a hallway where people bump into each other) and a layout play element per chapter, not only furniture placement. Today all 16 campaign maps are the same 14×10 rectangle (Big Tech 16×10) with furniture moved around. Every level must work from 1 to 4 players on one map.
 
@@ -61,7 +61,7 @@ Each is built later with a lab level, tests, 3D, bots and an intro card.
 
 ## Tools
 
-Draft maps live in [`maps/drafts/`](../../maps/drafts/README.md), one `<level-id>.txt` per level, in the normal map format plus the future chars `_` (wet floor), `L` (lift cabin) and `=` (partition). Until those mechanics exist the tools read `_` and `L` as floor and `=` as wall. The game never loads drafts.
+Draft maps live in [`maps/drafts/`](../../maps/drafts/README.md), one `<level-id>.txt` per level, in the normal map format plus the future chars `_` (wet floor), `L` (lift cabin) and `=` (partition). Until those mechanics exist the tools read `_` and `L` as floor and `=` as wall. Only dev builds load drafts, with `?draft=` (below); production builds leave them out.
 
 ```sh
 npm run sketch -- <level-id>         # current and draft side by side -> docs/plan/images/level-redesign/<level-id>.svg
@@ -72,11 +72,17 @@ npm run level-report -- --all --table  # the markdown table below
 npm run level-report -- --drafts --table
 npm run draft-shots -- <level-id>... # draft in the real 3D game -> docs/plan/images/level-redesign/<level-id>-3d.webp
 npm run draft-shots -- --drafts      # every level with a draft
+npm run sim -- --drafts [runs=5] [firstSeed=1] [--level=<id>] [--bots=1,2,3,4]  # bots on every draft vs its current map
+npm run dev                          # then open /?draft=<level-id>[&phase=N] to play a draft
 ```
 
 The sketch draws every tile type in its own color with a legend, spawns 1–4 numbered in the player colors, belts with arrows, gaps hatched and the void left empty; future chars get their own look (wet floor glossy blue, lift a boxed `L`, partition a dashed wall). Both maps are drawn at the same scale, so sizes compare at a glance.
 
-`draft-shots` renders a draft in the actual game: it makes a temporary git worktree at `HEAD`, copies each draft over its live `maps/level-XX-*.txt` (with the stand-ins above, so future chars show as floor or wall), starts vite there and runs `scripts/screenshots.ts` for that level. It always removes the worktree afterwards. Runs share Chrome's debug port, so parallel runs wait on a lock (`/tmp/isv-draft-shots.lock`).
+**Greybox loader (gate 2a).** In a dev build (`npm run dev`), `/?draft=<level-id>` plays `maps/drafts/<level-id>.txt` in the real 3D game with that level's current settings (duration, order schedule, stars, reviews, incidents, meetings, managers, look) and the stand-ins above for future chars; `&phase=N` plays reorg phase N (`<level-id>.phaseN.txt`) for the whole round. It opens straight in the lobby: join, start, play; nothing is saved and there's no online play. A bad id or a missing phase warns in the console and boots the normal game. `src/render/scene/draftLevel.ts` loads the draft (`main.ts` imports it behind `import.meta.env.DEV`, so production builds have neither the loader nor the drafts); the pure parts (`draftRequest`, `draftLevel`, the future chars) are in `src/sim/draftMap.ts`. With `?scene=level-<id>&draft=<id>` the level's screenshot scene shows the draft instead.
+
+`draft-shots` renders a draft in the actual game: it starts vite in this checkout on a free port and runs `scripts/screenshots.ts` for the level's scene with `--query=draft=<id>[&phase=N]`, so uncommitted draft edits render too. Runs share Chrome's debug port, so parallel runs wait on a lock (`/tmp/isv-draft-shots.lock`).
+
+`npm run sim -- --drafts` plays every draft (each reorg phase for the whole round) and its current map with the same seeds and settings, for 1 to 4 bots, and prints a markdown table: average score, the change against the current map, stars, tickets shipped and a verdict: `ok`, `low` (under half the current map's average), `stuck n/N` (runs that shipped nothing) or `error` (the sim threw). Bots don't know the future mechanics, so the numbers are for stand-in maps; the stars are still the current thresholds.
 
 Reorg levels have one draft per layout phase: `<level-id>.txt` is phase 1 and `<level-id>.phase2.txt`, `<level-id>.phase3.txt` are the later layouts, with `D` for a rolling desk (read as a counter). The sketch draws a panel per phase, the report prints a row per phase and checks that phases only differ in `=`, `D`, `d` and floor (same size, same stations, same number of desks), and `draft-shots` renders each later phase to `<level-id>-phaseN-3d.webp`. Enterprise also drafts with `d` (meeting door) and `+` (badge turnstile), both read as floor; the sketch footnote lists the stand-in of every future char a map uses.
 
@@ -815,6 +821,29 @@ Each level from 5-2 on adds one element no earlier level has. None of them is bu
 - **4 players:** spawns 1 and 2 in the hall (inbox, keyboards, merge, ship), 3 in the design room (whiteboards), 4 in the server room (tests, pipelines, incidents): four jobs, four rooms. The chokepoint is the server-room door (16,8), a cut for people; the bypass is the lift for people and the hatch for tickets. The partition moves the crowd from one lane to the other halfway through, and the spill sends anyone grabbing a ticket from the pickup counter sliding. Open questions for review: is a 58-step solo loop too long for the finale? How often should a belt outage come up (proposal: every other incident)?
 - **Review:** approved at gate 1 (2026-11-01, iteration 2)
 
+## Greybox bot report
+
+`npm run sim -- --drafts 5` (seeds 1–5) at gate 2a. Bots don't know the future mechanics, so these are stand-in maps (spills, lifts, doors, travelators and turnstiles play as plain floor or wall) under the current star thresholds. The drafts stay as they are; this is input for the couch test and for retuning in gate 2b.
+
+| Level                           | Draft vs current map (1 / 2 / 3 / 4 bots)               | Verdict                     |
+| ------------------------------- | ------------------------------------------------------- | --------------------------- |
+| 1-1 The Garage                  | +16% / +3% / +33% / +26%                                | ok                          |
+| 1-2 Open Plan Office            | +39% / +29% / +26% / +18%                               | ok                          |
+| 1-3 Down the Hall               | +2% / −16% / −26% / −43%                                | stuck 1/5 with 3 and 4 bots |
+| 2-1 Seed Round                  | −22% / −17% / −17% / −34%                               | ok                          |
+| 2-2 Demo Day                    | −40% / −5% / −5% / +10%                                 | ok                          |
+| 2-3 On Call                     | −50% / −55% / −22% / −14%                               | low with 2 bots             |
+| 3-1 Middle Management           | −14% / −15% / −12% / −14%                               | ok                          |
+| 3-2 Hypergrowth                 | −82% / −89% / −85% / −73%                               | low with every team size    |
+| 3-3 Hot Desking                 | −86% / −84% / −72% / −62%                               | low with every team size    |
+| 4-1 Back to Back                | +23% / +12% / +5% / +5%                                 | ok                          |
+| 4-2 Synergy (phase 1 / 2)       | −45% / −31% / −7% / −19% and −29% / +23% / +24% / −11%  | ok                          |
+| 4-3 The Reorg (phase 1 / 2 / 3) | −27% to −91%                                            | low in nearly every row     |
+| 5-1 The Atrium                  | +1% / −5% / +5% / 0%                                    | ok                          |
+| 5-2 Design Sprint               | +6% / 0% / −1% / −3%                                    | ok                          |
+| 5-3 Monorepo                    | +3% / −14% / −6% / −2%                                  | ok                          |
+| 5-4 Hackathon (phase 1 / 2)     | −52% / −35% / −25% / −22% and −42% / −35% / −25% / −18% | low solo in phase 1         |
+
 ## Delivery
 
 Stacked PRs on `main`, one layer per child session, each opening its own PR.
@@ -855,4 +884,10 @@ Gate 1 (design):
 - [ ] Enterprise drafts; reviewed
 - [ ] Big Tech drafts; reviewed
 
-Gate 2 and rollout get their own boxes once gate 1 is through.
+Gate 2a (greybox):
+
+- [x] Dev-only `?draft=<level-id>[&phase=N]` plays a draft in the real game with the level's settings; `draft-shots` uses it
+- [x] `npm run sim -- --drafts` report for 1–4 bots per draft
+- [ ] Couch test: Garage, Startup x-1, Scale-Up x-1, Enterprise x-1 and Big Tech drafts
+
+Gate 2b and rollout get their own boxes once the mechanics are planned.

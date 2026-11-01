@@ -24,7 +24,7 @@ Sketches of the redesigned campaign maps, for review on paper before anything is
   | `*`  | revolving door (Big Tech)                                     | floor `.`        |
 
 - Reorg levels change layout during the round: `<level-id>.txt` is phase 1 (the layout at the start), `<level-id>.phase2.txt`, `.phase3.txt` the layouts after each reorg. Same size; only partitions `=`, rolling desks `D` and meeting doors `d` move (onto and off floor), everything else stays put. Rolling desks pair up in reading order (the first `D` in phase 1 rolls to the first `D` in phase 2). The tools draw, report and render every phase, and flag a phase that moves anything else.
-- The game never loads these files (not until the greybox step of phase 23).
+- Dev builds play them in the real game (the greybox step): run `npm run dev` and open `http://localhost:5173/?draft=<level-id>`, with `&phase=N` for a later reorg phase. The level keeps its current settings; future chars play as their stand-ins. Production builds don't include the drafts.
 
 ## Tools
 
@@ -34,4 +34,8 @@ npm run sketch -- --drafts          # every draft here
 npm run level-report -- <level-id>  # numbers for the current map and its draft
 npm run level-report -- --drafts --table
 npm run draft-shots -- <level-id>   # draft in the real 3D game -> docs/plan/images/level-redesign/<level-id>-3d.webp
+npm run sim -- --drafts             # 1-4 bots on every draft vs its current map, as a markdown table
+npm run sim -- --drafts 10 --level=hot-desking --bots=2,4
 ```
+
+Play a draft on the couch: `npm run dev`, then `/?draft=garage`, `/?draft=the-reorg&phase=2`, and so on. It opens in the lobby: join and start as usual, play; nothing is saved.
