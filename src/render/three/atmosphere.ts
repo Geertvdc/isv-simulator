@@ -6,7 +6,7 @@
  * it can be tested; `look.ts` and `stage.ts` turn it into lights and effects.
  */
 
-import type { LevelMap } from '../../sim/level';
+import { type LevelMap, getTile } from '../../sim/level';
 import { type CameraPose, type Vec3, gridToWorld, projectPoint } from '../projection';
 
 /**
@@ -45,10 +45,20 @@ export interface Atmosphere {
   /** Screen edges tinted toward `color`; `inner` is where it starts (share of the half-diagonal). */
   vignette?: { color: number; opacity: number; inner: number };
   /**
-   * Warm point lights under the room's ceiling, no shadows; off on `low`.
-   * One per `spacing` tiles along the room, `height` world units up.
+   * Warm point lights in a row just inside the back wall (and the front wall
+   * of a room at least `frontFrom` rows deep), never over the open middle of
+   * the floor; no shadows, off on `low`. One per `spacing` tiles along the
+   * wall, `inset` grid units in from the wall's inner face, `height` world units up.
    */
-  lamps?: { color: number; intensity: number; distance: number; height: number; spacing: number };
+  lamps?: {
+    color: number;
+    intensity: number;
+    distance: number;
+    height: number;
+    spacing: number;
+    inset: number;
+    frontFrom: number;
+  };
   /** Dust drifting in the room's light: `perTile` motes per floor tile, faint and below bloom. */
   motes?: { color: number; opacity: number; perTile: number };
 }
@@ -68,24 +78,34 @@ export const DEFAULT_ATMOSPHERE: Atmosphere = {
 
 /**
  * Golden hour on a late-summer afternoon: a low warm sun from the back left
- * (about 38° up, so shadows run long toward the camera), a peach-lavender sky,
+ * (about 45° up, so shadows run long toward the camera without swallowing
+ * the floor by the back wall), a peach-lavender sky,
  * a cool blue fill in the shade, dusk-violet air at the edges, and the
  * garage's bare bulbs glowing warm inside.
  */
 const GOLDEN_HOUR: Atmosphere = {
   sun: {
-    color: 0xffbd7a,
+    color: 0xffcb8e,
     intensity: 3.9,
-    from: { x: -7, y: -6, height: 7.2, perMapSize: false },
+    from: { x: -7, y: -6, height: 9, perMapSize: false },
     reach: 0.95,
   },
-  sky: { sky: 0xc9c6ec, ground: 0x8a6643, intensity: 0.8 },
-  fill: { color: 0x9db6f0, intensity: 0.6 },
+  sky: { sky: 0xc9c6ec, ground: 0x7a7266, intensity: 1 },
+  fill: { color: 0xb3c4ee, intensity: 1 },
   environment: 0.16,
   backdrop: { inner: 0x7a6c86, outer: 0x463e58 },
   fog: { color: 0x74688a, start: 0.5, span: 8 },
-  vignette: { color: 0x2a2238, opacity: 0.5, inner: 0.62 },
-  lamps: { color: 0xffa955, intensity: 16, distance: 6.5, height: 2.1, spacing: 4 },
+  vignette: { color: 0x2a2238, opacity: 0.35, inner: 0.7 },
+  lamps: {
+    color: 0xffa955,
+    intensity: 6,
+    distance: 4.5,
+    height: 1.7,
+    spacing: 4,
+    inset: 0.55,
+    // Front lamps would hang between the camera and the players: only a very deep room gets them.
+    frontFrom: 12,
+  },
   motes: { color: 0xffe2b0, opacity: 0.55, perTile: 0.6 },
 };
 
@@ -119,16 +139,51 @@ export function sunPlacement(
   };
 }
 
-/** Where the lamps hang: evenly along the room's middle row, under the ceiling. */
-export function lampSpots(atmosphere: Atmosphere, map: Pick<LevelMap, 'width' | 'height'>): Vec3[] {
+/**
+ * Where the lamps hang: a row just inside the back wall, and in a room at
+ * least `frontFrom` rows deep a second one inside the front wall, over the
+ * wall-side row and never over the open middle of the floor. With tiles (a
+ * real map) each row spans only the room's inside along that wall, so an
+ * L-shaped room keeps its lamps under its own ceiling.
+ */
+export function lampSpots(
+  atmosphere: Atmosphere,
+  map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles'>>,
+): Vec3[] {
   const lamps = atmosphere.lamps;
   if (!lamps) return [];
-  const inner = Math.max(1, map.width - 2);
-  const count = Math.max(1, Math.round(inner / lamps.spacing));
-  const cy = (map.height - 1) / 2;
-  return Array.from({ length: count }, (_, i) =>
-    gridToWorld(0.5 + (inner * (i + 0.5)) / count, cy, lamps.height),
-  );
+  // The wall's inner face is half a tile in from its row's center.
+  const rows: { y: number; inside: number }[] = [{ y: 0.5 + lamps.inset, inside: 1 }];
+  if (map.height >= lamps.frontFrom) {
+    rows.push({ y: map.height - 1.5 - lamps.inset, inside: map.height - 2 });
+  }
+  return rows.flatMap(({ y, inside }) => {
+    const [x0, x1] = insideSpan(map, inside);
+    if (x1 < x0) return [];
+    const length = x1 - x0 + 1;
+    const count = Math.max(1, Math.round(length / lamps.spacing));
+    return Array.from({ length: count }, (_, i) =>
+      gridToWorld(x0 - 0.5 + (length * (i + 0.5)) / count, y, lamps.height),
+    );
+  });
+}
+
+/** The first and last column of a row inside the room: not wall or void (all but the edges without tiles). */
+function insideSpan(
+  map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles'>>,
+  y: number,
+): [number, number] {
+  if (!map.tiles) return [1, Math.max(1, map.width - 2)];
+  const full = map as LevelMap;
+  let x0 = map.width;
+  let x1 = -1;
+  for (let x = 0; x < map.width; x++) {
+    const tile = getTile(full, x, y);
+    if (tile === null || tile === 'wall' || tile === 'void') continue;
+    x0 = Math.min(x0, x);
+    x1 = Math.max(x1, x);
+  }
+  return [x0, x1];
 }
 
 /** Fog near and far for the camera: it starts behind the level's farthest floor corner. */
