@@ -19,6 +19,9 @@ Sketches of the redesigned campaign maps, for review on paper before anything is
   | `D`  | rolling desk (Enterprise: reorgs)                             | counter `C`      |
   | `d`  | meeting door (Enterprise: shut while a meeting is in session) | floor `.`        |
   | `+`  | badge turnstile, one way (Enterprise)                         | floor `.`        |
+  | `Q`  | travelator (Big Tech)                                         | floor `.`        |
+  | `Y`  | shuttle stop (Big Tech)                                       | floor `.`        |
+  | `*`  | revolving door (Big Tech)                                     | floor `.`        |
 
 - Reorg levels change layout during the round: `<level-id>.txt` is phase 1 (the layout at the start), `<level-id>.phase2.txt`, `.phase3.txt` the layouts after each reorg. Same size; only partitions `=`, rolling desks `D` and meeting doors `d` move (onto and off floor), everything else stays put. Rolling desks pair up in reading order (the first `D` in phase 1 rolls to the first `D` in phase 2). The tools draw, report and render every phase, and flag a phase that moves anything else.
 - The game never loads these files (not until the greybox step of phase 23).

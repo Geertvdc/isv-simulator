@@ -31,6 +31,10 @@ export const FUTURE_CHARS: Readonly<Record<string, FutureChar>> = {
   D: { name: 'rolling desk (reorgs)', standIn: 'C' },
   d: { name: 'meeting door (shut while in session)', standIn: '.' },
   '+': { name: 'badge turnstile (one way)', standIn: '.' },
+  // Big Tech
+  Q: { name: 'travelator (campus)', standIn: '.' },
+  Y: { name: 'shuttle stop (campus)', standIn: '.' },
+  '*': { name: 'revolving door (campus)', standIn: '.' },
 };
 
 /** The map text with every future char replaced by its stand-in. */

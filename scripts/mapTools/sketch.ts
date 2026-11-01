@@ -41,6 +41,9 @@ type Look =
   | { kind: 'rolling' }
   | { kind: 'door' }
   | { kind: 'turnstile' }
+  | { kind: 'travelator' }
+  | { kind: 'shuttle' }
+  | { kind: 'revolving' }
   | { kind: 'unknown' };
 
 interface CharInfo {
@@ -100,10 +103,14 @@ const CHARS: Readonly<Record<string, CharInfo>> = {
   D: { look: { kind: 'rolling' }, name: `${FUTURE_CHARS.D?.name ?? 'rolling desk'} *` },
   d: { look: { kind: 'door' }, name: `${FUTURE_CHARS.d?.name ?? 'meeting door'} *` },
   '+': { look: { kind: 'turnstile' }, name: `${FUTURE_CHARS['+']?.name ?? 'turnstile'} *` },
+  // Big Tech
+  Q: { look: { kind: 'travelator' }, name: `${FUTURE_CHARS.Q?.name ?? 'travelator'} *` },
+  Y: { look: { kind: 'shuttle' }, name: `${FUTURE_CHARS.Y?.name ?? 'shuttle stop'} *` },
+  '*': { look: { kind: 'revolving' }, name: `${FUTURE_CHARS['*']?.name ?? 'revolving door'} *` },
 };
 
 /** Legend order: `CHARS` keys can't give it, digit keys come first in an object. */
-const LEGEND_ORDER = '.# ~CIBKTRPSXWG><v^1234Mm_o%rL=lHDd+'.split('');
+const LEGEND_ORDER = '.# ~CIBKTRPSXWG><v^1234Mm_o%rL=lHDd+QY*'.split('');
 
 const UNKNOWN: CharInfo = { look: { kind: 'unknown' }, name: 'unknown char' };
 
@@ -256,6 +263,37 @@ function cellSvg(look: Look, x: number, y: number, t: number): string {
         `<circle cx="${x + t * 0.28}" cy="${y + t * 0.84}" r="${t * 0.08}" fill="${INK}"/>` +
         `<circle cx="${x + t * 0.72}" cy="${y + t * 0.84}" r="${t * 0.08}" fill="${INK}"/>` +
         label(cx, cy - t * 0.05, t * 0.44, 'D', `font-weight="bold" fill="#ffffff"`)
+      );
+    case 'travelator': {
+      // A grey walkway with ribs across it; its direction is in the level notes.
+      const ribs = [0.25, 0.5, 0.75]
+        .map(
+          (f) =>
+            `<line x1="${x + f * t}" y1="${y + inset * 2}" x2="${x + f * t}" y2="${y + t - inset * 2}" stroke="#eceff1" stroke-width="${Math.max(1.5, t * 0.06)}"/>`,
+        )
+        .join('');
+      return floor + rect(x, y + inset, t, t - 2 * inset, 'fill="#78909c"') + ribs;
+    }
+    case 'shuttle':
+      // The cart's stop: a yellow cart on a floor tile.
+      return (
+        floor +
+        rect(
+          x + inset,
+          y + inset * 2,
+          t - 2 * inset,
+          t - 4 * inset,
+          `rx="${inset * 2}" fill="#ffca28" stroke="${INK}" stroke-width="1.5"`,
+        ) +
+        label(cx, cy, t * 0.46, 'Y', `font-weight="bold" fill="${INK}"`)
+      );
+    case 'revolving':
+      // A glass drum seen from above, with its four wings.
+      return (
+        floor +
+        `<circle cx="${cx}" cy="${cy}" r="${t * 0.42}" fill="#b3e5fc" stroke="${INK}" stroke-width="1.5"/>` +
+        `<line x1="${cx - t * 0.3}" y1="${cy - t * 0.3}" x2="${cx + t * 0.3}" y2="${cy + t * 0.3}" stroke="${INK}" stroke-width="1.5"/>` +
+        `<line x1="${cx - t * 0.3}" y1="${cy + t * 0.3}" x2="${cx + t * 0.3}" y2="${cy - t * 0.3}" stroke="${INK}" stroke-width="1.5"/>`
       );
     case 'door':
       // A door leaf across the gap, red like a "meeting in progress" light.

@@ -27,7 +27,17 @@ describe('drawMap', () => {
   });
 
   it('marks unknown chars', () => {
-    expect(drawMap('Q').svg).toContain('#ff00ff');
+    expect(drawMap('?').svg).toContain('#ff00ff');
+  });
+});
+
+describe('Big Tech chars', () => {
+  it('draw a travelator, a shuttle stop and a revolving door, not unknown chars', () => {
+    const { svg } = drawMap('QY*');
+    expect(svg).not.toContain('#ff00ff');
+    expect(svg).toContain('#78909c');
+    expect(svg).toContain('#ffca28');
+    expect(svg).toContain('#b3e5fc');
   });
 });
 
