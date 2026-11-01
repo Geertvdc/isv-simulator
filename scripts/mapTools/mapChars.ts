@@ -17,6 +17,10 @@ export interface FutureChar {
 /** Chars for mechanics still to build, and the stand-ins the tools use for them. */
 export const FUTURE_CHARS: Readonly<Record<string, FutureChar>> = {
   _: { name: 'wet floor (spills)', standIn: '.' },
+  // Startup
+  o: { name: 'leaky tap', standIn: 'C' },
+  '%': { name: 'spill zone (tap floods it)', standIn: '.' },
+  r: { name: 'mop robot route', standIn: '.' },
   L: { name: 'lift cabin (lifts)', standIn: '.' },
   '=': { name: 'partition (reorgs)', standIn: '#' },
 };
