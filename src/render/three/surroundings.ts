@@ -8,9 +8,9 @@ import { type KitMaterials, type Model, kitMaterials } from './kit';
 import { SLAB_DEPTH } from './layout';
 import { matte } from './look';
 import { type Pose, type PoseInput, playerPose, strideHz } from './pose';
-import { SCENE_PERSON_SCALE, type ScenePose, garageScene } from './scenes/garage';
-import { LAWN, groundModel } from './scenes/ground';
-import { catLoaf, dog, hoseSpray } from './setDressing/suburb';
+import { SCENES } from './scenes';
+import { groundModel } from './scenes/ground';
+import { type AliveKind, SCENE_PERSON_SCALE, type Scene, type ScenePose } from './scenes/types';
 import { SETTINGS, type SeatPose, type SetPiece } from './setDressing';
 
 /**
@@ -256,7 +256,7 @@ export function placeSetPieces(
 export class Surroundings {
   readonly root = new THREE.Group();
   private readonly extras: Extra[] = [];
-  /** The scene's few living props (the dog, the cat, the hose's spray), moved in `update`. */
+  /** The scene's few living props (a dog, a cat, a hose's spray), moved in `update`. */
   private readonly alive: Alive[] = [];
   private readonly geometries: THREE.BufferGeometry[] = [];
   /** The level's own number, so its people and props differ from the next level's. */
@@ -271,8 +271,9 @@ export class Surroundings {
   private groundMaterial: THREE.Material | null = null;
 
   constructor(map: LevelMap, setting: string | undefined, scene?: string) {
-    if (scene === 'garage') {
-      this.buildGarage(map);
+    const build = scene === undefined ? undefined : SCENES[scene];
+    if (build) {
+      this.buildScene(map, build(map));
       return;
     }
     const s = setting === undefined ? undefined : SETTINGS[setting];
@@ -385,12 +386,12 @@ export class Surroundings {
   }
 
   /**
-   * The garage level's hand-built world (`scenes/garage.ts`) in place of the
-   * chapter's rows: a lawn out to the horizon, the scene's ground surfaces
-   * merged into one mesh, its props merged like the rows', and its people.
+   * A level's hand-built world (`scenes/`, looked up in `SCENES`) in place
+   * of the chapter's rows: its horizon color out to the horizon, its ground
+   * surfaces merged into one mesh, its props merged like the rows' (living
+   * ones each their own mesh), and its people.
    */
-  private buildGarage(map: LevelMap): void {
-    const scene = garageScene(map);
+  private buildScene(map: LevelMap, scene: Scene): void {
     this.level = levelSalt(map);
     const material = new THREE.MeshStandardMaterial({
       vertexColors: true,
@@ -399,19 +400,19 @@ export class Surroundings {
     });
     material.color.setScalar(GROUND_DIM);
     this.groundMaterial = material;
-    // The lawn, one big plane under it all; the level's slab stands on it.
-    const lawn = new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE).rotateX(-Math.PI / 2);
-    lawn.setAttribute(
+    // The horizon, one big plane under it all; the level's slab stands on it.
+    const horizon = new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE).rotateX(-Math.PI / 2);
+    horizon.setAttribute(
       'color',
       new THREE.Float32BufferAttribute(
-        Array.from({ length: lawn.getAttribute('position').count }, () =>
-          new THREE.Color(LAWN).toArray(),
+        Array.from({ length: horizon.getAttribute('position').count }, () =>
+          new THREE.Color(scene.horizon).toArray(),
         ).flat(),
         3,
       ),
     );
-    this.geometries.push(lawn);
-    const plane = new THREE.Mesh(lawn, material);
+    this.geometries.push(horizon);
+    const plane = new THREE.Mesh(horizon, material);
     put(plane, gridToWorld((map.width - 1) / 2, (map.height - 1) / 2, GROUND_Y - 0.002));
     plane.receiveShadow = true;
     this.root.add(plane);
@@ -421,11 +422,12 @@ export class Surroundings {
     const surfaces = new THREE.Mesh(body, material);
     surfaces.receiveShadow = true;
     this.root.add(surfaces);
-    const living = (p: { piece: SetPiece }) => ALIVE.has(p.piece);
     this.addProps(
-      scene.pieces.filter((p) => !living(p)).map((p) => ({ ...p, side: 'front' as const })),
+      scene.pieces
+        .filter((p) => p.alive === undefined)
+        .map((p) => ({ ...p, side: 'front' as const })),
     );
-    for (const p of scene.pieces.filter(living)) this.addAlive(p);
+    for (const p of scene.pieces) if (p.alive) this.addAlive(p, p.alive);
     scene.people.forEach((p, i) => {
       // Smaller and greyer than the players, so they read as the neighbourhood, not a fifth player.
       const { character } = this.addExtra(i, p.at, p.yaw, p.pose);
@@ -434,8 +436,8 @@ export class Surroundings {
     });
   }
 
-  /** A living prop as its own mesh, so `update` can move it. */
-  private addAlive(p: Omit<Placement, 'side'>): void {
+  /** A living prop as its own mesh, so `update` can move it as `kind` says. */
+  private addAlive(p: Omit<Placement, 'side'>, kind: AliveKind): void {
     const model = p.piece.model(p.variant);
     model.glow?.dispose();
     model.glass?.dispose();
@@ -449,7 +451,7 @@ export class Surroundings {
     mesh.castShadow = p.row === 'near';
     mesh.receiveShadow = true;
     this.root.add(mesh);
-    this.alive.push({ mesh, kind: ALIVE.get(p.piece) ?? 'breathe', yaw: p.yaw, scale: p.scale });
+    this.alive.push({ mesh, kind, yaw: p.yaw, scale: p.scale });
   }
 
   private addProps(placements: readonly Placement[]): void {
@@ -547,22 +549,12 @@ const STILL: PoseInput = {
   stride: 0,
 };
 
-/** How a living prop moves: breathing slowly, or (the hose's water) swaying with the hand. */
-type AliveKind = 'breathe' | 'purr' | 'spray';
-
 interface Alive {
   mesh: THREE.Mesh;
   kind: AliveKind;
   yaw: number;
   scale: [number, number, number];
 }
-
-/** The garage scene's living props. All stand well clear of the level (the cat is on the car). */
-const ALIVE = new Map<SetPiece, AliveKind>([
-  [dog, 'breathe'],
-  [catLoaf, 'purr'],
-  [hoseSpray, 'spray'],
-]);
 
 /** Moves living prop `a` to time `t` (seconds); `phase` is the waterer's, so the spray follows their hand. */
 function moveAlive(a: Alive, t: number, phase: number): void {
@@ -589,6 +581,7 @@ function poseFor(extra: Extra, timeMs: number): Pose {
     ...STILL,
     phase: extra.phase,
     working: extra.pose === 'typing',
+    carrying: extra.pose === 'carrying',
     speed,
     // They never change speed, so time times the step rate is the walk cycle.
     stride: (timeMs / 1000 + extra.phase) * Math.PI * 2 * strideHz(speed, STILL.fullSpeed),
@@ -613,6 +606,29 @@ function poseFor(extra: Extra, timeMs: number): Pose {
     pose.bob = Math.abs(Math.sin(t * 3)) * 0.02;
     pose.leftHand = { ...MOWER_GRIP, x: -MOWER_GRIP.x };
     pose.rightHand = { ...MOWER_GRIP };
+  }
+  if (extra.pose === 'phoning') {
+    // Phone to the ear, the other hand on the hip, shifting from foot to foot.
+    const t = timeMs / 1000 + extra.phase * 9;
+    pose.roll = Math.sin(t * 1.3) * 0.06;
+    pose.nod = Math.sin(t * 0.9) * 0.08;
+    pose.rightHand = { x: 0.24, y: 0.8, z: 0.06 };
+    pose.leftHand = { x: -0.36, y: 0.42, z: -0.02 };
+  }
+  if (extra.pose === 'carrying') {
+    // Something held in both hands at chest height (the scene puts the prop there), a slow bob.
+    const t = timeMs / 1000 + extra.phase * 4;
+    pose.bob = Math.abs(Math.sin(t * 2.2)) * 0.012;
+    // Hands stay on the (still) prop while the body bobs.
+    pose.leftHand = { ...pose.leftHand, y: pose.leftHand.y - pose.bob };
+    pose.rightHand = { ...pose.rightHand, y: pose.rightHand.y - pose.bob };
+  }
+  if (extra.pose === 'sipping') {
+    // A cup held in front, raised to the mouth for a sip now and then.
+    const t = timeMs / 1000 + extra.phase * 11;
+    const sip = Math.max(0, Math.sin(t * 0.9) - 0.75) * 4;
+    pose.rightHand = { x: 0.3 - sip * 0.2, y: 0.55 + sip * 0.22, z: 0.22 + sip * 0.04 };
+    pose.lean = -sip * 0.06;
   }
   return pose;
 }
