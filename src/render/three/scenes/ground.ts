@@ -1,13 +1,17 @@
 import { type Model, ModelBuilder, tint } from '../kit';
 import { tileHash } from '../../mapShape';
 import { tuft } from '../setDressing/suburb';
-import type { GroundPatch, Scene } from './garage';
+import type { GroundPatch, Scene } from './types';
+
+export type { GroundPainter } from './types';
 
 /**
  * The ground of a hand-built scene, as one model: thin slabs per surface
  * (concrete in cast slabs with joints, sidewalk flags, a raised curb,
  * asphalt with a painted line, lawns in mowing stripes) and tufts of long
  * grass. Each surface sits a hair above the one under it, so none flicker.
+ * A scene brings its own kinds with `Scene.painters`, built from the helpers
+ * here (`slabs`, `stripes`, `shade`, `GROUND_TOPS`) and `tint` from the kit.
  */
 
 /** The lawn everything else lies on, out to the horizon. */
@@ -30,8 +34,11 @@ const TUFT = 0x4e7a3a;
 /** How far out from the curb the road's dashed centre line runs. */
 export const ROAD_LINE = 0.18;
 
-/** How high each surface's top sits above the ground. */
-const TOP: Readonly<Record<GroundPatch['kind'], number>> = {
+/**
+ * How high each built-in surface's top sits above the ground, so a scene's
+ * own painters can slot theirs in between.
+ */
+export const GROUND_TOPS = {
   lawn: 0.004,
   mown: 0.006,
   road: 0.008,
@@ -43,33 +50,49 @@ const TOP: Readonly<Record<GroundPatch['kind'], number>> = {
   driveway: 0.056,
   chalk: 0.053,
   curb: 0.11,
-};
+} as const;
+type BuiltIn = keyof typeof GROUND_TOPS;
+const TOP: Readonly<Record<BuiltIn, number>> = GROUND_TOPS;
 
 /** A shade from 0 to 1 for slab (i, j) of a patch, so each slab has its own. */
-function shade(i: number, j: number, salt: number): number {
+export function shade(i: number, j: number, salt: number): number {
   return (tileHash(i + salt * 131, j - salt * 17) % 1000) / 1000;
 }
 
-export function groundModel(scene: Pick<Scene, 'ground' | 'tufts'>): Model {
+/**
+ * The scene's ground as one model: each patch painted by the scene's own
+ * painter for its kind if it has one, else by the built-in one (a kind
+ * neither knows is left out), then the tufts.
+ */
+export function groundModel(scene: Pick<Scene, 'ground' | 'tufts' | 'painters'>): Model {
   const b = new ModelBuilder();
   scene.ground.forEach((g, k) => {
-    surface(b, g, k);
+    const own = scene.painters?.[g.kind];
+    if (own) own(b, g, k);
+    else if (isBuiltIn(g.kind)) surface(b, g, g.kind, k);
   });
   for (const [x, z, s] of scene.tufts) tuft(b, x, z, s, TUFT);
   return b.build();
 }
 
-/** Lays slabs of `size` over the patch, `gap` apart over a darker joint, each its own shade. */
-function slabs(
+function isBuiltIn(kind: string): kind is BuiltIn {
+  return Object.hasOwn(GROUND_TOPS, kind);
+}
+
+/**
+ * Lays slabs of `size` over the patch, its top at `top`, `gap` apart over a
+ * darker joint, each its own shade (up to `vary` either way of `base`).
+ */
+export function slabs(
   b: ModelBuilder,
   g: GroundPatch,
+  top: number,
   base: number,
   size: [number, number],
   gap: number,
   vary: number,
   salt: number,
 ): void {
-  const top = TOP[g.kind];
   const w = g.x1 - g.x0;
   const d = g.z1 - g.z0;
   b.box(
@@ -101,41 +124,57 @@ function slabs(
   }
 }
 
-function surface(b: ModelBuilder, g: GroundPatch, salt: number): void {
+/**
+ * Stripes `width` wide across the patch, its top at `top`, in `colors` by
+ * turns, running along `g.stripes` (z by default): a mown lawn, painted bays.
+ */
+export function stripes(
+  b: ModelBuilder,
+  g: GroundPatch,
+  top: number,
+  colors: readonly number[],
+  width: number,
+): void {
   const w = g.x1 - g.x0;
   const d = g.z1 - g.z0;
   const cx = (g.x0 + g.x1) / 2;
   const cz = (g.z0 + g.z1) / 2;
-  const top = TOP[g.kind];
-  switch (g.kind) {
+  const along = g.stripes ?? 'z';
+  const span = along === 'z' ? w : d;
+  const n = Math.max(1, Math.round(span / width));
+  for (let i = 0; i < n; i++) {
+    const c = colors[i % colors.length] ?? LAWN;
+    const t = span / n;
+    if (along === 'z') b.box(t, 0.004, d, c, { at: [g.x0 + (i + 0.5) * t, top - 0.002, cz] }, 0);
+    else b.box(w, 0.004, t, c, { at: [cx, top - 0.002, g.z0 + (i + 0.5) * t] }, 0);
+  }
+}
+
+function surface(b: ModelBuilder, g: GroundPatch, kind: BuiltIn, salt: number): void {
+  const w = g.x1 - g.x0;
+  const d = g.z1 - g.z0;
+  const cx = (g.x0 + g.x1) / 2;
+  const cz = (g.z0 + g.z1) / 2;
+  const top = TOP[kind];
+  switch (kind) {
     case 'lawn':
       b.box(w, 0.004, d, LAWN, { at: [cx, top - 0.002, cz] }, 0);
       return;
-    case 'mown': {
+    case 'mown':
       // Stripes of two greens, the way a mower leaves them.
-      const along = g.stripes ?? 'z';
-      const span = along === 'z' ? w : d;
-      const n = Math.max(1, Math.round(span / 0.62));
-      for (let i = 0; i < n; i++) {
-        const c = MOWN[i % 2] ?? LAWN;
-        const t = span / n;
-        if (along === 'z')
-          b.box(t, 0.004, d, c, { at: [g.x0 + (i + 0.5) * t, top - 0.002, cz] }, 0);
-        else b.box(w, 0.004, t, c, { at: [cx, top - 0.002, g.z0 + (i + 0.5) * t] }, 0);
-      }
+      stripes(b, g, top, MOWN, 0.62);
       return;
-    }
     case 'concrete':
-      slabs(b, g, CONCRETE, [1.45, 1.45], 0.035, 0.12, salt);
+      slabs(b, g, top, CONCRETE, [1.45, 1.45], 0.035, 0.12, salt);
       // An old oil stain, where the car drips.
       if (d > 1.5)
         b.cylinder(0.32, 0.32, 0.004, 0x6a685e, { at: [cx + 0.1, top + 0.003, g.z1 - 1.1] }, 14);
       return;
     case 'sidewalk':
-      slabs(b, g, SIDEWALK, [1, d], 0.03, 0.1, salt);
+      slabs(b, g, top, SIDEWALK, [1, d], 0.03, 0.1, salt);
       return;
     case 'patio':
-      slabs(b, g, PATIO, [0.5, 0.5], 0.03, 0.18, salt);
+      slabs(b, g, top, PATIO, [0.5, 0.5], 0.03, 0.18, salt);
       return;
     case 'curb':
       b.box(w, top, d, CURB, { at: [cx, top / 2, cz] }, 0);
@@ -165,7 +204,7 @@ function surface(b: ModelBuilder, g: GroundPatch, salt: number): void {
     }
     case 'driveway': {
       // Poured in slabs, with two worn tyre tracks running down it.
-      slabs(b, g, DRIVEWAY, [w, 0.7], 0.03, 0.06, salt);
+      slabs(b, g, top, DRIVEWAY, [w, 0.7], 0.03, 0.06, salt);
       const track = Math.min(0.5, w * 0.3);
       for (const s of [-1, 1])
         for (let z = g.z0 + 0.04, k = 0; z < g.z1 - 0.08; z += 0.22, k++) {

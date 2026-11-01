@@ -1,7 +1,7 @@
 import type { LevelMap } from '../../../sim/level';
 import { firstGroup, tileHash } from '../../mapShape';
 import { garageRoom } from '../garageRoom';
-import { type Vec3, gridToWorld } from '../../projection';
+import { gridToWorld } from '../../projection';
 import { bushes, hoop, kennel, shed, tires, tree } from '../setDressing/garage';
 import type { SetPiece } from '../setDressing/shared';
 import {
@@ -34,6 +34,16 @@ import {
   washingLine,
   wheelbarrow,
 } from '../setDressing/suburb';
+import { LAWN } from './ground';
+import {
+  type AliveKind,
+  GROUND,
+  type GroundKind,
+  type GroundPatch,
+  type Scene,
+  type ScenePerson,
+  type ScenePiece,
+} from './types';
 
 /**
  * The garage level's own world (the garage environment pass): Mom's house
@@ -47,61 +57,6 @@ import {
  * front (+z) the bottom. Only low things stand in front of the level.
  */
 
-export type GroundKind =
-  | 'lawn'
-  | 'mown'
-  | 'concrete'
-  | 'sidewalk'
-  | 'curb'
-  | 'road'
-  | 'patio'
-  | 'soil'
-  | 'stone'
-  | 'chalk'
-  | 'driveway';
-
-/** A patch of ground: a rectangle in world x and z, of one surface. */
-export interface GroundPatch {
-  kind: GroundKind;
-  x0: number;
-  x1: number;
-  z0: number;
-  z1: number;
-  /** Which way a lawn's mowing stripes run. */
-  stripes?: 'x' | 'z';
-}
-
-/** One prop in the scene. Near props cast shadows; far ones (the houses, the trees) don't. */
-export interface ScenePiece {
-  piece: SetPiece;
-  variant: number;
-  at: Vec3;
-  yaw: number;
-  scale: [number, number, number];
-  tint: [number, number, number];
-  row: 'near' | 'far';
-}
-
-export type ScenePose = 'idle' | 'chatting' | 'watering' | 'mowing';
-
-/** Someone in the scene, standing at `at` facing `yaw`. */
-export interface ScenePerson {
-  at: Vec3;
-  yaw: number;
-  pose: ScenePose;
-}
-
-export interface Scene {
-  /** Ground surfaces, drawn over a lawn that runs out to the horizon. */
-  ground: GroundPatch[];
-  pieces: ScenePiece[];
-  people: ScenePerson[];
-  /** Tufts of long grass on the lawns: x, z and a size. */
-  tufts: [number, number, number][];
-}
-
-/** The ground the props stand on (the foot of the level's slab); kept in step with `Surroundings`. */
-const GROUND = -0.463;
 /** How far the house runs out past the garage's left wall, and back from its front. */
 const HOUSE_LEFT = 2;
 const HOUSE_DEPTH = 4.2;
@@ -130,8 +85,12 @@ const CAR_ROOF = 0.98;
 const APRON = 0.12;
 const SIDEWALK = 0.34;
 const CURB = 0.12;
-/** Scene people are smaller than the players and the office people, so nobody takes them for a player. */
-export const SCENE_PERSON_SCALE = 0.88;
+/** The scene's living props: the dog and the cat asleep, the hose's spray. */
+const ALIVE: ReadonlyMap<SetPiece, AliveKind> = new Map<SetPiece, AliveKind>([
+  [dog, 'breathe'],
+  [catLoaf, 'purr'],
+  [hoseSpray, 'spray'],
+]);
 /** Someone pushing the mower stands this far behind it, holding its handle. */
 const MOWER_REACH = 1.02;
 /** Long grass every so often, more where nobody mowed. */
@@ -181,6 +140,7 @@ export function garageScene(map: LevelMap): Scene {
     // A slight brightness and warmth change per prop, so repeats don't match.
     const bright = 0.92 + unit(i, 1, 3) * 0.12;
     const warm = (unit(i, 2, 5) * 2 - 1) * 0.05;
+    const alive = ALIVE.get(piece);
     pieces.push({
       piece,
       variant: variant % (piece.variants ?? 1),
@@ -189,6 +149,7 @@ export function garageScene(map: LevelMap): Scene {
       scale: [size, size, size],
       tint: [bright * (1 + warm), bright, bright * (1 - warm)],
       row,
+      ...(alive ? { alive } : {}),
     });
   };
   const patch = (
@@ -372,6 +333,7 @@ export function garageScene(map: LevelMap): Scene {
   if (corner) put(bbq, corner.x, corner.z - 0.1, 0.3);
 
   return {
+    horizon: LAWN,
     ground,
     pieces,
     people,

@@ -6,7 +6,8 @@ import { type LevelMap, getTile, parseLevelMap } from '../../../sim/level';
 import { fitCamera3d, projectPoint } from '../../projection';
 import { garageRoom } from '../garageRoom';
 import { WALL_HEIGHT, levelBox } from '../layout';
-import { type ScenePiece, garageScene } from './garage';
+import { garageScene } from './garage';
+import type { ScenePiece } from './types';
 import { fence, hedge, sideGate } from '../setDressing/suburb';
 import { ROAD_LINE, groundModel } from './ground';
 
