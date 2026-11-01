@@ -26,6 +26,14 @@ describe('future map chars', () => {
     expect(map.spawns).toHaveLength(4);
   });
 
+  it('let Startup drafts parse: the tap as a counter, spill zone and robot route as floor', () => {
+    const map = parseDraftMap(['#Io%r#', '#1234#', '#S##T#', ''].join('\n'));
+    const at = (x: number, y: number): string | undefined => map.tiles[y * map.width + x];
+    expect(at(2, 0)).toBe('counter');
+    expect(at(3, 0)).toBe('floor');
+    expect(at(4, 0)).toBe('floor');
+  });
+
   it('are counted', () => {
     expect(countFutureChars(DRAFT)).toEqual({ _: 1, L: 1, '=': 1 });
   });

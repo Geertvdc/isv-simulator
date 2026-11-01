@@ -34,6 +34,8 @@ type Look =
   | { kind: 'manager' }
   | { kind: 'meeting' }
   | { kind: 'wet' }
+  | { kind: 'spillZone' }
+  | { kind: 'robotRoute' }
   | { kind: 'lift' }
   | { kind: 'partition' }
   | { kind: 'unknown' };
@@ -79,12 +81,16 @@ const CHARS: Readonly<Record<string, CharInfo>> = {
   M: { look: { kind: 'manager' }, name: 'manager start' },
   m: { look: { kind: 'meeting' }, name: 'meeting room floor' },
   _: { look: { kind: 'wet' }, name: `${FUTURE_CHARS._?.name ?? 'wet floor'} *` },
+  // Startup
+  o: { look: block('#8d5a2b', 'o'), name: `${FUTURE_CHARS.o?.name ?? 'leaky tap'} *` },
+  '%': { look: { kind: 'spillZone' }, name: `${FUTURE_CHARS['%']?.name ?? 'spill zone'} *` },
+  r: { look: { kind: 'robotRoute' }, name: `${FUTURE_CHARS.r?.name ?? 'mop robot route'} *` },
   L: { look: { kind: 'lift' }, name: `${FUTURE_CHARS.L?.name ?? 'lift'} *` },
   '=': { look: { kind: 'partition' }, name: `${FUTURE_CHARS['=']?.name ?? 'partition'} *` },
 };
 
 /** Legend order: `CHARS` keys can't give it, digit keys come first in an object. */
-const LEGEND_ORDER = '.# ~CIBKTRPSXWG><v^1234Mm_L='.split('');
+const LEGEND_ORDER = '.# ~CIBKTRPSXWG><v^1234Mm_o%rL='.split('');
 
 const UNKNOWN: CharInfo = { look: { kind: 'unknown' }, name: 'unknown char' };
 
@@ -182,6 +188,23 @@ function cellSvg(look: Look, x: number, y: number, t: number): string {
         rect(x, y, t, t, `fill="#64b5f6" stroke="#90caf9" stroke-width="1"`) +
         `<ellipse cx="${x + t * 0.38}" cy="${y + t * 0.32}" rx="${t * 0.22}" ry="${t * 0.09}" fill="#ffffff" fill-opacity="0.75" transform="rotate(-25 ${x + t * 0.38} ${y + t * 0.32})"/>` +
         `<ellipse cx="${x + t * 0.66}" cy="${y + t * 0.7}" rx="${t * 0.1}" ry="${t * 0.05}" fill="#ffffff" fill-opacity="0.6"/>`
+      );
+    case 'spillZone':
+      return (
+        rect(x, y, t, t, `fill="#d6ecfb" stroke="${GRID}" stroke-width="1"`) +
+        rect(
+          x + inset * 2,
+          y + inset * 2,
+          t - 4 * inset,
+          t - 4 * inset,
+          `rx="${t * 0.25}" fill="none" stroke="#42a5f5" stroke-width="1.5" stroke-dasharray="${t * 0.12} ${t * 0.08}"`,
+        )
+      );
+    case 'robotRoute':
+      return (
+        floor +
+        `<circle cx="${cx}" cy="${cy}" r="${t * 0.14}" fill="#78909c"/>` +
+        `<circle cx="${cx}" cy="${cy}" r="${t * 0.3}" fill="none" stroke="#78909c" stroke-width="1.5"/>`
       );
     case 'lift':
       return (

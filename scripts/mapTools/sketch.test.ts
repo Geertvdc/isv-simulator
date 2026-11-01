@@ -39,6 +39,15 @@ describe('legendEntries', () => {
     expect(names.filter((n) => n === 'player spawn')).toHaveLength(1);
     expect(names.some((n) => n.startsWith('wet floor'))).toBe(true);
   });
+
+  it('knows the Startup chars', () => {
+    const names = legendEntries(new Set(['o', '%', 'r'])).map((e) => e.name);
+    expect(names).toEqual([
+      expect.stringMatching(/^leaky tap/),
+      expect.stringMatching(/^spill zone/),
+      expect.stringMatching(/^mop robot route/),
+    ]);
+  });
 });
 
 describe('renderSketchSvg', () => {
