@@ -109,9 +109,71 @@ const GOLDEN_HOUR: Atmosphere = {
   motes: { color: 0xffe2b0, opacity: 0.55, perTile: 0.6 },
 };
 
+/**
+ * A bright, crisp Monday morning on a business park: a high, nearly white sun
+ * from the right and a little in front (about 53° up, so shadows fall short toward the back
+ * left and the back row stays lit), a pale blue sky at the frame edges, a soft
+ * cool fill, and cool fluorescent strips humming along the back wall.
+ */
+const MONDAY_MORNING: Atmosphere = {
+  sun: {
+    color: 0xfff3e2,
+    intensity: 3.7,
+    from: { x: 8, y: 3.5, height: 11.5, perMapSize: false },
+    reach: 0.95,
+  },
+  sky: { sky: 0xd6e6ff, ground: 0x857a6c, intensity: 1 },
+  fill: { color: 0xd6e0f2, intensity: 0.65 },
+  environment: 0.2,
+  backdrop: { inner: 0xc4dcf2, outer: 0x8fb2d6 },
+  fog: { color: 0xb4cde6, start: 0.5, span: 9 },
+  vignette: { color: 0x2c3e58, opacity: 0.3, inner: 0.7 },
+  lamps: {
+    color: 0xe8f2ff,
+    intensity: 3,
+    distance: 4.5,
+    height: 1.75,
+    spacing: 4,
+    inset: 0.55,
+    frontFrom: 12,
+  },
+};
+
+/**
+ * Late afternoon turning to evening by the canal: a warm sun low-ish from the
+ * west (left, about 42° up, so the back row still reads), a deepening blue sky
+ * at the frame edges, and warm Edison bulbs glowing along the back wall.
+ */
+const CANAL_EVENING: Atmosphere = {
+  sun: {
+    color: 0xffdcb4,
+    intensity: 4.4,
+    from: { x: -9, y: -2, height: 8.5, perMapSize: false },
+    reach: 0.95,
+  },
+  sky: { sky: 0xc2cef0, ground: 0x7a7068, intensity: 1.15 },
+  fill: { color: 0xd0d8f0, intensity: 1 },
+  environment: 0.18,
+  backdrop: { inner: 0x5a6a9a, outer: 0x2a3462 },
+  fog: { color: 0x52608e, start: 0.5, span: 8 },
+  vignette: { color: 0x1a2040, opacity: 0.35, inner: 0.7 },
+  lamps: {
+    color: 0xffb060,
+    intensity: 6,
+    distance: 4.5,
+    height: 1.7,
+    spacing: 4,
+    inset: 0.55,
+    frontFrom: 12,
+  },
+  motes: { color: 0xffe2b0, opacity: 0.45, perTile: 0.4 },
+};
+
 /** Presets per `MapLook.scene` id. */
 export const ATMOSPHERES: Readonly<Record<string, Atmosphere>> = {
   garage: GOLDEN_HOUR,
+  'open-plan': MONDAY_MORNING,
+  'scale-up': CANAL_EVENING,
 };
 
 /** The light and air for a scene id; the default for none or an unknown one. */
@@ -144,7 +206,9 @@ export function sunPlacement(
  * least `frontFrom` rows deep a second one inside the front wall, over the
  * wall-side row and never over the open middle of the floor. With tiles (a
  * real map) each row spans only the room's inside along that wall, so an
- * L-shaped room keeps its lamps under its own ceiling.
+ * L-shaped room keeps its lamps under its own ceiling, and a second room
+ * whose back wall sits a row or two lower (two units off one hallway) gets
+ * its own row along that wall.
  */
 export function lampSpots(
   atmosphere: Atmosphere,
@@ -153,12 +217,12 @@ export function lampSpots(
   const lamps = atmosphere.lamps;
   if (!lamps) return [];
   // The wall's inner face is half a tile in from its row's center.
-  const rows: { y: number; inside: number }[] = [{ y: 0.5 + lamps.inset, inside: 1 }];
+  const rows = backRows(map).map((r) => ({ ...r, y: r.inside - 0.5 + lamps.inset }));
   if (map.height >= lamps.frontFrom) {
-    rows.push({ y: map.height - 1.5 - lamps.inset, inside: map.height - 2 });
+    const [x0, x1] = insideSpan(map, map.height - 2);
+    rows.push({ y: map.height - 1.5 - lamps.inset, inside: map.height - 2, x0, x1 });
   }
-  return rows.flatMap(({ y, inside }) => {
-    const [x0, x1] = insideSpan(map, inside);
+  return rows.flatMap(({ y, x0, x1 }) => {
     if (x1 < x0) return [];
     const length = x1 - x0 + 1;
     const count = Math.max(1, Math.round(length / lamps.spacing));
@@ -166,6 +230,49 @@ export function lampSpots(
       gridToWorld(x0 - 0.5 + (length * (i + 0.5)) / count, y, lamps.height),
     );
   });
+}
+
+/**
+ * The runs of floor along a back wall: per column the first row inside the
+ * room (from row 1, under the wall line), grouped into runs of neighbouring
+ * columns that share it. Only rows near the top count, so a hallway's wall
+ * in the middle of the map never gets lamps; runs beside the room's first row need three tiles. Without tiles, the
+ * whole width along row 1.
+ */
+function backRows(
+  map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles'>>,
+): { inside: number; x0: number; x1: number }[] {
+  if (!map.tiles) return [{ inside: 1, x0: 1, x1: Math.max(1, map.width - 2) }];
+  const full = map as LevelMap;
+  const deepest = Math.max(1, Math.floor(map.height * 0.3));
+  const tops: (number | null)[] = [];
+  for (let x = 0; x < map.width; x++) {
+    let top: number | null = null;
+    for (let y = 1; y <= deepest && top === null; y++) {
+      const tile = getTile(full, x, y);
+      if (tile !== null && tile !== 'wall' && tile !== 'void') top = y;
+    }
+    tops.push(top);
+  }
+  const runs: { inside: number; x0: number; x1: number }[] = [];
+  for (let x = 0; x < tops.length; x++) {
+    const top = tops[x];
+    if (top === null || top === undefined) continue;
+    const last = runs[runs.length - 1];
+    if (last && last.inside === top && last.x1 === x - 1) last.x1 = x;
+    else runs.push({ inside: top, x0: x, x1: x });
+  }
+  if (runs.length === 0) return [];
+  // The room's first row spans its whole inside along the wall (stubs and notches included)...
+  const first = Math.min(...runs.map((r) => r.inside));
+  const main = runs.filter((r) => r.inside === first);
+  const x0 = Math.min(...main.map((r) => r.x0));
+  const x1 = Math.max(...main.map((r) => r.x1));
+  // ...and a deeper run counts only beside it, at least three tiles long: a second room.
+  const apart = runs.filter(
+    (r) => r.inside !== first && (r.x0 > x1 || r.x1 < x0) && r.x1 - r.x0 >= 2,
+  );
+  return [{ inside: first, x0, x1 }, ...apart];
 }
 
 /** The first and last column of a row inside the room: not wall or void (all but the edges without tiles). */
