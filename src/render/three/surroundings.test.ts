@@ -195,6 +195,15 @@ describe('Surroundings', () => {
     }
   });
 
+  it('builds a hand-built scene in place of the chapter rows', () => {
+    const rows = new Surroundings(map, 'garage');
+    const scene = new Surroundings(map, 'garage', 'garage');
+    expect(scene.root.children.length).toBeGreaterThan(4);
+    expect(scene.root.children.length).not.toBe(rows.root.children.length);
+    rows.destroy();
+    scene.destroy();
+  });
+
   it('salts every level apart by its map', () => {
     const other = parseLevelMap(
       ['##############', '#1..3.#...2.4#', '#............#', '##############'].join('\n'),
