@@ -290,49 +290,79 @@ function shipStation(): StationModel {
   return { base: base.build(), hero: hero.build(), heroAt: [-0.32, -0.3] };
 }
 
+/** Where a garage counter tile sits in its run of counters (x along the run). */
+export interface GarageCounterRun {
+  /** No counter past its −x edge, past its +x edge: the door ends there. */
+  minusEnd: boolean;
+  plusEnd: boolean;
+  /** Whether a sawhorse stands under this tile. */
+  legs: boolean;
+  /** Whether the door's knob hole is on this tile. */
+  knob: boolean;
+}
+
 /**
- * A garage counter: an old flush door laid over two wooden sawhorses, the
- * knob hole still in it. Its top is as light as a plain counter's and sits at
- * the same height, so it reads as somewhere to put a ticket down.
+ * A garage counter tile: part of an old flush door laid over sawhorses, the
+ * knob hole still in it. Tiles in a run join into one door, a darker edge
+ * band only round its outside; only the tiles `run.legs` says stand on a
+ * sawhorse, a trestle with its legs splayed across the door. A dark contact
+ * shadow on the floor under it. Its top sits at counter height, a shade
+ * under the stations' brightness, so it reads as somewhere to put a ticket down.
  */
-export function garageCounter(): StationModel {
+export function garageCounter(run: GarageCounterRun): StationModel {
   const b = new ModelBuilder();
-  const wood = COLOR.wood;
-  const door = 0xe6dcc6;
-  // Two sawhorses: a beam on splayed legs, a brace between each pair.
-  for (const x of [-0.3, 0.3]) {
-    const beamY = TOP - TOP_THICKNESS - 0.03;
-    b.box(0.08, 0.06, 0.8, wood, { at: [x, beamY, 0] }, 0.01);
-    for (const z of [-0.3, 0.3]) {
+  const door = 0xcdbf9f;
+  const band = tint(door, -0.18);
+  const { minusEnd, plusEnd } = run;
+  // The shadow it casts on the slab right under it.
+  b.box(1, 0.002, 0.96, 0x6c6a66, { at: [0, 0.002, 0] }, 0);
+  b.box(
+    minusEnd || plusEnd ? 0.86 : 1,
+    0.002,
+    0.74,
+    0x5a5855,
+    {
+      at: [(minusEnd ? 0.07 : 0) - (plusEnd ? 0.07 : 0), 0.0025, 0],
+    },
+    0,
+  );
+  if (run.legs) {
+    const x = minusEnd === plusEnd ? 0 : minusEnd ? -0.26 : 0.26;
+    const wood = tint(COLOR.wood, -0.3);
+    const beamY = TOP - TOP_THICKNESS - 0.035;
+    b.box(0.09, 0.07, 0.86, tint(COLOR.wood, -0.18), { at: [x, beamY, 0] }, 0.01);
+    for (const z of [-0.34, 0.34]) {
       for (const s of [-1, 1]) {
         b.box(
-          0.05,
+          0.07,
           beamY,
-          0.05,
-          tint(wood, -0.15),
-          {
-            at: [x + s * 0.07, beamY / 2, z],
-            rot: [0, 0, s * 0.22],
-          },
+          0.07,
+          wood,
+          { at: [x + s * 0.06, beamY / 2, z], rot: [0, 0, s * 0.14] },
           0,
         );
       }
-      b.box(0.24, 0.035, 0.03, tint(wood, -0.25), { at: [x, 0.16, z] }, 0);
+      b.box(0.2, 0.04, 0.035, tint(wood, -0.15), { at: [x, 0.18, z] }, 0);
     }
   }
-  // The door: a lighter face panel and the knob hole near one end.
-  b.box(1, TOP_THICKNESS, 0.96, tint(door, -0.12), { at: [0, TOP - TOP_THICKNESS / 2, 0] }, 0.012);
-  b.box(0.98, 0.006, 0.94, door, { at: [0, TOP + 0.001, 0] }, 0);
-  b.cylinder(0.035, 0.035, 0.01, tint(door, -0.5), { at: [0.38, TOP + 0.002, 0.3] }, 12);
-  // An orange cable hanging off the back edge.
-  b.box(
-    0.016,
-    0.3,
-    0.016,
-    COLOR.tangerine,
-    { at: [-0.12, TOP - 0.18, -0.47], rot: [0.15, 0, 0] },
-    0,
-  );
+  // The door: the edge band all round under a lighter face that runs on into the next tile.
+  b.box(1, TOP_THICKNESS, 0.96, band, { at: [0, TOP - TOP_THICKNESS / 2, 0] }, 0.006);
+  const x0 = minusEnd ? -0.45 : -0.5;
+  const x1 = plusEnd ? 0.45 : 0.5;
+  b.box(x1 - x0, 0.006, 0.86, door, { at: [(x0 + x1) / 2, TOP + 0.001, 0] }, 0);
+  if (run.knob)
+    b.cylinder(0.035, 0.035, 0.01, tint(door, -0.5), { at: [0.34, TOP + 0.003, 0.3] }, 12);
+  if (minusEnd) {
+    // An orange cable hanging off the back edge.
+    b.box(
+      0.016,
+      0.3,
+      0.016,
+      COLOR.tangerine,
+      { at: [-0.12, TOP - 0.18, -0.47], rot: [0.15, 0, 0] },
+      0,
+    );
+  }
   return { base: b.build(), hero: null, heroAt: [0, 0] };
 }
 

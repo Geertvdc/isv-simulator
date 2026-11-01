@@ -7,6 +7,7 @@ import { type WallPiece, levelSalt, tileHash, wallDeco, wallPiece } from '../map
 import { VIEW3D_PITCH, type Vec3, gridToWorld } from '../projection';
 import { type KitMaterials, type Model, ModelBuilder, kitMaterials } from './kit';
 import {
+  FRONT_WALL_HEIGHT,
   SLAB_DEPTH,
   STATION_HEIGHT,
   WALL_HEIGHT,
@@ -16,26 +17,33 @@ import {
 } from './layout';
 import { COLOR } from './palette';
 import { WALL_TOP_PROPS } from './setDressing';
-import { GARAGE_WALL_TOP_PROPS } from './setDressing/wallTops';
+import { GARAGE_FRONT_WALL_PROPS, GARAGE_WALL_TOP_PROPS } from './setDressing/wallTops';
 import { atmosphereFor, lampSpots } from './atmosphere';
 import { garageRoom } from './garageRoom';
 import { PALETTE } from './look';
 import {
+  BULB_HANG,
+  FOUNDATION_LOOKS,
   GARAGE_WALL_LOOKS,
   bannerModel,
   bulbModel,
   conveyorModel,
+  doorHeaderModel,
   doorJambModel,
   doormatModel,
+  foundationModel,
   garageDoorModel,
   houseDoorModel,
+  lampWireModel,
   oilStainModel,
   slabLook,
+  slabTone,
   WALL_DECO_MODELS,
   floorModel,
   wallModel,
 } from './roomModels';
 import {
+  type GarageCounterRun,
   STATION_MODELS,
   type StationModel,
   type StationTile,
@@ -64,9 +72,8 @@ interface Placement {
   tint?: number;
 }
 
-/** One wall in this many gets clutter on top; a garage keeps more up there. */
+/** One wall in this many gets clutter on top (a garage piles its junk in clusters, see `garageRoom`). */
 const CLUTTER_EVERY = 5;
-const GARAGE_CLUTTER_EVERY = 2;
 /** No two walls this close (in tiles, either way) carry the same clutter. */
 const CLUTTER_SPREAD = 4;
 
@@ -80,8 +87,7 @@ function wallTopProps(look: MapLook): readonly (() => Model)[] {
  * mugs and the like, on some full-height walls. Never next to a counter or
  * station, nor with floor beside it (by the play area it'd look like
  * something to pick up), never on a wall with floor behind it (it'd hide
- * someone standing there), never on glass. A garage's tins and boxes are
- * plainly junk, so they stand on the side walls by the floor too, and more often.
+ * someone standing there), never on glass.
  */
 function wallClutter(
   map: LevelMap,
@@ -92,19 +98,16 @@ function wallClutter(
   level: number,
 ): number | undefined {
   if (piece === 'wall-front' || look.walls === 'glass') return undefined;
-  const garage = look.walls === 'garage';
-  const every = garage ? GARAGE_CLUTTER_EVERY : CLUTTER_EVERY;
   const h = (tileHash(x, y) ^ level) >>> 0;
-  if (h % every !== 0) return undefined;
+  if (h % CLUTTER_EVERY !== 0) return undefined;
   if (getTile(map, x, y - 1) === 'floor') return undefined;
-  if (!garage && (getTile(map, x - 1, y) === 'floor' || getTile(map, x + 1, y) === 'floor'))
-    return undefined;
+  if (getTile(map, x - 1, y) === 'floor' || getTile(map, x + 1, y) === 'floor') return undefined;
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
       if (isWorkSurface(getTile(map, x + dx, y + dy))) return undefined;
     }
   }
-  return Math.floor(h / every) % wallTopProps(look).length;
+  return Math.floor(h / CLUTTER_EVERY) % wallTopProps(look).length;
 }
 
 /**
@@ -165,8 +168,16 @@ export function buildMap(map: LevelMap, look: MapLook): MapView {
     }
     return model;
   };
-  let doorCounter: StationModel | null = null;
-  const garageCounterModel = (): StationModel => (doorCounter ??= garageCounter());
+  const doorCounters = new Map<string, StationModel>();
+  const garageCounterModel = (c: CounterRun): StationModel => {
+    const k = `${c.minusEnd}:${c.plusEnd}:${c.legs}:${c.knob}`;
+    let model = doorCounters.get(k);
+    if (!model) {
+      model = garageCounter(c);
+      doorCounters.set(k, model);
+    }
+    return model;
+  };
   const badges = new Map<string, THREE.MeshBasicMaterial>();
   const badgeGeometry = new THREE.PlaneGeometry(BADGE_SIZE, BADGE_SIZE).rotateX(-VIEW3D_PITCH);
   const place = (key: string, model: () => Model, p: Placement) => {
@@ -184,11 +195,33 @@ export function buildMap(map: LevelMap, look: MapLook): MapView {
   const level = levelSalt(map);
   const garage = look.walls === 'garage' ? garageRoom(map) : null;
   const closedDoor = new Set(garage?.door.map((t) => `${t.x},${t.y}`));
-  if (garage) placeGarage(garage, place);
-  // A bare bulb where each of the garage's warm lamps shines from.
-  if (garage)
-    for (const at of lampSpots(atmosphereFor(look.scene), map))
-      place('bulb', bulbModel, { at, yaw: 0 });
+  if (garage) {
+    placeGarage(garage, place);
+    // A shaded bulb where each of the garage's warm lamps shines from, on a wire strung wall to wall.
+    const spots = lampSpots(atmosphereFor(look.scene), map);
+    for (const at of spots) place('bulb', bulbModel, { at, yaw: 0 });
+    placeLampWires(map, spots, place);
+    // Junk piled on the wall tops in clusters, leaning toward its partner.
+    garage.capProps.forEach(({ x, y, slot, toward }) => {
+      const index = (slot + level) % tops.length;
+      const h = (tileHash(y, x) ^ level) >>> 0;
+      const at = gridToWorld(x + toward.dx * CAP_LEAN, y + toward.dy * CAP_LEAN, WALL_HEIGHT);
+      place(`clutter:garage:${index}`, tops[index] ?? (() => new ModelBuilder().build()), {
+        at,
+        yaw: (((h >> 2) % 5) - 2) * 0.12,
+      });
+    });
+    garage.frontProps.forEach(({ x, y, slot }) => {
+      const index = (slot + level) % GARAGE_FRONT_WALL_PROPS.length;
+      const model = GARAGE_FRONT_WALL_PROPS[index];
+      if (!model) return;
+      const h = (tileHash(y, x) ^ level) >>> 0;
+      place(`front:${index}`, model, {
+        at: gridToWorld(x, y, FRONT_WALL_HEIGHT),
+        yaw: (((h >> 2) % 5) - 2) * 0.1,
+      });
+    });
+  }
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const tile = getTile(map, x, y);
@@ -206,15 +239,20 @@ export function buildMap(map: LevelMap, look: MapLook): MapView {
         }
         continue;
       }
-      // The slab under every tile but drops: the level's outline, edges and all.
-      place('slab', slabModel, { at: gridToWorld(x, y), yaw: 0 });
-      // Floor runs under stations too, so no gaps show at their feet; walls cover theirs.
       const hash = tileHash(x, y);
-      const wobble = 1 - FLOOR_WOBBLE + ((hash % 100) / 100) * FLOOR_WOBBLE * 2;
-      // A slab is poured in one piece: no checker, its joints and wear come in looks.
+      // The slab under every tile but drops: the level's outline, edges and all; a garage stands on concrete.
+      if (garage) {
+        const f = ((hash ^ level) >>> 9) % FOUNDATION_LOOKS;
+        place(`slab:${f}`, () => foundationModel(f), { at: gridToWorld(x, y), yaw: 0 });
+      } else place('slab', slabModel, { at: gridToWorld(x, y), yaw: 0 });
+      // Floor runs under stations too, so no gaps show at their feet; walls cover theirs.
+      // A slab is poured in pieces: no checker, a shade per piece, its joints and wear come in looks.
       const slab = look.floor === 'slab';
+      const wobble = slab
+        ? slabTone(x, y, level)
+        : 1 - FLOOR_WOBBLE + ((hash % 100) / 100) * FLOOR_WOBBLE * 2;
       const checker = slab || (x + y) % 2 === 0 ? 1 : 0.95;
-      const floorLook = slab ? slabLook(x, y, (hash >>> 7) ^ level) : 0;
+      const floorLook = slab ? slabLook(x, y, garage?.floorWear[`${x},${y}`] ?? 0) : 0;
       const doorTile = tile === 'wall' && closedDoor.has(`${x},${y}`);
       if (tile !== 'wall' || doorTile)
         place(`floor:${floorLook}`, () => floorModel(look.floor, floorLook), {
@@ -225,8 +263,8 @@ export function buildMap(map: LevelMap, look: MapLook): MapView {
       if (tile === 'floor') continue;
       if (doorTile) {
         // A closed roll-up door in place of the front wall, its handle in the middle.
-        const handle = !closedDoor.has(`${x - 1},${y}`);
-        place(`garageDoor:${handle}`, () => garageDoorModel(handle), {
+        const first = !closedDoor.has(`${x - 1},${y}`);
+        place(`garageDoor:${first}`, () => garageDoorModel(first), {
           at: gridToWorld(x, y),
           yaw: 0,
         });
@@ -246,7 +284,7 @@ export function buildMap(map: LevelMap, look: MapLook): MapView {
           : piece === 'wall' && open
             ? wallDeco(x, y, look.walls, level)
             : null;
-        const wanted = wallClutter(map, x, y, piece, look, level);
+        const wanted = garage ? undefined : wallClutter(map, x, y, piece, look, level);
         const clutterIndex =
           wanted === undefined
             ? undefined
@@ -257,7 +295,7 @@ export function buildMap(map: LevelMap, look: MapLook): MapView {
           // Square to the wall, give or take a little.
           const h = (tileHash(y, x) ^ level) >>> 0;
           const turn = ((h % 4) * Math.PI) / 2 + (((h >> 2) % 3) - 1) * 0.15;
-          place(`clutter:${look.walls === 'garage' ? 'garage:' : ''}${clutterIndex}`, clutter, {
+          place(`clutter:${clutterIndex}`, clutter, {
             at: gridToWorld(x, y, WALL_HEIGHT),
             yaw: turn,
           });
@@ -274,8 +312,15 @@ export function buildMap(map: LevelMap, look: MapLook): MapView {
         });
         continue;
       }
+      if (tile === 'counter' && garage) {
+        // A door on sawhorses: doors in a run join up, and only some tiles stand on a sawhorse.
+        const c = counterRun(map, x, y);
+        const k = `counter:${c.minusEnd}:${c.plusEnd}:${c.legs}:${c.knob}`;
+        place(k, () => garageCounterModel(c).base, { at: gridToWorld(x, y), yaw: c.yaw });
+        continue;
+      }
       const yaw = facingYaw(stationFacing(map, x, y));
-      const station = tile === 'counter' && garage ? garageCounterModel() : stationModel(tile);
+      const station = stationModel(tile);
       place(`station:${tile}`, () => station.base, { at: gridToWorld(x, y), yaw });
       if (station.hero) {
         const hero = station.hero;
@@ -294,7 +339,8 @@ export function buildMap(map: LevelMap, look: MapLook): MapView {
   }
 
   for (const [key, { model, at }] of placements) {
-    const flat = NO_SHADOW.has(key) || key.startsWith('floor');
+    const flat =
+      NO_SHADOW.has(key) || key.startsWith('floor') || key.startsWith('slab:') || isWire(key);
     root.add(...instances(model(), at, materials, !flat));
   }
   const belts = beltTops(map);
@@ -319,8 +365,13 @@ function placeGarage(
 ): void {
   const { opening, houseDoor, doormat, banner, oilStain } = room;
   if (opening) {
-    for (const x of [opening.x0 - 0.58, opening.x1 + 0.58])
+    const [left, right] = [opening.x0 - DOOR_JAMB_OUT, opening.x1 + DOOR_JAMB_OUT];
+    for (const x of [left, right])
       place('doorJamb', doorJambModel, { at: gridToWorld(x, opening.y), yaw: 0 });
+    place('doorHeader', () => doorHeaderModel(right - left), {
+      at: gridToWorld((left + right) / 2, opening.y),
+      yaw: 0,
+    });
   }
   if (houseDoor)
     place('houseDoor', houseDoorModel, { at: gridToWorld(houseDoor.x, houseDoor.y), yaw: 0 });
@@ -334,6 +385,85 @@ function placeGarage(
     place('oilStain', oilStainModel, { at: gridToWorld(oilStain.x, oilStain.y), yaw: 0 });
 }
 
+/** How far past the opening's end tiles the open door's jambs stand. */
+const DOOR_JAMB_OUT = 0.58;
+/** How far (in tiles) a cluster's junk leans in toward its partner. */
+const CAP_LEAN = 0.28;
+
+/** How a garage counter sits in its run of counters, and how it's turned so x runs along it. */
+interface CounterRun extends GarageCounterRun {
+  yaw: number;
+}
+
+/**
+ * Where the counter at (x, y) sits in its straight run of counters: along
+ * the row if it has a counter beside it, else down the column. The run's
+ * end tiles stand on a sawhorse, and every second tile between them, but
+ * never the one next to an end; a lone counter stands on one in its middle.
+ */
+function counterRun(map: LevelMap, x: number, y: number): CounterRun {
+  const isCounter = (tx: number, ty: number) => getTile(map, tx, ty) === 'counter';
+  const across =
+    isCounter(x - 1, y) || isCounter(x + 1, y) || !(isCounter(x, y - 1) || isCounter(x, y + 1));
+  // Turned a quarter, the model's +x points up the map (−y).
+  const [dx, dy] = across ? [1, 0] : [0, -1];
+  let back = 0;
+  while (isCounter(x - dx * (back + 1), y - dy * (back + 1))) back++;
+  let ahead = 0;
+  while (isCounter(x + dx * (ahead + 1), y + dy * (ahead + 1))) ahead++;
+  return {
+    minusEnd: back === 0,
+    plusEnd: ahead === 0,
+    legs: back === 0 || ahead === 0 || (back % 2 === 0 && ahead !== 1),
+    knob: ahead === 0 && back > 0,
+    yaw: across ? 0 : Math.PI / 2,
+  };
+}
+
+/**
+ * The wire each row of lamps hangs from: from the room's wall on one side,
+ * through the top of every lamp's flex, to the wall on the other, just over
+ * the wall tops.
+ */
+function placeLampWires(
+  map: LevelMap,
+  spots: readonly Vec3[],
+  place: (key: string, model: () => Model, p: Placement) => void,
+): void {
+  const rows = new Map<number, Vec3[]>();
+  for (const p of spots) {
+    const k = Math.round(p.z * 100);
+    rows.set(k, [...(rows.get(k) ?? []), p]);
+  }
+  for (const row of rows.values()) {
+    row.sort((a, b) => a.x - b.x);
+    const first = row[0];
+    const last = row[row.length - 1];
+    if (!first || !last) continue;
+    const y = first.y + BULB_HANG;
+    // Out to the walls: the last tile in from each end of the row that isn't wall.
+    const gy = Math.round(first.z);
+    let x0 = Math.floor(first.x);
+    while (x0 > 0 && getTile(map, x0 - 1, gy) !== 'wall' && getTile(map, x0 - 1, gy) !== null) x0--;
+    let x1 = Math.ceil(last.x);
+    while (
+      x1 < map.width - 1 &&
+      getTile(map, x1 + 1, gy) !== 'wall' &&
+      getTile(map, x1 + 1, gy) !== null
+    )
+      x1++;
+    const ends: [number, number][] = [
+      [x0 - 0.5, y + 0.06],
+      ...row.map((p): [number, number] => [p.x, y]),
+      [x1 + 0.5, y + 0.06],
+    ];
+    place(`lampWire:${first.z}`, () => lampWireModel(ends), {
+      at: { x: 0, y: 0, z: first.z },
+      yaw: 0,
+    });
+  }
+}
+
 /** Flat pieces that never shadow anything. */
 const NO_SHADOW: ReadonlySet<string> = new Set([
   'slab',
@@ -343,6 +473,8 @@ const NO_SHADOW: ReadonlySet<string> = new Set([
   'doormat',
   'bulb',
 ]);
+/** Thin pieces whose shadows would only be noise: the lamp wires. */
+const isWire = (key: string) => key.startsWith('lampWire');
 /** How deep a gap drops: well below the ground outside, which never covers the level. */
 const PIT_DEPTH = 1.6;
 /** Belt stripes per second, in texture repeats; one repeat is one tile. */
