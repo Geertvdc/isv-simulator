@@ -16,9 +16,31 @@ import {
 } from './layout';
 import { COLOR } from './palette';
 import { WALL_TOP_PROPS } from './setDressing';
+import { GARAGE_WALL_TOP_PROPS } from './setDressing/wallTops';
+import { atmosphereFor, lampSpots } from './atmosphere';
+import { garageRoom } from './garageRoom';
 import { PALETTE } from './look';
-import { conveyorModel, WALL_DECO_MODELS, floorModel, wallModel } from './roomModels';
-import { STATION_MODELS, type StationModel, type StationTile } from './stationModels';
+import {
+  GARAGE_WALL_LOOKS,
+  bannerModel,
+  bulbModel,
+  conveyorModel,
+  doorJambModel,
+  doormatModel,
+  garageDoorModel,
+  houseDoorModel,
+  oilStainModel,
+  slabLook,
+  WALL_DECO_MODELS,
+  floorModel,
+  wallModel,
+} from './roomModels';
+import {
+  STATION_MODELS,
+  type StationModel,
+  type StationTile,
+  garageCounter,
+} from './stationModels';
 
 /** Station glyphs on the station tops, the same tiles as the step tiles on the order cards. */
 const STATION_GLYPHS: Partial<Record<Tile, { glyph: GlyphId; color: number }>> = {
@@ -42,17 +64,24 @@ interface Placement {
   tint?: number;
 }
 
-/** One wall in this many gets clutter on top. */
+/** One wall in this many gets clutter on top; a garage keeps more up there. */
 const CLUTTER_EVERY = 5;
+const GARAGE_CLUTTER_EVERY = 2;
 /** No two walls this close (in tiles, either way) carry the same clutter. */
 const CLUTTER_SPREAD = 4;
+
+/** What stands on wall tops in a look: garage shelving or office clutter. */
+function wallTopProps(look: MapLook): readonly (() => Model)[] {
+  return look.walls === 'garage' ? GARAGE_WALL_TOP_PROPS : WALL_TOP_PROPS;
+}
 
 /**
  * What stands on top of the wall on tile (x, y), if anything: plants, books,
  * mugs and the like, on some full-height walls. Never next to a counter or
  * station, nor with floor beside it (by the play area it'd look like
  * something to pick up), never on a wall with floor behind it (it'd hide
- * someone standing there), never on glass.
+ * someone standing there), never on glass. A garage's tins and boxes are
+ * plainly junk, so they stand on the side walls by the floor too, and more often.
  */
 function wallClutter(
   map: LevelMap,
@@ -63,16 +92,19 @@ function wallClutter(
   level: number,
 ): number | undefined {
   if (piece === 'wall-front' || look.walls === 'glass') return undefined;
+  const garage = look.walls === 'garage';
+  const every = garage ? GARAGE_CLUTTER_EVERY : CLUTTER_EVERY;
   const h = (tileHash(x, y) ^ level) >>> 0;
-  if (h % CLUTTER_EVERY !== 0) return undefined;
+  if (h % every !== 0) return undefined;
   if (getTile(map, x, y - 1) === 'floor') return undefined;
-  if (getTile(map, x - 1, y) === 'floor' || getTile(map, x + 1, y) === 'floor') return undefined;
+  if (!garage && (getTile(map, x - 1, y) === 'floor' || getTile(map, x + 1, y) === 'floor'))
+    return undefined;
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
       if (isWorkSurface(getTile(map, x + dx, y + dy))) return undefined;
     }
   }
-  return Math.floor(h / CLUTTER_EVERY) % WALL_TOP_PROPS.length;
+  return Math.floor(h / every) % wallTopProps(look).length;
 }
 
 /**
@@ -84,13 +116,14 @@ function unlikeNeighbours(
   x: number,
   y: number,
   placed: readonly { x: number; y: number; index: number }[],
+  count: number,
 ): number {
   const near = placed
     .filter((p) => Math.max(Math.abs(p.x - x), Math.abs(p.y - y)) <= CLUTTER_SPREAD)
     .map((p) => p.index);
   let index = wanted;
-  for (let t = 0; t < WALL_TOP_PROPS.length && near.includes(index); t++) {
-    index = (index + 1) % WALL_TOP_PROPS.length;
+  for (let t = 0; t < count && near.includes(index); t++) {
+    index = (index + 1) % count;
   }
   return index;
 }
@@ -132,6 +165,8 @@ export function buildMap(map: LevelMap, look: MapLook): MapView {
     }
     return model;
   };
+  let doorCounter: StationModel | null = null;
+  const garageCounterModel = (): StationModel => (doorCounter ??= garageCounter());
   const badges = new Map<string, THREE.MeshBasicMaterial>();
   const badgeGeometry = new THREE.PlaneGeometry(BADGE_SIZE, BADGE_SIZE).rotateX(-VIEW3D_PITCH);
   const place = (key: string, model: () => Model, p: Placement) => {
@@ -144,8 +179,16 @@ export function buildMap(map: LevelMap, look: MapLook): MapView {
   };
 
   const clutterPlaced: { x: number; y: number; index: number }[] = [];
+  const tops = wallTopProps(look);
   // Each level its own clutter and decorations, even where two maps share a wall.
   const level = levelSalt(map);
+  const garage = look.walls === 'garage' ? garageRoom(map) : null;
+  const closedDoor = new Set(garage?.door.map((t) => `${t.x},${t.y}`));
+  if (garage) placeGarage(garage, place);
+  // A bare bulb where each of the garage's warm lamps shines from.
+  if (garage)
+    for (const at of lampSpots(atmosphereFor(look.scene), map))
+      place('bulb', bulbModel, { at, yaw: 0 });
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const tile = getTile(map, x, y);
@@ -166,34 +209,55 @@ export function buildMap(map: LevelMap, look: MapLook): MapView {
       // The slab under every tile but drops: the level's outline, edges and all.
       place('slab', slabModel, { at: gridToWorld(x, y), yaw: 0 });
       // Floor runs under stations too, so no gaps show at their feet; walls cover theirs.
-      const wobble = 1 - FLOOR_WOBBLE + ((tileHash(x, y) % 100) / 100) * FLOOR_WOBBLE * 2;
-      const checker = (x + y) % 2 === 0 ? 1 : 0.95;
-      if (tile !== 'wall')
-        place('floor', () => floorModel(look.floor), {
+      const hash = tileHash(x, y);
+      const wobble = 1 - FLOOR_WOBBLE + ((hash % 100) / 100) * FLOOR_WOBBLE * 2;
+      // A slab is poured in one piece: no checker, its joints and wear come in looks.
+      const slab = look.floor === 'slab';
+      const checker = slab || (x + y) % 2 === 0 ? 1 : 0.95;
+      const floorLook = slab ? slabLook(x, y, (hash >>> 7) ^ level) : 0;
+      const doorTile = tile === 'wall' && closedDoor.has(`${x},${y}`);
+      if (tile !== 'wall' || doorTile)
+        place(`floor:${floorLook}`, () => floorModel(look.floor, floorLook), {
           at: gridToWorld(x, y),
           yaw: 0,
           tint: new THREE.Color(1, 1, 1).multiplyScalar(wobble * checker).getHex(),
         });
       if (tile === 'floor') continue;
+      if (doorTile) {
+        // A closed roll-up door in place of the front wall, its handle in the middle.
+        const handle = !closedDoor.has(`${x - 1},${y}`);
+        place(`garageDoor:${handle}`, () => garageDoorModel(handle), {
+          at: gridToWorld(x, y),
+          yaw: 0,
+        });
+        continue;
+      }
       if (tile === 'wall') {
         const piece = wallPiece(map, x, y);
-        place(`wall:${piece}`, () => wallModel(look.walls, piece), {
+        const wallLook = look.walls === 'garage' ? ((hash ^ level) >>> 3) % GARAGE_WALL_LOOKS : 0;
+        place(`wall:${piece}:${wallLook}`, () => wallModel(look.walls, piece, wallLook), {
           at: gridToWorld(x, y),
           yaw: 0,
         });
         // Only on walls with open floor in front: not behind a station or counter.
         const open = getTile(map, x, y + 1) === 'floor';
-        const deco = piece === 'wall' && open ? wallDeco(x, y, look.walls, level) : null;
+        const deco = garage
+          ? (garage.decos[`${x},${y}`] ?? null)
+          : piece === 'wall' && open
+            ? wallDeco(x, y, look.walls, level)
+            : null;
         const wanted = wallClutter(map, x, y, piece, look, level);
         const clutterIndex =
-          wanted === undefined ? undefined : unlikeNeighbours(wanted, x, y, clutterPlaced);
-        const clutter = clutterIndex === undefined ? undefined : WALL_TOP_PROPS[clutterIndex];
+          wanted === undefined
+            ? undefined
+            : unlikeNeighbours(wanted, x, y, clutterPlaced, tops.length);
+        const clutter = clutterIndex === undefined ? undefined : tops[clutterIndex];
         if (clutter && clutterIndex !== undefined) {
           clutterPlaced.push({ x, y, index: clutterIndex });
           // Square to the wall, give or take a little.
           const h = (tileHash(y, x) ^ level) >>> 0;
           const turn = ((h % 4) * Math.PI) / 2 + (((h >> 2) % 3) - 1) * 0.15;
-          place(`clutter:${clutterIndex}`, clutter, {
+          place(`clutter:${look.walls === 'garage' ? 'garage:' : ''}${clutterIndex}`, clutter, {
             at: gridToWorld(x, y, WALL_HEIGHT),
             yaw: turn,
           });
@@ -211,7 +275,7 @@ export function buildMap(map: LevelMap, look: MapLook): MapView {
         continue;
       }
       const yaw = facingYaw(stationFacing(map, x, y));
-      const station = stationModel(tile);
+      const station = tile === 'counter' && garage ? garageCounterModel() : stationModel(tile);
       place(`station:${tile}`, () => station.base, { at: gridToWorld(x, y), yaw });
       if (station.hero) {
         const hero = station.hero;
@@ -230,7 +294,8 @@ export function buildMap(map: LevelMap, look: MapLook): MapView {
   }
 
   for (const [key, { model, at }] of placements) {
-    root.add(...instances(model(), at, materials, !NO_SHADOW.has(key)));
+    const flat = NO_SHADOW.has(key) || key.startsWith('floor');
+    root.add(...instances(model(), at, materials, !flat));
   }
   const belts = beltTops(map);
   if (belts) root.add(belts.mesh);
@@ -243,8 +308,41 @@ export function buildMap(map: LevelMap, look: MapLook): MapView {
   };
 }
 
+/**
+ * The garage room's story pieces (see `garageRoom`): the open roll-up door's
+ * jambs at the ship hatch, the house door round the inbox and its doormat,
+ * the banner on the back wall, the oil stain.
+ */
+function placeGarage(
+  room: ReturnType<typeof garageRoom>,
+  place: (key: string, model: () => Model, p: Placement) => void,
+): void {
+  const { opening, houseDoor, doormat, banner, oilStain } = room;
+  if (opening) {
+    for (const x of [opening.x0 - 0.58, opening.x1 + 0.58])
+      place('doorJamb', doorJambModel, { at: gridToWorld(x, opening.y), yaw: 0 });
+  }
+  if (houseDoor)
+    place('houseDoor', houseDoorModel, { at: gridToWorld(houseDoor.x, houseDoor.y), yaw: 0 });
+  if (doormat) place('doormat', doormatModel, { at: gridToWorld(doormat.x, doormat.y), yaw: 0 });
+  if (banner)
+    place('banner', () => bannerModel(banner.width), {
+      at: gridToWorld(banner.x, banner.y),
+      yaw: 0,
+    });
+  if (oilStain)
+    place('oilStain', oilStainModel, { at: gridToWorld(oilStain.x, oilStain.y), yaw: 0 });
+}
+
 /** Flat pieces that never shadow anything. */
-const NO_SHADOW: ReadonlySet<string> = new Set(['floor', 'slab', 'pit', 'pitWall']);
+const NO_SHADOW: ReadonlySet<string> = new Set([
+  'slab',
+  'pit',
+  'pitWall',
+  'oilStain',
+  'doormat',
+  'bulb',
+]);
 /** How deep a gap drops: well below the ground outside, which never covers the level. */
 const PIT_DEPTH = 1.6;
 /** Belt stripes per second, in texture repeats; one repeat is one tile. */
