@@ -77,32 +77,10 @@ export const WALL_DECOS: Readonly<Record<WallTheme, readonly string[]>> = {
   glass: ['whiteboard', 'clock', 'dashboard', 'tv', 'braces'],
   // A garage: pegboard, a shelf of paint tins, the founders' sticky notes, a strip light.
   garage: ['pegboard', 'paintShelf', 'stickies', 'stripLight', 'cordReel', 'kanban'],
-  // For now as plaster and wood; their Room passes give them their own.
-  officePark: [
-    'poster',
-    'whiteboard',
-    'clock',
-    'kanban',
-    'dashboard',
-    'plants',
-    'frames',
-    'shelf',
-    'pinboard',
-    'braces',
-    'tv',
-  ],
-  warehouse: [
-    'poster',
-    'whiteboard',
-    'clock',
-    'kanban',
-    'dashboard',
-    'plants',
-    'frames',
-    'shelf',
-    'pinboard',
-    'braces',
-  ],
+  // A business-park unit: corkboard, whiteboard, fire-exit sign, wall clock, thermostat, a motivational poster.
+  officePark: ['pinboard', 'whiteboard', 'fireExit', 'officeClock', 'thermostat', 'motivation'],
+  // The biscuit works hang their own art (see `rooms/warehouseRoom.ts`); this is the fallback.
+  warehouse: ['poster', 'clock', 'plants', 'pinboard', 'frames', 'braces'],
 };
 /** No two decorations this close along a wall are the same. */
 export const WALL_DECO_SPREAD = 4;

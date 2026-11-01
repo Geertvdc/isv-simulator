@@ -120,9 +120,10 @@ export const FLOOR_COLORS: Readonly<Record<FloorTheme, readonly [number, number]
   parquet: [COLOR.wood, 0xab7947],
   // Sealed garage concrete, a touch cool; the second is the expansion joints, thin and pale.
   slab: [0xa3a39f, 0x75736d],
-  // For now as carpet and parquet; their Room passes give them their own.
-  carpetTiles: [0x3f8a80, 0x3a8078],
-  boards: [COLOR.wood, 0xab7947],
+  // Grey-blue office carpet tiles; the second is the tiles laid the other way.
+  carpetTiles: [0x7b8998, 0x778593],
+  // Old wide factory floorboards, honey-brown; the second is the dark gaps between them.
+  boards: [0xa5825e, 0x4a3628],
 };
 
 /** Wall colors per theme: face and top. Caps stay darker than stations, so the eye goes to the stations. */
@@ -132,9 +133,10 @@ export const WALL_COLORS: Readonly<Record<WallTheme, { face: number; top: number
   glass: { face: COLOR.glassClear, top: 0x7d8c9a },
   // Painted cinder block over a grey-green dado, capped with concrete coping.
   garage: { face: 0xc4c0b4, top: 0x8d8b86 },
-  // For now as plaster and wood; their Room passes give them their own.
-  officePark: { face: 0x8fa3b8, top: 0x5e6f82 },
-  warehouse: { face: 0x9a5a32, top: 0x6b4529 },
+  // Magnolia plasterboard, capped with a cool light trim.
+  officePark: { face: 0xd3c7a8, top: 0x939ca3 },
+  // Red factory brick (over a limewashed band), capped with cool stone coping.
+  warehouse: { face: 0x9c4f37, top: 0x8a8c88 },
 };
 
 /** Marks the room's warm lamps, which only `medium` and `high` quality light (see `Stage`). */
