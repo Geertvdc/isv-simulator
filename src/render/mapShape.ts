@@ -75,6 +75,8 @@ export const WALL_DECOS: Readonly<Record<WallTheme, readonly string[]>> = {
     'braces',
   ],
   glass: ['whiteboard', 'clock', 'dashboard', 'tv', 'braces'],
+  // A garage: pegboard, a shelf of paint tins, the founders' sticky notes, a strip light.
+  garage: ['pegboard', 'paintShelf', 'stickies', 'stripLight', 'cordReel', 'kanban'],
 };
 /** No two decorations this close along a wall are the same. */
 export const WALL_DECO_SPREAD = 4;

@@ -1,11 +1,15 @@
 import type { BlockTile } from '../sim/level';
 
-/** Wall looks a level can pick. */
-export const WALL_THEMES = ['plaster', 'wood', 'glass'] as const;
+/**
+ * Wall looks a level can pick. `garage` is painted cinder block, and dresses
+ * the room as a converted garage: roll-up door at the ship hatch, house door
+ * at the inbox, pegboard and paint tins, counters as doors on sawhorses.
+ */
+export const WALL_THEMES = ['plaster', 'wood', 'glass', 'garage'] as const;
 export type WallTheme = (typeof WALL_THEMES)[number];
 
-/** Floor looks a level can pick. */
-export const FLOOR_THEMES = ['concrete', 'carpet', 'parquet'] as const;
+/** Floor looks a level can pick. `slab` is a garage's sealed concrete, joints, oil stain and all. */
+export const FLOOR_THEMES = ['concrete', 'carpet', 'parquet', 'slab'] as const;
 export type FloorTheme = (typeof FLOOR_THEMES)[number];
 
 /** How a level's map looks. */
@@ -25,7 +29,7 @@ export const DEFAULT_LOOK: MapLook = { walls: 'plaster', floor: 'concrete' };
 
 /** Map look per level id; levels not listed get `DEFAULT_LOOK`. */
 export const LEVEL_LOOKS: Readonly<Record<string, MapLook>> = {
-  garage: { walls: 'plaster', floor: 'concrete', scene: 'garage' },
+  garage: { walls: 'garage', floor: 'slab', scene: 'garage' },
   'open-plan': { walls: 'glass', floor: 'carpet' },
   'scale-up': { walls: 'wood', floor: 'parquet' },
   // Startup: a loft, warm wood.

@@ -290,6 +290,52 @@ function shipStation(): StationModel {
   return { base: base.build(), hero: hero.build(), heroAt: [-0.32, -0.3] };
 }
 
+/**
+ * A garage counter: an old flush door laid over two wooden sawhorses, the
+ * knob hole still in it. Its top is as light as a plain counter's and sits at
+ * the same height, so it reads as somewhere to put a ticket down.
+ */
+export function garageCounter(): StationModel {
+  const b = new ModelBuilder();
+  const wood = COLOR.wood;
+  const door = 0xe6dcc6;
+  // Two sawhorses: a beam on splayed legs, a brace between each pair.
+  for (const x of [-0.3, 0.3]) {
+    const beamY = TOP - TOP_THICKNESS - 0.03;
+    b.box(0.08, 0.06, 0.8, wood, { at: [x, beamY, 0] }, 0.01);
+    for (const z of [-0.3, 0.3]) {
+      for (const s of [-1, 1]) {
+        b.box(
+          0.05,
+          beamY,
+          0.05,
+          tint(wood, -0.15),
+          {
+            at: [x + s * 0.07, beamY / 2, z],
+            rot: [0, 0, s * 0.22],
+          },
+          0,
+        );
+      }
+      b.box(0.24, 0.035, 0.03, tint(wood, -0.25), { at: [x, 0.16, z] }, 0);
+    }
+  }
+  // The door: a lighter face panel and the knob hole near one end.
+  b.box(1, TOP_THICKNESS, 0.96, tint(door, -0.12), { at: [0, TOP - TOP_THICKNESS / 2, 0] }, 0.012);
+  b.box(0.98, 0.006, 0.94, door, { at: [0, TOP + 0.001, 0] }, 0);
+  b.cylinder(0.035, 0.035, 0.01, tint(door, -0.5), { at: [0.38, TOP + 0.002, 0.3] }, 12);
+  // An orange cable hanging off the back edge.
+  b.box(
+    0.016,
+    0.3,
+    0.016,
+    COLOR.tangerine,
+    { at: [-0.12, TOP - 0.18, -0.47], rot: [0.15, 0, 0] },
+    0,
+  );
+  return { base: b.build(), hero: null, heroAt: [0, 0] };
+}
+
 function plainCounter(): StationModel {
   return {
     base: counter(new ModelBuilder(), PALETTE.counterFront, PALETTE.counterTop).build(),

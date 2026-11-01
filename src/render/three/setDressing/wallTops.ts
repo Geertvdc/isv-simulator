@@ -1,6 +1,6 @@
-import { type Model, ModelBuilder } from '../kit';
+import { type Model, ModelBuilder, tint } from '../kit';
 import { COLOR } from '../palette';
-import { books, DARK, mug, nth, plantPot, SPINES, STEEL, WOOD_DARK } from './shared';
+import { books, CARDBOARD, DARK, mug, nth, plantPot, SPINES, STEEL, WOOD_DARK } from './shared';
 
 /** On the office's own walls: what stands on top of them. */
 
@@ -104,4 +104,110 @@ export const WALL_TOP_PROPS: readonly (() => Model)[] = [
     for (let i = 0; i < 4; i++)
       b.led(0.008, COLOR.ledGreen, { at: [-0.06 + i * 0.04, 0.03, 0.081] });
   }, 1.8),
+];
+
+/** Paint tins in the garage's colors: a lid, a band of label, a drip down the side. */
+function paintTin(b: ModelBuilder, x: number, y: number, z: number, look: number, r = 0.07): void {
+  const label = nth(
+    [COLOR.porcelain, COLOR.sage, COLOR.terracotta, COLOR.dustyBlue, COLOR.khaki],
+    look,
+  );
+  b.cylinder(r, r, r * 1.7, COLOR.silver, { at: [x, y + r * 0.85, z] }, 14);
+  b.cylinder(r + 0.002, r + 0.002, r * 0.9, label, { at: [x, y + r * 0.8, z] }, 14);
+  b.cylinder(r * 0.9, r * 0.9, 0.006, COLOR.chrome, { at: [x, y + r * 1.7 + 0.003, z] }, 14);
+  b.box(0.02, r * 0.7, 0.01, label, { at: [x + r * 0.4, y + r * 1.4, z + r * 0.92] }, 0);
+}
+
+/**
+ * Things on top of a garage's walls: what a garage keeps up out of the way.
+ * Paint tins, cardboard boxes, a toolbox, a coiled extension cord, a petrol
+ * can, a stack of pizza boxes and energy-drink cans (the startup moved in), a
+ * box of Christmas lights, a boombox, a spare tyre.
+ */
+export const GARAGE_WALL_TOP_PROPS: readonly (() => Model)[] = [
+  wallTop((b) => {
+    paintTin(b, -0.1, 0, 0, 0);
+    paintTin(b, 0.08, 0, 0.04, 1);
+    paintTin(b, -0.02, 0.12, 0.02, 2);
+  }, 1.5),
+  wallTop((b) => {
+    // Two cardboard boxes, one on the other, taped.
+    b.box(0.4, 0.26, 0.32, CARDBOARD, { at: [0, 0.13, 0] }, 0.015);
+    b.box(0.41, 0.03, 0.08, 0xe8d4a8, { at: [0, 0.255, 0] }, 0);
+    b.box(0.3, 0.2, 0.26, 0xb8864e, { at: [0.03, 0.36, 0], rot: [0, 0.25, 0] }, 0.015);
+    b.box(0.1, 0.06, 0.004, DARK, { at: [0.06, 0.38, 0.14], rot: [0, 0.25, 0] }, 0);
+  }),
+  wallTop((b) => {
+    // A red toolbox, lid shut, handle up.
+    b.box(0.34, 0.16, 0.18, COLOR.signalRed, { at: [0, 0.08, 0] }, 0.02);
+    b.box(0.35, 0.02, 0.19, tint(COLOR.signalRed, -0.3), { at: [0, 0.12, 0] }, 0);
+    b.box(0.18, 0.02, 0.03, DARK, { at: [0, 0.22, 0] }, 0);
+    for (const x of [-0.08, 0.08]) b.box(0.02, 0.06, 0.03, DARK, { at: [x, 0.19, 0] }, 0);
+  }, 1.3),
+  wallTop((b) => {
+    // An orange extension cord, coiled.
+    for (let i = 0; i < 4; i++)
+      b.torus(0.15 - i * 0.008, 0.02, COLOR.tangerine, {
+        at: [i * 0.01, 0.02 + i * 0.03, 0],
+        rot: [Math.PI / 2, 0, 0],
+      });
+    b.box(0.06, 0.04, 0.08, DARK, { at: [0.18, 0.02, 0.08] }, 0.01);
+  }, 1.3),
+  wallTop((b) => {
+    // A petrol can for the mower.
+    b.box(0.24, 0.26, 0.12, 0xb8322a, { at: [0, 0.13, 0] }, 0.03);
+    b.box(0.1, 0.03, 0.04, DARK, { at: [-0.04, 0.28, 0] }, 0);
+    b.cylinder(0.02, 0.025, 0.1, DARK, { at: [0.1, 0.3, 0], rot: [0, 0, -0.6] }, 8);
+  }, 1.4),
+  wallTop((b) => {
+    // Pizza boxes stacked high, energy-drink cans on top.
+    for (let i = 0; i < 5; i++)
+      b.box(
+        0.36,
+        0.045,
+        0.36,
+        i % 2 ? 0xd8b080 : CARDBOARD,
+        {
+          at: [0, 0.023 + i * 0.047, 0],
+          rot: [0, (((i * 7) % 5) - 2) * 0.05, 0],
+        },
+        0.006,
+      );
+    for (const [x, z] of [
+      [-0.08, 0.04],
+      [0.04, -0.06],
+      [0.1, 0.08],
+    ] as const)
+      b.cylinder(0.03, 0.03, 0.1, COLOR.neonLime, { at: [x, 0.29, z] }, 10);
+  }, 1.3),
+  wallTop((b) => {
+    // A box marked for the Christmas lights, a string of them spilling out.
+    b.box(0.34, 0.2, 0.26, CARDBOARD, { at: [0, 0.1, 0] }, 0.015);
+    b.box(0.2, 0.06, 0.004, COLOR.signalRed, { at: [0, 0.12, 0.131] }, 0);
+    for (let i = 0; i < 5; i++)
+      b.led(0.018, nth([COLOR.signalRed, COLOR.leafLight, COLOR.amber, COLOR.noteBlue], i), {
+        at: [-0.14 + i * 0.07, 0.21 + (i % 2) * 0.02, 0.1],
+      });
+  }, 1.3),
+  wallTop((b) => {
+    // An old boombox.
+    b.box(0.38, 0.18, 0.12, COLOR.graphite, { at: [0, 0.09, 0] }, 0.02);
+    for (const x of [-0.11, 0.11]) {
+      b.cylinder(0.06, 0.06, 0.01, DARK, { at: [x, 0.09, 0.062], rot: [Math.PI / 2, 0, 0] }, 16);
+      b.cylinder(
+        0.025,
+        0.025,
+        0.012,
+        STEEL,
+        { at: [x, 0.09, 0.064], rot: [Math.PI / 2, 0, 0] },
+        10,
+      );
+    }
+    b.box(0.3, 0.02, 0.02, STEEL, { at: [0, 0.22, 0] }, 0);
+  }, 1.3),
+  wallTop((b) => {
+    // A spare tyre lying flat, a paint tin on it.
+    b.torus(0.18, 0.07, 0x2a2a2c, { at: [0, 0.07, 0], rot: [Math.PI / 2, 0, 0] });
+    paintTin(b, 0, 0.0, 0, 3, 0.06);
+  }, 1.2),
 ];
