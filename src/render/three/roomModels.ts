@@ -6,6 +6,7 @@ import { FLOOR_COLORS, PALETTE, WALL_COLORS } from './look';
 import { COLOR } from './palette';
 import { type WallPiece, tileHash } from '../mapShape';
 import { SLAB_WEAR } from './rooms/garageRoom';
+import { OFFICE_PARK_DECOS } from './roomModels/officePark';
 
 /**
  * The room round the stations, built in code like the rest of the office
@@ -100,6 +101,8 @@ export function wallModel(theme: WallTheme, piece: WallPiece, look = 0): Model {
 
 /** Things hung on the front of a wall (all in front of z = 0.5), by name. */
 export const WALL_DECO_MODELS: Readonly<Record<string, () => Model>> = {
+  // The business-park unit's own (fire-exit sign, office clock, thermostat, poster).
+  ...OFFICE_PARK_DECOS,
   whiteboard: () => {
     const b = new ModelBuilder();
     b.box(0.72, 0.42, 0.03, COLOR.chrome, { at: [0, 0.68, 0.515] }, 0.01);
