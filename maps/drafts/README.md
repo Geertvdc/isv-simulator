@@ -6,19 +6,21 @@ Sketches of the redesigned campaign maps, for review on paper before anything is
 - Same format as the maps in `maps/`: the chars from `src/sim/level.ts` (`#` wall, `.` floor, `C` counter, `I` inbox, `B` bug queue, `K` keyboard, `T` test bench, `R` review, `P` pipeline, `S` ship, `X` bin, `W` whiteboard, `G` merge, space for void, `~` gap, `>` `<` `^` `v` belts, `1` to `4` spawns, `M` manager start, `m` meeting room floor).
 - Plus chars for mechanics that don't exist yet. The tools read them as a stand-in until the mechanic is built:
 
-  | Char | Will be                                                      | Tools read it as |
-  | ---- | ------------------------------------------------------------ | ---------------- |
-  | `_`  | wet floor (Startup: spills)                                  | floor `.`        |
-  | `o`  | leaky tap (Startup)                                          | counter `C`      |
-  | `%`  | spill zone, wet while its tap leaks (Startup)                | floor `.`        |
-  | `r`  | mop robot route, a closed loop (Startup)                     | floor `.`        |
-  | `L`  | lift cabin (Scale-Up: lifts)                                 | floor `.`        |
-  | `=`  | partition (Enterprise: reorgs)                               | wall `#`         |
-  | `l`  | express lift cabin (Scale-Up: lifts, skips floors)           | floor `.`        |
-  | `H`  | mail chute hatch (Scale-Up: one-way drop to the floor below) | counter `C`      |
-  | `D`  | rolling desk (Enterprise: reorgs)                            | counter `C`      |
+  | Char | Will be                                                       | Tools read it as |
+  | ---- | ------------------------------------------------------------- | ---------------- |
+  | `_`  | wet floor (Startup: spills)                                   | floor `.`        |
+  | `o`  | leaky tap (Startup)                                           | counter `C`      |
+  | `%`  | spill zone, wet while its tap leaks (Startup)                 | floor `.`        |
+  | `r`  | mop robot route, a closed loop (Startup)                      | floor `.`        |
+  | `L`  | lift cabin (Scale-Up: lifts)                                  | floor `.`        |
+  | `=`  | partition (Enterprise: reorgs)                                | wall `#`         |
+  | `l`  | express lift cabin (Scale-Up: lifts, skips floors)            | floor `.`        |
+  | `H`  | mail chute hatch (Scale-Up: one-way drop to the floor below)  | counter `C`      |
+  | `D`  | rolling desk (Enterprise: reorgs)                             | counter `C`      |
+  | `d`  | meeting door (Enterprise: shut while a meeting is in session) | floor `.`        |
+  | `+`  | badge turnstile, one way (Enterprise)                         | floor `.`        |
 
-- Reorg levels change layout during the round: `<level-id>.txt` is phase 1 (the layout at the start), `<level-id>.phase2.txt`, `.phase3.txt` the layouts after each reorg. Same size; only partitions `=` and rolling desks `D` move (onto and off floor), everything else stays put. Rolling desks pair up in reading order (the first `D` in phase 1 rolls to the first `D` in phase 2). The tools draw, report and render every phase, and flag a phase that moves anything else.
+- Reorg levels change layout during the round: `<level-id>.txt` is phase 1 (the layout at the start), `<level-id>.phase2.txt`, `.phase3.txt` the layouts after each reorg. Same size; only partitions `=`, rolling desks `D` and meeting doors `d` move (onto and off floor), everything else stays put. Rolling desks pair up in reading order (the first `D` in phase 1 rolls to the first `D` in phase 2). The tools draw, report and render every phase, and flag a phase that moves anything else.
 - The game never loads these files (not until the greybox step of phase 23).
 
 ## Tools
