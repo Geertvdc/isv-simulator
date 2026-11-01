@@ -7,9 +7,9 @@
  * tested.
  */
 
-import { type GridPoint, type LevelMap, getTile, isWorkSurface } from '../../sim/level';
-import { WALL_DECOS, levelSalt, tileHash, wallPiece } from '../mapShape';
-import { tilesOf } from './layout';
+import { type GridPoint, type LevelMap, getTile, isWorkSurface } from '../../../sim/level';
+import { WALL_DECOS, levelSalt, tileHash, wallPiece } from '../../mapShape';
+import { tilesOf } from '../layout';
 
 /** Wear on a slab tile (see `floorWear`), one per tile; `roomModels` draws them. */
 export const SLAB_WEAR = {
