@@ -24,6 +24,7 @@ import { People } from './People';
 import { Surroundings } from './surroundings';
 import { WorldFx } from './WorldFx';
 import { blockHeight, levelBox, pickTile, placeTicket } from './layout';
+import { type Atmosphere, atmosphereFor, fogRange } from './atmosphere';
 import { createLights, dressScene } from './look';
 import { kitMaterials } from './kit';
 import { type MapView, buildMap } from './MapView';
@@ -61,6 +62,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
   private readonly people: People;
   private readonly surroundings: Surroundings;
   private readonly mapView: MapView;
+  private readonly atmosphere: Atmosphere;
   private readonly carrierYaw = (id: PlayerId): number | undefined => this.people.yawOf(id);
   /** The last round frame, placed again every render with the camera as it is then. */
   private frame: RoundFrame | null = null;
@@ -78,9 +80,10 @@ export class ThreeRoundRenderer implements RoundRenderer {
     const parent = scene.game.canvas.parentElement;
     if (!parent) throw new Error('The game canvas has no parent');
     this.stage = getStage(parent);
-    dressScene(this.world, this.stage.renderer);
+    this.atmosphere = atmosphereFor(look.scene);
+    dressScene(this.world, this.stage.renderer, this.atmosphere);
     this.mapView = buildMap(map, look);
-    this.world.add(...createLights(map), this.mapView.root);
+    this.world.add(...createLights(map, this.atmosphere), this.mapView.root);
     this.hover = new THREE.LineLoop(
       new THREE.BufferGeometry().setFromPoints([
         new THREE.Vector3(-0.5, 0, -0.5),
@@ -93,9 +96,9 @@ export class ThreeRoundRenderer implements RoundRenderer {
     this.hover.visible = false;
     this.world.add(this.hover);
     this.overlays = new Overlays(scene, map);
-    this.fx = new WorldFx(this.world, map);
+    this.fx = new WorldFx(this.world, map, this.atmosphere);
     this.people = new People(this.world, this.materials);
-    this.surroundings = new Surroundings(map, look.setting);
+    this.surroundings = new Surroundings(map, look.setting, look.scene);
     this.world.add(this.surroundings.root);
 
     this.pose = this.fit();
@@ -228,10 +231,10 @@ export class ThreeRoundRenderer implements RoundRenderer {
     this.pose = this.fit();
   };
 
-  /** Frames the level between the HUD bands. */
+  /** Frames the level between the HUD bands, and fits the fog to that camera. */
   private fit(): CameraPose {
     const { width, height } = this.scene.scale;
-    return fitCamera3d(
+    const pose = fitCamera3d(
       levelBox(this.map),
       { width, height },
       {
@@ -241,6 +244,12 @@ export class ThreeRoundRenderer implements RoundRenderer {
         left: CAMERA_FIT_PADDING,
       },
     );
+    const fog = fogRange(this.atmosphere, this.map, pose);
+    if (fog && this.world.fog instanceof THREE.Fog) {
+      this.world.fog.near = fog.near;
+      this.world.fog.far = fog.far;
+    }
+    return pose;
   }
 
   /** A see-through plate in the player's color on the block they face; nothing for floor and walls. */

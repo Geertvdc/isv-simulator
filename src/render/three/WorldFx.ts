@@ -4,6 +4,7 @@ import { type Pipeline, pipelineWarning } from '../../sim/pipeline';
 import type { GameState, Vec } from '../../sim/state';
 import { pipelinePulse } from '../effects';
 import { type Vec3, gridToWorld } from '../projection';
+import { type Atmosphere, DEFAULT_ATMOSPHERE, type MoteSeed, moteSeeds } from './atmosphere';
 import { blockHeight, facingYaw, heroPlacement, stationFacing } from './layout';
 import { PIPELINE_SERVER_AT } from './stationModels';
 import { COLOR } from './palette';
@@ -23,6 +24,11 @@ const RUG_PULSE_MS = 300;
 const PUFF_COLOR = 0xd9d4c7;
 const PUFF_COUNT = 4;
 const PUFF_MS = 350;
+/** How far a dust mote drifts from where it hangs, in world units, and how long a sway takes. */
+const MOTE_DRIFT = 0.18;
+const MOTE_PERIOD_MS = 9000;
+/** Mote size on screen, in world units (they shrink with distance). */
+const MOTE_SIZE = 0.045;
 /** How far shake moves the picture at intensity 1, as a share of the canvas height. */
 const SHAKE_SCALE = 1;
 
@@ -57,14 +63,42 @@ export class WorldFx {
   private readonly rug: THREE.MeshBasicMaterial;
   private readonly puffs: Puff[] = [];
   private readonly puffGeometry = new THREE.SphereGeometry(1, 10, 8);
+  /** Dust drifting in the room's light, if the atmosphere has it. */
+  private readonly motes: { points: THREE.Points; seeds: MoteSeed[] } | null = null;
   private shake = { untilMs: 0, intensity: 0 };
   shakeEnabled = true;
 
   constructor(
     world: THREE.Scene,
     private readonly map: LevelMap,
+    atmosphere: Atmosphere = DEFAULT_ATMOSPHERE,
   ) {
     world.add(this.root);
+    const seeds = moteSeeds(atmosphere, map);
+    if (atmosphere.motes && seeds.length > 0) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        'position',
+        new THREE.BufferAttribute(new Float32Array(seeds.length * 3), 3),
+      );
+      // Additive and faint: it adds a glint over the floor but stays under bloom.
+      const points = new THREE.Points(
+        geometry,
+        new THREE.PointsMaterial({
+          color: atmosphere.motes.color,
+          size: MOTE_SIZE,
+          transparent: true,
+          opacity: atmosphere.motes.opacity,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          fog: false,
+        }),
+      );
+      points.frustumCulled = false;
+      this.root.add(points);
+      this.motes = { points, seeds };
+      this.driftMotes(0);
+    }
     this.rug = new THREE.MeshBasicMaterial({
       color: RUG_COLOR,
       transparent: true,
@@ -111,8 +145,9 @@ export class WorldFx {
     this.shake = { untilMs: timeMs + ms, intensity };
   }
 
-  /** Moves puffs along; returns this frame's shake offset in canvas pixels. */
+  /** Moves puffs and dust along; returns this frame's shake offset in canvas pixels. */
   update(timeMs: number, canvas: { width: number; height: number }): { x: number; y: number } {
+    this.driftMotes(timeMs);
     for (let i = this.puffs.length - 1; i >= 0; i--) {
       const puff = this.puffs[i];
       if (!puff) continue;
@@ -134,6 +169,23 @@ export class WorldFx {
       x: (Math.random() * 2 - 1) * k * canvas.width,
       y: (Math.random() * 2 - 1) * k * canvas.height,
     };
+  }
+
+  /** Each mote sways slowly on its own loop, a little up and down. */
+  private driftMotes(timeMs: number): void {
+    if (!this.motes) return;
+    const position = this.motes.points.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const t = timeMs / MOTE_PERIOD_MS;
+    this.motes.seeds.forEach(({ at, phase }, i) => {
+      const a = (t + phase) * Math.PI * 2;
+      position.setXYZ(
+        i,
+        at.x + Math.sin(a) * MOTE_DRIFT,
+        at.y + Math.sin(a * 2 + phase * 5) * MOTE_DRIFT * 0.5,
+        at.z + Math.cos(a * 0.7) * MOTE_DRIFT,
+      );
+    });
+    position.needsUpdate = true;
   }
 
   private syncPipeline(pipeline: Pipeline, timeMs: number): void {

@@ -11,7 +11,9 @@ import {
 import * as THREE from 'three';
 import type { Graphics } from '../../flow/save';
 import { type CameraPose, cameraPosition } from '../projection';
+import { type Atmosphere, cssRgba } from './atmosphere';
 import { GLOW_BOOST_KEY } from './kit';
+import { LAMP_KEY, VIGNETTE_KEY } from './look';
 import {
   type FrameWatch,
   type Quality,
@@ -62,6 +64,12 @@ export class Stage {
   /** The level last drawn, to set it up for the quality when a new one comes. */
   private scene: THREE.Scene | null = null;
   private lastFrameMs: number | null = null;
+  /**
+   * Darkened screen edges over the canvas (and under Phaser's), for levels
+   * whose atmosphere has a vignette. Plain CSS, so it costs nothing and looks
+   * the same on every quality.
+   */
+  private readonly vignette = document.createElement('div');
 
   constructor(parent: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -84,6 +92,14 @@ export class Stage {
     // order; `#game` is fixed, so z-index -1 stays inside it.
     canvas.style.zIndex = '-1';
     parent.prepend(canvas);
+    Object.assign(this.vignette.style, {
+      position: 'absolute',
+      inset: '0',
+      pointerEvents: 'none',
+      zIndex: '-1',
+      display: 'none',
+    });
+    canvas.after(this.vignette);
     const start = startQuality('auto', qualityParam());
     this.quality = start.quality;
     this.frames = createFrameWatch(start.watch);
@@ -145,7 +161,10 @@ export class Stage {
 
   /** Drops the post-processing chain of a level that is gone. */
   forget(scene: THREE.Scene): void {
-    if (this.scene === scene) this.scene = null;
+    if (this.scene === scene) {
+      this.scene = null;
+      this.showVignette(undefined);
+    }
     if (this.composer?.scene !== scene) return;
     this.composer.composer.dispose();
     this.composer = null;
@@ -164,7 +183,12 @@ export class Stage {
   /** Sets a level's lights and materials up for the current quality. */
   private prepare(scene: THREE.Scene): void {
     const size = SHADOW_MAP[this.quality];
+    this.showVignette(scene.userData[VIGNETTE_KEY] as Atmosphere['vignette']);
     scene.traverse((obj) => {
+      // Warm room lamps are a nicety: low skips their cost.
+      if (obj instanceof THREE.PointLight && obj.userData[LAMP_KEY] === true) {
+        obj.visible = this.quality !== 'low';
+      }
       if (obj instanceof THREE.DirectionalLight && obj.castShadow) {
         if (obj.shadow.mapSize.x !== size) {
           obj.shadow.mapSize.set(size, size);
@@ -183,6 +207,17 @@ export class Stage {
         }
       }
     });
+  }
+
+  private showVignette(vignette: Atmosphere['vignette']): void {
+    const style = this.vignette.style;
+    style.display = vignette ? 'block' : 'none';
+    if (!vignette) return;
+    const edge = cssRgba(vignette.color, vignette.opacity);
+    const mid = cssRgba(vignette.color, vignette.opacity * 0.35);
+    const inner = Math.round(vignette.inner * 100);
+    const between = Math.round(((1 + vignette.inner) / 2) * 100);
+    style.background = `radial-gradient(ellipse farthest-corner at 50% 48%, transparent ${inner}%, ${mid} ${between}%, ${edge} 100%)`;
   }
 
   private applyPixelRatio(): void {

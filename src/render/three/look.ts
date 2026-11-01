@@ -3,6 +3,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import type { BlockTile, LevelMap } from '../../sim/level';
 import type { FloorTheme, WallTheme } from '../mapLook';
 import { gridToWorld } from '../projection';
+import { type Atmosphere, DEFAULT_ATMOSPHERE, lampSpots, sunPlacement } from './atmosphere';
 import { COLOR } from './palette';
 
 /**
@@ -117,6 +118,8 @@ export const FLOOR_COLORS: Readonly<Record<FloorTheme, readonly [number, number]
   // A warm teal: blue carpet sank into the backdrop.
   carpet: [0x3f8a80, 0x3a8078],
   parquet: [COLOR.wood, 0xab7947],
+  // Sealed garage concrete, a little warm; the second is the expansion joints.
+  slab: [0x9d9c97, 0x5a5853],
 };
 
 /** Wall colors per theme: face and top. Caps stay darker than stations, so the eye goes to the stations. */
@@ -124,30 +127,36 @@ export const WALL_COLORS: Readonly<Record<WallTheme, { face: number; top: number
   plaster: { face: 0x8fa3b8, top: 0x5e6f82 },
   wood: { face: 0x9a5a32, top: 0x6b4529 },
   glass: { face: COLOR.glassClear, top: 0x7d8c9a },
+  // Painted cinder block over a grey-green dado, capped with concrete coping.
+  garage: { face: 0xb9b19f, top: 0x6f6a62 },
 };
 
-/** Sun color and strength; it shines from behind and left (see `createLights`). */
-const SUN = { color: 0xffe9c7, intensity: 3.6 };
-const SKY = { sky: 0xc9dcff, ground: 0x6e5a48, intensity: 0.6 };
-/** A weak cool light from the camera side that lifts the shadow sides. */
-const FILL = { color: 0xbfd4ff, intensity: 0.6 };
-/** How much the soft room reflections show on materials. */
-const ENVIRONMENT_INTENSITY = 0.2;
+/** Marks the room's warm lamps, which only `medium` and `high` quality light (see `Stage`). */
+export const LAMP_KEY = 'lamp';
 
-/** Lights for a level: sky, sun with soft shadows fitted to the map, and a fill. */
-export function createLights(map: Pick<LevelMap, 'width' | 'height'>): THREE.Object3D[] {
+/**
+ * Lights for a level: sky, sun with soft shadows fitted to the map, a fill
+ * and, if the atmosphere has them, warm lamps in the room. The light comes
+ * from `atmosphere` (see `atmosphere.ts`), today's studio light by default.
+ */
+export function createLights(
+  map: Pick<LevelMap, 'width' | 'height'>,
+  atmosphere: Atmosphere = DEFAULT_ATMOSPHERE,
+): THREE.Object3D[] {
   const { width, height } = map;
   const cx = (width - 1) / 2;
   const cy = (height - 1) / 2;
+  const { sky: SKY, sun: SUN, fill: FILL } = atmosphere;
   const sky = new THREE.HemisphereLight(SKY.sky, SKY.ground, SKY.intensity);
 
   const sun = new THREE.DirectionalLight(SUN.color, SUN.intensity);
-  // From behind and left, about 58° up: shadows fall forward and right, toward the
-  // camera, where they show under people and props instead of hiding behind them.
-  put(sun, gridToWorld(cx - width * 0.3, cy - height * 0.45, 12));
-  put(sun.target, gridToWorld(cx, cy));
+  // From behind and left: shadows fall forward and right, toward the camera,
+  // where they show under people and props instead of hiding behind them.
+  const placed = sunPlacement(atmosphere, map);
+  put(sun, placed.position);
+  put(sun.target, placed.target);
   sun.castShadow = true;
-  const reach = Math.max(width, height) * 0.72;
+  const reach = placed.reach;
   const cam = sun.shadow.camera;
   cam.left = -reach;
   cam.right = reach;
@@ -164,7 +173,16 @@ export function createLights(map: Pick<LevelMap, 'width' | 'height'>): THREE.Obj
   // From the camera side, so the front faces the sun leaves in shade aren't black.
   put(fill, gridToWorld(cx + width * 0.6, cy + height * 1.2, 6));
   put(fill.target, gridToWorld(cx, cy));
-  return [sky, sun, sun.target, fill, fill.target];
+
+  // Bare bulbs: cheap point lights with a short reach and no shadows.
+  const lamps = lampSpots(atmosphere, map).map((p) => {
+    const spec = atmosphere.lamps;
+    const lamp = new THREE.PointLight(spec?.color, spec?.intensity, spec?.distance, 2);
+    put(lamp, p);
+    lamp.userData[LAMP_KEY] = true;
+    return lamp;
+  });
+  return [sky, sun, sun.target, fill, fill.target, ...lamps];
 }
 
 let environment: THREE.Texture | null = null;
@@ -178,15 +196,33 @@ export function roomEnvironment(renderer: THREE.WebGLRenderer): THREE.Texture {
   return environment;
 }
 
-/** Dresses `scene` with the room reflections and the backdrop. */
-export function dressScene(scene: THREE.Scene, renderer: THREE.WebGLRenderer): void {
+/** Where a scene keeps its vignette for `Stage` (an `Atmosphere['vignette']`). */
+export const VIGNETTE_KEY = 'vignette';
+
+/**
+ * Dresses `scene` with the room reflections, the backdrop and the
+ * atmosphere's fog and vignette (fog distances come later, from the camera:
+ * see `fogRange`).
+ */
+export function dressScene(
+  scene: THREE.Scene,
+  renderer: THREE.WebGLRenderer,
+  atmosphere: Atmosphere = DEFAULT_ATMOSPHERE,
+): void {
   scene.environment = roomEnvironment(renderer);
-  scene.environmentIntensity = ENVIRONMENT_INTENSITY;
-  scene.background = backdrop();
+  scene.environmentIntensity = atmosphere.environment;
+  scene.background = backdrop(atmosphere.backdrop);
+  if (atmosphere.fog) scene.fog = new THREE.Fog(atmosphere.fog.color);
+  if (atmosphere.vignette) scene.userData[VIGNETTE_KEY] = atmosphere.vignette;
 }
 
 /** A radial gradient behind the diorama, so it doesn't float in flat black. */
-function backdrop(): THREE.Texture {
+function backdrop(
+  colors: { inner: number; outer: number } = {
+    inner: PALETTE.backdropInner,
+    outer: PALETTE.backdropOuter,
+  },
+): THREE.Texture {
   const size = 256;
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -194,8 +230,8 @@ function backdrop(): THREE.Texture {
   const ctx = canvas.getContext('2d');
   if (ctx) {
     const g = ctx.createRadialGradient(size / 2, size * 0.45, 0, size / 2, size / 2, size * 0.75);
-    g.addColorStop(0, css(PALETTE.backdropInner));
-    g.addColorStop(1, css(PALETTE.backdropOuter));
+    g.addColorStop(0, css(colors.inner));
+    g.addColorStop(1, css(colors.outer));
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, size, size);
   }

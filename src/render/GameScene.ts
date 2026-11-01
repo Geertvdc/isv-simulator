@@ -19,6 +19,7 @@ import { type LevelMap, type Tile, getTile } from '../sim/level';
 import { type Bot, botInput, createBot } from '../sim/bot';
 import { LEVELS, levelById, type Level } from '../sim/levels';
 import type { GameEvent } from '../sim/orders';
+import { sceneById } from '../sim/sceneCatalog';
 import { type Scene, sceneDone, sceneInputs, sceneState } from '../sim/scenes';
 import { type GameState, createGame } from '../sim/state';
 import { GameLoop } from './GameLoop';
@@ -146,7 +147,8 @@ function mapLook(levelId: string): MapLook {
     setting:
       params.get('setting') ?? look.setting ?? chapterIdOf(LEVEL_IDS.indexOf(levelId)) ?? undefined,
     // `?scene=<id>` previews a hand-built world on another level, `?scene=none` turns it off.
-    scene: scene === null ? look.scene : scene === 'none' ? undefined : scene,
+    // A screenshot scene (`?scene=level-garage`, see `main.ts`) keeps the level's own world.
+    scene: scene === null || sceneById(scene) ? look.scene : scene === 'none' ? undefined : scene,
   };
 }
 
