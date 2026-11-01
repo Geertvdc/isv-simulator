@@ -33,7 +33,7 @@ Read from the fixed front camera (top of screen = back of the level):
 
 The rules in the [level-environment skill](../../.agents/skills/level-environment/SKILL.md) hold, plus:
 
-- **Both maps:** the shipped `maps/level-02-open-plan.txt` (14×10, inbox at the back, ship at the front) and the draft `maps/drafts/open-plan.txt` (16×9, `?draft=open-plan`, ship on the **right** edge). Place everything from the outline and the ship and inbox tiles: the courier van goes wherever the ship hatch is.
+- **Both maps:** the shipped `maps/level-02-open-plan.txt` (14×10, inbox at the back, ship at the front) and the draft `maps/drafts/open-plan.txt` (16×9, `?draft=open-plan`, a void notch at the back right, inbox **and** ship both on the front edge). Place everything from the outline, the void tiles and the ship and inbox tiles: the courier van goes wherever the ship hatch is, the lobby door wherever the inbox is.
 - Other levels keep their look: the new wall and floor themes are used only by `open-plan`.
 
 ## Work split
