@@ -278,7 +278,7 @@ The sketches draw wet tiles glossy blue, the spill zone as light blue with a das
 
 - **Solo:** spawn 1 in the office next to the inbox. First ship 27 steps, a loop is 40 (current 30). The loop is longer because the office and the closet are rooms with doors, not open corners. Every room has two doors, so solo never queues on a door.
 - **4 players:** spawn 1 in the office, 2 and 3 in the loft (left and right of the pod), 4 in the closet. A natural split: one on the inbox and the founders' desk, two at the pod, one in the closet on tests, deploys and bugs. The pod has room for four on all sides. Players bump in the strip in front of the tests and in the room doors. Two pipelines, so the closet never queues on one.
-- **Review:** _human feedback from gate 1_
+- **Review:** approved at gate 1 (2026-11-01, iteration 2)
 
 #### 2-2 Demo Day (`demo-day`)
 
@@ -320,7 +320,7 @@ The sketches draw wet tiles glossy blue, the spill zone as light blue with a das
 
 - **Solo:** spawn 1 next to the back keyboards. First ship 34 steps, loop 48 (current 52), 60 on the dry way when the foyer floods. Solo is never forced onto wet floor, and the tap is on the dry return route (backstage → foyer top), so fixing it costs one stop.
 - **4 players:** spawns 1 and 2 in coworking, 3 and 4 in the hall. The coworking pair codes; the hall pair reviews, tests, deploys and ships. When the tap leaks, someone has to call it: one runs to the tap while the others re-route over the stage, or everyone slides. The backstage door is where the outbound and return flows meet when the foyer is wet.
-- **Review:** _human feedback from gate 1_
+- **Review:** approved at gate 1 (2026-11-01, iteration 2)
 
 #### 2-3 On Call (`on-call`)
 
@@ -361,7 +361,7 @@ The sketches draw wet tiles glossy blue, the spill zone as light blue with a das
 
 - **Solo:** spawn 1 by the inbox. First ship 41 steps, loop 50 (current 42; long walks are the theme). Every station on the robot's route also has an access tile off it (island keyboards from 3,4 or 3,6; review from 14,5, 14,7 or 16,6), so solo never has to stand in its way, only cross it.
 - **4 players:** spawns 1 and 2 in the desks room, 3 and 4 in the ops room. The desks pair takes, codes and ships; the ops pair tests and reviews; everyone deploys in the server room. Coded tickets go right, reviewed and tested ones come back left, and the robot sends both flows round whichever side is dry. The narrow spots are the fire door (12,2), the server room doors and wherever the robot is right now.
-- **Review:** _human feedback from gate 1_
+- **Review:** approved at gate 1 (2026-11-01, iteration 2)
 
 ### Chapter 3: Scale-Up
 
@@ -411,7 +411,7 @@ The company outgrows one room: 3-1 is one big corporate floor with a real corner
 - **Intent:** a corporate open floor, the biggest yet (152 tiles), split into a back half (inbox, bug queue, three keyboards, test benches) and a front half (pipelines on the right wall, ship and bin on the left) by a spine of rooms across the middle. The spine is the manager's corner office, which sticks out of the left side of the building, and the meeting room. Between them runs a 1-wide aisle (9,4–9,7), and the office door opens right onto it. On the right a 5-wide aisle (16–20,4–7) is the open way round. The work goes in a lap: inbox → keyboards → tests along the back, down the wide aisle to the pipelines, ship at the front-left, and back up to the inbox. The narrow aisle is the short way back. The one manager starts at his desk. He wanders out through his door into the narrow aisle and across the floor, and players can't push him.
 - **Solo:** spawn 1 under the inbox, by the keyboards: 39 steps to the first ship, a loop is 54 (current 32). The floor is big, but the loop is one lap. With the manager in the narrow aisle the way back goes round by the wide aisle (+14, the report's detours).
 - **4 players:** spawns 1 at the back; 2, 3 and 4 in the front half. The back pair (1 and one who goes up) takes and codes; the front pair tests from the back half and deploys and ships. The chokepoint is the narrow aisle by the office door, where empty hands going back meet coded tickets and the manager coming out of his office. The bypass is the 5-wide right aisle. The meeting-room table (reached from the front doors) is a parking spot.
-- **Review:** _human feedback from gate 1_
+- **Review:** approved at gate 1 (2026-11-01, iteration 2)
 
 #### 3-2 Hypergrowth (`hypergrowth`)
 
@@ -448,7 +448,7 @@ The company outgrows one room: 3-1 is one big corporate floor with a real corner
 - **Intent:** the company has rented the floor above. The ground floor (left, 7×7) is front of house: inbox and bug queue on the back wall, ship and bin on the left wall, pipelines on the front wall. The first floor (right, 8×7, higher up the screen) is engineering: four keyboards on the back wall and the test benches on the right. Between them is the empty shaft. The work goes up by the lift, gets coded and tested, then goes down the mail chute: the tester drops it on the hatch and it slides out by the ground floor's lift. The ground pair deploys and ships it. People still need the lift or the stairs: the stairwell is 1 wide and 13 steps long. It leaves the ground floor at the front-right, runs along the front of the building and turns up into the first floor's front door (18,8). The manager starts upstairs, wanders both floors and takes a place in the cabin.
 - **Solo:** spawn 1 under the inbox, 4 steps from the cabin. With the cabins bridged (a stand-in for the lift) the loop is 56 plus two rides; by the stairs it is the report's 68. The chute saves the solo player carrying the ticket down, but they walk down anyway to deploy. Nothing needs a second player.
 - **4 players:** spawns 1 and 2 on the ground floor, 3 and 4 upstairs, so the team splits by floor. Tickets go up in the lift, the chute brings them down, and nobody has to ride with a finished ticket. The chokepoint is the cabin (everyone going up queues, and the manager takes a place); the bypasses are the stairwell for people and the chute for tickets. Incidents still need a keyboard, so hotfixes go upstairs too.
-- **Review:** _human feedback from gate 1_
+- **Review:** approved at gate 1 (2026-11-01, iteration 2)
 
 #### 3-3 Hot Desking (`hot-desking`)
 
@@ -493,7 +493,7 @@ The company outgrows one room: 3-1 is one big corporate floor with a real corner
   - **Breakdown and managers:** twice a round the express breaks down, so everyone crowds the local lift and the stairs. Two managers, one in the lobby and one at the desks, ride the lifts too.
 - **Solo:** spawn 1 by the inbox: take the ticket, cross the bridge to the desks and code, go up the stairs or the local lift, test and deploy. Drop the ticket down the chute, ride the express from the second floor straight down to the lobby, and ship. By the stairs that is the report's 70 a loop; the lifts and the chute shorten it. Solo gets no reviews (they need two players), so the meeting room is only a quiet room with a table. A breakdown takes away only one of the ways down; the local lift and the stairs still work.
 - **4 players:** spawns 1 and 2 in the lobby, 3 at the desks, 4 on the second floor: one or two per floor. The ground pair takes, ships and runs reviews in the meeting room. The desk player codes, and the top player tests, deploys and drops tickets down the chute. Chokepoints: the local lift (holds two, on every short route) and the narrow stairs up to the second floor. Bypasses: the express (only the whole way) and the chute for tickets. The breakdown moves the whole team onto the local lift and the stairs for 20 s, which is when the managers in the cabins hurt most.
-- **Review:** _human feedback from gate 1_
+- **Review:** approved at gate 1 (2026-11-01, iteration 2)
 
 ### Chapter 4: Enterprise
 
@@ -541,7 +541,7 @@ Every meeting room in this chapter is a real room: `#` (or partition) walls on a
 - **Intent:** the first floor at HQ. Two offices sit back to back with a glass meeting room between them, the **Fishbowl** (8–12,2–4, table at 10,3); above it is the lift lobby we don't see (the void notch at the top). A 2-wide corridor runs along the front of the offices, and a second meeting room, the **Aquarium** (14–18,9–10, table at 16,10), sticks out of the front right as a bay off the corridor. That gives an outline with a notch at the top and a bay at the bottom right. Office A (left) has the inbox, two keyboards, the bug queue and the bin; office C (right) has two more keyboards and its own bug queue. The test benches, pipelines and ship are in the corridor's front wall (T 3 and 11, P 6 and 9, S 7–8), so whoever works there stands in one of the two lanes. Each office has a near door, a far door and a hatch counter in between (A: 6,5 / 1,5 / 3,5; C: 14,5 / 19,5 / 17,5). The Fishbowl has a meeting door on each side (7,3 and 13,3), so it's a shortcut from office to office; the Aquarium has two doors from the corridor (15,8 and 17,8). Meetings are calm (one invite every ~45 s, 25 s to get there), and back-to-back invites alternate rooms: Fishbowl, then Aquarium, then Fishbowl. While a meeting runs in the Fishbowl, its doors shut for everyone else and the A↔C shortcut is gone: the corridor is the way round.
 - **Solo:** spawn 1 stands under the keyboards and the inbox. Inbox → keyboard → near door → test bench (3,8) → pipeline (6,8) → ship (7,8) → back: a 24-step lap (current 38; first ticket 19). Office C, its keyboards and both rooms' shortcuts are optional. An invite to the Fishbowl is 4 steps from office A, one to the Aquarium is 8 steps from the ship. The doors never shut on the solo player (they hold the invite).
 - **4 players:** spawns 1 and 2 in office A, 3 and 4 in office C. Office C has no inbox, so the C pair walks through the Fishbowl (or the corridor) to fetch features: two flows cross in the Fishbowl and in the corridor. The chokepoint is A's near door (6,5): every A feature goes out through it and every returning player comes in (`detour 6,5 +8`); the bypass is the far door and the hatch. Meetings are what makes it fun: an invite to the Aquarium sends someone from office A down the whole corridor against the traffic, and the next one goes to the Fishbowl, which then shuts its doors in the face of whoever was using it as a shortcut.
-- **Review:** _human feedback from gate 1_
+- **Review:** approved at gate 1 (2026-11-01, iteration 2)
 
 #### 4-2 Synergy (`synergy`)
 
@@ -586,7 +586,7 @@ Every meeting room in this chapter is a real room: `#` (or partition) walls on a
 
 - **Solo:** spawn 1 stands between the inboxes and the keyboards. The lap is 42 steps in both phases (current 36; first ticket 26): solo uses the front passage and never needs the hall. What the fold changes for solo is the meeting: about 14 steps up and round when closed, about 7 straight across when open.
 - **4 players:** spawns 1 and 2 in dev, 3 and 4 in ops. Dev takes and codes, ops tests, deploys and ships (and codes too, with its own keyboards). Closed, the passage carries both directions and jams; the corridor relieves it but is long, and invited players cut through it to the boardroom past the manager. Open, the hall gives five lanes and the desks become the hand-off. The team learns to time things: get the ticket over before the walls come back, and don't leave one on the table.
-- **Review:** _human feedback from gate 1_
+- **Review:** approved at gate 1 (2026-11-01, iteration 2)
 
 #### 4-3 The Reorg (`the-reorg`)
 
@@ -654,7 +654,7 @@ Every meeting room in this chapter is a real room: `#` (or partition) walls on a
 
   Three plans in one round means re-planning twice, out loud. For review: a turnstile flip on top of a full reorg may be one change too many. If greybox says so, keep the turnstiles fixed (in left, out right) and let the walls do the work.
 
-- **Review:** _human feedback from gate 1_
+- **Review:** approved at gate 1 (2026-11-01, iteration 2)
 
 ### Chapter 5: Big Tech
 
@@ -700,7 +700,7 @@ Each level from 5-2 on adds one element no earlier level has. None of them is bu
 - **Intent:** the first campus map: two offset buildings face each other across a 4-wide atrium void (gaps, x9–12) that runs from the back of the map to the front. The west building is where work starts and ends: inbox and two keyboards on the back wall, two more keyboards, the ship and the bin on the left wall. The east building, shifted two rows down, is where work gets checked: bug queue and two test benches on the back wall, pipelines and two more test benches on the right wall. Ways across: the 1-wide skybridge (r5) between two open balconies (x8 and x13, r4–6, where you can stand at the edge and throw over), the belt bridges (r3 eastbound into a counter at 13,3, r7 westbound into a counter at 8,7), and the travelator (r10, x4–12): out of the west building's front door (4,9), along the front of the atrium and into the east building (13,10). The travelator runs east only. Anything dropped into the atrium is gone.
 - **Solo:** spawn 1 stands under the inbox and keyboards: 45 steps to the first ship, a loop is 50 (current 52). Grab, code in the west building, then either walk over the skybridge or take the front door onto the travelator (the report counts it as plain floor: 20 steps longer, but riding it is about as quick as the skybridge), test and deploy in the east building, walk back over the skybridge to ship. The belts save carrying: put a coded ticket on the r3 belt and pick it up at the far counter; the r7 belt brings a deployed ticket home. Nothing needs a second player.
 - **4 players:** spawns 1 and 2 in the west building (inbox, keyboards, ship), 3 and 4 in the east (bugs, tests, pipelines): a code team and a QA/ops team, with the belts as the hand-off both ways. The chokepoint is the skybridge (9,5–12,5), used both ways; the bypass is the travelator, which turns the trip into a one-way loop (east along the front, back west over the bridge) and cuts head-on bumps. Open question for review: should the travelator flip direction at half time?
-- **Review:** _human feedback from gate 1_
+- **Review:** approved at gate 1 (2026-11-01, iteration 2)
 
 #### 5-2 Design Sprint (`design-sprint`)
 
@@ -733,7 +733,7 @@ Each level from 5-2 on adds one element no earlier level has. None of them is bu
 - **Intent:** a real studio, a hallway and a big hall. The studio (5×4 inside, walls all round) has three whiteboards (back wall and left wall) and two ways in or out: a revolving door (2,5) for people and a hatch counter (4,5) for tickets, both onto the hallway. Designed tickets leave the studio over a belt through its right wall into a hall counter (9,2). The 2-wide hallway (r6–7) has the inbox on its left wall and leads into the hall, which is built for pairing: two free-standing keyboard islands (KK at 11–12,3 and 14–15,5), bug queue and test benches on the back wall, pipelines on the right wall, the bin and the ship at the front. Players queue at the revolving door: one at a time, while the next designer waits outside.
 - **Solo:** spawn 1 stands by the inbox in the hallway, right under the revolving door: 29 steps to the first ship, a loop is 42 (current 38). Grab a ticket; if it needs design, go through the revolving door, design, drop it on the belt and walk out again; then pick it up at the hall counter, code at an island, test, deploy, ship and walk back. A plain ticket never enters the studio. Pairing is a speed-up, never needed.
 - **4 players:** spawns 1 and 3 in the hallway and hall, 2 in the studio (the designer), 4 in the hall. The studio fits two; a third person in there is in the way. The chokepoint is the revolving door (2,5), a cut for people and one player at a time; the bypass for tickets is the hatch (hallway to studio) and the belt (studio to hall). This answers the iteration-1 question: one door plus a hatch.
-- **Review:** _human feedback from gate 1_
+- **Review:** approved at gate 1 (2026-11-01, iteration 2)
 
 #### 5-3 Monorepo (`monorepo`)
 
@@ -768,7 +768,7 @@ Each level from 5-2 on adds one element no earlier level has. None of them is bu
 - **Intent:** an H: two towers joined by the integration room. The FE tower (left) and BE tower (right) each have their own inbox, a wall keyboard, a free-standing keyboard island for pairing and a bin; bugs come in at the BE tower. Between the towers at the back is an open courtyard (gaps), crossed by the shuttle (stops 6,2 and 15,2) and, in front of it, by two belts that run from each tower into the merge station (G, 10,5). The integration room (x6–15, r5–10) is a walled room: tests, G and pipelines on its back wall, the ship in its front wall, a table in the middle, and two 2-wide doors at opposite corners (FE at 6,8–9, BE at 15,6–7), so the FE and BE flows cross the room diagonally. Full-stack orders give one FE and one BE ticket; each team codes its half at home, puts it on its belt and both halves meet at G. Players bump in the room and around the merge station.
 - **Solo:** spawn 1 stands in the FE tower by the inbox: 25 steps to the first ship, a loop is 40 (current 36). A full-stack order means coding the FE half and putting it on the FE belt, crossing to the BE tower (through the room, or on the shuttle when it's waiting), coding the BE half and putting it on the BE belt, then merging, testing, deploying and shipping in the room. Both belts deliver to G on their own, so a solo player never carries both halves.
 - **4 players:** spawn 1 in the FE tower, 2 and 4 in the BE tower, 3 in the integration room: the team splits FE / BE / integration by itself. No 1-wide spot left (`none`): the doors are 2 wide, as asked; the crowd is the integration room, where both teams cross the merge and ship traffic. The bypass is the shuttle over the courtyard (tower to tower without entering the room) and the belts for tickets. Open question for review: should the shuttle also carry a ticket put down on it (like a moving counter)?
-- **Review:** _human feedback from gate 1_
+- **Review:** approved at gate 1 (2026-11-01, iteration 2)
 
 #### 5-4 Hackathon (`hackathon`)
 
@@ -813,7 +813,7 @@ Each level from 5-2 on adds one element no earlier level has. None of them is bu
 
 - **Solo:** spawn 1 stands under the inbox: 45 steps to the first ship, a loop is 58 in both phases (current 36): the longest in the game, as the finale, because every ticket visits the server room for the pipelines. The belt carries for you (drop a ticket at the west side, pick it up at the front), the server hatch saves walking in with every ticket, and the lift is the short way into the server room from the back. During a belt outage solo carries by hand. Nothing needs a second player.
 - **4 players:** spawns 1 and 2 in the hall (inbox, keyboards, merge, ship), 3 in the design room (whiteboards), 4 in the server room (tests, pipelines, incidents): four jobs, four rooms. The chokepoint is the server-room door (16,8), a cut for people; the bypass is the lift for people and the hatch for tickets. The partition moves the crowd from one lane to the other halfway through, and the spill sends anyone grabbing a ticket from the pickup counter sliding. Open questions for review: is a 58-step solo loop too long for the finale? How often should a belt outage come up (proposal: every other incident)?
-- **Review:** _human feedback from gate 1_
+- **Review:** approved at gate 1 (2026-11-01, iteration 2)
 
 ## Delivery
 
