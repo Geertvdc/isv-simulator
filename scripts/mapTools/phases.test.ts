@@ -33,8 +33,8 @@ describe('draft phase files', () => {
 describe('phaseProblems', () => {
   const first = ['#I#K#', '#1=D#', '#2.3#', '#4.C#', '#SPT#'].join('\n');
 
-  it('lets partitions and rolling desks move onto and off floor', () => {
-    const later = ['#I#K#', '#1.=#', '#2D3#', '#4.C#', '#SPT#'].join('\n');
+  it('lets partitions, rolling desks and meeting doors move onto and off floor', () => {
+    const later = ['#I#K#', '#1.=#', '#2D3#', '#4dC#', '#SPT#'].join('\n');
     expect(phaseProblems(first, later)).toEqual([]);
   });
 

@@ -39,6 +39,8 @@ type Look =
   | { kind: 'lift'; express?: boolean }
   | { kind: 'partition' }
   | { kind: 'rolling' }
+  | { kind: 'door' }
+  | { kind: 'turnstile' }
   | { kind: 'unknown' };
 
 interface CharInfo {
@@ -96,10 +98,12 @@ const CHARS: Readonly<Record<string, CharInfo>> = {
   H: { look: block('#6d4c41', 'H'), name: `${FUTURE_CHARS.H?.name ?? 'mail chute'} *` },
   // Enterprise
   D: { look: { kind: 'rolling' }, name: `${FUTURE_CHARS.D?.name ?? 'rolling desk'} *` },
+  d: { look: { kind: 'door' }, name: `${FUTURE_CHARS.d?.name ?? 'meeting door'} *` },
+  '+': { look: { kind: 'turnstile' }, name: `${FUTURE_CHARS['+']?.name ?? 'turnstile'} *` },
 };
 
 /** Legend order: `CHARS` keys can't give it, digit keys come first in an object. */
-const LEGEND_ORDER = '.# ~CIBKTRPSXWG><v^1234Mm_o%rL=lHD'.split('');
+const LEGEND_ORDER = '.# ~CIBKTRPSXWG><v^1234Mm_o%rL=lHDd+'.split('');
 
 const UNKNOWN: CharInfo = { look: { kind: 'unknown' }, name: 'unknown char' };
 
@@ -253,9 +257,47 @@ function cellSvg(look: Look, x: number, y: number, t: number): string {
         `<circle cx="${x + t * 0.72}" cy="${y + t * 0.84}" r="${t * 0.08}" fill="${INK}"/>` +
         label(cx, cy - t * 0.05, t * 0.44, 'D', `font-weight="bold" fill="#ffffff"`)
       );
+    case 'door':
+      // A door leaf across the gap, red like a "meeting in progress" light.
+      return (
+        floor +
+        rect(
+          x + inset,
+          cy - t * 0.12,
+          t - 2 * inset,
+          t * 0.24,
+          `rx="${t * 0.05}" fill="#e57373" stroke="${INK}" stroke-width="1.5"`,
+        ) +
+        label(cx, cy, t * 0.3, 'd', `font-weight="bold" fill="#ffffff"`)
+      );
+    case 'turnstile':
+      // A badge gate: a hub with three arms.
+      return (
+        floor +
+        `<circle cx="${cx}" cy="${cy}" r="${t * 0.36}" fill="#fff3c4" stroke="${INK}" stroke-width="1.5"/>` +
+        [90, 210, 330]
+          .map((a) => {
+            const r = (a * Math.PI) / 180;
+            return `<line x1="${cx}" y1="${cy}" x2="${cx + Math.cos(r) * t * 0.3}" y2="${cy - Math.sin(r) * t * 0.3}" stroke="${INK}" stroke-width="${Math.max(2, t * 0.07)}" stroke-linecap="round"/>`;
+          })
+          .join('') +
+        `<circle cx="${cx}" cy="${cy}" r="${t * 0.08}" fill="${INK}"/>`
+      );
     case 'unknown':
       return rect(x, y, t, t, 'fill="#ff00ff"') + label(cx, cy, t * 0.5, '?', 'fill="#ffffff"');
   }
+}
+
+/** "* not in the game yet: …", with the stand-in the tools read for each future char used. */
+export function futureFootnote(chars: readonly string[]): string {
+  const parts = chars.flatMap((c) => {
+    const future = FUTURE_CHARS[c];
+    if (!future) return [];
+    const name = future.name.replace(/ \(.*\)$/, '');
+    const standIn = charInfo(future.standIn).name;
+    return [`${name} as ${standIn}`];
+  });
+  return `* not in the game yet: tools read ${parts.join(', ')}`;
 }
 
 /** A char's look at legend size; the void, drawn as nothing on the map, gets a dashed outline. */
@@ -387,15 +429,8 @@ export function renderSketchSvg(panels: readonly SketchPanel[], heading = ''): s
   const hasFuture = legend.some((e) => FUTURE_CHARS[e.char]);
   const footnoteTop = legendTop + legendRows * LEGEND_ROW + 6;
   if (hasFuture) {
-    const standIns = legend
-      .flatMap((e) => {
-        const future = FUTURE_CHARS[e.char];
-        if (!future) return [];
-        return [`${future.name.replace(/ \(.*\)$/, '')} as ${charInfo(future.standIn).name}`];
-      })
-      .join(', ');
     parts.push(
-      `<text x="${MARGIN}" y="${footnoteTop + 6}" font-size="12" ${FONT} fill="#616161">${escapeXml(`* not in the game yet, the tools read: ${standIns}`)}</text>`,
+      `<text x="${MARGIN}" y="${footnoteTop + 6}" font-size="12" ${FONT} fill="#616161">${escapeXml(futureFootnote(legend.map((e) => e.char)))}</text>`,
     );
   }
 

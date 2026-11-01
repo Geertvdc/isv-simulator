@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PLAYER_COLORS } from '../../src/render/playerColors';
-import { SKETCH_TILE, drawMap, legendEntries, renderSketchSvg } from './sketch';
+import { SKETCH_TILE, drawMap, futureFootnote, legendEntries, renderSketchSvg } from './sketch';
 
 const MAP = ['#I##K#', '#1.>v#', '#2_~C#', '#34L=#', '#S#'].join('\n');
 
@@ -88,5 +88,13 @@ describe('Scale-Up chars', () => {
     expect(drawMap('L').svg).toContain('>L</text>');
     expect(drawMap('H').svg).toContain('>H</text>');
     expect(drawMap('lH').svg).not.toContain('#ff00ff');
+  });
+});
+
+describe('futureFootnote', () => {
+  it('names the stand-in of each future char used', () => {
+    expect(futureFootnote(['#', '=', 'd', '+'])).toBe(
+      '* not in the game yet: tools read partition as wall, meeting door as floor, badge turnstile as floor',
+    );
   });
 });

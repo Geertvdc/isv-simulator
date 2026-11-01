@@ -22,12 +22,15 @@ export const FUTURE_CHARS: Readonly<Record<string, FutureChar>> = {
   '%': { name: 'spill zone (tap floods it)', standIn: '.' },
   r: { name: 'mop robot route', standIn: '.' },
   L: { name: 'lift cabin (lifts)', standIn: '.' },
+  // Enterprise
   '=': { name: 'partition (reorgs)', standIn: '#' },
   // Scale-Up
   l: { name: 'express lift cabin (lifts)', standIn: '.' },
   H: { name: 'mail chute hatch (lifts)', standIn: 'C' },
   // Enterprise
   D: { name: 'rolling desk (reorgs)', standIn: 'C' },
+  d: { name: 'meeting door (shut while in session)', standIn: '.' },
+  '+': { name: 'badge turnstile (one way)', standIn: '.' },
 };
 
 /** The map text with every future char replaced by its stand-in. */

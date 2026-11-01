@@ -1,14 +1,14 @@
 /**
  * Reorg layout phases of a draft (phase 23): `<id>.txt` is the layout at the
  * start, `<id>.phase2.txt` and on the layouts after each reorg. Only
- * partitions (`=`) and rolling desks (`D`) move, onto and off floor; walls,
- * stations, spawns and meeting rooms stay where they are.
+ * partitions (`=`), rolling desks (`D`) and meeting doors (`d`) move, onto and
+ * off floor; walls, stations, spawns and meeting rooms stay where they are.
  */
 
 import { mapRows } from './mapChars';
 
 /** Chars a reorg may change a tile between. */
-const MOVABLE = new Set(['.', '=', 'D']);
+const MOVABLE = new Set(['.', '=', 'D', 'd']);
 
 /** What differs between phase 1 and a later phase that a reorg can't do; empty if fine. */
 export function phaseProblems(first: string, later: string): string[] {
