@@ -37,6 +37,11 @@ describe('future map chars', () => {
     expect(at(4, 0)).toBe('floor');
   });
 
+  it('read travelators, shuttle stops and revolving doors as floor (Big Tech)', () => {
+    expect(toStandIns('QY*')).toBe('...');
+    expect(countFutureChars('#QQY*#')).toEqual({ Q: 2, Y: 1, '*': 1 });
+  });
+
   it('are counted', () => {
     expect(countFutureChars(DRAFT)).toEqual({ _: 1, L: 1, '=': 1, D: 1, d: 1, '+': 1 });
   });
