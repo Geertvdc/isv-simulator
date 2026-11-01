@@ -15,18 +15,14 @@ export function renderFileName(id: string, phase = 1): string {
   return phase > 1 ? `${id}-phase${phase}-3d.webp` : `${id}-3d.webp`;
 }
 
-/**
- * Render passes: the live maps can hold one phase of each level at a time,
- * so pass N renders phase N of every level that has one.
- */
-export function phasePasses<T extends { phase: number }>(
-  phasesById: ReadonlyMap<string, readonly T[]>,
-): { id: string; draft: T }[][] {
-  const passes: { id: string; draft: T }[][] = [];
-  for (const [id, phases] of phasesById) {
-    for (const draft of phases) (passes[draft.phase - 1] ??= []).push({ id, draft });
-  }
-  return passes.filter((pass) => pass.length > 0);
+/** URL params that load a draft (and a later reorg phase of it) in the game: `?draft=` in dev builds. */
+export function draftQuery(id: string, phase = 1): string {
+  return phase > 1 ? `draft=${id}&phase=${phase}` : `draft=${id}`;
+}
+
+/** The dev server URL to play a draft on the couch. */
+export function draftPlayUrl(base: string, id: string, phase = 1): string {
+  return `${base.replace(/\/$/, '')}/?${draftQuery(id, phase)}`;
 }
 
 export type ShotRequest = { ids: string[] } | { error: string };

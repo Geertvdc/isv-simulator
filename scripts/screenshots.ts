@@ -11,8 +11,9 @@
  * `--only` takes shots whose name contains the text, `--skip` leaves them
  * out. `--out=<dir>` writes them somewhere other than `docs/game/images/`. `--server` is the game
  * server the page talks to; a second room member joins it from here for the
- * online lobby shot. Set CHROME to the Chrome binary if it isn't in the usual
- * place.
+ * online lobby shot. `--query=<params>` adds URL params to every scene, like
+ * `--query=draft=garage` for a level redesign draft (`npm run draft-shots`).
+ * Set CHROME to the Chrome binary if it isn't in the usual place.
  */
 
 import { type ChildProcess, spawn } from 'node:child_process';
@@ -30,6 +31,7 @@ const BASE = arg('base') ?? 'http://localhost:5173';
 const SERVER = arg('server') ?? 'http://localhost:2567';
 const ONLY = arg('only');
 const SKIP = arg('skip');
+const QUERY = arg('query');
 const OUT = arg('out') ?? join(import.meta.dirname, '..', 'docs', 'game', 'images');
 const WIDTH = Number(arg('width') ?? 1440);
 const HEIGHT = Number(arg('height') ?? 810);
@@ -186,7 +188,7 @@ async function launch(): Promise<{ chrome: ChildProcess; page: Page; profile: st
 /** Opens a scene and waits until it froze on its moment. */
 async function showScene(page: Page, id: string): Promise<void> {
   // Straight to polling: popups from the last tick fade within a second.
-  await page.open(`/?scene=${id}`, 0);
+  await page.open(`/?scene=${id}${QUERY ? `&${QUERY}` : ''}`, 0);
   for (let i = 0; i < 200; i++) {
     if (await page.eval<boolean>(`window.isvScene?.done === true`)) {
       // Let effects that started on the last tick show.
