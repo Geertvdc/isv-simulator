@@ -54,6 +54,7 @@ Reusable agent workflows live in `.agents/skills/<name>/SKILL.md` (the cross-age
 
 - `ship`: open a PR, wait for CI, rebase-merge into main, pull main.
 - `screenshots`: retake the docs screenshots, check them and commit them.
+- `level-environment`: give one level a hand-built, story-telling world (Room / World / Light agents, critic, second round); the garage was the pilot.
 
 ## Working on phases
 
