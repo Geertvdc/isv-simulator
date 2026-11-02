@@ -132,6 +132,18 @@ describe('openPlanScene', () => {
       }
     });
 
+    it(`keeps its living props a tile from the room, a few of them (${name})`, () => {
+      const alive = scene.pieces.filter((p) => p.alive !== undefined);
+      expect(alive.length).toBeGreaterThanOrEqual(4);
+      for (const p of alive) {
+        const dx = Math.max(-0.5 - p.at.x, p.at.x - (map.width - 0.5), 0);
+        const dz = Math.max(-0.5 - p.at.z, p.at.z - front, 0);
+        expect(Math.hypot(dx, dz), `${p.alive} at ${p.at.x}, ${p.at.z}`).toBeGreaterThanOrEqual(
+          0.95,
+        );
+      }
+    });
+
     it(`fills both sides, the back and the front (${name})`, () => {
       const at = scene.pieces.map((p) => p.at);
       expect(at.some((p) => p.x < -1.5)).toBe(true);
@@ -147,7 +159,8 @@ describe('openPlanScene', () => {
       if (!van) throw new Error('no van');
       const sx = ship % map.width;
       const sz = Math.floor(ship / map.width);
-      if (sz === map.height - 1) expect(Math.abs(van.at.x - (sx + 0.5))).toBeLessThan(0.6);
+      // Off the door's middle by under a tile, so its back still meets the hatching.
+      if (sz === map.height - 1) expect(Math.abs(van.at.x - (sx + 0.5))).toBeLessThan(1);
       else expect(Math.abs(van.at.z - sz)).toBeLessThan(1);
     });
 

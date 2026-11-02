@@ -7,20 +7,30 @@ import {
   bikeRack,
   bottleCage,
   type BlockUnit,
+  buddleia,
   cardboardBale,
   carriedParcel,
   commercialBin,
   cone,
   corporateShrub,
   courierVan,
+  featherFlag,
   gritBin,
+  gull,
+  hazardLamp,
   lampPost,
   leasedHatchback,
   pallet,
+  parcelCage,
   parkBlock,
   parkHedge,
   parkedCar,
+  pigeon,
+  postAFrame,
+  postTrolley,
   signTotem,
+  SLATE_CAR,
+  smokeWisp,
   smokingShelter,
   verjeTree,
   wheelStop,
@@ -29,6 +39,7 @@ import { GAME_TITLE } from '../../../sim/content';
 import type { SetPiece } from '../setDressing/shared';
 import { GROUND_TOPS, shade, slabs } from './ground';
 import {
+  type AliveKind,
   GROUND,
   type GroundPainter,
   type GroundPatch,
@@ -67,12 +78,18 @@ const UNIT_W = 7;
 /** In front: the paved walk along the front, the kerb, then the car park. */
 const WALK = 0.3;
 const KERB_W = 0.1;
-/** The van's back stands this far out from the level's edge: past the visible strip. */
-const VAN_BACK = 1.32;
+/**
+ * The van's back stands this far out from the level's edge: just past the
+ * low strip (nothing over 0.6 in its first tile), so its winged-open back
+ * doors and roof show over the bottom of the frame; the tail lift reaches in.
+ */
+const VAN_BACK = 1.08;
 /** Half the van's length (`courierVan` is 3.4 long, its middle at its origin). */
 const VAN_HALF = 1.7;
-/** How far off the door's middle it stands. */
-const VAN_OFF = 0.45;
+/** How far off the door's middle it stands: away from the pause hint at the bottom centre. */
+const VAN_OFF = 0.9;
+/** The van's roof beacon, from its middle (see `courierVan`): x, height, z. */
+const BEACON = [0.5, 1.26, -1.45] as const;
 /** Parking bays: this wide, this long. */
 const BAY_W = 1.6;
 const BAY_L = 3.0;
@@ -253,6 +270,13 @@ export function openPlanScene(map: LevelMap): Scene {
   const ground: GroundPatch[] = [];
   const people: ScenePerson[] = [];
   let n = 0;
+  /** Makes the piece just put a living one (see `AliveKind`), optionally lit up by `glow`. */
+  const live = (kind: AliveKind, glow = 1) => {
+    const p = pieces[pieces.length - 1];
+    if (!p) return;
+    p.alive = kind;
+    if (glow !== 1) p.tint = [glow, glow, glow];
+  };
   const put = (
     piece: SetPiece,
     x: number,
@@ -347,6 +371,18 @@ export function openPlanScene(map: LevelMap): Scene {
   };
   const [vx, vz, vyaw] = vanAt[shipEdge] ?? [shipX, F + VAN_BACK + VAN_HALF, 0];
   put(courierVan, vx, vz, vyaw);
+  // The roof beacon flashing amber while it's parked on the hatching.
+  const [bx, by, bz] = BEACON;
+  put(
+    hazardLamp,
+    vx + bx * Math.cos(vyaw) + bz * Math.sin(vyaw),
+    vz - bx * Math.sin(vyaw) + bz * Math.cos(vyaw),
+    vyaw,
+    0,
+    'near',
+    by,
+  );
+  live('blink', 1.6);
   if (shipEdge === 'front') {
     // Keep clear: hatching in front of the door, a cone by it.
     patch(
@@ -356,12 +392,17 @@ export function openPlanScene(map: LevelMap): Scene {
       parkZ + 0.05,
       F + VAN_BACK - 0.08,
     );
-    put(cone, shipX + ship.length / 2 + 0.45, parkZ + 0.4, 0);
+    put(cone, vx + Math.sign(vx - shipX) * 1.7, parkZ + 0.4, 0);
+    // A roll cage of parcels on the hatching, halfway to the tail lift.
+    put(parcelCage, vx - Math.sign(vx - shipX) * 0.3, F + 0.62, 0.12);
   }
   if (inboxFront) {
     // Keep clear in front of the lobby door too: the post comes in that way.
     const hw = (inbox.length + 0.2) / 2;
     patch('hatch', inboxX - hw, inboxX + hw, parkZ + 0.05, parkZ + 1.2);
+    // The post comes in here: a trolley of mail sacks by the door and an A-board pointing to it.
+    put(postTrolley, inboxX - hw - 0.35, F + 0.62, 0.15);
+    put(postAFrame, inboxX - hw - 1.1, F + 0.55, 0.3);
   }
   // The courier: on the side nearest the door, a tile out, a parcel in both hands, heading for the van.
   const courierRight = shipEdge === 'right' || (shipEdge !== 'left' && shipX > (width - 1) / 2);
@@ -399,19 +440,32 @@ export function openPlanScene(map: LevelMap): Scene {
   // The smoking shelter, its bench facing the room; the ash post outside it.
   const shelterZ = B + 3.55;
   put(smokingShelter, L - 2.35, shelterZ, 0.12);
-  put(ashPost, L - 1.15, shelterZ + 0.45);
-  // The print-shop guy on the phone by the ash post; a dental tech with a coffee in the shelter.
+  put(ashPost, L - 1.35, shelterZ + 0.45);
+  // A cigarette left smouldering on the ash post, smoke curling up.
+  put(smokeWisp, L - 1.35, shelterZ + 0.45, 0, 0, 'near', 0.98, 1.4);
+  live('wisp');
+  // The print-shop guy on a smoke break by the ash post; a dental tech with a coffee in the shelter.
   people.push({
-    at: gridToWorld(L - 1.45, shelterZ + 1.0, GROUND),
+    at: gridToWorld(L - 1.75, shelterZ + 1.0, GROUND),
     yaw: Math.PI / 2 + 0.6,
-    pose: 'phoning',
+    pose: 'smoking',
+    grey: 0.45,
   });
-  people.push({ at: gridToWorld(L - 2.6, shelterZ + 0.05, GROUND), yaw: 0.4, pose: 'sipping' });
+  people.push({
+    at: gridToWorld(L - 2.9, shelterZ + 0.05, GROUND),
+    yaw: 0.4,
+    pose: 'sipping',
+    grey: 0.45,
+  });
+  // A buddleia that seeded itself by the bins, nodding in the breeze.
+  put(buddleia, L - 3.85, B + 2.75, 0.4);
+  live('sway');
   // The bike rack down the wall, then the left car park.
   put(bikeRack, L - 1.0, shelterZ + 2.4, 0);
   patch('bays', L - 30, L - 1.4, shelterZ + 1.4, F + WALK, 'x');
-  put(parkedCar, L - 3.1, shelterZ + 2.2, Math.PI / 2, 0);
-  put(gritBin, L - 1.9, shelterZ + 1.25, 0.2);
+  // Backed in, its brake lights to the room; a darker paint so the frame's edge doesn't glare.
+  put(parkedCar, L - 3.1, shelterZ + 2.2, -Math.PI / 2, SLATE_CAR);
+  put(gritBin, L - 0.7, shelterZ + 1.3, 0.2);
   // Out past the frame: the hedge round the park, more cars, a tree.
   for (let z = B + 2.6, i = 0; z < F + 6; z += 1, i++)
     put(parkHedge, L - 6.4, z, Math.PI / 2, i, 'far');
@@ -431,6 +485,12 @@ export function openPlanScene(map: LevelMap): Scene {
   put(verjeTree, R + 0.5, B + 3.0, 0.4, 0);
   put(lampPost, R + 0.45, B + 5.4, 0, 0);
   put(signTotem, R + 0.5, F - 1.3, -Math.PI / 2 + 0.25);
+  // The dental lab's feather flag out by its door, flapping; a pigeon at a dropped crust in the empty bay.
+  put(featherFlag, R + 1.3, B + 0.55, -0.3);
+  live('sway');
+  put(pigeon, R + 1.7, B + 5.9, 2.4, 0);
+  live('peck');
+  put(pigeon, R + 1.95, B + 6.25, -0.6, 1);
   // The bays: two columns of lines along z, cars nose in to the block or to the verge.
   const bx0 = R + 1.0;
   patch('bays', bx0, bx0 + BAY_W * 4, B + 0.9, B + 0.9 + BAY_L, 'z');
@@ -447,6 +507,13 @@ export function openPlanScene(map: LevelMap): Scene {
   put(verjeTree, R + 7.4, B + 2.2, 1.1, 1, 'far');
   put(verjeTree, R + 7.6, B + 7.0, 0.2, 0, 'far');
   put(lampPost, R + 5.6, B + 3.5, Math.PI, 0, 'far');
+
+  // Gulls on the block's roof, over the right end of our unit, clear of the order cards.
+  const roofY = 2.38;
+  put(gull, R - 2.6, B - 1.45, 0.5, 0, 'near', roofY);
+  live('peck');
+  put(gull, R - 1.9, B - 1.7, -0.7, 0, 'near', roofY);
+  live('bob');
 
   // The water-cooler bottles by our side door, unless a notch's service yard has them.
   if (!map.tiles.includes('void')) put(bottleCage, R + 0.5, B + 0.75, -0.1);
