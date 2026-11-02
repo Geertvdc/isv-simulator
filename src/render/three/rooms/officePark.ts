@@ -1,5 +1,4 @@
 import { gridToWorld } from '../../projection';
-import { lampWireModel } from '../roomModels';
 import {
   BRICK_LOOKS,
   OFFICE_PARK_WALL_LOOKS,
@@ -14,13 +13,14 @@ import {
   officeParkWallModel,
   partitionModel,
   stripLightModel,
+  stripWireModel,
   tallGlassDoorModel,
 } from '../roomModels/officePark';
 import {
   OFFICE_PARK_FRONT_WALL_PROPS,
   OFFICE_PARK_WALL_TOP_PROPS,
 } from '../setDressing/officeParkWallTops';
-import { type OfficeParkRoom, type Side, officeParkRoom } from './officeParkRoom';
+import { type OfficeParkRoom, type Side, officeParkRoom, stripLightFit } from './officeParkRoom';
 import type { RoomDressing } from './types';
 
 /** The turn that puts a door model's back (−z) toward the outside on `side`. */
@@ -60,7 +60,11 @@ export const OFFICE_PARK_ROOM: RoomDressing<OfficeParkRoom> = {
   foundation: { model: brickPlinthModel, looks: BRICK_LOOKS },
   counter: officeDeskCounter,
   swapModels: { partitionZ: partitionModel },
-  lamp: { model: stripLightModel, wire: { hang: STRIP_HANG, model: lampWireModel } },
+  lamp: {
+    model: stripLightModel,
+    wire: { hang: STRIP_HANG, model: stripWireModel },
+    fit: stripLightFit,
+  },
   placeStory({ lobbyDoor, lobbyMat, frontDoor }, _map, place) {
     if (lobbyDoor) {
       const span = lobbyDoor.tiles.length;

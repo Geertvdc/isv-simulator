@@ -58,8 +58,21 @@ const MORTAR = 0xa39686;
 /** Looks a wall comes in: a socket, scuffed, patched screw holes, the ghost of an old poster. */
 export const OFFICE_PARK_WALL_LOOKS = 4;
 
-/** The cool light trim on top of a wall `h` tall (shaded a little by `look`), and its shadow line. */
-function cap(b: ModelBuilder, h: number, look: number, width = 1, depth = 1): void {
+/**
+ * The cool light coping on top of a wall `h` tall (shaded a little by
+ * `look`), its lip and the shadow line under it. Coping stones half a tile
+ * long: a groove every 0.5 across the run (`along` x on the low front wall;
+ * both ways on a full wall, which runs either way), a deeper joint at the
+ * tile's edges.
+ */
+function cap(
+  b: ModelBuilder,
+  h: number,
+  look: number,
+  along: 'x' | 'both',
+  width = 1,
+  depth = 1,
+): void {
   const { face, top } = WALL_COLORS.officePark;
   const body = h - CAP;
   b.box(width + 0.03, 0.012, depth + 0.03, tint(face, -0.42), { at: [0, body - 0.006, 0] }, 0);
@@ -67,15 +80,36 @@ function cap(b: ModelBuilder, h: number, look: number, width = 1, depth = 1): vo
     width + CAP_LIP * 2,
     CAP,
     depth + CAP_LIP * 2,
-    tint(top, 0.1),
+    tint(top, 0.06),
     { at: [0, h - CAP / 2, 0] },
     0,
   );
-  // The top a shade darker than its edge, so it reads as trim; a joint at each tile's edges.
+  // The top a shade darker than its lip, so it reads as coping.
   const shade = [0, 0.03, -0.03, 0.015][look] ?? 0;
   b.box(width - 0.02, 0.004, depth - 0.02, tint(top, shade), { at: [0, h + 0.002, 0] }, 0);
-  b.box(0.012, 0.005, depth + CAP_LIP * 2, tint(top, -0.25), { at: [-width / 2, h + 0.003, 0] }, 0);
-  b.box(width + CAP_LIP * 2, 0.005, 0.012, tint(top, -0.25), { at: [0, h + 0.003, -depth / 2] }, 0);
+  const joint = tint(top, -0.3);
+  const groove = tint(top, -0.12);
+  const lipD = depth + CAP_LIP * 2;
+  const lipW = width + CAP_LIP * 2;
+  // Joints across x (lines down z): at the tile's edge, a groove halfway.
+  b.box(0.014, 0.005, lipD, joint, { at: [-width / 2, h + 0.003, 0] }, 0);
+  b.box(0.02, 0.005, lipD, groove, { at: [0, h + 0.003, 0] }, 0);
+  // Down the front of the lip too, so the joints show from the front.
+  for (const [u, w, c] of [
+    [-width / 2, 0.014, joint],
+    [0, 0.02, groove],
+  ] as const)
+    b.box(w, CAP, 0.004, c, { at: [u, h - CAP / 2, depth / 2 + CAP_LIP + 0.001] }, 0);
+  if (along === 'both') {
+    b.box(lipW, 0.005, 0.014, joint, { at: [0, h + 0.003, -depth / 2] }, 0);
+    b.box(lipW, 0.005, 0.02, groove, { at: [0, h + 0.003, 0] }, 0);
+    for (const [u, w, c] of [
+      [-depth / 2, 0.014, joint],
+      [0, 0.02, groove],
+    ] as const)
+      for (const s of [-1, 1])
+        b.box(0.004, CAP, w, c, { at: [s * (width / 2 + CAP_LIP + 0.001), h - CAP / 2, u] }, 0);
+  }
 }
 
 /**
@@ -109,7 +143,7 @@ export function officeParkWallModel(piece: WallPiece, look: number): Model {
       for (let u = -0.5 + (i % 2 ? 0.125 : 0.25); u < 0.49; u += 0.25)
         b.box(0.01, hh, 0.004, MORTAR, { at: [u, y0 + hh / 2, 0.512] }, 0);
     }
-    cap(b, h, look);
+    cap(b, h, look, 'x');
     return b.build();
   }
   const h = WALL_HEIGHT;
@@ -174,7 +208,7 @@ export function officeParkWallModel(piece: WallPiece, look: number): Model {
           wear(0.022, 0.018, 0x8aa0c0, u + sx * (w / 2 - 0.02), y + sy * (hh / 2 - 0.02));
     }
   }
-  cap(b, h, look);
+  cap(b, h, look, 'both');
   return b.build();
 }
 
@@ -237,7 +271,7 @@ export function brickPlinthModel(look: number): Model {
   const brick = tint(BRICK, [0, -0.06, 0.05][look] ?? 0);
   b.box(1.002, SLAB_DEPTH, 1.002, brick, { at: [0, top - SLAB_DEPTH / 2, 0] }, 0);
   // The floor slab's pale edge, then the damp course.
-  b.box(1.006, 0.016, 1.006, 0x9c978e, { at: [0, top - 0.008, 0] }, 0);
+  b.box(1.006, 0.016, 1.006, 0x8a8f93, { at: [0, top - 0.008, 0] }, 0);
   b.box(1.005, 0.012, 1.005, 0x45444a, { at: [0, top - 0.026, 0] }, 0);
   const courses = Math.floor((SLAB_DEPTH - 0.032) / COURSE);
   for (let i = 1; i <= courses; i++)
@@ -380,8 +414,8 @@ export function carpetFloorModel(look: number): Model {
 // ---- Desks ----
 
 /** Beech-effect laminate: darker than every station top. */
-const BEECH = 0xae906b;
-const DESK_STEEL = 0x858b93;
+export const BEECH = 0x887258;
+const DESK_STEEL = 0x6f757c;
 const DESK_TOP = 0.045;
 
 /**
@@ -413,8 +447,8 @@ export function officeDeskCounter(run: CounterRun): StationModel {
   // The frame under the top, the modesty panel and its cable tray.
   for (const z of [-0.4, 0.4])
     b.box(len - 0.04, 0.04, 0.035, DESK_STEEL, { at: [mid, top - DESK_TOP - 0.02, z] }, 0);
-  b.box(len - 0.02, 0.26, 0.02, 0x9ba1a8, { at: [mid, top - DESK_TOP - 0.15, 0] }, 0);
-  b.box(len - 0.02, 0.012, 0.022, tint(0x9ba1a8, -0.3), { at: [mid, top - DESK_TOP - 0.28, 0] }, 0);
+  b.box(len - 0.02, 0.26, 0.02, 0x7d838a, { at: [mid, top - DESK_TOP - 0.15, 0] }, 0);
+  b.box(len - 0.02, 0.012, 0.022, tint(0x7d838a, -0.3), { at: [mid, top - DESK_TOP - 0.28, 0] }, 0);
   b.box(len - 0.04, 0.05, 0.12, 0x5c6168, { at: [mid, top - DESK_TOP - 0.05, -0.1] }, 0);
   if (run.legs) {
     const xs = minusEnd && plusEnd ? [-0.4, 0.4] : minusEnd ? [-0.4] : plusEnd ? [0.4] : [0];
@@ -599,15 +633,19 @@ export function lobbyDoorModel(span: number): Model {
 
 /**
  * The lobby door on the front edge, which the camera looks over: nothing
- * tall, only an aluminium threshold, two stub jambs and a wire post tray on
- * the front wall beside it.
+ * tall, only an aluminium threshold, two low jambs, the glass leaves pinned
+ * open against the outside wall and a wire post tray on the wall top beside it.
  */
 export function lobbyThresholdModel(span: number): Model {
   const b = new ModelBuilder();
   const half = span / 2;
   b.box(span, 0.02, 0.1, ALUMINIUM, { at: [0, 0.01, 0.46] }, 0.004);
-  for (const x of [-half - 0.04, half + 0.04])
-    b.box(0.08, 0.34, 0.12, 0x8b9298, { at: [x, 0.17, 0.42] }, 0.01);
+  for (const s of [-1, 1]) {
+    b.box(0.08, 0.5, 0.12, ALUMINIUM, { at: [s * (half + 0.04), 0.25, 0.44] }, 0.01);
+    // The lobby's glass door, pinned open against the outside wall like the front door's.
+    const leafW = Math.min(0.8, half + 0.05);
+    pinnedGlassLeaf(b, s * (half + 0.1 + leafW / 2), 0.512, leafW, 0.46, -s);
+  }
   // The post tray on the wall top to the left, letters in it.
   const tx = -half - 0.42;
   const y = FRONT_WALL_HEIGHT;
@@ -654,12 +692,78 @@ export function lobbyMatModel(width: number): Model {
   return b.build();
 }
 
+/** Door glass: pale blue-grey, and how much of the brick behind a pinned-open leaf shows through it. */
+const DOOR_GLASS = 0x8fbcd6;
+const DOOR_GLASS_SEEN = 0.75;
+
+/**
+ * A glass door leaf `w` wide and `h` tall, swung right round to lie flat
+ * against the outside of the front wall, centred at x, its back on the
+ * brick at z: a chunky aluminium frame standing 0.1 proud (its top and
+ * inner edges catch the light, so it reads as a door and not a sign), the
+ * glass set back in it with the brick seen through, sky streaks, a push bar
+ * and a sticker (`PULL` on one, opening hours on the other). `s` is the
+ * side it hinges toward the opening from.
+ */
+function pinnedGlassLeaf(
+  b: ModelBuilder,
+  x: number,
+  z: number,
+  w: number,
+  h: number,
+  s: number,
+): void {
+  const deep = 0.1;
+  const fz = z + deep / 2;
+  const rail = 0.045;
+  b.box(w, rail + 0.02, deep, ALUMINIUM, { at: [x, (rail + 0.02) / 2, fz] }, 0.008);
+  b.box(w, rail, deep, ALUMINIUM, { at: [x, h - rail / 2, fz] }, 0.008);
+  for (const e of [-1, 1])
+    b.box(rail, h, deep, ALUMINIUM, { at: [x + (e * (w - rail)) / 2, h / 2, fz] }, 0.008);
+  // The frame's inner edge a shade darker, so the glass sits in a recess.
+  const gw = w - rail * 2;
+  const gh = h - rail * 2 - 0.02;
+  const gy = rail + 0.02 + gh / 2;
+  b.box(gw, gh, 0.01, mix(DOOR_GLASS, BRICK, 1 - DOOR_GLASS_SEEN), { at: [x, gy, z + 0.03] }, 0);
+  for (const e of [-1, 1])
+    b.box(
+      gw,
+      0.008,
+      deep - 0.03,
+      tint(ALUMINIUM, -0.3),
+      {
+        at: [x, gy + (e * gh) / 2, z + 0.05],
+      },
+      0,
+    );
+  // Sky caught in the glass: two pale streaks across it.
+  for (const [o, sw] of [
+    [-0.1, 0.06],
+    [0.04, 0.03],
+  ] as const)
+    b.box(
+      sw,
+      gh - 0.06,
+      0.004,
+      0xdbe8f0,
+      { at: [x + o * s, gy, z + 0.037], rot: [0, 0, 0.5 * s] },
+      0,
+    );
+  // The push bar on stand-offs, and the sticker by the handle edge.
+  const hx = x + s * (w / 2 - 0.12);
+  b.box(w * 0.55, 0.025, 0.025, COLOR.chrome, { at: [x, 0.25, z + deep + 0.03] }, 0.008);
+  for (const e of [-1, 1])
+    b.box(0.02, 0.02, 0.04, COLOR.chrome, { at: [x + e * w * 0.24, 0.25, z + deep + 0.01] }, 0);
+  b.box(0.1, 0.05, 0.004, 0xf3f1ea, { at: [hx, 0.36, z + 0.04] }, 0);
+  b.box(0.07, 0.016, 0.004, s < 0 ? 0x2b2f38 : 0x3a8a7a, { at: [hx, 0.36, z + 0.043] }, 0);
+}
+
 /**
  * The glass front door onto the car park at the ship hatch, on the front
- * edge (`span` tiles wide): low, as everything in front must be. Dark bronze
+ * edge (`span` tiles wide): low, as everything in front must be. Aluminium
  * jambs just past the opening, a transom bar in front of the station's face,
- * an aluminium threshold, and both glass leaves pinned open flat against the
- * outside of the front wall, push bars and an opening-hours sticker on them.
+ * a threshold, and both glass leaves pinned open flat against the outside
+ * of the front wall.
  */
 export function frontDoorModel(span: number): Model {
   const b = new ModelBuilder();
@@ -667,41 +771,17 @@ export function frontDoorModel(span: number): Model {
   const h = 0.58;
   for (const s of [-1, 1]) {
     const x = s * (half + 0.06);
-    b.box(0.09, h, 0.1, BRONZE, { at: [x, h / 2, 0.44] }, 0.008);
-    // The leaf, swung out round its hinge to lie along the wall, outside it.
+    b.box(0.09, h, 0.12, ALUMINIUM, { at: [x, h / 2, 0.45] }, 0.008);
+    b.box(0.02, h - 0.04, 0.124, tint(ALUMINIUM, -0.35), { at: [x - s * 0.035, h / 2, 0.45] }, 0);
     const leafW = Math.min(0.9, half + 0.1);
-    const lx = s * (half + 0.12 + leafW / 2);
-    const lh = 0.5;
-    const z = 0.58;
-    b.box(leafW, 0.05, 0.035, BRONZE, { at: [lx, 0.025, z] }, 0.006);
-    b.box(leafW, 0.04, 0.035, BRONZE, { at: [lx, lh - 0.02, z] }, 0.006);
-    for (const e of [-1, 1])
-      b.box(0.04, lh, 0.035, BRONZE, { at: [lx + (e * (leafW - 0.04)) / 2, lh / 2, z] }, 0.006);
-    b.pane(leafW - 0.06, lh - 0.08, 0.012, 0xdfeaf0, { at: [lx, lh / 2, z] });
-    // Sky caught in the glass: two pale streaks across it.
-    for (const [o, w] of [
-      [-0.12, 0.05],
-      [0.02, 0.025],
-    ] as const)
-      b.box(
-        w,
-        lh - 0.12,
-        0.004,
-        0xe6eef4,
-        {
-          at: [lx + o * s, lh / 2, z + 0.008],
-          rot: [0, 0, 0.5 * s],
-        },
-        0,
-      );
-    b.box(leafW * 0.6, 0.025, 0.03, COLOR.chrome, { at: [lx, 0.26, z + 0.035] }, 0.008);
-    b.box(0.1, 0.07, 0.004, 0xf3f1ea, { at: [lx - s * (leafW / 2 - 0.12), 0.38, z + 0.02] }, 0);
+    pinnedGlassLeaf(b, s * (half + 0.12 + leafW / 2), 0.512, leafW, 0.5, -s);
   }
-  b.box(span + 0.26, 0.05, 0.1, BRONZE, { at: [0, h - 0.025, 0.52] }, 0.008);
+  b.box(span + 0.26, 0.05, 0.12, ALUMINIUM, { at: [0, h - 0.025, 0.52] }, 0.008);
+  b.box(span + 0.2, 0.01, 0.124, tint(ALUMINIUM, -0.3), { at: [0, h - 0.055, 0.52] }, 0);
   b.box(span, 0.016, 0.12, ALUMINIUM, { at: [0, 0.008, 0.5] }, 0.003);
   // A door entry buzzer on the right jamb.
-  b.box(0.06, 0.1, 0.02, 0xc8ccd0, { at: [half + 0.06, 0.36, 0.5] }, 0.006);
-  b.led(0.008, COLOR.ledGreen, { at: [half + 0.06, 0.39, 0.512] });
+  b.box(0.06, 0.1, 0.02, 0xc8ccd0, { at: [half + 0.06, 0.36, 0.52] }, 0.006);
+  b.led(0.008, COLOR.ledGreen, { at: [half + 0.06, 0.39, 0.532] });
   return b.build();
 }
 
@@ -725,14 +805,18 @@ export function tallGlassDoorModel(span: number): Model {
 
 // ---- Strip lights ----
 
-/** How far a strip light's hangers run up from the fitting to the wire. */
+/** How far a strip light's drop runs up from the fitting to the wire. */
 export const STRIP_HANG = 0.3;
+/** The catenary wire and the drops: pale galvanised steel, thin, so it never crosses a station as a black line. */
+const WIRE = 0x6f747a;
+const WIRE_THICK = 0.006;
 
 /**
  * A fluorescent batten, built round the light (at the origin) so it hangs
  * where the room's lamps shine from: a white steel body, two bare tubes
  * showing on either side of it (drawn in the glow layer, so they bloom), on
- * two hangers that meet `STRIP_HANG` up at the wire over its middle.
+ * one thin drop up to the wire `STRIP_HANG` over its middle, a small clip
+ * where it meets it.
  */
 export function stripLightModel(): Model {
   const b = new ModelBuilder();
@@ -748,20 +832,59 @@ export function stripLightModel(): Model {
       },
       'glow',
     );
-  for (const s of [-1, 1]) {
-    const [ax, ay] = [s * 0.34, 0.03];
-    const [bx, by] = [0, STRIP_HANG];
-    b.box(
-      Math.hypot(bx - ax, by - ay),
-      0.006,
-      0.006,
-      0x3a3f4a,
-      {
-        at: [(ax + bx) / 2, (ay + by) / 2, 0],
-        rot: [0, 0, Math.atan2(by - ay, bx - ax)],
-      },
-      0,
-    );
+  b.box(0.05, 0.012, 0.03, 0xcfd2d6, { at: [0, 0.036, 0] }, 0.004);
+  b.box(
+    WIRE_THICK,
+    STRIP_HANG - 0.03,
+    WIRE_THICK,
+    WIRE,
+    { at: [0, 0.03 + (STRIP_HANG - 0.03) / 2, 0] },
+    0,
+  );
+  b.box(0.02, 0.02, 0.016, WIRE, { at: [0, STRIP_HANG, 0] }, 0.004);
+  return b.build();
+}
+
+/**
+ * The wire the battens hang from, through `points` (`[x, y]`), sagging a
+ * little between them, tied off at each end to a slim post on the wall top.
+ */
+export function stripWireModel(points: readonly [number, number][]): Model {
+  const b = new ModelBuilder();
+  const sag = 0.04;
+  const steps = 5;
+  for (let i = 0; i + 1 < points.length; i++) {
+    const [x0, y0] = points[i] ?? [0, 0];
+    const [x1, y1] = points[i + 1] ?? [0, 0];
+    const at = (t: number): [number, number] => [
+      x0 + (x1 - x0) * t,
+      y0 + (y1 - y0) * t - sag * 4 * t * (1 - t),
+    ];
+    for (let k = 0; k < steps; k++) {
+      const [ax, ay] = at(k / steps);
+      const [bx, by] = at((k + 1) / steps);
+      b.box(
+        Math.hypot(bx - ax, by - ay) + 0.002,
+        WIRE_THICK,
+        WIRE_THICK,
+        WIRE,
+        { at: [(ax + bx) / 2, (ay + by) / 2, 0], rot: [0, 0, Math.atan2(by - ay, bx - ax)] },
+        0,
+      );
+    }
   }
+  for (const [p, s] of [
+    [points[0], 1],
+    [points[points.length - 1], -1],
+  ] as const)
+    if (p) {
+      // A slim steel post up from the wall top, the wire tied off at its head.
+      const x = p[0] - s * 0.06;
+      const postH = p[1] + 0.03 - WALL_HEIGHT;
+      if (postH > 0)
+        b.box(0.022, postH, 0.022, 0x8a8f93, { at: [x, WALL_HEIGHT + postH / 2, 0] }, 0.004);
+      b.box(0.05, 0.012, 0.05, 0x7b8085, { at: [x, WALL_HEIGHT + 0.006, 0] }, 0.003);
+      b.box(0.03, 0.02, 0.03, 0x8a8f93, { at: [x, p[1] + 0.03, 0] }, 0.004);
+    }
   return b.build();
 }

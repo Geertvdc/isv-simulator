@@ -171,7 +171,10 @@ export function buildMap(map: LevelMap, look: MapLook): MapView {
     const lamp = dressing.lamp;
     if (lamp) {
       // A fitting where each of the room's lamps shines from, on a wire strung wall to wall.
-      const spots = lampSpots(atmosphereFor(look.scene), map);
+      const spots = lampSpots(atmosphereFor(look.scene), map).flatMap((at) => {
+        const fit = lamp.fit ? lamp.fit(at, map) : at;
+        return fit ? [fit] : [];
+      });
       for (const at of spots) place('lampFitting', lamp.model, { at, yaw: 0 });
       if (lamp.wire) placeLampWires(map, spots, lamp.wire, place);
     }

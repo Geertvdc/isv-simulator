@@ -121,9 +121,9 @@ export const FLOOR_COLORS: Readonly<Record<FloorTheme, readonly [number, number]
   // Sealed garage concrete, a touch cool; the second is the expansion joints, thin and pale.
   slab: [0xa3a39f, 0x75736d],
   // Grey-blue office carpet tiles; the second is the tiles laid the other way.
-  carpetTiles: [0x7b8998, 0x778593],
-  // Old wide factory floorboards, honey-brown; the second is the dark gaps between them.
-  boards: [0xa5825e, 0x4a3628],
+  carpetTiles: [0x75879a, 0x6f8195],
+  // Old wide factory floorboards, weathered grey-brown; the second is the dark gaps between them.
+  boards: [0x968676, 0x4a3c32],
 };
 
 /** Wall colors per theme: face and top. Caps stay darker than stations, so the eye goes to the stations. */
@@ -134,9 +134,9 @@ export const WALL_COLORS: Readonly<Record<WallTheme, { face: number; top: number
   // Painted cinder block over a grey-green dado, capped with concrete coping.
   garage: { face: 0xc4c0b4, top: 0x8d8b86 },
   // Magnolia plasterboard, capped with a cool light trim.
-  officePark: { face: 0xd3c7a8, top: 0x939ca3 },
+  officePark: { face: 0xc4b898, top: 0x6c747a },
   // Red factory brick (over a limewashed band), capped with cool stone coping.
-  warehouse: { face: 0x9c4f37, top: 0x8a8c88 },
+  warehouse: { face: 0x805a4e, top: 0x6e706d },
 };
 
 /** Marks the room's warm lamps, which only `medium` and `high` quality light (see `Stage`). */
