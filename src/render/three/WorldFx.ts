@@ -4,8 +4,19 @@ import { type Pipeline, pipelineWarning } from '../../sim/pipeline';
 import type { GameState, Vec } from '../../sim/state';
 import { pipelinePulse } from '../effects';
 import { type Vec3, gridToWorld } from '../projection';
-import { type Atmosphere, DEFAULT_ATMOSPHERE, type MoteSeed, moteSeeds } from './atmosphere';
+import {
+  AMBIENT_KEY,
+  type Atmosphere,
+  DEFAULT_ATMOSPHERE,
+  type MoteSeed,
+  moteSeeds,
+  sceneOf,
+} from './atmosphere';
 import { blockHeight, facingYaw, heroPlacement, stationFacing } from './layout';
+import { LAMP_KEY } from './look';
+import { SCENES } from './scenes';
+import { GROUND, type Scene, type ScenePiece } from './scenes/types';
+import { coffeeVan, narrowboat, quayLamp } from './setDressing/canal';
 import { PIPELINE_SERVER_AT } from './stationModels';
 import { COLOR } from './palette';
 
@@ -29,6 +40,24 @@ const MOTE_DRIFT = 0.18;
 const MOTE_PERIOD_MS = 9000;
 /** Mote size on screen, in world units (they shrink with distance). */
 const MOTE_SIZE = 0.045;
+/** Steam over the coffee van's hatch: puffs, how long one rises and how high. */
+const STEAM = { color: 0xf4f0e8, count: 7, ms: 3200, rise: 0.6, opacity: 0.75 };
+/** Smoke from the narrowboat's chimney: kept low (nothing tall in front of the level), drifting downwind. */
+const SMOKE = { color: 0xa09c94, count: 5, ms: 4200, rise: 0.4, opacity: 0.45 };
+/** Light streaks drifting slowly on the canal, world units and units per second. */
+const RIPPLE = { color: 0xc4dcd8, opacity: 0.55, length: 0.4, perUnit: 1.2, speed: 0.07 };
+/** A soft warm halo round a lamp head. */
+const HALO = { color: 0xffb060, size: 0.7, opacity: 0.6 };
+/**
+ * Where on the props the motion sits, in the prop's own space; kept in step
+ * with `setDressing/canal.ts`: the van's hatch, the boat's chimney, the lantern.
+ */
+const VAN_HATCH: Vec3 = { x: -0.15, y: 1.12, z: 0.72 };
+const BOAT_CHIMNEY: Vec3 = { x: -2.6, y: 0.62, z: -0.12 };
+const LAMP_HEAD: Vec3 = { x: 0, y: 2.0, z: 0 };
+/** Moving things keep at least this far (grid units) from the level's outline. */
+const CLEAR_OF_PLAY = 1;
+
 /** How far shake moves the picture at intensity 1, as a share of the canvas height. */
 const SHAKE_SCALE = 1;
 
@@ -52,10 +81,85 @@ interface Puff {
   size: number;
 }
 
+/** Where the scene's ambient motion goes (world units), from its props and ground. */
+export interface AmbientAnchors {
+  steam: Vec3[];
+  smoke: Vec3[];
+  halos: Vec3[];
+  /** Stretches of canal for drifting streaks, a tile or more from the level. */
+  water: { x0: number; x1: number; z0: number; z1: number }[];
+}
+
+/**
+ * Finds the anchors in a hand-built scene: steam and smoke only where they
+ * stay a tile clear of the level's outline, halos on every lamp head (they
+ * don't move), and the canal from a tile in front of the level, a band about
+ * as deep as the camera shows.
+ */
+export function ambientAnchors(
+  scene: Scene,
+  map: Pick<LevelMap, 'width' | 'height'>,
+): AmbientAnchors {
+  const on = (piece: ScenePiece['piece'], local: Vec3) =>
+    scene.pieces.filter((p) => p.piece === piece).map((p) => placeOn(p, local));
+  const clear = (p: Vec3) => outsideBy(p, map) >= CLEAR_OF_PLAY;
+  const front = map.height - 0.5 + CLEAR_OF_PLAY;
+  const water = scene.ground
+    .filter((g) => g.kind === 'water')
+    .map((g) => {
+      const z0 = Math.max(g.z0, front);
+      return { x0: g.x0, x1: g.x1, z0, z1: Math.min(g.z1, z0 + 1.2) };
+    })
+    .filter((w) => w.z1 > w.z0 && w.x1 > w.x0);
+  return {
+    steam: on(coffeeVan, VAN_HATCH).filter(clear),
+    smoke: on(narrowboat, BOAT_CHIMNEY).filter(clear),
+    halos: on(quayLamp, LAMP_HEAD),
+    water,
+  };
+}
+
+/** A point in a piece's own space, where the scene put it (scale, then yaw, then position). */
+function placeOn(p: ScenePiece, local: Vec3): Vec3 {
+  const [sx, sy, sz] = p.scale;
+  const x = local.x * sx;
+  const z = local.z * sz;
+  const c = Math.cos(p.yaw);
+  const s = Math.sin(p.yaw);
+  return { x: p.at.x + x * c + z * s, y: p.at.y + local.y * sy, z: p.at.z - x * s + z * c };
+}
+
+/** How far a world point lies outside the level's outline, in grid units (0 inside). */
+function outsideBy(p: Vec3, map: Pick<LevelMap, 'width' | 'height'>): number {
+  const dx = Math.max(-0.5 - p.x, 0, p.x - (map.width - 0.5));
+  const dz = Math.max(-0.5 - p.z, 0, p.z - (map.height - 0.5));
+  return Math.hypot(dx, dz);
+}
+
+/** A rising puff on a loop: steam or smoke. */
+interface Wisp {
+  mesh: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
+  from: Vec3;
+  phase: number;
+  kind: typeof STEAM;
+  /** Which way it drifts as it rises, world units over its life. */
+  drift: { x: number; z: number };
+}
+
+/** A streak of light on the water, sliding along x and wrapping in its stretch. */
+interface Ripple {
+  mesh: THREE.Mesh;
+  x0: number;
+  span: number;
+  offset: number;
+  phase: number;
+}
+
 /**
  * Things in the 3D world that only show state or react to events: pipeline
  * warning glow, smoke and sparks on a broken pipeline, the meeting room rug,
- * dash puffs and screen shake.
+ * dash puffs and screen shake; and the scene's ambient motion round the level
+ * (`Atmosphere.ambient`, off on `low`).
  */
 export class WorldFx {
   private readonly root = new THREE.Group();
@@ -65,6 +169,12 @@ export class WorldFx {
   private readonly puffGeometry = new THREE.SphereGeometry(1, 10, 8);
   /** Dust drifting in the room's light, if the atmosphere has it. */
   private readonly motes: { points: THREE.Points; seeds: MoteSeed[] } | null = null;
+  /** The scene's ambient motion, under one group that `Stage` hides on `low`. */
+  private readonly ambient = new THREE.Group();
+  private readonly wisps: Wisp[] = [];
+  private readonly ripples: Ripple[] = [];
+  private readonly lamps: { light: THREE.PointLight; base: number }[] = [];
+  private flicker = 0;
   private shake = { untilMs: 0, intensity: 0 };
   shakeEnabled = true;
 
@@ -99,6 +209,7 @@ export class WorldFx {
       this.motes = { points, seeds };
       this.driftMotes(0);
     }
+    this.buildAmbient(world, atmosphere);
     this.rug = new THREE.MeshBasicMaterial({
       color: RUG_COLOR,
       transparent: true,
@@ -148,6 +259,7 @@ export class WorldFx {
   /** Moves puffs and dust along; returns this frame's shake offset in canvas pixels. */
   update(timeMs: number, canvas: { width: number; height: number }): { x: number; y: number } {
     this.driftMotes(timeMs);
+    this.moveAmbient(timeMs);
     for (let i = this.puffs.length - 1; i >= 0; i--) {
       const puff = this.puffs[i];
       if (!puff) continue;
@@ -169,6 +281,117 @@ export class WorldFx {
       x: (Math.random() * 2 - 1) * k * canvas.width,
       y: (Math.random() * 2 - 1) * k * canvas.height,
     };
+  }
+
+  /** Steam, smoke, ripples and halos from the scene's props, and the lamps to flicker. */
+  private buildAmbient(world: THREE.Scene, atmosphere: Atmosphere): void {
+    const spec = atmosphere.ambient;
+    if (!spec) return;
+    this.ambient.userData[AMBIENT_KEY] = true;
+    this.root.add(this.ambient);
+    this.flicker = spec.flicker;
+    if (spec.flicker > 0) {
+      world.traverse((obj) => {
+        if (obj instanceof THREE.PointLight && obj.userData[LAMP_KEY] === true)
+          this.lamps.push({ light: obj, base: obj.intensity });
+      });
+    }
+    const id = sceneOf(atmosphere);
+    const build = id === undefined ? undefined : SCENES[id];
+    if (!build) return;
+    const anchors = ambientAnchors(build(this.map), this.map);
+    const wisps = (at: Vec3[], kind: typeof STEAM, drift: { x: number; z: number }) => {
+      at.forEach((from, k) => {
+        for (let i = 0; i < kind.count; i++) {
+          const mesh = new THREE.Mesh(
+            this.puffGeometry,
+            new THREE.MeshBasicMaterial({
+              color: kind.color,
+              transparent: true,
+              depthWrite: false,
+            }),
+          );
+          this.ambient.add(mesh);
+          this.wisps.push({ mesh, from, phase: i / kind.count + k * 0.37, kind, drift });
+        }
+      });
+    };
+    if (spec.steam) wisps(anchors.steam, STEAM, { x: 0.18, z: -0.1 });
+    if (spec.smoke) wisps(anchors.smoke, SMOKE, { x: -0.45, z: -0.08 });
+    if (spec.ripples && anchors.water.length > 0) {
+      const geometry = new THREE.PlaneGeometry(RIPPLE.length, 0.016).rotateX(-Math.PI / 2);
+      const material = new THREE.MeshBasicMaterial({
+        color: RIPPLE.color,
+        transparent: true,
+        opacity: RIPPLE.opacity,
+        depthWrite: false,
+      });
+      let n = 0;
+      for (const w of anchors.water) {
+        const span = w.x1 - w.x0;
+        const count = Math.round(span * (w.z1 - w.z0) * RIPPLE.perUnit);
+        for (let i = 0; i < count; i++, n++) {
+          const mesh = new THREE.Mesh(geometry, material);
+          mesh.position.set(0, GROUND + 0.012, w.z0 + unitOf(n, 2) * (w.z1 - w.z0));
+          this.ambient.add(mesh);
+          this.ripples.push({
+            mesh,
+            x0: w.x0,
+            span,
+            offset: unitOf(n, 1) * span,
+            phase: unitOf(n, 3),
+          });
+        }
+      }
+    }
+    if (spec.halos && anchors.halos.length > 0) {
+      const material = new THREE.SpriteMaterial({
+        map: haloTexture(),
+        color: HALO.color,
+        transparent: true,
+        opacity: HALO.opacity,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        // It sits inside the lantern; nothing stands in front of a lamp head 2 up.
+        depthTest: false,
+        fog: false,
+      });
+      for (const at of anchors.halos) {
+        const sprite = new THREE.Sprite(material);
+        putAt(sprite, at);
+        sprite.scale.setScalar(HALO.size);
+        this.ambient.add(sprite);
+      }
+    }
+  }
+
+  /** Puffs rise and fade on their loops, streaks slide on the water, lamps flicker. */
+  private moveAmbient(timeMs: number): void {
+    const t = timeMs / 1000;
+    this.lamps.forEach(({ light, base }, i) => {
+      // Two out-of-step wobbles: an uneven, never-repeating-looking flicker within ±flicker.
+      const w = 0.6 * Math.sin(t * 7.3 + i * 1.7) + 0.4 * Math.sin(t * 17.9 + i * 4.1);
+      light.intensity = base * (1 + this.flicker * w);
+    });
+    if (!this.ambient.visible) return;
+    for (const wisp of this.wisps) {
+      const k = (timeMs / wisp.kind.ms + wisp.phase) % 1;
+      const { from, drift, kind } = wisp;
+      wisp.mesh.position.set(
+        from.x + drift.x * k + Math.sin(k * 6 + wisp.phase * 9) * 0.03,
+        from.y + kind.rise * k,
+        from.z + drift.z * k,
+      );
+      wisp.mesh.scale.setScalar(0.05 + 0.12 * k);
+      // Fades in over the first tenth, then out.
+      wisp.mesh.material.opacity = kind.opacity * Math.min(1, k * 10) * (1 - k);
+    }
+    for (const r of this.ripples) {
+      const x = (r.offset + t * RIPPLE.speed) % r.span;
+      r.mesh.position.x = r.x0 + x;
+      // Each streak swells and thins on its own slow beat, so they glint rather than march.
+      r.mesh.scale.x = 0.35 + 0.65 * Math.abs(Math.sin(t * 0.6 + r.phase * Math.PI * 2));
+    }
   }
 
   /** Each mote sways slowly on its own loop, a little up and down. */
@@ -298,6 +521,32 @@ export class WorldFx {
       server,
     };
   }
+}
+
+/** A number in [0, 1) from an index and a salt. */
+function unitOf(i: number, salt: number): number {
+  const hash = Math.imul(i + 1, 0x9e3779b1) ^ Math.imul(salt, 0x85ebca6b);
+  return ((Math.imul(hash ^ (hash >>> 15), 0x2c1b3c6d) >>> 0) % 10007) / 10007;
+}
+
+/** A soft round glow, white in the middle and gone at the edge, for halo sprites. */
+function haloTexture(): THREE.Texture {
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.25, 'rgba(255,255,255,0.45)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
 }
 
 function putAt(obj: THREE.Object3D, p: Vec3): void {

@@ -138,6 +138,17 @@ describe('lampSpots', () => {
     }
   });
 
+  it('hangs the office strip lights high and close to the back wall, clear of the back row', () => {
+    for (const map of [OPEN_PLAN.map, parseDraftMap(openPlanDraft)]) {
+      const back = lampSpots(atmosphereFor('open-plan'), map).filter((p) => p.z < map.height / 2);
+      expect(back.length).toBeGreaterThanOrEqual(2);
+      for (const p of back) {
+        expect(p.y).toBeCloseTo(2.05);
+        expect(p.z % 1).toBeCloseTo(0.75);
+      }
+    }
+  });
+
   it('adds a front row only in a deep room', () => {
     const front = (map: { width: number; height: number }) =>
       lampSpots(garage, map).filter((p) => p.z > map.height / 2);

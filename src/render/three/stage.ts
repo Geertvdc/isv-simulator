@@ -11,7 +11,7 @@ import {
 import * as THREE from 'three';
 import type { Graphics } from '../../flow/save';
 import { type CameraPose, cameraPosition } from '../projection';
-import { type Atmosphere, cssRgba } from './atmosphere';
+import { AMBIENT_KEY, type Atmosphere, cssRgba } from './atmosphere';
 import { GLOW_BOOST_KEY } from './kit';
 import { LAMP_KEY, VIGNETTE_KEY } from './look';
 import {
@@ -185,6 +185,8 @@ export class Stage {
     const size = SHADOW_MAP[this.quality];
     this.showVignette(scene.userData[VIGNETTE_KEY] as Atmosphere['vignette']);
     scene.traverse((obj) => {
+      // So is the scene's ambient motion (steam, smoke, ripples, halos).
+      if (obj.userData[AMBIENT_KEY] === true) obj.visible = this.quality !== 'low';
       // Warm room lamps are a nicety: low skips their cost.
       if (obj instanceof THREE.PointLight && obj.userData[LAMP_KEY] === true) {
         obj.visible = this.quality !== 'low';

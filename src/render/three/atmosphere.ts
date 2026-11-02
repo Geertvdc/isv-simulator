@@ -61,7 +61,18 @@ export interface Atmosphere {
   };
   /** Dust drifting in the room's light: `perTile` motes per floor tile, faint and below bloom. */
   motes?: { color: number; opacity: number; perTile: number };
+  /**
+   * Small motion in the scene round the level (see `WorldFx`), all of it off
+   * on `low` and none of it moving within a tile of the play area: steam over
+   * the coffee van's hatch, smoke from the narrowboat's chimney, light
+   * streaks drifting on the canal, a soft halo round each lamp head, and the
+   * room's lamps flickering by `flicker` (a share of their brightness).
+   */
+  ambient?: { steam: boolean; smoke: boolean; ripples: boolean; halos: boolean; flicker: number };
 }
+
+/** Marks what `Stage` hides on `low`: the ambient motion of `Atmosphere.ambient`. */
+export const AMBIENT_KEY = 'ambient';
 
 /** Today's look: a bright neutral studio, sun from behind and left about 58° up. */
 export const DEFAULT_ATMOSPHERE: Atmosphere = {
@@ -117,46 +128,48 @@ const GOLDEN_HOUR: Atmosphere = {
  */
 const MONDAY_MORNING: Atmosphere = {
   sun: {
-    color: 0xfff3e2,
-    intensity: 3.7,
+    color: 0xfff6ea,
+    intensity: 4.5,
     from: { x: 8, y: 3.5, height: 11.5, perMapSize: false },
     reach: 0.95,
   },
-  sky: { sky: 0xd6e6ff, ground: 0x857a6c, intensity: 1 },
-  fill: { color: 0xd6e0f2, intensity: 0.65 },
-  environment: 0.2,
+  sky: { sky: 0xb4ccff, ground: 0x857a6c, intensity: 1.4 },
+  fill: { color: 0xc4d4f4, intensity: 0.65 },
+  environment: 0.05,
   backdrop: { inner: 0xc4dcf2, outer: 0x8fb2d6 },
   fog: { color: 0xb4cde6, start: 0.5, span: 9 },
-  vignette: { color: 0x2c3e58, opacity: 0.3, inner: 0.7 },
+  vignette: { color: 0x2c3e58, opacity: 0.35, inner: 0.7 },
   lamps: {
     color: 0xe8f2ff,
     intensity: 3,
     distance: 4.5,
-    height: 1.75,
+    height: 2.05,
     spacing: 4,
-    inset: 0.55,
+    inset: 0.25,
     frontFrom: 12,
   },
 };
 
 /**
  * Late afternoon turning to evening by the canal: a warm sun low-ish from the
- * west (left, about 42° up, so the back row still reads), a deepening blue sky
- * at the frame edges, and warm Edison bulbs glowing along the back wall.
+ * west (left and a little in front, about 42° up, so the back row still reads
+ * and the factory's front catches it), a deepening blue sky at the frame edges,
+ * warm Edison bulbs flickering along the back wall, steam over the coffee van
+ * and light drifting on the canal.
  */
 const CANAL_EVENING: Atmosphere = {
   sun: {
-    color: 0xffdcb4,
-    intensity: 4.4,
-    from: { x: -9, y: -2, height: 8.5, perMapSize: false },
+    color: 0xffe4c8,
+    intensity: 5,
+    from: { x: -9, y: 3.5, height: 8.5, perMapSize: false },
     reach: 0.95,
   },
-  sky: { sky: 0xc2cef0, ground: 0x7a7068, intensity: 1.15 },
-  fill: { color: 0xd0d8f0, intensity: 1 },
+  sky: { sky: 0xc2cef0, ground: 0x7a7068, intensity: 1.3 },
+  fill: { color: 0xd8dcf0, intensity: 1.45 },
   environment: 0.18,
-  backdrop: { inner: 0x5a6a9a, outer: 0x2a3462 },
+  backdrop: { inner: 0x6a7cb0, outer: 0x2a3462 },
   fog: { color: 0x52608e, start: 0.5, span: 8 },
-  vignette: { color: 0x1a2040, opacity: 0.35, inner: 0.7 },
+  vignette: { color: 0x1a2a68, opacity: 0.35, inner: 0.7 },
   lamps: {
     color: 0xffb060,
     intensity: 6,
@@ -167,6 +180,7 @@ const CANAL_EVENING: Atmosphere = {
     frontFrom: 12,
   },
   motes: { color: 0xffe2b0, opacity: 0.45, perTile: 0.4 },
+  ambient: { steam: true, smoke: true, ripples: true, halos: true, flicker: 0.05 },
 };
 
 /** Presets per `MapLook.scene` id. */
@@ -181,6 +195,11 @@ export function atmosphereFor(scene: string | undefined): Atmosphere {
   return scene !== undefined && Object.hasOwn(ATMOSPHERES, scene)
     ? (ATMOSPHERES[scene] ?? DEFAULT_ATMOSPHERE)
     : DEFAULT_ATMOSPHERE;
+}
+
+/** The scene id whose preset `atmosphere` is, if it is one. */
+export function sceneOf(atmosphere: Atmosphere): string | undefined {
+  return Object.keys(ATMOSPHERES).find((id) => ATMOSPHERES[id] === atmosphere);
 }
 
 /** The sun's world position and where it points for a map. */
