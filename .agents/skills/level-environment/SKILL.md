@@ -38,7 +38,8 @@ Commit the brief before spawning agents. Only wait for the user's approval if th
 Do the small shared changes yourself, so parallel agents never fight over them:
 
 - `LEVEL_LOOKS[<id>]` in `src/render/mapLook.ts`: set `scene: '<id>'`, plus the wall and floor themes the Room agent will add. Adding a theme to `WALL_THEMES` forces an entry in `WALL_DECOS` (`src/render/mapShape.ts`). Tell the Room agent so.
-- **Generalise what the garage hard-coded, before the second level copies it.** The garage dispatch is still a literal `scene === 'garage'` / `buildGarage` in `surroundings.ts`, `garageScene` returns the shared `Scene` type from `scenes/garage.ts`, and room dressing keys on `look.walls === 'garage'` in `MapView.ts` (`garageRoom`, `GARAGE_WALL_TOP_PROPS`). Turn these into small registries keyed by scene id or wall theme, with shared types moved to `scenes/types.ts`. Do this as its own commit, with garage screenshots unchanged, before round 1. Otherwise two passes end up in a pile of `if`s.
+- **Register the level, don't branch on it.** Worlds are a registry by scene id (`SCENES` in `scenes/index.ts`, types in `scenes/types.ts`: a scene brings its own `horizon`, ground `painters` and `alive` props) and rooms one by wall theme (`ROOMS` in `rooms/index.ts`, `RoomDressing` in `rooms/types.ts`: walls, floor, foundation, counter, lamp fitting, story pieces). Add a stub scene and a stub dressing with their registry lines before round 1, so every agent works only in its own `scenes/<id>.ts`, `rooms/<theme>.ts`, `roomModels/<theme>.ts` and `setDressing/<theme>WallTops.ts`. `MapView.ts` and `surroundings.ts` need no level-specific code. Generic living kinds (`sway`, `blink`, `peck`, `wisp`, `bob`) and poses (`phoning`, `carrying`, `sipping`, `smoking`) already exist.
+- **Two levels at once works:** Room and World per level plus one Light agent for both (Open Plan and Down the Hall ran that way).
 - `ATMOSPHERES` in `src/render/three/atmosphere.ts` is already keyed by scene id; levels without an entry get `DEFAULT_ATMOSPHERE` (today's look).
 
 Shots for each agent, on its own ports:
@@ -84,7 +85,7 @@ These are the round-1 lessons and the critic's findings, written as rules so rou
 
 - The fixed camera shows only **about 1.2 tiles of ground in front of the slab**. Build the front strip thin (the garage's apron is 0.12, the sidewalk 0.34), or the story's front ends up off frame.
 - **HUD-safe rects at 1440×810.** Keep story props out of them:
-  - order cards: 0–460 × 0–140
+  - order cards: 0–690 × 0–140 (three cards; two reach 460)
   - player legend: 0–220 × 610–745
   - SCORE: 0–135 × 755–810
   - timer: 1320–1440 × 755–810

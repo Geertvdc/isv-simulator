@@ -1,6 +1,10 @@
 # Open Plan Office environment pass
 
-**Status:** brief. Level 1-2 (`open-plan`) gets a hand-built world, the second level after the garage pilot ([garage-environment.md](garage-environment.md)). Done together with [Down the Hall](down-the-hall-environment.md), so chapter 1 reads as a journey: suburb, edge of town, city.
+**Status:** two rounds done (build, critic review, fixes). Level 1-2 (`open-plan`) gets a hand-built world, the second level after the garage pilot ([garage-environment.md](garage-environment.md)). Done together with [Down the Hall](down-the-hall-environment.md), so chapter 1 reads as a journey: suburb, edge of town, city.
+
+| Before                                        | After                                        | After, redesign draft                              |
+| --------------------------------------------- | -------------------------------------------- | -------------------------------------------------- |
+| ![](images/open-plan-environment/before.webp) | ![](images/open-plan-environment/after.webp) | ![](images/open-plan-environment/after-draft.webp) |
 
 **Goal:** the world around the level tells one story, the way Overcooked 2 levels do. Render only (`src/render/`); the sim, maps and balance don't change.
 
@@ -46,10 +50,18 @@ Round 1 runs five agents at once in one worktree (see the Down the Hall brief): 
 | **World** | `scenes/openPlan.ts` (+test), `setDressing/businessPark.ts`                                                                                                                                          |
 | **Light** | `atmosphere.ts` (+test), `stage.ts`, `WorldFx.ts`, `createLights` in `look.ts`                                                                                                                       |
 
+## Rounds
+
+Round 1 built the room (plasterboard and glass partitions, brick plinth, carpet tiles with placed wear, beech desks, lobby and glass front doors, strip lights), the world (the unit block with the OVERENGINEERED banner over the old tenant's ghost lettering, the car park, the bin store and smoking shelter, the verge and tenant sign) and the Monday-morning light. The critic scored it 5/10 (before: 2.5/10): desks and wall caps outshone the stations, the frame was bleached grey (mean luminance 115), the courier van was off frame, the roof was a dead band and nothing moved.
+
+Round 2, in three chunks: room values (darker desks, caps and walls, strip lights moved clear of the stations on a pale wire, wall-top clusters, cap joints, glass doors that read as glass), the world (the van with open doors and a parcel cage in frame, a post trolley and reception sign at the inbox, roof plant and parapet, living props: smoke, a blinking beacon, a flag, pecking pigeons and gulls, a swaying shrub, a smoking pose) and the light (cooler sky and fill, mean luminance about 106, frame saturation 0.29).
+
+Left for later: on the shipped map the reception sign over the back-wall inbox is under the order cards whenever 2–3 orders show; the front-wall clusters read small (they're capped at 0.35 high); the dental blinds' slats are about a pixel each. Not checked on a real GPU.
+
 ## Done when
 
-- [ ] The shot reads as "a startup's first office in a business-park unit" without explanation.
-- [ ] No flat empty ground and no void in the 1440×810 frame.
-- [ ] Stations and players read at a glance; nothing hides them.
-- [ ] Works on the shipped map and on `?draft=open-plan`.
-- [ ] `npm run check` passes; other levels look as before.
+- [x] The shot reads as "a startup's first office in a business-park unit" without explanation.
+- [x] No flat empty ground and no void in the 1440×810 frame.
+- [x] Stations and players read at a glance; nothing hides them.
+- [x] Works on the shipped map and on `?draft=open-plan`.
+- [x] `npm run check` passes; other levels look as before.

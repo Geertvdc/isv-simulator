@@ -1,6 +1,10 @@
 # Down the Hall environment pass
 
-**Status:** brief. Level 1-3 (`scale-up`, "Down the Hall") gets a hand-built world, after the garage pilot ([garage-environment.md](garage-environment.md)), together with [Open Plan Office](open-plan-environment.md).
+**Status:** two rounds done (build, critic review, fixes). Level 1-3 (`scale-up`, "Down the Hall") gets a hand-built world, after the garage pilot ([garage-environment.md](garage-environment.md)), together with [Open Plan Office](open-plan-environment.md).
+
+| Before                                            | After                                            | After, redesign draft                                  |
+| ------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------ |
+| ![](images/down-the-hall-environment/before.webp) | ![](images/down-the-hall-environment/after.webp) | ![](images/down-the-hall-environment/after-draft.webp) |
 
 **Goal:** the world around the level tells one story, the way Overcooked 2 levels do. Render only (`src/render/`); the sim, maps and balance don't change.
 
@@ -50,10 +54,20 @@ Five agents in one worktree at once, with strict file ownership. The shared plum
 | **World, 1-3**  | `scenes/downTheHall.ts` (+test), `setDressing/canal.ts`                                                                                                            |
 | **Light, both** | `atmosphere.ts` (+test), `stage.ts`, `WorldFx.ts`, `createLights` in `look.ts`                                                                                     |
 
+## Rounds
+
+Before round 1 the garage's hard-coded hooks became registries: `SCENES` by scene id (`scenes/index.ts`) and `ROOMS` by wall theme (`rooms/index.ts`), so each level's Room and World agent worked in its own files. Round 1 ran five agents at once (Room and World per level, one Light for both).
+
+Round 1 built the brick room (coursing, limewash band, stone coping and plinth, knotted boards, the hallway runner and tenant doors, scaffold counters, entrance-hall and loading doors, Edison bulbs), the world (the biscuit-works wall with its lettering, the canal quay and narrowboat, the courtyard light well, the coffee-van yard, the brewery dock) and the canal-evening light. The critic scored it 6/10 shipped, 6.5/10 on the draft (before: 2.5/10): the floor, runner and skip out-saturated the stations, counters and coping were as bright as station tops, the shipped inner wall was a bare slab, the canal sat under the HUD, there were empty cobbles and nothing visible moved.
+
+Round 2, in three chunks: room values (greyer boards, brick and runner, darker scaffold and coping, inner-wall clusters with YOGA and BREW CO plaques, a side-edge loading-bay frame, a taller limewash band), the world (the narrowboat in frame on the shipped map, readable kegs and lettering, filled cobbles and courtyard, bobbing ducks) and light and motion (a brighter evening with a lit facade, mean luminance 104 shipped and 98 draft; coffee-van steam, canal ripples, lamp halos and bulb flicker, all hidden on `low`).
+
+Left for later: the boat's lower half sits under the HUD's bottom band on the shipped map; no chimney smoke (the boat is within a tile of the level); the inbox hall door is under the order cards on both maps; the W glyph reads a bit like "LJ". Not checked on a real GPU.
+
 ## Done when
 
-- [ ] The shot reads as "a converted brick warehouse by a canal, two rooms down a shared hall" without explanation.
-- [ ] No flat empty ground and no void in the 1440×810 frame.
-- [ ] Stations and players read at a glance; nothing hides them.
-- [ ] Works on the shipped map and on `?draft=scale-up`.
-- [ ] `npm run check` passes; other levels look as before.
+- [x] The shot reads as "a converted brick warehouse by a canal, two rooms down a shared hall" without explanation.
+- [x] No flat empty ground and no void in the 1440×810 frame.
+- [x] Stations and players read at a glance; nothing hides them.
+- [x] Works on the shipped map and on `?draft=scale-up`.
+- [x] `npm run check` passes; other levels look as before.
