@@ -54,6 +54,8 @@ const FONT: Readonly<Record<string, string>> = {
   '.': '000000000000010',
   '-': '000000111000000',
   '&': '010101010101011',
+  '/': '001001010100100',
+  '>': '100010001010100',
   ' ': '000000000000000',
 };
 
@@ -147,9 +149,15 @@ const CLAD = 0x8a9096;
 const CLAD_DARK = 0x6a7078;
 const SILL = 0xa8a49c;
 const COPING = 0xb4b8bc;
+/** The parapet's own coping over the roof: cooler and darker than the sill, so it doesn't glare. */
+const PARAPET = 0x8a8f93;
 const GLASS = 0x2e3a46;
 const GLASS_GLINT = 0x7a8ea0;
-const ROOF = 0x4a4c50;
+const ROOF = 0x5a5c5e;
+/** Rainwater pooled in the felt's dips: the sky in it. */
+const PUDDLE = 0x6f7f8f;
+const SKYLIGHT = 0x9fb8c8;
+const PLANT = 0x9ea4a8;
 /** Inside lights on a Monday morning: cool fluorescent, seen through the strip windows. */
 const LIT = 0xb8cad0;
 const LOBBY_WALL = 0xc8c4b0;
@@ -282,34 +290,12 @@ function blockModel(
   for (let x = x0 + 0.6; x < x1; x += 0.6)
     b.box(0.018, cladH, 0.035, CLAD_DARK, { at: [x, BLOCK.sill + cladH / 2, 0.017] }, 0);
 
-  // The fascia, and the parapet's coping with a lip over the front.
+  // The fascia, and the parapet: a low brick upstand with a cool coping and a lip over the front.
   const fasciaH = BLOCK.top - BLOCK.fascia;
   b.box(w, fasciaH, 0.06, CLAD_DARK, { at: [cx, BLOCK.fascia + fasciaH / 2, 0.03] }, 0);
   b.box(w + 0.02, 0.06, 0.24, COPING, { at: [cx, BLOCK.top + 0.03, -0.04] }, 0);
   b.box(w + 0.02, 0.03, 0.02, tint(COPING, -0.2), { at: [cx, BLOCK.top - 0.005, 0.075] }, 0);
-  // The flat roof, felt in strips, and plant on it: AC boxes, an extract fan, a vent stack.
-  for (let z = -0.3, i = 0; z > -D; z -= 0.9, i++)
-    b.box(
-      w - 0.1,
-      0.02,
-      0.86,
-      i % 2 ? ROOF : tint(ROOF, 0.06),
-      {
-        at: [cx, BLOCK.top + 0.012, z - 0.43],
-      },
-      0,
-    );
-  for (let x = x0 + 2.3, k = 0; x < x1 - 1; x += 3.7 + (k % 3) * 0.9, k++) {
-    const z = -0.9 - (k % 2) * 0.6;
-    if (k % 3 === 2) {
-      b.cylinder(0.08, 0.08, 0.5, STEEL, { at: [x, BLOCK.top + 0.25, z] }, 10);
-      b.cylinder(0.13, 0.13, 0.05, STEEL, { at: [x, BLOCK.top + 0.52, z] }, 10);
-    } else {
-      b.box(0.7, 0.36, 0.5, 0xa0a4a6, { at: [x, BLOCK.top + 0.18, z] }, 0.02);
-      b.cylinder(0.18, 0.18, 0.02, DARK, { at: [x - 0.12, BLOCK.top + 0.37, z] }, 14);
-    }
-  }
-
+  roofModel(b, units, x0, x1);
   for (const u of units) unitFront(b, u, banner, lobby);
   // Brick piers between the units, proud of the face, and a downpipe beside each.
   const piers = [...new Set(units.flatMap((u) => [u.x0, u.x1]))].filter(
@@ -338,6 +324,102 @@ function blockModel(
   return b.build();
 }
 
+/**
+ * The flat roof over the block, read from the front camera as a band across
+ * the top of the frame: felt laid in strips with lapped seams, a low parapet
+ * with a cool coping, plant in clusters (two groups of three condensers on
+ * rails over our unit and the dental lab, joined by a cable tray), a row of
+ * rooflights, puddles by the outlets and a roofline sign for each
+ * neighbour standing on the parapet.
+ */
+function roofModel(b: ModelBuilder, units: readonly BlockUnit[], x0: number, x1: number): void {
+  const w = x1 - x0;
+  const cx = (x0 + x1) / 2;
+  const D = BLOCK.depth;
+  const T = BLOCK.top;
+  const P = 0.1;
+  // Felt in strips 0.5 wide, alternating ±6%, each with a darker lap at its front edge.
+  for (let z = -0.22, i = 0; z > -D + 0.1; z -= 0.5, i++) {
+    b.box(
+      w - 0.1,
+      0.02,
+      0.5,
+      tint(ROOF, i % 2 ? 0.06 : -0.04),
+      { at: [cx, T + 0.01, z - 0.25] },
+      0,
+    );
+    b.box(w - 0.1, 0.006, 0.03, tint(ROOF, -0.18), { at: [cx, T + 0.022, z - 0.015] }, 0);
+  }
+  // The parapet upstand behind the coping, and its own coping with a lip down the roof side.
+  b.box(w, P, 0.16, tint(BRICK, -0.1), { at: [cx, T + 0.06 + P / 2, -0.08] }, 0);
+  b.box(w + 0.02, 0.04, 0.24, PARAPET, { at: [cx, T + 0.08 + P, -0.06] }, 0);
+  b.box(w + 0.02, 0.05, 0.02, tint(PARAPET, -0.22), { at: [cx, T + 0.07 + P, -0.17] }, 0);
+  b.box(w + 0.02, 0.02, 0.02, tint(PARAPET, 0.12), { at: [cx, T + 0.105 + P, 0.05] }, 0);
+  const ours = units.find((u) => u.kind === 'ours');
+  const dental = units.find((u) => u.kind === 'dental');
+  const print = units.find((u) => u.kind === 'print');
+  // Plant in two groups of three condensers on rails: over our unit's right end, over the lab.
+  const groups = [ours ? ours.x1 - 4.6 : cx, dental ? dental.x0 + 1.4 : cx + 5];
+  for (const [g, gx] of groups.entries()) {
+    const gz = -1.15 - g * 0.25;
+    for (const s of [-1, 1])
+      b.box(2.5, 0.05, 0.05, DARK, { at: [gx + 0.75, T + 0.045, gz + s * 0.2] }, 0);
+    for (let k = 0; k < 3; k++) {
+      const ux = gx + k * 0.78;
+      const c = tint(PLANT, (k % 2 ? -0.05 : 0.03) - g * 0.04);
+      b.box(0.68, 0.4, 0.52, c, { at: [ux, T + 0.27, gz] }, 0.02);
+      // The fan grille on top and the louvres down the front.
+      b.cylinder(0.2, 0.2, 0.012, 0x3a3e44, { at: [ux, T + 0.475, gz] }, 16);
+      b.cylinder(0.05, 0.05, 0.02, STEEL, { at: [ux, T + 0.48, gz] }, 8);
+      for (let y = T + 0.12; y < T + 0.42; y += 0.06)
+        b.box(0.56, 0.012, 0.01, tint(c, -0.2), { at: [ux, y, gz + 0.265] }, 0);
+    }
+  }
+  // The cable tray between the groups and on to the risers, on little stands.
+  const [ga = cx, gb = cx] = groups;
+  const tz = -0.42;
+  const ta = Math.min(ga, gb) - 0.6;
+  const tb = Math.max(ga, gb) + 2.2;
+  b.box(tb - ta, 0.04, 0.16, 0x7a8086, { at: [(ta + tb) / 2, T + 0.14, tz] }, 0);
+  b.box(tb - ta, 0.03, 0.02, 0x5a6066, { at: [(ta + tb) / 2, T + 0.165, tz + 0.08] }, 0);
+  for (let x = ta + 0.3; x < tb; x += 1.1)
+    b.box(0.04, 0.12, 0.12, DARK, { at: [x, T + 0.06, tz] }, 0);
+  for (const gx of groups)
+    b.box(0.12, 0.04, 0.5, 0x7a8086, { at: [gx + 0.78, T + 0.14, tz - 0.42] }, 0);
+  // A row of rooflights, glazed domes on upstands, out along the whole block.
+  for (let x = x0 + 1.1, k = 0; x < x1 - 0.5; x += 1.9, k++) {
+    if (groups.some((gx) => x > gx - 0.8 && x < gx + 2.7)) continue;
+    const z = -0.95;
+    b.box(0.8, 0.1, 0.6, tint(PARAPET, -0.08), { at: [x, T + 0.06, z] }, 0.01);
+    b.box(0.7, 0.07, 0.5, SKYLIGHT, { at: [x, T + 0.14, z] }, 0.03);
+    b.box(0.08, 0.02, 0.42, tint(SKYLIGHT, 0.3), { at: [x - 0.18, T + 0.18, z] }, 0);
+  }
+  // Puddles in the dips by the outlets, behind the parapet.
+  for (let x = x0 + 2.05, k = 0; x < x1; x += 1.9 * (1 + (k % 2)), k++) {
+    const z = -0.7 - (k % 3) * 0.25;
+    b.cylinder(0.32 + (k % 2) * 0.12, 0.32, 0.004, PUDDLE, { at: [x, T + 0.022, z] }, 14);
+    b.cylinder(0.16, 0.16, 0.005, tint(PUDDLE, 0.12), { at: [x + 0.1, T + 0.023, z + 0.05] }, 10);
+  }
+  // The neighbours' roofline signs on posts over the parapet, so they read above the frame's top.
+  const roofSign = (
+    x: number,
+    sw: number,
+    text: string,
+    panel: number,
+    ink: number,
+    bar: number,
+  ) => {
+    const y = T + 0.36;
+    for (const s of [-1, 1])
+      b.box(0.05, 0.3, 0.05, DARK, { at: [x + s * (sw / 2 - 0.2), T + 0.24, -0.05] }, 0);
+    b.box(sw, 0.34, 0.06, panel, { at: [x, y, -0.02] }, 0.01);
+    b.box(sw, 0.06, 0.065, bar, { at: [x, y - 0.14, -0.02] }, 0);
+    lettering(b, text, x, y + 0.03, 0.012, Math.min(0.05, (sw - 0.3) / textColumns(text)), ink);
+  };
+  if (dental) roofSign(dental.x0 + 1.75, 2.9, 'BRIGHT DENTAL', 0xdfe2de, 0x2e7272, 0x3a8a8a);
+  if (print) roofSign(print.x1 - 1.9, 2.8, 'KWIK PRINT', 0xb4483c, 0xf0ece0, 0xe8e2d4);
+}
+
 /** The strip window across a stretch: glass in a frame, mullions every 0.5. */
 function stripWindow(b: ModelBuilder, a: number, c: number, look: 'lit' | 'dark' | 'blinds'): void {
   const h = BLOCK.window1 - BLOCK.window0;
@@ -349,12 +431,29 @@ function stripWindow(b: ModelBuilder, a: number, c: number, look: 'lit' | 'dark'
   for (let i = 0; i < n; i++) {
     const x = a + (i + 0.5) * pw;
     if (look === 'lit' && i % 3 !== 1) b.screen(pw - 0.04, h - 0.04, LIT, { at: [x, y, 0.05] });
-    else b.box(pw - 0.04, h - 0.04, 0.01, GLASS, { at: [x, y, 0.05] }, 0);
+    else
+      b.box(
+        pw - 0.04,
+        h - 0.04,
+        0.01,
+        look === 'blinds' ? BLIND_GLASS : GLASS,
+        { at: [x, y, 0.05] },
+        0,
+      );
     if (look === 'blinds') {
-      // Vertical blinds drawn, the slats catching the light, one gap where someone peeks.
-      for (let s = -pw / 2 + 0.05; s < pw / 2 - 0.03; s += 0.045)
-        if (!(i === 2 && s > 0))
-          b.box(0.036, h - 0.06, 0.008, 0xd8d6cc, { at: [x + s, y, 0.058], rot: [0, 0.4, 0] }, 0);
+      // Venetian blinds let down: pale horizontal slats over blue glass, one pane pulled
+      // half up, one with a pair of slats bent where someone peeks out.
+      const drop = i % 4 === 1 ? 0.45 : 1;
+      for (let k = 0, sy = y + h / 2 - 0.05; sy > y + h / 2 - (h - 0.04) * drop; sy -= 0.042, k++)
+        b.box(
+          pw - 0.06,
+          0.026,
+          0.012,
+          k % 2 ? BLIND : tint(BLIND, -0.06),
+          { at: [x, sy, 0.06], rot: [i % 4 === 3 && k === 4 ? -0.6 : -0.25, 0, 0] },
+          0,
+        );
+      b.box(pw - 0.04, 0.03, 0.02, tint(BLIND, -0.15), { at: [x, y + h / 2 - 0.02, 0.064] }, 0);
     } else {
       b.box(
         0.06,
@@ -370,6 +469,10 @@ function stripWindow(b: ModelBuilder, a: number, c: number, look: 'lit' | 'dark'
     }
   }
 }
+
+const BLIND = 0xd8dde0;
+const BLIND_GLASS = 0x6f8a9a;
+const DENTAL_TEAL = 0x3a8a8a;
 
 /** One tenant's front: windows, the sign, and whatever stands at the ground floor. */
 function unitFront(
@@ -416,6 +519,16 @@ function unitFront(
             },
             0,
           );
+      // Over the lobby door: RECEPTION and POST on a sign across the cladding, so the inbox reads
+      // as the way in for the post; right of the opening, clear of the first order cards.
+      if (lobby) {
+        const rx = lobby.x + 0.55;
+        const ry = (BLOCK.window0 + BLOCK.window1) / 2;
+        b.box(1.5, 0.5, 0.04, 0x2e3a5a, { at: [rx, ry, 0.075] }, 0.01);
+        b.box(1.5, 0.05, 0.045, 0xc0503e, { at: [rx, ry - 0.2, 0.077] }, 0);
+        lettering(b, 'RECEPTION', rx, ry + 0.09, 0.096, 0.034, 0xeae6da);
+        lettering(b, 'POST >', rx, ry - 0.07, 0.096, 0.034, 0xe8c050);
+      }
       // UNIT 4 on a little plate by the lobby door, when it shows.
       if (lobby) {
         const px = lobby.x + lobby.width / 2 + 0.25;
@@ -464,6 +577,19 @@ function unitFront(
     }
     case 'dental': {
       stripWindow(b, a, c, 'blinds');
+      // The window band's frame picked out, and a teal sill under it.
+      const wh = BLOCK.window1 - BLOCK.window0;
+      b.box(w + 0.08, 0.04, 0.05, 0x9aa1a8, { at: [cx, BLOCK.window1 + 0.04, 0.045] }, 0);
+      b.box(w + 0.12, 0.05, 0.1, DENTAL_TEAL, { at: [cx, BLOCK.window0 - 0.04, 0.06] }, 0.01);
+      for (const x of [a - 0.02, c + 0.02])
+        b.box(
+          0.04,
+          wh + 0.08,
+          0.05,
+          0x9aa1a8,
+          { at: [x, (BLOCK.window0 + BLOCK.window1) / 2, 0.045] },
+          0,
+        );
       b.box(w - 0.4, 0.24, 0.03, 0xdcdcd4, { at: [cx, fy, fz + 0.015] }, 0.01);
       lettering(
         b,
@@ -580,7 +706,7 @@ function lobbyModel(b: ModelBuilder, x: number, width: number): void {
  * saloon/estate (`long`), roof `roof` coloured, dark glass with a glint.
  */
 function carModel(b: ModelBuilder, paint: number, long: boolean, roofBars = false): void {
-  const glass = 0x2b3644;
+  const glass = 0x2e3a48;
   const glint = 0x9fb3c8;
   const L = long ? 2.9 : 2.55;
   const half = L / 2;
@@ -620,18 +746,24 @@ function carModel(b: ModelBuilder, paint: number, long: boolean, roofBars = fals
     [-0.65, -wz],
     [0.65, -wz],
   ] as const) {
-    b.cylinder(0.22, 0.22, 0.2, INK, { at: [x, 0.22, z], rot: [0, 0, Math.PI / 2] }, 14);
-    b.cylinder(0.1, 0.1, 0.21, STEEL, { at: [x, 0.22, z], rot: [0, 0, Math.PI / 2] }, 10);
+    // Tyres stand a touch proud of the body, so the wheels read from above.
+    const wx = x * 1.06;
+    b.cylinder(0.22, 0.22, 0.2, INK, { at: [wx, 0.22, z], rot: [0, 0, Math.PI / 2] }, 14);
+    b.cylinder(0.11, 0.11, 0.21, 0x9aa0a6, { at: [wx, 0.22, z], rot: [0, 0, Math.PI / 2] }, 10);
+    b.box(0.08, 0.06, 0.5, tint(paint, -0.3), { at: [x * 1.04, 0.46, z] }, 0.02);
   }
   for (const s of [-1, 1]) {
     b.box(0.28, 0.07, 0.06, 0xd8d4c0, { at: [s * 0.44, 0.54, half - 0.03] }, 0.01);
-    b.box(0.24, 0.11, 0.05, 0xa8443a, { at: [s * 0.46, 0.52, -half + 0.04] }, 0.01);
+    b.box(0.3, 0.13, 0.06, 0xc04a3e, { at: [s * 0.46, 0.53, -half + 0.03] }, 0.01);
+    b.box(0.1, 0.13, 0.065, 0xd8843a, { at: [s * 0.58, 0.53, -half + 0.03] }, 0.01);
     if (roofBars) b.box(0.04, 0.04, cabin - 0.3, DARK, { at: [s * 0.42, 0.97, cz] }, 0);
   }
 }
 
-/** Parked cars in muted colours: silver, slate blue, a dull green estate, a white saloon, a black one. */
-const CAR_PAINTS = [0x9aa0a6, 0x4a5a72, 0x5a6a58, 0xc8c8c0, 0x2e3238, 0x7a4a4a] as const;
+/** Parked cars in muted colours: silver, slate blue, a dull green estate, a white saloon, a black one, a maroon, a blue-grey. */
+const CAR_PAINTS = [0x9aa0a6, 0x4a5a72, 0x5a6a58, 0xc8c8c0, 0x2e3238, 0x7a4a4a, 0x7a8590] as const;
+/** `parkedCar`'s darker blue-grey look, for a car at the frame's edge that mustn't glare. */
+export const SLATE_CAR = 6;
 export const parkedCar = looks([1.5, 2.9], CAR_PAINTS.length, (b, v) => {
   carModel(b, nth(CAR_PAINTS, v), v % 2 === 0, v === 2);
 });
@@ -713,11 +845,16 @@ export const courierVan = looks([1.6, 3.4], 1, (b) => {
     b.cylinder(0.24, 0.24, 0.2, INK, { at: [x, 0.24, z], rot: [0, 0, Math.PI / 2] }, 14);
     b.cylinder(0.1, 0.1, 0.21, STEEL, { at: [x, 0.24, z], rot: [0, 0, Math.PI / 2] }, 10);
   }
-  // The back doors, swung out past the sides, their inside faces to the camera.
+  // The tail lift let down behind, a steel deck on the ground, ribbed.
+  b.box(1.32, 0.05, 0.56, 0x8a9096, { at: [0, 0.03, box0 - 0.34] }, 0.01);
+  for (let x = -0.55; x <= 0.56; x += 0.18)
+    b.box(0.03, 0.012, 0.52, 0x6a7078, { at: [x, 0.06, box0 - 0.34] }, 0);
+  b.box(1.32, 0.02, 0.04, 0xc8b048, { at: [0, 0.065, box0 - 0.6] }, 0);
+  // The back doors, swung right out like wings beside the opening, their outsides to the camera.
   for (const s of [-1, 1]) {
     const dw = 0.72;
-    // Hinged at the rear corner, swung right open: winged out along the sides.
-    const theta = (245 * Math.PI) / 180;
+    // Hinged at the rear corner, swung open past square: winged out sideways in line with the back.
+    const theta = (200 * Math.PI) / 180;
     const dx = -s * Math.cos(theta);
     const dz = -Math.sin(theta);
     const hx = s * 0.74;
@@ -733,6 +870,7 @@ export const courierVan = looks([1.6, 3.4], 1, (b) => {
       0.02,
     );
     b.box(dw * 0.6, 0.28, 0.06, 0x2b3644, { at: [mx, 1.0, mz], rot: [0, yaw, 0] }, 0);
+    b.box(dw, 0.1, 0.062, stripe, { at: [mx, 0.62, mz], rot: [0, yaw, 0] }, 0);
     b.box(0.08, 0.2, 0.06, 0xa8443a, { at: [s * 0.7, 0.62, box0 - 0.02] }, 0.01);
   }
 });
@@ -1020,4 +1158,151 @@ export const parkHedge = looks([1, 0.7], 2, (b, v) => {
   b.box(1.02, 0.9, 0.6, tint(c, -0.15), { at: [0, 0.45, 0] }, 0.08);
   b.sphere(0.36, c, { at: [-0.25, 0.75, 0.04] }, [1, 0.6, 0.9]);
   b.sphere(0.34, tint(c, 0.06), { at: [0.25, 0.78, -0.02] }, [1, 0.6, 0.9]);
+});
+
+// ---- Loading, the post, and the little lives round the park ----
+
+/**
+ * A roll cage of parcels, the kind couriers wheel up the tail lift: a
+ * steel mesh on castors, half full, under 0.5 high so it can stand in the
+ * strip in front of the level.
+ */
+export const parcelCage = looks([0.8, 0.6], 1, (b) => {
+  const mesh = 0xa8b0b6;
+  const W = 0.7;
+  const D = 0.5;
+  // Low sides, so the parcels heaped in it show over them.
+  const H = 0.3;
+  b.box(W, 0.04, D, 0x5a6066, { at: [0, 0.07, 0] }, 0);
+  for (const [x, z] of [
+    [-W / 2 + 0.05, -D / 2 + 0.05],
+    [W / 2 - 0.05, -D / 2 + 0.05],
+    [-W / 2 + 0.05, D / 2 - 0.05],
+    [W / 2 - 0.05, D / 2 - 0.05],
+  ] as const)
+    b.cylinder(0.03, 0.03, 0.03, INK, { at: [x, 0.03, z], rot: [0, 0, Math.PI / 2] }, 8);
+  for (const s of [-1, 1]) {
+    b.box(0.02, H, D, mesh, { at: [s * (W / 2), 0.07 + H / 2, 0] }, 0);
+    for (let z = -D / 2 + 0.08; z < D / 2; z += 0.08)
+      b.box(0.012, H, 0.008, tint(mesh, -0.15), { at: [s * (W / 2 + 0.006), 0.07 + H / 2, z] }, 0);
+  }
+  b.box(W, H, 0.02, mesh, { at: [0, 0.07 + H / 2, -D / 2] }, 0);
+  // Parcels: brown boxes, a white padded bag, one with tape across.
+  for (const [x, y, z, w, h, d, c] of [
+    [-0.15, 0.2, -0.08, 0.3, 0.22, 0.26, CARDBOARD],
+    [0.16, 0.18, -0.05, 0.26, 0.18, 0.3, tint(CARDBOARD, -0.12)],
+    [0.0, 0.2, 0.14, 0.4, 0.2, 0.18, tint(CARDBOARD, 0.06)],
+    [-0.12, 0.38, -0.02, 0.24, 0.14, 0.22, tint(CARDBOARD, -0.06)],
+    [0.16, 0.34, 0.06, 0.24, 0.12, 0.3, tint(CARDBOARD, 0.1)],
+    [-0.1, 0.5, -0.02, 0.3, 0.1, 0.24, tint(CARDBOARD, 0.12)],
+    [0.14, 0.47, 0.08, 0.26, 0.05, 0.32, 0xdedad0],
+  ] as const) {
+    b.box(w, h, d, c, { at: [x, y, z], rot: [0, x * 0.8, 0] }, 0.01);
+    b.box(w + 0.004, 0.012, 0.05, 0xc8c0a8, { at: [x, y + h / 2, z], rot: [0, x * 0.8, 0] }, 0);
+  }
+});
+
+/**
+ * A post trolley: a low steel cart with grey mail sacks slumped on it,
+ * red-tagged, and a bundle of letters in an elastic band on top.
+ */
+export const postTrolley = looks([0.8, 0.6], 1, (b) => {
+  b.box(0.72, 0.04, 0.48, 0x6a7078, { at: [0, 0.1, 0] }, 0.01);
+  for (const [x, z] of [
+    [-0.3, -0.18],
+    [0.3, -0.18],
+    [-0.3, 0.18],
+    [0.3, 0.18],
+  ] as const)
+    b.cylinder(0.05, 0.05, 0.03, INK, { at: [x, 0.05, z], rot: [0, 0, Math.PI / 2] }, 10);
+  b.cylinder(0.015, 0.015, 0.36, STEEL, { at: [-0.36, 0.28, 0], rot: [0, 0, 0.1] }, 6);
+  b.cylinder(0.015, 0.015, 0.5, STEEL, { at: [-0.38, 0.45, 0], rot: [Math.PI / 2, 0, 0] }, 6);
+  for (const [x, z, r] of [
+    [-0.12, -0.06, 0.18],
+    [0.17, 0.02, 0.16],
+    [0.0, 0.12, 0.14],
+  ] as const) {
+    b.sphere(r, 0x8a8c80, { at: [x, 0.12 + r * 0.8, z] }, [1, 0.85, 0.9]);
+    b.box(0.05, 0.07, 0.01, 0xc0503e, { at: [x + r * 0.6, 0.12 + r, z + r * 0.7] }, 0);
+  }
+  b.box(0.2, 0.06, 0.14, WHITE, { at: [0.06, 0.44, 0.04], rot: [0, 0.3, 0] }, 0.01);
+  b.box(0.21, 0.02, 0.02, 0xc0503e, { at: [0.06, 0.45, 0.04], rot: [0, 0.3, 0] }, 0);
+});
+
+/** A pavement A-board pointing the post round: POST > and UNIT 4, leaning open. */
+export const postAFrame = looks([0.5, 0.4], 1, (b) => {
+  for (const s of [-1, 1]) {
+    b.box(0.46, 0.46, 0.025, 0x2e3a5a, { at: [0, 0.22, s * 0.08], rot: [s * -0.2, 0, 0] }, 0.01);
+    b.box(0.4, 0.4, 0.02, 0xeae6da, { at: [0, 0.23, s * 0.092], rot: [s * -0.2, 0, 0] }, 0);
+  }
+  const t = Math.tan(0.2);
+  lettering(b, 'POST', 0, 0.31, 0.11 - 0.31 * t + 0.03, 0.022, 0xc0503e, 0.006);
+  lettering(b, 'UNIT 4', 0, 0.18, 0.11 - 0.18 * t + 0.04, 0.014, 0x2e3a5a, 0.006);
+  b.box(0.16, 0.03, 0.01, 0x2e3a5a, { at: [0, 0.09, 0.105], rot: [-0.2, 0, 0] }, 0);
+  b.box(0.04, 0.04, 0.01, 0x2e3a5a, { at: [0.07, 0.095, 0.107], rot: [-0.2, 0, 0.78] }, 0);
+});
+
+/** Cigarette smoke curling up: a short column of pale puffs, widest at the top (`wisp` alive). */
+export const smokeWisp = looks([0.2, 0.2], 1, (b) => {
+  for (const [x, y, z, r, c] of [
+    [0, 0.02, 0, 0.022, 0xe0e2e0],
+    [0.015, 0.08, 0.01, 0.035, 0xdcdedc],
+    [-0.01, 0.16, -0.01, 0.05, 0xd4d8d8],
+    [0.03, 0.27, 0.0, 0.065, 0xcdd2d4],
+    [0.0, 0.4, 0.02, 0.08, 0xc4cacd],
+  ] as const)
+    b.sphere(r, c, { at: [x, y, z] }, [1, 0.8, 1]);
+});
+
+/** A feral pigeon, standing at its feet and facing +z (`peck` alive): grey, a green-sheened neck. */
+export const pigeon = looks([0.3, 0.3], 2, (b, v) => {
+  const body = v ? 0x6a6e78 : 0x7a808a;
+  b.sphere(0.09, body, { at: [0, 0.1, -0.01] }, [0.85, 0.75, 1.3]);
+  b.sphere(0.06, tint(body, -0.15), { at: [0, 0.12, -0.07] }, [1.2, 0.5, 1.2]);
+  b.box(0.08, 0.02, 0.12, tint(body, -0.25), { at: [0, 0.1, -0.15], rot: [0.3, 0, 0] }, 0.01);
+  b.sphere(0.045, 0x4e6a64, { at: [0, 0.17, 0.08] }, [1, 1.1, 1]);
+  b.sphere(0.04, tint(body, -0.1), { at: [0, 0.21, 0.1] });
+  b.cone(0.012, 0.04, 0xd8c8a0, { at: [0, 0.21, 0.15], rot: [Math.PI / 2, 0, 0] }, 6);
+  for (const x of [-0.025, 0.025]) b.box(0.012, 0.05, 0.012, 0xc06a5a, { at: [x, 0.025, 0] }, 0);
+});
+
+/** A herring gull on the roof, standing at its feet and facing +z: white, grey back, yellow bill. */
+export const gull = looks([0.4, 0.4], 1, (b) => {
+  b.sphere(0.12, 0xeceae4, { at: [0, 0.16, 0] }, [0.8, 0.75, 1.4]);
+  b.sphere(0.1, 0x9aa2aa, { at: [0, 0.2, -0.05] }, [1.0, 0.45, 1.4]);
+  b.box(0.1, 0.03, 0.14, 0x2e3236, { at: [0, 0.19, -0.22], rot: [0.25, 0, 0] }, 0.01);
+  b.sphere(0.06, 0xf0eee8, { at: [0, 0.28, 0.12] });
+  b.cone(0.016, 0.08, 0xd8b440, { at: [0, 0.27, 0.21], rot: [Math.PI / 2, 0, 0] }, 6);
+  for (const x of [-0.035, 0.035]) b.box(0.015, 0.09, 0.015, 0xd8a890, { at: [x, 0.045, 0] }, 0);
+});
+
+/** A feather flag for the dental lab: a tall teal sail on a bent pole (`sway` alive). */
+export const featherFlag = looks([0.4, 0.4], 1, (b) => {
+  b.box(0.26, 0.04, 0.26, 0x3a3e44, { at: [0, 0.02, 0] }, 0.01);
+  b.cylinder(0.014, 0.016, 1.7, 0x9aa0a6, { at: [0, 0.85, 0] }, 6);
+  for (let k = 0; k < 6; k++) {
+    const y = 0.55 + k * 0.19;
+    const wdt = 0.32 - Math.max(0, k - 3) * 0.07;
+    b.box(wdt, 0.2, 0.012, k % 3 === 1 ? 0xe8ece8 : DENTAL_TEAL, { at: [wdt / 2 + 0.01, y, 0] }, 0);
+  }
+  b.box(0.1, 0.1, 0.014, 0xe8ece8, { at: [0.12, 0.9, 0.002] }, 0);
+});
+
+/** A buddleia that seeded itself by the bins: a scraggly bush with purple spikes (`sway` alive). */
+export const buddleia = looks([0.8, 0.8], 1, (b) => {
+  b.sphere(0.32, 0x5a6a48, { at: [0, 0.32, 0] }, [1, 0.9, 1]);
+  b.sphere(0.24, 0x627450, { at: [0.2, 0.5, 0.05] });
+  b.sphere(0.2, 0x56664a, { at: [-0.18, 0.55, -0.05] });
+  for (const [x, y, z, r] of [
+    [0.25, 0.75, 0.1, 0.4],
+    [-0.15, 0.78, 0.05, -0.3],
+    [0.05, 0.85, -0.1, 0.1],
+    [0.32, 0.58, 0.22, 0.8],
+  ] as const)
+    b.cone(0.05, 0.2, 0x7a5a8a, { at: [x, y, z], rot: [0, 0, r] }, 6);
+});
+
+/** An amber hazard lamp, lit (`blink` alive), to sit over the van's roof beacon. */
+export const hazardLamp = looks([0.2, 0.2], 1, (b) => {
+  b.box(0.24, 0.09, 0.14, 0xffa020, { at: [0, 0.045, 0] }, 0.02);
 });

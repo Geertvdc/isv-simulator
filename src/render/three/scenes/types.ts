@@ -34,11 +34,23 @@ export interface GroundPatch {
 export type GroundPainter = (b: ModelBuilder, g: GroundPatch, salt: number) => void;
 
 /**
- * How a living prop moves (see `Surroundings`): breathing slowly in its
- * sleep, purring (slower, softer), or swaying with the hand of whoever is
- * `watering` (a hose's spray).
+ * How a living prop moves (see `moveAlive` in `Surroundings`), each about
+ * the piece's own origin, so build it standing on the ground at its foot:
+ * - `breathe`: asleep, a slow breath and now and then a twitch (a dog).
+ * - `purr`: the same, slower and softer (a cat).
+ * - `spray`: sways with the hand of whoever is `watering` (a hose's spray).
+ * - `sway`: rocks gently about its foot, about 2°, in the breeze (a shrub,
+ *   a feather flag, a weed, washing).
+ * - `blink`: on for half a second, off for half a second (a hazard light,
+ *   a beacon); give it a bright tint, as the glow layer isn't kept.
+ * - `peck`: dips its head down now and then and turns a little (a bird
+ *   pecking at crumbs); face it along +z.
+ * - `wisp`: rises, swells and twists (smoke, steam); build it as a small
+ *   column of pale puffs.
+ * - `bob`: floats up and down a hair (a bird on a roof, a buoy, a float).
+ * Living props stay a tile from the room and keep still on low quality.
  */
-export type AliveKind = 'breathe' | 'purr' | 'spray';
+export type AliveKind = 'breathe' | 'purr' | 'spray' | 'sway' | 'blink' | 'peck' | 'wisp' | 'bob';
 
 /** One prop in the scene. Near props cast shadows; far ones (the houses, the trees) don't. */
 export interface ScenePiece {
@@ -56,16 +68,19 @@ export interface ScenePiece {
 /**
  * What a scene person is doing: standing about, talking with their hands,
  * watering with a hose, pushing a mower, on the phone (pacing a little),
- * carrying something in both hands at chest height, or sipping from a cup.
+ * carrying something in both hands at chest height, sipping from a cup, or
+ * smoking (the cigarette raised to the mouth every few seconds).
  */
 export type ScenePose =
-  'idle' | 'chatting' | 'watering' | 'mowing' | 'phoning' | 'carrying' | 'sipping';
+  'idle' | 'chatting' | 'watering' | 'mowing' | 'phoning' | 'carrying' | 'sipping' | 'smoking';
 
 /** Someone in the scene, standing at `at` facing `yaw`. */
 export interface ScenePerson {
   at: Vec3;
   yaw: number;
   pose: ScenePose;
+  /** How far their colors fade toward grey (default `SCENE_PERSON_GREY` in `Surroundings`, 0.3). */
+  grey?: number;
 }
 
 /** A level's hand-built world, as data. */

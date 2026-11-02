@@ -432,7 +432,7 @@ export class Surroundings {
       // Smaller and greyer than the players, so they read as the neighbourhood, not a fifth player.
       const { character } = this.addExtra(i, p.at, p.yaw, p.pose);
       character.root.scale.setScalar(SCENE_PERSON_SCALE);
-      for (const g of character.geometries) desaturate(g, SCENE_PERSON_GREY);
+      for (const g of character.geometries) desaturate(g, p.grey ?? SCENE_PERSON_GREY);
     });
   }
 
@@ -451,7 +451,9 @@ export class Surroundings {
     mesh.castShadow = p.row === 'near';
     mesh.receiveShadow = true;
     this.root.add(mesh);
-    this.alive.push({ mesh, kind, yaw: p.yaw, scale: p.scale });
+    // Tilts (a sway, a peck) turn about the prop's own axes, after its yaw.
+    if (!OLD_KINDS.has(kind)) mesh.rotation.order = 'YXZ';
+    this.alive.push({ mesh, kind, yaw: p.yaw, scale: p.scale, y: p.at.y });
   }
 
   private addProps(placements: readonly Placement[]): void {
@@ -554,11 +556,20 @@ interface Alive {
   kind: AliveKind;
   yaw: number;
   scale: [number, number, number];
+  /** Where it stands, so a `bob` floats round it. */
+  y: number;
 }
+
+/** The garage's kinds, which only ever turn about y (kept exactly as they were). */
+const OLD_KINDS: ReadonlySet<AliveKind> = new Set(['breathe', 'purr', 'spray']);
 
 /** Moves living prop `a` to time `t` (seconds); `phase` is the waterer's, so the spray follows their hand. */
 function moveAlive(a: Alive, t: number, phase: number): void {
   const [sx, sy, sz] = a.scale;
+  if (!OLD_KINDS.has(a.kind)) {
+    moveLiving(a, t);
+    return;
+  }
   if (a.kind === 'spray') {
     // The watering pose sways the nozzle at this rate (see `poseFor`); the arc flickers a little.
     const sway = Math.sin((t + phase * 5) * 0.8);
@@ -572,6 +583,51 @@ function moveAlive(a: Alive, t: number, phase: number): void {
   const twitch = Math.max(0, Math.sin(t * 0.7) - 0.96) * 2;
   a.mesh.scale.set(sx * (1 + breath * 0.4), sy * (1 + breath), sz);
   a.mesh.rotation.y = a.yaw + Math.sin(t * 20) * twitch * 0.15;
+}
+
+/**
+ * The generic living kinds (see `AliveKind`): each prop gets its own phase
+ * from where it stands, so two of a kind never move in step.
+ */
+function moveLiving(a: Alive, t: number): void {
+  const [sx, sy, sz] = a.scale;
+  const p = a.mesh.position;
+  const own = (p.x * 1.7 + p.z * 2.3) % 7;
+  const m = a.mesh;
+  switch (a.kind) {
+    case 'sway': {
+      // About 2° each way, slow, with a second gust over it.
+      const k = t + own;
+      m.rotation.set(
+        Math.sin(k * 1.1) * 0.02 + Math.sin(k * 2.9) * 0.008,
+        a.yaw,
+        Math.sin(k * 0.8 + 1) * 0.035,
+      );
+      return;
+    }
+    case 'blink':
+      // 1 Hz, half on.
+      m.visible = (t + own) % 1 < 0.5;
+      return;
+    case 'peck': {
+      // Head down twice in quick succession every couple of seconds, a small turn between.
+      const k = (t + own) % 2.4;
+      const dip = k < 0.5 ? Math.sin((k / 0.5) * Math.PI * 2) ** 2 : 0;
+      m.rotation.set(dip * 0.55, a.yaw + Math.sin(Math.floor((t + own) / 2.4) * 2.1) * 0.5, 0);
+      return;
+    }
+    case 'wisp': {
+      // A slow rise and swell, twisting, leaning with the breeze.
+      const k = (t * 0.5 + own) % 1;
+      m.scale.set(sx * (0.8 + k * 0.5), sy * (0.75 + k * 0.45), sz * (0.8 + k * 0.5));
+      m.rotation.set(Math.sin(t * 0.7 + own) * 0.12, a.yaw + t * 0.6, Math.sin(t * 0.9) * 0.1);
+      return;
+    }
+    case 'bob':
+      m.position.y = a.y + Math.sin((t + own) * 1.6) * 0.012;
+      m.rotation.y = a.yaw + Math.sin((t + own) * 0.3) * 0.15;
+      return;
+  }
 }
 
 /** What a background person is doing now. */
@@ -629,6 +685,14 @@ function poseFor(extra: Extra, timeMs: number): Pose {
     const sip = Math.max(0, Math.sin(t * 0.9) - 0.75) * 4;
     pose.rightHand = { x: 0.3 - sip * 0.2, y: 0.55 + sip * 0.22, z: 0.22 + sip * 0.04 };
     pose.lean = -sip * 0.06;
+  }
+  if (extra.pose === 'smoking') {
+    // The cigarette held low, raised to the mouth every four seconds; the other hand in a pocket.
+    const t = timeMs / 1000 + extra.phase * 13;
+    const drag = Math.max(0, Math.sin(t * Math.PI * 0.5) - 0.6) * 2.5;
+    pose.rightHand = { x: 0.3 - drag * 0.16, y: 0.48 + drag * 0.3, z: 0.14 + drag * 0.08 };
+    pose.leftHand = { x: -0.3, y: 0.4, z: 0.02 };
+    pose.nod = -drag * 0.08;
   }
   return pose;
 }
