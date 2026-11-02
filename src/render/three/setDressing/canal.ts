@@ -64,20 +64,20 @@ function hash01(a: number, b: number, salt: number): number {
 
 /** A blocky painted alphabet, five rows high: just the letters the signs use. */
 const GLYPHS: Readonly<Record<string, readonly string[]>> = {
-  '&': ['.#.', '#.#', '.#.', '#.#', '.##'],
-  S: ['###', '#..', '###', '..#', '###'],
-  O: ['###', '#.#', '#.#', '#.#', '###'],
-  N: ['#..#', '##.#', '#.##', '#..#', '#..#'],
-  B: ['##.', '#.#', '##.', '#.#', '##.'],
+  '&': ['.#...', '#.#..', '.##..', '#..##', '.##.#'],
+  S: ['.###', '#...', '.##.', '...#', '###.'],
+  O: ['.##.', '#..#', '#..#', '#..#', '.##.'],
+  N: ['#...#', '##..#', '#.#.#', '#..##', '#...#'],
+  B: ['###.', '#..#', '###.', '#..#', '###.'],
   I: ['###', '.#.', '.#.', '.#.', '###'],
-  C: ['###', '#..', '#..', '#..', '###'],
-  U: ['#.#', '#.#', '#.#', '#.#', '###'],
-  T: ['###', '.#.', '.#.', '.#.', '.#.'],
+  C: ['.###', '#...', '#...', '#...', '.###'],
+  U: ['#..#', '#..#', '#..#', '#..#', '.##.'],
+  T: ['#####', '..#..', '..#..', '..#..', '..#..'],
   W: ['#...#', '#...#', '#.#.#', '##.##', '#...#'],
-  R: ['##.', '#.#', '##.', '#.#', '#.#'],
-  K: ['#.#', '#.#', '##.', '#.#', '#.#'],
-  E: ['###', '#..', '##.', '#..', '###'],
-  P: ['##.', '#.#', '##.', '#..', '#..'],
+  R: ['###.', '#..#', '###.', '#.#.', '#..#'],
+  K: ['#..#', '#.#.', '##..', '#.#.', '#..#'],
+  E: ['####', '#...', '###.', '#...', '####'],
+  P: ['###.', '#..#', '###.', '#...', '#...'],
   ' ': ['..', '..', '..', '..', '..'],
 };
 
@@ -342,10 +342,10 @@ function factoryModel(plan: FactoryPlan): Model {
     b.box(0.1, 0.06, 0.05, tint(BRICK, -0.08), { at: [x, H - 0.26, 0.025] }, 0);
   // The faded lettering on its band.
   const text = '& SONS BISCUIT WORKS';
-  const px = 0.085;
+  const px = 0.072;
   const textW = textPixels(text) * px;
   b.box(textW + 0.5, px * 7, 0.01, tint(BRICK, -0.12), { at: [plan.sign, SIGN_Y, 0.006] }, 0);
-  letters(b, text, plan.sign + 0.12, SIGN_Y, 0.014, px, PAINT, 0.04);
+  letters(b, text, plan.sign + 0.12, SIGN_Y, 0.014, px, PAINT, 0.015);
   // The flaked-off first name, nearly gone: a ghost of paint before the "&".
   for (let k = 0; k < 9; k++) {
     const x = plan.sign - textW / 2 - 0.1 - k * 0.16 * (1 + hash01(k, 1, 9) * 0.3);
@@ -472,7 +472,7 @@ function hallDoor(b: ModelBuilder, x: number, w: number): void {
       0,
     );
   // A little enamel sign: POST.
-  b.box(0.44, 0.17, 0.02, 0x2e4a5a, { at: [x, h + 0.55, 0.02] }, 0.01);
+  b.box(0.58, 0.17, 0.02, 0x2e4a5a, { at: [x, h + 0.55, 0.02] }, 0.01);
   letters(b, 'POST', x, h + 0.55, 0.035, 0.026, 0xe8e0c8);
 }
 
@@ -681,7 +681,7 @@ export const pallets = looks([1, 0.8], 4, (b, v) => {
 
 /** A builder's skip, a dull mustard, full of the last tenant's leftovers. */
 export const skip = looks([1.6, 1], 1, (b) => {
-  const paint = 0xa88a44;
+  const paint = 0x968a5c;
   b.box(1.2, 0.55, 0.9, paint, { at: [0, 0.3, 0] }, 0.03);
   for (const s of [-1, 1])
     b.box(0.32, 0.55, 0.9, paint, { at: [s * 0.68, 0.32, 0], rot: [0, 0, s * -0.45] }, 0.03);
@@ -700,69 +700,253 @@ export const skip = looks([1.6, 1], 1, (b) => {
 
 // ---- The brewery ----
 
-/** Steel kegs: three on the ground, a pallet of them two high, or one on its side. */
+/** Keg steel, dulled; the dark rolling rings; the plastic cap collars, one colour per brew. */
+const KEG = 0x7f878d;
+const KEG_RING = 0x4a4f53;
+const KEG_CAPS = [0x8a3a32, 0x3a5a4a, 0xb08a3a] as const;
+/** An oak cask's staves and its iron hoops. */
+const CASK = 0x6a4a30;
+
+/** Turns a point along a keg's axis: up (`lying` false) or along x (lying on its side). */
+function along(
+  x: number,
+  y: number,
+  z: number,
+  t: number,
+  lying: boolean,
+): [number, number, number] {
+  return lying ? [x + t, y, z] : [x, y + t, z];
+}
+
+/**
+ * A steel keg, 0.36 long, centred at (x, y, z): standing, or lying on its
+ * side along x. Two dark rolling rings, a coloured cap collar at its top
+ * end with the spear fitting in it.
+ */
+function keg(b: ModelBuilder, x: number, y: number, z: number, cap: number, lying = false): void {
+  const rot: [number, number, number] = lying ? [0, 0, Math.PI / 2] : [0, 0, 0];
+  const ringRot: [number, number, number] = lying ? [0, Math.PI / 2, 0] : [Math.PI / 2, 0, 0];
+  b.cylinder(0.13, 0.13, 0.36, KEG, { at: [x, y, z], rot }, 16);
+  for (const t of [-0.1, 0.1])
+    b.torus(0.133, 0.016, KEG_RING, { at: along(x, y, z, t, lying), rot: ringRot });
+  // The chimes, a bit lighter, and the cap collar on the top one.
+  b.torus(0.12, 0.014, tint(KEG, 0.15), { at: along(x, y, z, -0.18, lying), rot: ringRot });
+  b.cylinder(0.122, 0.122, 0.04, cap, { at: along(x, y, z, 0.17, lying), rot }, 16);
+  b.cylinder(0.04, 0.04, 0.03, KEG_RING, { at: along(x, y, z, 0.195, lying), rot }, 8);
+}
+
+/** An oak cask, 0.4 long, bellied, three iron hoops a side: standing, or lying along x. */
+function cask(b: ModelBuilder, x: number, y: number, z: number, lying = false): void {
+  const rot: [number, number, number] = lying ? [0, 0, Math.PI / 2] : [0, 0, 0];
+  const ringRot: [number, number, number] = lying ? [0, Math.PI / 2, 0] : [Math.PI / 2, 0, 0];
+  // Two frustums meeting at the belly: the top half's wide end down.
+  const s = lying ? -1 : 1;
+  b.cylinder(0.125, 0.155, 0.2, CASK, { at: along(x, y, z, 0.1 * s, lying), rot }, 14);
+  b.cylinder(
+    0.155,
+    0.125,
+    0.2,
+    tint(CASK, -0.06),
+    { at: along(x, y, z, -0.1 * s, lying), rot },
+    14,
+  );
+  for (const [t, r] of [
+    [-0.18, 0.13],
+    [-0.1, 0.145],
+    [0.1, 0.145],
+    [0.18, 0.13],
+  ] as const)
+    b.torus(r, 0.012, IRON, { at: along(x, y, z, t, lying), rot: ringRot });
+  b.cylinder(0.12, 0.12, 0.012, tint(CASK, 0.12), { at: along(x, y, z, 0.2, lying), rot }, 14);
+  b.cylinder(0.12, 0.12, 0.012, tint(CASK, 0.12), { at: along(x, y, z, -0.2, lying), rot }, 14);
+}
+
+/**
+ * The brewery's kegs: a pyramid of three on their sides, a pallet with two
+ * standing and an oak cask laid in front, or a standing keg with a cask
+ * chocked on its side beside it.
+ */
 export const kegs = looks([1, 1], 3, (b, v) => {
-  const keg = (x: number, y: number, z: number, cap: number) => {
-    b.cylinder(0.13, 0.13, 0.36, 0xa8aeb4, { at: [x, y + 0.18, z] }, 14);
-    for (const dy of [0.04, 0.32])
-      b.torus(0.13, 0.012, 0x8a9096, { at: [x, y + dy, z], rot: [Math.PI / 2, 0, 0] });
-    b.cylinder(0.05, 0.05, 0.03, cap, { at: [x, y + 0.37, z] }, 8);
-  };
-  const caps = [0x6a8a7a, 0x8a5a4a, 0x8a8a5a];
+  const cap = (i: number) => nth(KEG_CAPS, v + i);
   if (v === 0) {
-    keg(-0.15, 0, -0.1, nth(caps, 0));
-    keg(0.15, 0, -0.08, nth(caps, 1));
-    keg(0.02, 0, 0.18, nth(caps, 0));
+    keg(b, 0, 0.13, -0.14, cap(0), true);
+    keg(b, 0.02, 0.13, 0.14, cap(1), true);
+    keg(b, 0.01, 0.355, 0, cap(2), true);
   } else if (v === 1) {
-    for (const z of [-0.32, 0, 0.32]) b.box(0.9, 0.12, 0.12, 0xa88a64, { at: [0, 0.06, z] }, 0);
-    b.box(0.9, 0.03, 0.8, 0xa88a64, { at: [0, 0.135, 0] }, 0);
-    for (let i = 0; i < 6; i++)
-      keg(-0.28 + (i % 3) * 0.28, 0.15 + (i >= 3 ? 0.37 : 0), i % 2 ? 0.14 : -0.14, nth(caps, i));
+    for (const z of [-0.32, 0, 0.32]) b.box(0.9, 0.1, 0.12, 0x8a7458, { at: [0, 0.05, z] }, 0);
+    b.box(0.9, 0.03, 0.8, 0x9a8264, { at: [0, 0.115, 0] }, 0);
+    keg(b, -0.2, 0.31, -0.16, cap(0));
+    keg(b, 0.14, 0.31, -0.18, cap(1));
+    cask(b, 0, 0.29, 0.2, true);
   } else {
-    keg(-0.15, 0, 0, nth(caps, 2));
-    b.cylinder(
-      0.13,
-      0.13,
-      0.36,
-      0xa8aeb4,
-      { at: [0.2, 0.13, 0.15], rot: [Math.PI / 2, 0.6, 0] },
-      14,
-    );
+    keg(b, -0.18, 0.18, -0.05, cap(0));
+    cask(b, 0.16, 0.155, 0.12, true);
+    b.box(0.06, 0.05, 0.08, WOOD_DARK, { at: [0.16, 0.025, 0.28] }, 0);
   }
 });
 
-/** A bike rack: three Sheffield stands with two bikes locked to them. */
-export const bikeRack = looks([1.6, 0.6], 1, (b) => {
-  for (let k = 0; k < 3; k++)
-    b.torus(
-      0.26,
-      0.022,
+/**
+ * The brewer's handcart, waiting for the dray: a flat bed on two big
+ * wheels, its handles down on a prop, three kegs laid on it and a cask.
+ */
+export const handcart = looks([1.3, 0.8], 1, (b) => {
+  const wood = 0x7a6248;
+  // The bed, its side rails, the axle and two spoked wheels at the back.
+  b.box(1.0, 0.05, 0.62, wood, { at: [0, 0.3, 0] }, 0.01);
+  for (const s of [-1, 1]) {
+    b.box(1.5, 0.05, 0.05, tint(wood, -0.18), { at: [0.2, 0.27, s * 0.33] }, 0);
+    b.torus(0.26, 0.03, INK, { at: [-0.25, 0.26, s * 0.38] });
+    b.cylinder(
+      0.05,
+      0.05,
+      0.06,
       IRON,
-      { at: [-0.5 + k * 0.5, 0.42, 0], rot: [0, Math.PI / 2, 0] },
-      Math.PI,
+      { at: [-0.25, 0.26, s * 0.38], rot: [Math.PI / 2, 0, 0] },
+      8,
     );
-  for (let k = 0; k < 3; k++)
-    for (const s of [-1, 1])
-      b.cylinder(0.022, 0.022, 0.42, IRON, { at: [-0.5 + k * 0.5, 0.21, s * 0.26] }, 6);
-  const frames = [0x5a7a7a, 0x8a6a5a];
-  [-0.25, 0.25].forEach((x, i) => {
-    const f = nth(frames, i);
-    for (const z of [-0.32, 0.32])
-      b.torus(0.2, 0.02, INK, { at: [x, 0.22, z], rot: [0, Math.PI / 2, 0] });
-    b.box(0.03, 0.03, 0.62, f, { at: [x, 0.36, 0], rot: [0.25, 0, 0] }, 0);
-    b.box(0.03, 0.26, 0.03, f, { at: [x, 0.38, 0.1] }, 0);
-    b.box(0.06, 0.03, 0.14, INK, { at: [x, 0.52, 0.1] }, 0);
-    b.box(0.34, 0.02, 0.02, STEEL, { at: [x, 0.52, -0.26] }, 0);
+    for (let k = 0; k < 4; k++)
+      b.box(
+        0.5,
+        0.02,
+        0.02,
+        tint(wood, -0.1),
+        {
+          at: [-0.25, 0.26, s * 0.38],
+          rot: [0, 0, (k * Math.PI) / 4],
+        },
+        0,
+      );
+  }
+  b.cylinder(0.025, 0.025, 0.8, IRON, { at: [-0.25, 0.26, 0], rot: [Math.PI / 2, 0, 0] }, 6);
+  // The prop leg under the front, and the grips.
+  b.box(0.05, 0.27, 0.05, tint(wood, -0.18), { at: [0.55, 0.135, 0] }, 0);
+  for (const s of [-1, 1]) b.box(0.12, 0.06, 0.06, INK, { at: [0.95, 0.27, s * 0.33] }, 0.02);
+  // The load: two kegs side by side, one atop between, a cask at the front.
+  keg(b, -0.22, 0.46, -0.15, nth(KEG_CAPS, 0), true);
+  keg(b, -0.2, 0.46, 0.15, nth(KEG_CAPS, 1), true);
+  keg(b, -0.21, 0.68, 0, nth(KEG_CAPS, 2), true);
+  cask(b, 0.28, 0.48, 0, false);
+});
+
+/** A slumped heap of the old works' flour sacks, printed with a faded band. */
+export const flourSacks = looks([1, 0.7], 2, (b, v) => {
+  const sack = 0xcfc4aa;
+  const spots: [number, number, number, number][] =
+    v === 0
+      ? [
+          [-0.25, 0.1, -0.1, 0.3],
+          [0.15, 0.1, -0.12, -0.2],
+          [-0.05, 0.1, 0.18, 0.5],
+          [-0.08, 0.26, -0.02, 0.1],
+        ]
+      : [
+          [-0.15, 0.1, 0, 0.2],
+          [0.22, 0.1, 0.05, -0.4],
+        ];
+  spots.forEach(([x, y, z, r], i) => {
+    b.sphere(0.2, tint(sack, (i % 2) * -0.06), { at: [x, y, z], rot: [0, r, 0] }, [1.2, 0.5, 0.8]);
+    b.box(0.2, 0.012, 0.3, 0x8a6a4a, { at: [x, y + 0.1, z], rot: [0, r, 0] }, 0);
   });
 });
 
+/** A canal bench: oak slats on cast-iron ends, a coffee cup someone left on it. */
+export const quayBench = looks([1.3, 0.5], 1, (b) => {
+  const oak = 0x8a6e50;
+  for (const s of [-1, 1]) {
+    b.box(0.05, 0.42, 0.44, IRON, { at: [s * 0.55, 0.21, 0] }, 0.01);
+    b.box(0.06, 0.05, 0.5, IRON, { at: [s * 0.55, 0.02, 0] }, 0);
+  }
+  for (let k = 0; k < 3; k++)
+    b.box(1.25, 0.035, 0.11, tint(oak, k * 0.03), { at: [0, 0.27, -0.13 + k * 0.13] }, 0);
+  for (let k = 0; k < 2; k++)
+    b.box(
+      1.25,
+      0.1,
+      0.03,
+      tint(oak, -0.05),
+      {
+        at: [0, 0.4 + k * 0.12, -0.2],
+        rot: [-0.15, 0, 0],
+      },
+      0,
+    );
+  b.cylinder(0.03, 0.025, 0.08, 0xf0ead8, { at: [0.35, 0.33, 0.05] }, 8);
+});
+
+/** A half barrel planted with a round box shrub: under 0.6, for the light well's front. */
+export const shrubTub = looks([0.6, 0.6], 2, (b, v) => {
+  b.cylinder(0.22, 0.19, 0.24, CASK, { at: [0, 0.12, 0] }, 12);
+  for (const y of [0.04, 0.2])
+    b.torus(0.21, 0.012, IRON, { at: [0, y, 0], rot: [Math.PI / 2, 0, 0] });
+  b.sphere(0.21, nth(LEAVES, v), { at: [0, 0.38, 0] }, [1, 0.85, 1]);
+  b.sphere(0.12, nth(LEAVES, v + 1), { at: [0.1, 0.46, 0.06] });
+});
+
 /**
- * A courier's cargo bike: a long box bike, its wooden box up front full of
- * parcels, kept under 0.6 high so it can wait in front of the level.
+ * A bicycle, side on along x, its stand down: wheels, a diamond frame in
+ * `frame`, saddle, bars and a basket. `lean` tips it toward -z.
+ */
+function bicycle(b: ModelBuilder, x: number, z: number, frame: number, lean = 0): void {
+  const r = 0.19;
+  const y = r + 0.02;
+  const tilt: [number, number, number] = [lean, 0, 0];
+  for (const dx of [-0.3, 0.3]) {
+    b.torus(r, 0.022, INK, { at: [x + dx, y, z], rot: tilt });
+    b.cylinder(0.025, 0.025, 0.05, STEEL, { at: [x + dx, y, z], rot: [Math.PI / 2, 0, 0] }, 6);
+  }
+  const bar = (x0: number, y0: number, x1: number, y1: number) =>
+    b.box(
+      Math.hypot(x1 - x0, y1 - y0),
+      0.03,
+      0.03,
+      frame,
+      {
+        at: [x + (x0 + x1) / 2, (y0 + y1) / 2, z],
+        rot: [lean, 0, Math.atan2(y1 - y0, x1 - x0)],
+      },
+      0,
+    );
+  bar(-0.3, y, -0.04, y); // chain stay
+  bar(-0.3, y, -0.1, y + 0.26); // seat stay
+  bar(-0.04, y, -0.1, y + 0.26); // seat tube
+  bar(-0.1, y + 0.26, 0.2, y + 0.25); // top tube
+  bar(-0.04, y, 0.2, y + 0.25); // down tube
+  bar(0.2, y + 0.25, 0.3, y); // fork
+  b.box(0.12, 0.035, 0.06, INK, { at: [x - 0.11, y + 0.32, z], rot: tilt }, 0.01);
+  b.box(0.03, 0.03, 0.3, STEEL, { at: [x + 0.2, y + 0.32, z], rot: tilt }, 0);
+  b.box(0.14, 0.1, 0.16, 0x9a8264, { at: [x + 0.32, y + 0.3, z], rot: tilt }, 0.01);
+}
+
+/** A galvanised Sheffield stand: an inverted U of tube, facing +z. */
+function sheffield(b: ModelBuilder, x: number, z: number): void {
+  const galv = 0x8a9096;
+  b.torus(0.2, 0.025, galv, { at: [x, 0.5, z] }, Math.PI);
+  for (const s of [-1, 1]) b.cylinder(0.025, 0.025, 0.5, galv, { at: [x + s * 0.2, 0.25, z] }, 8);
+}
+
+/** A bike rack by the quay: two galvanised Sheffield stands, one bike locked between them. */
+export const bikeRack = looks([1, 0.6], 1, (b) => {
+  sheffield(b, 0, -0.18);
+  sheffield(b, 0, 0.26);
+  bicycle(b, 0.02, 0.04, 0x5a7a7a);
+  // The D-lock round the frame and the near stand.
+  b.torus(0.06, 0.012, 0x3a3a3a, { at: [-0.12, 0.32, 0.15], rot: [Math.PI / 2, 0, 0] });
+});
+
+/** A bike left against a planter, on its stand: two looks. */
+export const parkedBike = looks([0.9, 0.4], 2, (b, v) => {
+  bicycle(b, 0, 0, nth([0x8a5a4a, 0x5a6a7a], v), -0.12);
+});
+
+/**
+ * A courier's cargo bike: a long box bike, its box up front full of
+ * parcels, kept under 0.6 high so it can wait in front of the level. The
+ * courier's own (look 0) is pale with the firm's teal stripe; look 1 is a
+ * tenant's, timber.
  */
 export const cargoBike = looks([0.6, 1.3], 2, (b, v) => {
-  const frame = nth([0x4a5a62, 0x6a5a4a], v);
-  const box = nth([0x5e7a80, 0x8a7a5a], v);
+  const frame = nth([0x3a5a62, 0x6a5a4a], v);
+  const box = nth([0xd8ccae, 0x8a7a5a], v);
   b.torus(0.17, 0.025, INK, { at: [0, 0.19, -0.42], rot: [0, Math.PI / 2, 0] });
   b.torus(0.12, 0.022, INK, { at: [0, 0.14, 0.42], rot: [0, Math.PI / 2, 0] });
   b.box(0.04, 0.04, 0.95, frame, { at: [0, 0.16, 0.0] }, 0);
@@ -772,6 +956,7 @@ export const cargoBike = looks([0.6, 1.3], 2, (b, v) => {
   b.box(0.42, 0.025, 0.025, STEEL, { at: [0, 0.54, 0.02] }, 0);
   // The box: plank sides, parcels and a padded bag inside.
   b.box(0.5, 0.26, 0.5, box, { at: [0, 0.32, 0.36] }, 0.02);
+  if (v === 0) b.box(0.52, 0.06, 0.52, 0x3f7a78, { at: [0, 0.36, 0.36] }, 0);
   b.box(0.44, 0.02, 0.44, tint(box, -0.3), { at: [0, 0.44, 0.36] }, 0);
   b.box(0.22, 0.12, 0.2, CARDBOARD, { at: [-0.1, 0.49, 0.3], rot: [0, 0.3, 0] }, 0.01);
   b.box(0.2, 0.09, 0.26, tint(CARDBOARD, 0.1), { at: [0.12, 0.48, 0.42], rot: [0, -0.2, 0] }, 0.01);
@@ -803,8 +988,15 @@ export const quayLamp = looks([0.4, 0.4], 1, (b) => {
   b.cylinder(0.08, 0.1, 0.2, IRON, { at: [0, 0.1, 0] }, 10);
   b.cylinder(0.035, 0.045, 1.7, IRON, { at: [0, 1.0, 0] }, 8);
   b.box(0.24, 0.03, 0.24, IRON, { at: [0, 1.86, 0] }, 0);
-  b.screen(0.16, 0.22, 0xffd08a, { at: [0, 2.0, 0.09] });
-  b.led(0.07, LAMP, { at: [0, 2.0, 0] });
+  // The lantern: a lit glass box in its iron frame, all of it in the glow layer.
+  b.add(new THREE.BoxGeometry(0.15, 0.22, 0.15), LAMP, { at: [0, 2.0, 0] }, 'glow');
+  for (const [x, z] of [
+    [-1, -1],
+    [1, -1],
+    [-1, 1],
+    [1, 1],
+  ] as const)
+    b.box(0.02, 0.24, 0.02, IRON, { at: [x * 0.08, 2.0, z * 0.08] }, 0);
   b.cone(0.16, 0.12, IRON, { at: [0, 2.18, 0] }, 4);
   b.sphere(0.03, IRON, { at: [0, 2.26, 0] });
 });

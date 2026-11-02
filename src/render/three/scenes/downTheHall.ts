@@ -19,15 +19,20 @@ import {
   DOCK,
   duck,
   factoryWall,
+  flourSacks,
+  handcart,
   kegs,
   lowPlanter,
   narrowboat,
   nextWarehouse,
   pallets,
+  parkedBike,
   picnicTable,
   planterTree,
   postSacks,
+  quayBench,
   quayLamp,
+  shrubTub,
   skip,
   stringLights,
 } from '../setDressing/canal';
@@ -68,14 +73,26 @@ const SETTS = 0x77726e;
 const FLAGS = 0x8a8478;
 const YARD = 0x8a8680;
 const COPING = 0x8e8a80;
-const WATER = 0x324c4f;
-/** The quay in front: a strip of cobbles (at most this deep), the stone coping, then the water. */
+const WATER = 0x3c5a5c;
+/** The light well's weathering: moss along the walls, rainwater pooled in a sunk flag. */
+const MOSS = 0x66704e;
+const PUDDLE = 0x7e8c9a;
+/**
+ * The quay in front: a strip of cobbles (at most this deep, at least the
+ * thin one), the stone coping, then the water. With less water than
+ * `SHALLOW` showing under the coping, the quay goes thin and the boat moors
+ * close, so its roof and bow show above the HUD's bottom band.
+ */
 const QUAY = 0.42;
+const QUAY_THIN = 0.16;
 const COPE = 0.18;
+const SHALLOW = 0.9;
+/** The screen band the boat must fit in when the canal barely shows (above SCORE's bottom, right of it, left of the pause hint). */
+const BOAT_BAND = { top: 745, bottom: 805, left: 270, right: 565 };
 /** The old lettering: about how wide it is, how high it's painted, and the screen x it starts right of (the order cards). */
-const SIGN_WIDTH = 6.8;
+const SIGN_WIDTH = 7.1;
 const SIGN_HIGH = 2.9;
-const SIGN_LEFT = 700;
+const SIGN_LEFT = 720;
 /** How far the factory's wall stands behind the level's back wall: hidden behind it, so no gap shows. */
 const FACTORY_GAP = 0.06;
 /** How far the factory and the cobbles run out past the level on each side. */
@@ -83,10 +100,10 @@ const OUT = 6;
 /** The screen the scene is composed for, and the HUD's top band (`HUD_TOP_3D` in `ThreeRoundRenderer`). */
 const VIEW = { width: 1440, height: 810 };
 const HUD_TOP = 0.1;
-/** The living props: the cat asleep on the boat's roof, the ducks bobbing. */
+/** The living props: the cat asleep on the boat's roof, the ducks bobbing on the water. */
 const ALIVE: ReadonlyMap<SetPiece, AliveKind> = new Map<SetPiece, AliveKind>([
   [catLoaf, 'purr'],
-  [duck, 'breathe'],
+  [duck, 'bob'],
 ]);
 
 type Edge = 'back' | 'front' | 'left' | 'right';
@@ -252,7 +269,9 @@ export function downTheHallScene(map: LevelMap): Scene {
   // ---- Ground: cobbles round the building, the quay, the canal ----
   // As much of the quay as leaves the water showing at the bottom of the frame.
   const bottomZ = screenToGround(pose, VIEW.width / 2, VIEW.height, GROUND)?.y ?? F + 1.2;
-  const quay = Math.max(0.16, Math.min(QUAY, (bottomZ - F) * 0.3));
+  const shallow =
+    bottomZ - (F + Math.max(QUAY_THIN, Math.min(QUAY, (bottomZ - F) * 0.3)) + COPE) < SHALLOW;
+  const quay = shallow ? QUAY_THIN : Math.max(QUAY_THIN, Math.min(QUAY, (bottomZ - F) * 0.3));
   const q0 = F + quay;
   const q1 = q0 + COPE;
   patch('setts', fx0, L, B - FACTORY_GAP, q0);
@@ -282,6 +301,14 @@ export function downTheHallScene(map: LevelMap): Scene {
   if (F - 2.4 > vanZ + 1.2) put(pallets, L - 0.48, F - 2.4, Math.PI / 2, 2, 'near', 0, 0.85);
   if (F - 2.9 > vanZ + 1.4) put(pallets, L - 1.45, F - 2.9, 0.3, 0, 'near', 0, 0.85);
   put(lowPlanter, vanX + 0.1, vanZ - 1.45, 0, 1, 'near', 0, 0.9);
+  // Flour sacks spilled by the skip; past the queue, a bench for the coffee, a planter at its end.
+  put(flourSacks, L - 1.75, B + 1.2, 0.3, 0, 'near', 0, 0.9);
+  const benchZ = vanZ + 1.95;
+  if (benchZ + 1.2 < F - 1) {
+    put(quayBench, vanX - 0.15, benchZ, Math.PI / 2, 0);
+    put(lowPlanter, vanX - 0.2, benchZ + 1.05, Math.PI / 2, 0, 'near', 0, 0.9);
+    put(flourSacks, vanX + 0.75, benchZ + 0.6, -0.4, 1, 'near', 0, 0.85);
+  }
 
   // ---- Right: the next warehouse, the brewery's dock ----
   const wx = R + Math.max(0.95, Math.min(1.6, sideR - 0.9));
@@ -294,16 +321,22 @@ export function downTheHallScene(map: LevelMap): Scene {
   put(pallets, R + 0.5, B + 0.4, 0, 0, 'near', 0, 0.8);
   // The brewery's worker, carrying a crate from the dock.
   person(wx + 0.8, wz + DOCK.depth + 0.55, -2.4, 'carrying');
-  // Down the right of the level: a cluster of empties waiting for the dray, where there's room.
+  // Down the right of the level: empties waiting for the dray, a pallet of sacks, the brewer's
+  // handcart loaded and left mid-alley, more empties against the far side; where there's room.
   const emptiesZ = wz + DOCK.depth + 1.4;
   if (emptiesZ + 1.2 < F - 1.8) {
     put(kegs, R + 1.0, emptiesZ, 0.5, 0, 'near', 0, 0.95);
-    put(pallets, R + 1.05, emptiesZ + 0.85, Math.PI / 2 + 0.1, 0, 'near', 0, 0.8);
+    put(pallets, R + 0.95, emptiesZ + 0.8, Math.PI / 2 + 0.1, 2, 'near', 0, 0.8);
+    const cartZ = Math.max(emptiesZ + 2.3, midZ + 1.2);
+    if (cartZ < F - 2) put(handcart, R + 1.6, cartZ, -0.35, 0);
+    put(kegs, R + 2.8, emptiesZ + 1.5, -0.2, 2, 'near', 0, 0.95);
+    put(pallets, R + 2.9, wz + DOCK.depth + 0.5, 0.05, 2, 'near', 0, 0.8);
   }
-  // The alley lamp and the bike rack toward the quay, a cyclist checking their phone.
-  const rackZ = Math.max(wz + DOCK.depth + 1.6, F - 1.2);
-  put(bikeRack, wx + 0.75, rackZ, Math.PI / 2, 0);
-  person(wx + 1.45, rackZ + 0.3, -Math.PI / 2 - 0.4, 'phoning');
+  // The alley lamp and the bike rack toward the quay, in from the frame's edge; a cyclist on the phone.
+  const rackZ = Math.max(wz + DOCK.depth + 1.6, F - 1.9);
+  const rackX = Math.max(R + 0.85, Math.min(R + 1.6, xAt(VIEW.width - 120, rackZ) - 0.5));
+  put(bikeRack, rackX, rackZ, 0, 0);
+  person(Math.max(rackX + 0.95, R + 2.1), rackZ + 0.35, -Math.PI / 2 - 0.4, 'phoning');
   put(quayLamp, R + 0.75, F - 0.2, 0);
   put(quayLamp, L - 0.85, B + 2.3, 0);
 
@@ -313,7 +346,7 @@ export function downTheHallScene(map: LevelMap): Scene {
     const sz = mid(ship, 'z');
     if (shipEdge === 'front')
       put(cargoBike, sx, F + Math.max(0.34, quay), Math.PI / 2 + 0.08, 0, 'near', 0, 0.9);
-    else if (shipEdge === 'right') put(cargoBike, R + 0.45, sz, 0.06, 0);
+    else if (shipEdge === 'right') put(cargoBike, R + 0.75, sz, 0.5, 0);
     else if (shipEdge === 'left') put(cargoBike, L - 0.45, sz, -0.06, 0);
     else put(cargoBike, sx + 1, B - 0.9, Math.PI / 2, 0, 'far');
   }
@@ -323,9 +356,10 @@ export function downTheHallScene(map: LevelMap): Scene {
 
   // ---- Front: the quay and the moored narrowboat ----
   // Bow toward the middle, clear of the score and the pause hint; the cat asleep on its roof.
-  const boatZ = q1 + 0.42;
-  const bowX = xAt(560, boatZ, 0.4) - 0.4;
-  const sternX = xAt(150, boatZ, 0.4) + 0.4;
+  // Where little canal shows, moored close and sized so roof and bow sit in the band over the HUD.
+  const boatZ = shallow ? q1 + 0.34 : q1 + 0.42;
+  const bowX = shallow ? xAt(BOAT_BAND.right, boatZ, 0.3) - 0.05 : xAt(560, boatZ, 0.4) - 0.4;
+  const sternX = shallow ? xAt(BOAT_BAND.left, boatZ, 0.3) + 0.1 : xAt(150, boatZ, 0.4) + 0.4;
   const boatSize = Math.min(1, (bowX - sternX) / 3.95);
   if (boatSize > 0.6) {
     put(narrowboat, bowX - 0.36 * boatSize, boatZ, 0, 0, 'near', -0.08, boatSize);
@@ -341,7 +375,7 @@ export function downTheHallScene(map: LevelMap): Scene {
   put(duck, xAt(1050, boatZ), boatZ + 0.2, 2.9, 0, 'near', 0, 1.2);
 
   // ---- Void tiles inside the outline: a courtyard light well ----
-  courtyard(voids, isVoid, hides, put);
+  courtyard(voids, isVoid, hides, put, patch);
 
   return {
     horizon: HORIZON,
@@ -372,6 +406,7 @@ function courtyard(
     lift?: number,
     size?: number,
   ) => void,
+  patch: (kind: string, x0: number, x1: number, z0: number, z1: number) => void,
 ): void {
   if (voids.length === 0) return;
   const used = new Set<string>();
@@ -471,6 +506,42 @@ function courtyard(
     put(lowPlanter, t.x, t.z, isVoid(t.x, t.z - 1) ? Math.PI / 2 : 0, planters, 'near', 0, 0.9);
     planters++;
   }
+  // What the tenants leave out here, so no stretch of flags lies bare: wherever a free tile has
+  // nothing next to it, something low (a tub shrub, sacks, a bike, a bench, a keg).
+  const near = (t: Tile) =>
+    [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ].some(([dx, dz]) => used.has(key({ x: t.x + (dx ?? 0), z: t.z + (dz ?? 0) })));
+  const odds: readonly [SetPiece, number][] = [
+    [shrubTub, 0.95],
+    [flourSacks, 0.9],
+    [parkedBike, 1],
+    [quayBench, 0.9],
+    [kegs, 0.9],
+  ];
+  let k = 0;
+  for (const t of [...voids].sort((a, b) => a.z - b.z || a.x - b.x)) {
+    if (!free(t) || near(t) || hides(t.x, t.z, 0.6, 0.3)) continue;
+    used.add(key(t));
+    const [piece, size] = odds[k % odds.length] ?? [shrubTub, 1];
+    // Benches and bikes along the wall they stand against.
+    const yaw = (isVoid(t.x, t.z - 1) ? Math.PI / 2 : 0) + (unit(t.x, t.z, 13) - 0.5) * 0.4;
+    put(piece, t.x, t.z, yaw, piece === kegs ? 2 : piece === flourSacks ? 0 : k, 'near', 0, size);
+    k++;
+  }
+  // Weathering: moss along the foot of the walls now and then, a puddle in a sunk flag.
+  for (const t of voids) {
+    const r = unit(t.x, t.z, 17);
+    if (!isVoid(t.x, t.z - 1) && r < 0.45)
+      patch('moss', t.x - 0.45, t.x + 0.45, t.z - 0.5, t.z - 0.36);
+    if (!isVoid(t.x - 1, t.z) && r > 0.6)
+      patch('moss', t.x - 0.5, t.x - 0.38, t.z - 0.4, t.z + 0.4);
+    const open = around(t) >= 3 && (t.x * 3 + t.z * 5) % 7 === 0;
+    if (open) patch('puddle', t.x - 0.35, t.x + 0.3, t.z + 0.05, t.z + 0.42);
+  }
 }
 
 // ---- The scene's own ground ----
@@ -545,9 +616,42 @@ const water: GroundPainter = (b, g, salt) => {
     const x = g.x0 + shade(k, 0, salt) * w;
     const z = g.z0 + 0.12 + shade(k, 1, salt) * Math.min(d, 1.6);
     const len = 0.18 + shade(k, 2, salt) * 0.4;
-    const c = shade(k, 3, salt) > 0.85 ? 0x8a7e62 : tint(WATER, 0.25 + shade(k, 4, salt) * 0.2);
-    b.box(len, 0.002, 0.018, c, { at: [x, 0.008, z] }, 0);
+    const c = shade(k, 3, salt) > 0.85 ? 0x8a7e62 : tint(WATER, 0.35 + shade(k, 4, salt) * 0.25);
+    b.box(len, 0.002, 0.022, c, { at: [x, 0.008, z] }, 0);
   }
 };
 
-const PAINTERS: Readonly<Record<string, GroundPainter>> = { setts, flags, yard, coping, water };
+/** Moss creeping out from the foot of a wall: a soft strip of small tufts. */
+const moss: GroundPainter = (b, g, salt) => {
+  const w = g.x1 - g.x0;
+  const d = g.z1 - g.z0;
+  const n = Math.max(3, Math.round(Math.max(w, d) / 0.09));
+  for (let k = 0; k < n; k++) {
+    const t = (k + 0.5) / n;
+    const x = w > d ? g.x0 + t * w : g.x0 + shade(k, 1, salt) * w;
+    const z = w > d ? g.z0 + shade(k, 1, salt) * d : g.z0 + t * d;
+    const s = 0.05 + shade(k, 2, salt) * 0.05;
+    b.box(s, 0.006, s, tint(MOSS, (shade(k, 3, salt) - 0.5) * 0.25), { at: [x, 0.04, z] }, 0);
+  }
+};
+
+/** Rainwater pooled in a sunk flag: a flat sheet with the sky's light on it. */
+const puddle: GroundPainter = (b, g) => {
+  const w = g.x1 - g.x0;
+  const d = g.z1 - g.z0;
+  const cx = (g.x0 + g.x1) / 2;
+  const cz = (g.z0 + g.z1) / 2;
+  b.box(w, 0.004, d * 0.7, PUDDLE, { at: [cx, 0.039, cz] }, 0);
+  b.box(w * 0.75, 0.004, d, PUDDLE, { at: [cx + w * 0.05, 0.039, cz] }, 0);
+  b.box(w * 0.4, 0.002, 0.03, tint(PUDDLE, 0.3), { at: [cx - w * 0.1, 0.042, cz - d * 0.15] }, 0);
+};
+
+const PAINTERS: Readonly<Record<string, GroundPainter>> = {
+  setts,
+  flags,
+  yard,
+  coping,
+  water,
+  moss,
+  puddle,
+};

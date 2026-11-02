@@ -53,7 +53,7 @@ const VIEW = { width: 1440, height: 810 };
 
 /** Screen rectangles the HUD covers at 1440×810: (x0, y0, x1, y1). */
 const HUD_RECTS: Record<string, [number, number, number, number]> = {
-  orders: [0, 0, 460, 140],
+  orders: [0, 0, 690, 140],
   legend: [0, 610, 220, 745],
   score: [0, 755, 135, 810],
   timer: [1320, 755, 1440, 810],
