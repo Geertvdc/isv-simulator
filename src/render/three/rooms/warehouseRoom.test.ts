@@ -114,6 +114,37 @@ describe('warehouseRoom', () => {
     }
   });
 
+  it('dresses the low wall in front of the hallway: plaques at its ends, three low clusters with bare tiles between', () => {
+    const inner = warehouseRoom(shipped).innerProps;
+    expect(inner.filter((p) => p.kind.endsWith('Plaque'))).toEqual([
+      { x: 2, y: 7, kind: 'yogaPlaque' },
+      { x: 11, y: 7, kind: 'brewPlaque' },
+    ]);
+    const clusters = inner.filter((p) => !p.kind.endsWith('Plaque'));
+    expect(clusters).toHaveLength(3);
+    expect(new Set(clusters.map((c) => c.kind)).size).toBe(3);
+    clusters.forEach((c, i) => {
+      const prev = clusters[i - 1];
+      if (prev) expect(c.x - prev.x).toBe(3);
+    });
+    for (const m of maps)
+      for (const p of warehouseRoom(m).innerProps) {
+        expect(wallPiece(m, p.x, p.y)).toBe('wall-front');
+        expect(isOpen(getTile(m, p.x, p.y - 1))).toBe(true);
+        expect(isOpen(getTile(m, p.x, p.y + 1))).toBe(true);
+        if (!p.kind.endsWith('Plaque'))
+          for (const [dx, dy] of [
+            [1, 0],
+            [-1, 0],
+            [0, 1],
+            [0, -1],
+          ] as const)
+            expect(isWorkSurface(getTile(m, p.x + dx, p.y + dy))).toBe(false);
+      }
+    // The draft's only low wall between floors stands between a counter and a station: nothing on it.
+    expect(warehouseRoom(draft).innerProps).toEqual([]);
+  });
+
   it('is deterministic', () => {
     for (const m of maps) expect(warehouseRoom(m)).toEqual(warehouseRoom(m));
   });

@@ -21,7 +21,8 @@ function wallTop(build: (b: ModelBuilder) => void, scale = 1): () => Model {
   };
 }
 
-const CRATE = 0x9a7a52;
+/** Old grey-brown crate timber: darker and greyer than any ticket's card. */
+const CRATE = 0x6e6252;
 const TIN_COLORS = [0x8a9a8a, 0xb8a070, 0x9a5a48, 0x6a7a8a, 0xc8bca0];
 
 /** A wooden crate, slatted, standing on (x, y, z): `w` × `h` × `d`. */
@@ -34,7 +35,6 @@ function crate(
   h: number,
   d: number,
   turn = 0,
-  stencil = true,
 ): void {
   const rot: [number, number, number] = [0, turn, 0];
   b.box(w, h, d, tint(CRATE, -0.35), { at: [x, y + h / 2, z], rot }, 0);
@@ -52,10 +52,6 @@ function crate(
       const [px, pz] = off((u * w) / 2, 0);
       b.box(0.012, h / 3 - 0.014, d + 0.004, tone, { at: [px, yy, pz], rot }, 0);
     }
-  }
-  if (stencil) {
-    const [px, pz] = off(0, d / 2 + 0.008);
-    b.box(w * 0.5, h * 0.18, 0.003, 0x3a2e22, { at: [px, y + h * 0.5, pz], rot }, 0);
   }
 }
 
@@ -120,21 +116,22 @@ function biscuitTin(
 
 /**
  * Clusters for the wall tops, two to a cluster (consecutive slots differ):
- * tin planters, a record player on a crate with sleeves, crates stacked two
- * high, growlers on a crate, a stack of the factory's old biscuit tins,
- * books and a trailing plant.
+ * tin planters, a record player on a crate with sleeves, a demijohn and
+ * old bottles, growlers on a crate, a stack of the factory's old biscuit
+ * tins, books and a trailing plant. Few boxes: on a wall top a box reads
+ * as a ticket.
  */
 export const WAREHOUSE_WALL_TOP_PROPS: readonly (() => Model)[] = [
   wallTop((b) => {
     // Three tin planters, one up on a crate.
-    crate(b, -0.08, 0, 0, 0.26, 0.16, 0.22, 0.1, false);
+    crate(b, -0.08, 0, 0, 0.26, 0.16, 0.22, 0.1);
     tinPlant(b, -0.08, 0.16, 0, 0);
     tinPlant(b, 0.16, 0, 0.04, 1, 0.06);
     tinPlant(b, -0.26, 0, -0.04, 3, 0.055);
   }, 1.5),
   wallTop((b) => {
     // A record player on a crate of records, sleeves leaning on it.
-    crate(b, 0, 0, 0, 0.36, 0.2, 0.3, 0, false);
+    crate(b, 0, 0, 0, 0.36, 0.2, 0.3, 0);
     for (let i = 0; i < 6; i++)
       b.box(
         0.012,
@@ -148,29 +145,40 @@ export const WAREHOUSE_WALL_TOP_PROPS: readonly (() => Model)[] = [
         0,
       );
     const y = 0.2;
-    b.box(0.34, 0.07, 0.28, 0x7a4a2e, { at: [0, y + 0.035, 0] }, 0.01);
+    b.box(0.34, 0.07, 0.28, 0x5e4a3e, { at: [0, y + 0.035, 0] }, 0.01);
     b.cylinder(0.11, 0.11, 0.012, 0x1e1e1e, { at: [-0.04, y + 0.076, 0] }, 24);
     b.cylinder(0.035, 0.035, 0.014, 0xd04a3a, { at: [-0.04, y + 0.078, 0] }, 12);
     b.box(0.012, 0.012, 0.16, 0xb8bec8, { at: [0.11, y + 0.09, 0.0], rot: [0, 0.35, 0] }, 0);
-    // A sleeve leaning against it.
-    b.box(0.24, 0.24, 0.01, 0xd8a84a, { at: [0.0, 0.12, 0.17], rot: [-0.25, 0, 0] }, 0);
+    // A sleeve leaning against it, a record half out of it.
+    b.box(0.24, 0.24, 0.01, 0x3e5a64, { at: [0.0, 0.12, 0.17], rot: [-0.25, 0, 0] }, 0);
     b.cylinder(
       0.06,
       0.06,
       0.004,
-      0x3a5a7a,
+      0xc87a4a,
       { at: [0.0, 0.13, 0.18], rot: [Math.PI / 2 - 0.25, 0, 0] },
       16,
     );
   }, 1.45),
   wallTop((b) => {
-    // Biscuit crates stacked two high, the top one turned.
-    crate(b, 0, 0, 0, 0.4, 0.2, 0.3, 0);
-    crate(b, 0.03, 0.2, 0, 0.34, 0.18, 0.28, 0.3);
+    // A green glass demijohn in its wicker, old bottles beside it, a trailing plant.
+    b.cylinder(0.11, 0.1, 0.1, 0x7a6448, { at: [-0.06, 0.05, 0] }, 16);
+    b.sphere(0.12, 0x3e5e44, { at: [-0.06, 0.15, 0] }, [1, 0.85, 1]);
+    b.cylinder(0.03, 0.04, 0.08, 0x3e5e44, { at: [-0.06, 0.27, 0] }, 10);
+    b.cylinder(0.034, 0.034, 0.02, 0x8a6a4a, { at: [-0.06, 0.31, 0] }, 10);
+    for (const [bx, bz, glass] of [
+      [0.12, -0.04, 0x4a3a26],
+      [0.18, 0.04, 0x2e4a3a],
+      [0.24, -0.02, 0x6a5a3a],
+    ] as const) {
+      b.cylinder(0.032, 0.032, 0.14, glass, { at: [bx, 0.07, bz] }, 10);
+      b.cylinder(0.012, 0.022, 0.06, glass, { at: [bx, 0.17, bz] }, 8);
+    }
+    tinPlant(b, -0.24, 0, 0.04, 2, 0.06);
   }, 1.4),
   wallTop((b) => {
     // The brewery's empty growlers on a crate, one on the coping.
-    crate(b, 0, 0, 0, 0.36, 0.14, 0.26, 0, false);
+    crate(b, 0, 0, 0, 0.36, 0.14, 0.26, 0);
     growler(b, -0.1, 0.14, 0.0);
     growler(b, 0.06, 0.14, 0.02, 0x4a5a2e);
     growler(b, 0.26, 0, 0.06);
@@ -201,7 +209,7 @@ export const WAREHOUSE_WALL_TOP_PROPS: readonly (() => Model)[] = [
   }, 1.4),
 ];
 
-/** Low things lying on the front walls: a rolled yoga mat, a coil of rope, a crate on its side, a skateboard. */
+/** Low things lying on the front walls: a rolled yoga mat, a coil of rope, a watering can, a skateboard. */
 export const WAREHOUSE_FRONT_WALL_PROPS: readonly (() => Model)[] = [
   wallTop((b) => {
     b.cylinder(0.05, 0.05, 0.42, 0x8a7a9a, { at: [0, 0.05, 0], rot: [0, 0, Math.PI / 2] }, 14);
@@ -216,8 +224,14 @@ export const WAREHOUSE_FRONT_WALL_PROPS: readonly (() => Model)[] = [
       });
   }, 1.4),
   wallTop((b) => {
-    crate(b, 0, 0, 0, 0.34, 0.1, 0.24, 0.15, false);
-    b.box(0.2, 0.004, 0.14, 0xe0d4b4, { at: [0.02, 0.102, 0], rot: [0, 0.2, 0] }, 0);
+    // A galvanised watering can.
+    b.cylinder(0.08, 0.09, 0.15, 0x8a9096, { at: [0, 0.075, 0] }, 16);
+    b.cylinder(0.082, 0.082, 0.012, 0x6e7478, { at: [0, 0.15, 0] }, 16);
+    b.cylinder(0.012, 0.018, 0.2, 0x8a9096, { at: [0.14, 0.12, 0], rot: [0, 0, -0.9] }, 8);
+    b.add(new THREE.TorusGeometry(0.06, 0.01, 6, 14, Math.PI), 0x6e7478, {
+      at: [-0.02, 0.15, 0],
+      rot: [0, 0, 0],
+    });
   }, 1.3),
   wallTop((b) => {
     b.box(0.44, 0.018, 0.12, 0x5a6a5a, { at: [0, 0.05, 0] }, 0.008);
@@ -233,3 +247,76 @@ export const WAREHOUSE_FRONT_WALL_PROPS: readonly (() => Model)[] = [
         );
   }, 1.4),
 ];
+
+/** A rolled yoga mat lying along x, `r` thick, on (x, y, z). */
+function mat(b: ModelBuilder, x: number, y: number, z: number, color: number, len = 0.4): void {
+  const r = 0.045;
+  b.cylinder(r, r, len, color, { at: [x, y + r, z], rot: [0, 0, Math.PI / 2] }, 14);
+  for (const s of [-1, 1])
+    b.cylinder(
+      r * 0.55,
+      r * 0.55,
+      0.004,
+      tint(color, -0.3),
+      {
+        at: [x + (s * len) / 2, y + r, z],
+        rot: [0, 0, Math.PI / 2],
+      },
+      10,
+    );
+  b.box(
+    0.02,
+    0.004,
+    r * 2.05,
+    0x3a3a3a,
+    { at: [x - len * 0.25, y + r, z], rot: [Math.PI / 2, 0, 0] },
+    0,
+  );
+}
+
+/**
+ * Clusters for the low wall in front of the hallway (see `InnerProp`), all
+ * under 0.3 tall and nothing like a ticket: the yoga studio's rolled mats
+ * and a cork block, the tenants' post in a wooden letter rack with a plant,
+ * a red fire bucket of sand with a trowel in it, plants in tins.
+ */
+export const WAREHOUSE_INNER_WALL_PROPS: Readonly<Record<string, () => Model>> = {
+  mats: wallTop((b) => {
+    mat(b, -0.04, 0, -0.1, 0x5f8a86);
+    mat(b, 0.0, 0, 0.0, 0x8a6e9a);
+    mat(b, -0.02, 0.09, -0.05, 0x7a8a5a, 0.36);
+    b.box(0.12, 0.08, 0.08, 0x8a7a6a, { at: [0.28, 0.04, 0.06], rot: [0, 0.4, 0] }, 0.01);
+    tinPlant(b, -0.32, 0, 0.02, 4, 0.05);
+  }, 1.65),
+  post: wallTop((b) => {
+    // A letter rack: a base and three dividers, letters standing in it.
+    b.box(0.3, 0.025, 0.14, 0x5a4232, { at: [-0.06, 0.0125, 0] }, 0.004);
+    for (const z of [-0.06, 0, 0.06])
+      b.box(0.3, 0.09, 0.012, 0x6a4e3a, { at: [-0.06, 0.07, z] }, 0.003);
+    for (const [x, z, h, color] of [
+      [-0.14, -0.03, 0.1, 0xd8d6cc],
+      [-0.02, -0.03, 0.12, 0xa8b4bc],
+      [-0.1, 0.03, 0.11, 0xc8bca4],
+      [0.04, 0.03, 0.09, 0xd8d6cc],
+    ] as const)
+      b.box(0.11, h, 0.006, color, { at: [x, 0.025 + h / 2, z], rot: [0.1, 0, 0] }, 0);
+    tinPlant(b, 0.22, 0, 0.0, 1, 0.06);
+  }, 1.65),
+  bucket: wallTop((b) => {
+    // A fire bucket of sand, a trowel stuck in it, and a small plant beside it.
+    b.cylinder(0.085, 0.065, 0.14, 0x9a3a30, { at: [0, 0.07, 0] }, 16);
+    b.cylinder(0.087, 0.087, 0.012, 0x7a2e26, { at: [0, 0.135, 0] }, 16);
+    b.cylinder(0.08, 0.08, 0.01, 0xb8a888, { at: [0, 0.128, 0] }, 14);
+    b.box(0.09, 0.024, 0.004, 0xe0d8c4, { at: [0, 0.07, 0.078] }, 0);
+    b.add(new THREE.TorusGeometry(0.08, 0.006, 4, 16, Math.PI), 0x3a3a3a, {
+      at: [0, 0.14, 0],
+      rot: [-1.2, 0, 0],
+    });
+    b.box(0.02, 0.05, 0.012, 0x6a4a30, { at: [0.03, 0.15, 0.01], rot: [0, 0, -0.3] }, 0);
+    tinPlant(b, -0.2, 0, 0.04, 0, 0.055);
+  }, 1.65),
+  plants: wallTop((b) => {
+    tinPlant(b, -0.1, 0, 0, 3, 0.065);
+    tinPlant(b, 0.12, 0, 0.04, 2, 0.055);
+  }, 1.65),
+};
