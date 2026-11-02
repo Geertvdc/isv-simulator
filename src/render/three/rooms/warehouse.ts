@@ -1,5 +1,6 @@
 import { levelSalt, tileHash } from '../../mapShape';
 import { gridToWorld } from '../../projection';
+import { FRONT_WALL_HEIGHT } from '../layout';
 import { lampWireModel } from '../roomModels';
 import {
   EDISON_HANG,
@@ -7,6 +8,7 @@ import {
   WAREHOUSE_WALL_ART,
   WAREHOUSE_WALL_LOOKS,
   bayDoorFrontModel,
+  bayFrameModel,
   bayDoorInsideModel,
   bayRailFrontModel,
   boardLook,
@@ -17,11 +19,13 @@ import {
   plinthModel,
   scaffoldCounter,
   tenantDoorModel,
+  tenantPlaqueModel,
   wallPipeModel,
   warehouseWallModel,
 } from '../roomModels/warehouse';
 import {
   WAREHOUSE_FRONT_WALL_PROPS,
+  WAREHOUSE_INNER_WALL_PROPS,
   WAREHOUSE_WALL_TOP_PROPS,
 } from '../setDressing/warehouseWallTops';
 import type { RoomDressing } from './types';
@@ -69,7 +73,7 @@ export const WAREHOUSE_ROOM: RoomDressing<WarehousePlan> = {
     breweryDoor: () => tenantDoorModel('brewery', 1),
   },
   lamp: { model: edisonBulbModel, wire: { hang: EDISON_HANG, model: lampWireModel } },
-  placeStory({ hallDoor, loading, wallArt, pipes }, _map, place) {
+  placeStory({ hallDoor, loading, wallArt, pipes, innerProps }, map, place) {
     if (hallDoor) {
       // Turned so the hall lies outside; on the front edge only its low threshold, so it hides no one.
       const { width, out } = hallDoor;
@@ -100,6 +104,12 @@ export const WAREHOUSE_ROOM: RoomDressing<WarehousePlan> = {
       } else if (first) {
         // On a side or the back: parked against the inside of the wall beside it, facing the room.
         const yaw = Math.atan2(-out.dx, -out.dy);
+        // The opening framed in iron posts and a lintel, a worn sill and setts outside it.
+        const last = opening[opening.length - 1] ?? first;
+        place(`bayFrame:${opening.length}`, () => bayFrameModel(opening.length), {
+          at: gridToWorld((first.x + last.x) / 2, (first.y + last.y) / 2),
+          yaw,
+        });
         const [ux, uy] = [Math.cos(yaw), -Math.sin(yaw)];
         park.forEach((p, i) => {
           const lead =
@@ -116,6 +126,17 @@ export const WAREHOUSE_ROOM: RoomDressing<WarehousePlan> = {
       const name = art === 'neon' && !Number.isInteger(x) ? 'neonWide' : art;
       const model = WAREHOUSE_WALL_ART[name];
       if (model) place(`art:${name}`, model, { at: gridToWorld(x, y), yaw: 0 });
+    }
+    // On the low wall in front of the hallway: the tenants' plaques and low clusters.
+    const level = levelSalt(map);
+    for (const { x, y, kind } of innerProps) {
+      const plaque = kind === 'yogaPlaque' || kind === 'brewPlaque';
+      const model = plaque
+        ? () => tenantPlaqueModel(kind === 'yogaPlaque' ? 'yoga' : 'brewery')
+        : WAREHOUSE_INNER_WALL_PROPS[kind];
+      if (!model) continue;
+      const turn = plaque ? 0 : ((((tileHash(y, x) ^ level) >>> 2) % 5) - 2) * 0.12;
+      place(`inner:${kind}`, model, { at: gridToWorld(x, y, FRONT_WALL_HEIGHT), yaw: turn });
     }
     for (const { x, y, end } of pipes)
       place(`pipe:${end}`, () => wallPipeModel(end), { at: gridToWorld(x, y), yaw: 0 });

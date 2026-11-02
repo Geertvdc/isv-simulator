@@ -8,6 +8,7 @@ import type { WallPiece } from '../../mapShape';
 import { tint } from '../kit';
 import { PALETTE } from '../look';
 import { SCAFFOLD, WAREHOUSE_WALL_ART } from '../roomModels/warehouse';
+import { WAREHOUSE_INNER_WALL_PROPS } from '../setDressing/warehouseWallTops';
 import { ROOMS, floorDressing } from '.';
 import { WAREHOUSE_ROOM } from './warehouse';
 
@@ -36,6 +37,7 @@ describe('WAREHOUSE_ROOM', () => {
       });
       expect(keys.some((k) => k.startsWith('hallDoor'))).toBe(true);
       expect(keys.some((k) => k.startsWith('bayDoor'))).toBe(true);
+      if (plan.loading?.out.dy !== 1) expect(keys.some((k) => k.startsWith('bayFrame'))).toBe(true);
       for (const name of Object.values(plan.swaps))
         expect(WAREHOUSE_ROOM.swapModels?.[name]).toBeDefined();
     }
@@ -43,6 +45,14 @@ describe('WAREHOUSE_ROOM', () => {
       for (let look = 0; look < (WAREHOUSE_ROOM.wall?.looks ?? 0); look++)
         expect(WAREHOUSE_ROOM.wall?.model(piece, look).body).toBeDefined();
     for (const model of Object.values(WAREHOUSE_WALL_ART)) expect(model().body).toBeDefined();
+  });
+
+  it('keeps the inner-wall clusters low (under 0.3), so they hide no one and read as no ticket', () => {
+    for (const model of Object.values(WAREHOUSE_INNER_WALL_PROPS)) {
+      const { body } = model();
+      body.computeBoundingBox();
+      expect(body.boundingBox?.max.y).toBeLessThanOrEqual(0.3);
+    }
   });
 
   it('keeps the scaffold-board counter tops darker than every station top', () => {

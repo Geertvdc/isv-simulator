@@ -47,8 +47,8 @@ function ellipse(
 /** One course of brick, and a brick's length: four to a tile, every other course offset by half. */
 const COURSE = 0.115;
 const BRICK = 0.25;
-/** The painted band along the bottom of the inside walls. */
-const BAND = 0.36;
+/** The painted band along the bottom of the inside walls: high enough that stations stand against it. */
+const BAND = 0.58;
 const BAND_PAINT = 0xd6cfbf;
 const MORTAR = 0xb2a491;
 /** How far the coping overhangs the brick, and how thick it is. */
@@ -62,7 +62,7 @@ function brickTone(face: number, h: number): number {
   const r = h % 13;
   if (r < 6) return face;
   if (r < 8) return tint(face, -0.1);
-  if (r < 10) return mix(face, 0xb86a44, 0.4);
+  if (r < 10) return mix(face, 0xa86e56, 0.4);
   if (r < 12) return tint(face, 0.06);
   return mix(face, 0x5e3a34, 0.5);
 }
@@ -208,8 +208,10 @@ function buildBrickWall(b: ModelBuilder, h: number, bandHeight: number, look: nu
   shades.forEach((t, i) =>
     b.box(0.5, 0.004, 1, tint(top, t), { at: [-0.25 + i * 0.5, h + 0.002, 0] }, 0),
   );
-  const joint = tint(top, -0.32);
-  for (const x of [-0.5, 0]) b.box(0.016, 0.004, w - 0.02, joint, { at: [x, h + 0.003, 0] }, 0);
+  // A clear joint at every tile's edge, a finer one between its two stones.
+  const joint = tint(top, -0.2);
+  b.box(0.026, 0.004, w - 0.02, joint, { at: [-0.5, h + 0.003, 0] }, 0);
+  b.box(0.012, 0.004, w - 0.02, tint(top, -0.12), { at: [0, h + 0.003, 0] }, 0);
   b.box(w - 0.02, 0.004, 0.012, joint, { at: [0, h + 0.003, -0.5] }, 0);
   // A pale worn arris along the lip's front edge, and weathering: lichen and grime spots.
   b.box(w - 0.02, 0.004, 0.03, tint(top, 0.1), { at: [0, h + 0.0025, 0.5 + LIP - 0.03] }, 0);
@@ -381,7 +383,7 @@ export function boardsFloorModel(look: number): Model {
           ];
     segments.forEach(([u0, u1], s) => {
       let tone = tint(a, BOARD_TONES[(pattern * 3 + i * 2 + s) % BOARD_TONES.length] ?? 0);
-      if (wear === BOARD_WEAR.newBoard && i === 1) tone = mix(a, 0xd9b27c, 0.45);
+      if (wear === BOARD_WEAR.newBoard && i === 1) tone = mix(a, 0xc8b496, 0.45);
       const gapU = 0.006;
       const x0 = u0 + (u0 > -0.5 ? gapU : 0);
       const x1 = u1 - (u1 < 0.5 ? gapU : 0);
@@ -471,7 +473,7 @@ export function boardsFloorModel(look: number): Model {
 }
 
 /** The runner's colors: a faded madder field, an ochre border, cream and slate in its pattern. */
-const RUG = { field: 0xa45a4c, border: 0xcfa66e, line: 0x6a3e38, cream: 0xe0cba4, slate: 0x56707a };
+const RUG = { field: 0x8e7068, border: 0xaa9c88, line: 0x6a4a42, cream: 0xc4a892, slate: 0x5e6e74 };
 
 /**
  * A tile's piece of the hallway runner: `part` 0 is a whole narrow runner,
@@ -524,7 +526,7 @@ function runner(b: ModelBuilder, part: number, end: number, floor: number): void
 // ---- Counters ----
 
 /** The scaffold boards' timber (darker than every station top) and the black pipe frame. */
-export const SCAFFOLD = 0xa08866;
+export const SCAFFOLD = 0x726a5e;
 const PIPE = 0x2a2c2f;
 const GALV = 0x9aa1a6;
 const TOP = STATION_HEIGHT;
@@ -868,6 +870,15 @@ const FONT: Readonly<Record<string, readonly string[]>> = {
   I: ['###', '.#.', '.#.', '.#.', '###'],
   P: ['###', '#.#', '###', '#..', '#..'],
   T: ['###', '.#.', '.#.', '.#.', '.#.'],
+  Y: ['#.#', '#.#', '.#.', '.#.', '.#.'],
+  O: ['###', '#.#', '#.#', '#.#', '###'],
+  G: ['###', '#..', '#.#', '#.#', '###'],
+  A: ['.#.', '#.#', '###', '#.#', '#.#'],
+  B: ['##.', '#.#', '##.', '#.#', '##.'],
+  R: ['##.', '#.#', '##.', '#.#', '#.#'],
+  E: ['###', '#..', '##.', '#..', '###'],
+  W: ['#...#', '#...#', '#.#.#', '#.#.#', '.#.#.'],
+  C: ['###', '#..', '#..', '#..', '###'],
   '4': ['#.#', '#.#', '###', '..#', '..#'],
   '!': ['#', '#', '#', '.', '#'],
   ' ': ['.', '.', '.', '.', '.'],
@@ -904,6 +915,99 @@ function stencil(
     });
     col += w + 1;
   }
+}
+
+/**
+ * Another tenant's plaque, propped on the coping of the low wall in front
+ * of the hallway (its foot at y 0, facing +z, leaning back toward the
+ * camera): an enamel plate in the tenant's colour with a pale rim and the
+ * name in pale letters. Under 0.2 tall: it hides no one.
+ */
+export function tenantPlaqueModel(kind: TenantDoor): Model {
+  const b = new ModelBuilder();
+  const [text, plate, px] =
+    kind === 'yoga' ? ['YOGA', 0x5e4e72, 0.04] : (['BREW CO', 0x2c4a3c, 0.03] as const);
+  const columns = Array.from(text).reduce((n, c) => n + (FONT[c]?.[0]?.length ?? 0) + 1, -1);
+  const w = columns * px + 0.12;
+  const h = 5 * px + 0.08;
+  const tilt = 0.7;
+  const [c, sn] = [Math.cos(tilt), Math.sin(tilt)];
+  // A point `v` up the plate's face and `d` out of it, from its foot.
+  const on = (u: number, v: number, d: number): [number, number, number] => [
+    u,
+    0.02 + v * c + d * sn,
+    0.06 - v * sn + d * c,
+  ];
+  const rot: [number, number, number] = [-tilt, 0, 0];
+  // The wedge it leans on, the rim, the plate, the letters.
+  b.box(w * 0.7, 0.04, 0.12, 0x4a4540, { at: [0, 0.02, 0.0] }, 0.006);
+  b.box(w + 0.03, h + 0.03, 0.02, 0xc8bc9c, { at: on(0, h / 2, 0), rot }, 0.006);
+  b.box(w, h, 0.02, plate, { at: on(0, h / 2, 0.006), rot }, 0.004);
+  let col = 0;
+  for (const ch of Array.from(text)) {
+    const rows = FONT[ch] ?? [];
+    const cw = rows[0]?.length ?? 0;
+    rows.forEach((row, r) => {
+      for (let i = 0; i < cw; i++)
+        if (row[i] === '#')
+          b.box(
+            px * 0.9,
+            px * 0.9,
+            0.004,
+            0xe8dfc6,
+            { at: on((col + i - columns / 2 + 0.5) * px, 0.04 + (4.5 - r) * px, 0.018), rot },
+            0,
+          );
+    });
+    col += cw + 1;
+  }
+  return b.build();
+}
+
+/**
+ * The frame of a loading-bay opening `width` tiles wide on a side or back
+ * edge (outward is −z, the opening's outer face at z = −0.5): two iron
+ * posts in the door's green with a lintel across, a stone sill in the
+ * opening, and outside it a pale patch of setts worn by trolleys, 0.9 deep.
+ */
+export function bayFrameModel(width: number): Model {
+  const b = new ModelBuilder();
+  const half = width / 2;
+  const z = -0.5;
+  const top = WALL_HEIGHT - 0.04;
+  for (const s of [-1, 1]) {
+    b.box(0.12, top, 0.12, BAY_DOOR, { at: [s * (half - 0.02), top / 2, z] }, 0.01);
+    // Paint chipped back to iron at the foot, a fender plate where trolleys hit it.
+    b.box(0.126, 0.18, 0.126, tint(BAY_DOOR, -0.35), { at: [s * (half - 0.02), 0.09, z] }, 0.008);
+    b.box(0.13, 0.03, 0.13, tint(BAY_DOOR, 0.2), { at: [s * (half - 0.02), top - 0.2, z] }, 0.004);
+  }
+  b.box(width + 0.06, 0.14, 0.14, BAY_DOOR, { at: [0, top + 0.03, z] }, 0.01);
+  b.box(width + 0.08, 0.025, 0.16, tint(BAY_DOOR, -0.3), { at: [0, top - 0.04, z] }, 0);
+  // The sill: worn stone in the opening.
+  b.box(width - 0.1, 0.02, 0.16, 0xa8a296, { at: [0, 0.008, z] }, 0.004);
+  b.box(width - 0.14, 0.004, 0.05, 0xc2bcae, { at: [0, 0.02, z - 0.04] }, 0);
+  // Outside, on the setts: a pale worn patch with ragged edges.
+  const ground = -SLAB_DEPTH - 0.002;
+  const pale = 0xb4ab9a;
+  b.box(width - 0.2, 0.006, 0.9, pale, { at: [0, ground, z - 0.5] }, 0);
+  for (let i = 0; i < 6; i++) {
+    const h = tileHash(i + 3, width + 17);
+    b.box(
+      0.18 + (h % 4) * 0.06,
+      0.006,
+      0.14 + ((h >> 3) % 3) * 0.06,
+      tint(pale, -0.06),
+      {
+        at: [
+          (((h >> 6) % 9) / 8 - 0.5) * (width - 0.3),
+          ground + 0.001,
+          z - 0.2 - ((h >> 9) % 7) * 0.11,
+        ],
+      },
+      0,
+    );
+  }
+  return b.build();
 }
 
 /** Which other tenant's door. */

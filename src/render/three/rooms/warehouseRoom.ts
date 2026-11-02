@@ -79,6 +79,20 @@ export interface LoadingBay {
   park: GridPoint[];
 }
 
+/**
+ * What stands on a low wall with floor on both sides (the wall in front of
+ * the hallway): the tenants' plaques at its ends, and between them low
+ * clusters (rolled yoga mats, the tenants' post in a letter rack, a fire
+ * bucket, plants in tins).
+ */
+export type InnerProp = 'yogaPlaque' | 'brewPlaque' | 'mats' | 'post' | 'bucket' | 'plants';
+
+/** The clusters along an inner low wall, in turn. */
+const INNER_CLUSTERS: readonly InnerProp[] = ['mats', 'post', 'bucket', 'plants'];
+/** Clusters on one inner wall at most, and the bare tiles between two. */
+const INNER_MAX = 3;
+const INNER_GAP = 2;
+
 export interface WarehouseRoom extends RoomPlan {
   /** Always empty: the brick's art is placed as story pieces (`wallArt`), not hashed decorations. */
   decos: Record<string, string>;
@@ -99,6 +113,8 @@ export interface WarehouseRoom extends RoomPlan {
   raised: GridPoint[];
   loading: LoadingBay | null;
   wallArt: WallArtSpot[];
+  /** On the low walls with floor on both sides: plaques at a run's ends, clusters between. */
+  innerProps: { x: number; y: number; kind: InnerProp }[];
   /** Back-wall tiles carrying the cast-iron pipe under the coping, and which end of its run each is. */
   pipes: { x: number; y: number; end: 'mid' | 'west' | 'east' | 'both' }[];
 }
@@ -139,6 +155,7 @@ export function warehouseRoom(map: LevelMap): WarehouseRoom {
     floorWear: floorWear(map, hall),
     capProps: capProps(map, hallDoor),
     frontProps: frontProps(map, loading),
+    innerProps: innerProps(map),
   };
 }
 
@@ -655,6 +672,54 @@ function frontProps(map: LevelMap, loading: LoadingBay | null): WarehouseRoom['f
       }
       out.push({ x, y, slot: out.length });
       gap = 2 + (((tileHash(x, y + 5) ^ salt) >>> 0) % 2);
+    }
+  }
+  return out;
+}
+
+/**
+ * The low walls with floor on both sides (in front of the hallway), row by
+ * row: on a run of four or more, the yoga studio's plaque on its first tile
+ * and the brewery's on its last (flat things, so a station beside them
+ * doesn't matter); between them up to `INNER_MAX` low clusters with
+ * `INNER_GAP` bare tiles between, never beside a station or counter (it'd
+ * stand behind it, or in front of it).
+ */
+function innerProps(map: LevelMap): WarehouseRoom['innerProps'] {
+  const out: WarehouseRoom['innerProps'] = [];
+  const inner = (x: number, y: number) =>
+    getTile(map, x, y) === 'wall' &&
+    wallPiece(map, x, y) === 'wall-front' &&
+    isOpen(getTile(map, x, y - 1)) &&
+    isOpen(getTile(map, x, y + 1));
+  const clear = (x: number, y: number) =>
+    !SIDES.some(([dx, dy]) => isWorkSurface(getTile(map, x + dx, y + dy)));
+  let next = 0;
+  for (let y = 1; y < map.height - 1; y++) {
+    let x0 = -1;
+    for (let x = 0; x <= map.width; x++) {
+      if (x < map.width && inner(x, y)) {
+        if (x0 < 0) x0 = x;
+        continue;
+      }
+      if (x0 < 0) continue;
+      const x1 = x - 1;
+      const plaques = x1 - x0 + 1 >= 4;
+      if (plaques) {
+        out.push({ x: x0, y, kind: 'yogaPlaque' });
+        out.push({ x: x1, y, kind: 'brewPlaque' });
+      }
+      let placed = 0;
+      for (let cx = plaques ? x0 + 1 : x0; cx <= (plaques ? x1 - 1 : x1) && placed < INNER_MAX;) {
+        if (!clear(cx, y)) {
+          cx++;
+          continue;
+        }
+        out.push({ x: cx, y, kind: INNER_CLUSTERS[next++ % INNER_CLUSTERS.length] ?? 'plants' });
+        placed++;
+        cx += INNER_GAP + 1;
+      }
+      x0 = -1;
     }
   }
   return out;
