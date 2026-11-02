@@ -10,6 +10,7 @@
 
 import { type GridPoint, type LevelMap, getTile, isWorkSurface } from '../../../sim/level';
 import { WALL_DECOS, levelSalt, tileHash, wallPiece } from '../../mapShape';
+import type { Vec3 } from '../../projection';
 import { tilesOf } from '../layout';
 
 /** Wear on a carpet tile (see `floorWear`), one per tile; `roomModels/officePark` draws them. */
@@ -354,10 +355,24 @@ function capFree(
     !nearDoor(doors, x, y, 1);
 }
 
+/** Clusters of clutter on the wall tops, at most: along the back, on each side wall, on the front wall. */
+export const CAP_CLUSTERS = { back: 3, side: 2, front: 3 } as const;
+
+/** `n` of `list`, spread evenly along it (all of it when it has no more). */
+function spread<T>(list: readonly T[], n: number): T[] {
+  if (list.length <= n) return [...list];
+  return Array.from(
+    { length: n },
+    (_, i) => list[Math.floor(((i + 0.5) * list.length) / n)],
+  ).filter((v): v is T => v !== undefined);
+}
+
 /**
- * Clutter on the wall tops, in clusters: along each run of free wall (rows
- * first, then what's left in columns) a cluster of one or two tiles, then
- * a tile or two of bare wall, and so on.
+ * Clutter on the wall tops, in a few stacked clusters, the rest bare: along
+ * each run of free wall (rows first, then what's left in columns) the
+ * places for a two-tile cluster (one where only one tile is left), a bare
+ * tile between them; then on each wall (the back, the left and right side
+ * walls) at most `CAP_CLUSTERS` of those, spread along it.
  */
 function capProps(
   map: LevelMap,
@@ -365,9 +380,8 @@ function capProps(
   swaps: Record<string, string>,
 ): OfficeParkRoom['capProps'] {
   const free = capFree(map, doors, swaps);
-  const salt = levelSalt(map);
   const taken = new Set<string>();
-  const runs: GridPoint[][] = [];
+  const runs: { tiles: GridPoint[]; across: boolean }[] = [];
   const collect = (across: boolean) => {
     const [outer, inner] = across ? [map.height, map.width] : [map.width, map.height];
     for (let a = 0; a < outer; a++) {
@@ -379,7 +393,7 @@ function capProps(
           continue;
         }
         if (run.length >= (across ? 2 : 1)) {
-          runs.push(run);
+          runs.push({ tiles: run, across });
           for (const p of run) taken.add(key(p.x, p.y));
         }
         run = [];
@@ -388,15 +402,27 @@ function capProps(
   };
   collect(true);
   collect(false);
+  // Which wall a run is on: a row, or a tile with the room's floor in front of it, is the back.
+  const wallOf = ({ tiles, across }: (typeof runs)[number]): 'back' | 'left' | 'right' => {
+    const p = tiles[0];
+    if (!p || across || getTile(map, p.x, p.y + 1) === 'floor') return 'back';
+    return p.x < map.width / 2 ? 'left' : 'right';
+  };
+  const places: Record<'back' | 'left' | 'right', GridPoint[][]> = {
+    back: [],
+    left: [],
+    right: [],
+  };
+  for (const run of runs)
+    for (let i = 0; i < run.tiles.length; i += 3)
+      places[wallOf(run)].push(run.tiles.slice(i, i + 2));
   const out: OfficeParkRoom['capProps'] = [];
   let slot = 0;
-  for (const run of runs) {
-    for (let i = 0; i < run.length;) {
-      const first = run[i];
-      if (!first) break;
-      const h = (tileHash(first.x + 7, first.y + 3) ^ salt) >>> 0;
-      const size = run.length - i >= 2 && h % 3 !== 0 ? 2 : 1;
-      const cluster = run.slice(i, i + size);
+  for (const wall of ['back', 'left', 'right'] as const)
+    for (const cluster of spread(
+      places[wall],
+      wall === 'back' ? CAP_CLUSTERS.back : CAP_CLUSTERS.side,
+    ))
       cluster.forEach((p, k) => {
         const other = cluster[1 - k];
         out.push({
@@ -406,36 +432,73 @@ function capProps(
           toward: other ? { dx: other.x - p.x, dy: other.y - p.y } : { dx: 0, dy: 0 },
         });
       });
-      i += size + (run.length >= 5 ? 2 : 1 + ((h >> 3) % 2));
-    }
-  }
   return out;
 }
 
-/** Low things on the front wall: every second or third tile, never beside a door. */
+/**
+ * Clusters on the low front wall (each one a whole cluster model, see
+ * `OFFICE_PARK_FRONT_WALL_PROPS`): at most `CAP_CLUSTERS.front`, spread
+ * evenly along it, never beside a door.
+ */
 function frontProps(
   map: LevelMap,
   doors: readonly (Doorway | null)[],
 ): OfficeParkRoom['frontProps'] {
-  const salt = levelSalt(map);
-  const out: OfficeParkRoom['frontProps'] = [];
   const y = map.height - 1;
-  let gap = 0;
-  for (let x = 1; x < map.width - 1; x++) {
-    const ok =
+  const free: GridPoint[] = [];
+  for (let x = 1; x < map.width - 1; x++)
+    if (
       getTile(map, x, y) === 'wall' &&
       wallPiece(map, x, y) === 'wall-front' &&
-      !nearDoor(doors, x, y, 1);
-    if (!ok) {
-      gap = 0;
-      continue;
-    }
-    if (gap > 0) {
-      gap--;
-      continue;
-    }
-    out.push({ x, y, slot: out.length });
-    gap = 1 + (((tileHash(x, y + 5) ^ salt) >>> 0) % 2);
+      !nearDoor(doors, x, y, 1)
+    )
+      free.push({ x, y });
+  // Evenly along the wall by where the tiles are, the free tile nearest each mark.
+  const first = free[0];
+  const last = free[free.length - 1];
+  if (!first || !last) return [];
+  const n = Math.min(CAP_CLUSTERS.front, free.length);
+  const picked: GridPoint[] = [];
+  for (let i = 0; i < n; i++) {
+    const mark = first.x + ((i + 0.5) * (last.x - first.x + 1)) / n - 0.5;
+    const left = free.filter((p) => !picked.includes(p));
+    const best = left.reduce((a, b) => (Math.abs(b.x - mark) < Math.abs(a.x - mark) ? b : a));
+    picked.push(best);
   }
-  return out;
+  return picked.sort((a, b) => a.x - b.x).map((p, slot) => ({ ...p, slot }));
+}
+
+/** Half a strip light's length, and the most it moves along its row to clear a station. */
+export const STRIP_HALF = 0.45;
+const STRIP_SHIFT_MAX = 1.25;
+const STRIP_SHIFT_STEP = 0.25;
+
+/**
+ * Where the strip light for the lamp spot `at` hangs (see
+ * `RoomDressing.lamp.fit`): the light hangs high over the back wall, so on
+ * screen it lands on whatever stands in the rows just behind and in front
+ * of it. It must never cover a station (or desk) there: it slides along its
+ * row, nearest first, to where its whole length (and its drop) clears every
+ * one of them and stays inside the room, or is left out.
+ */
+export function stripLightFit(at: Vec3, map: LevelMap): Vec3 | null {
+  const near = Math.floor(at.z + 0.5);
+  const rows = [Math.floor(at.z) - 1, Math.floor(at.z), near];
+  const blocked: number[] = [];
+  for (const y of rows)
+    for (let x = 0; x < map.width; x++) {
+      const t = getTile(map, x, y);
+      if (t !== null && t !== 'floor' && t !== 'wall' && t !== 'void') blocked.push(x);
+    }
+  const inside = (x: number) => {
+    const t = getTile(map, Math.round(x), near);
+    return t !== null && t !== 'wall' && t !== 'void';
+  };
+  const ok = (x: number) =>
+    inside(x - STRIP_HALF) &&
+    inside(x + STRIP_HALF) &&
+    blocked.every((bx) => Math.abs(bx - x) >= 0.5 + STRIP_HALF);
+  for (let d = 0; d <= STRIP_SHIFT_MAX + 1e-9; d += STRIP_SHIFT_STEP)
+    for (const x of d === 0 ? [at.x] : [at.x - d, at.x + d]) if (ok(x)) return { ...at, x };
+  return null;
 }

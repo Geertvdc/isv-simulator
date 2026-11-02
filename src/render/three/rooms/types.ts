@@ -90,6 +90,12 @@ export interface RoomDressing<P extends RoomPlan = RoomPlan> {
   lamp?: {
     model: () => Model;
     wire?: { hang: number; model(points: readonly [number, number][]): Model };
+    /**
+     * Where the fitting for the lamp spot `at` hangs instead (moved along
+     * its row), or null for none there (the light itself stays at the spot);
+     * left out, every spot gets its fitting.
+     */
+    fit?(at: Vec3, map: LevelMap): Vec3 | null;
   };
   /** Places the room's one-off story pieces (doors, a banner, a stain). */
   placeStory?(plan: P, map: LevelMap, place: Place): void;

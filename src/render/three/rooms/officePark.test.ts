@@ -1,10 +1,17 @@
 import { readFileSync } from 'node:fs';
+import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { parseLevelMap } from '../../../sim/level';
 import { LEVEL_LOOKS } from '../../mapLook';
 import { WALL_DECOS } from '../../mapShape';
-import type { Model } from '../kit';
+import { type Model, tint } from '../kit';
+import { PALETTE, WALL_COLORS } from '../look';
 import { WALL_DECO_MODELS } from '../roomModels';
+import { BEECH, STRIP_HANG, stripWireModel } from '../roomModels/officePark';
+import {
+  FRONT_PROP_MAX_HEIGHT,
+  OFFICE_PARK_FRONT_WALL_PROPS,
+} from '../setDressing/officeParkWallTops';
 import { ROOMS, floorDressing } from '.';
 import { CARPET_WEAR } from './officeParkRoom';
 import { OFFICE_PARK_ROOM } from './officePark';
@@ -14,6 +21,19 @@ const map = parseLevelMap(
 );
 
 const vertices = (m: Model) => m.body.getAttribute('position').count;
+const luminance = (c: number) => {
+  const { r, g, b } = new THREE.Color(c);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const bounds = (m: Model) => {
+  const box = new THREE.Box3();
+  for (const g of [m.body, m.glow, m.glass]) {
+    if (!g) continue;
+    g.computeBoundingBox();
+    if (g.boundingBox) box.union(g.boundingBox);
+  }
+  return box;
+};
 
 describe('OFFICE_PARK_ROOM', () => {
   it("dresses the open-plan level's walls and floor", () => {
@@ -61,5 +81,37 @@ describe('OFFICE_PARK_ROOM', () => {
           expect(
             vertices(counter({ minusEnd, plusEnd, legs, knob: plusEnd, yaw: 0 }).base),
           ).toBeGreaterThan(0);
+  });
+
+  it('keeps the desk tops and wall caps darker than every station top', () => {
+    // Station tops are their color lifted (as the warehouse test has it).
+    for (const color of Object.values(PALETTE.station)) {
+      expect(luminance(BEECH)).toBeLessThan(luminance(tint(color, 0.4)));
+      expect(luminance(WALL_COLORS.officePark.top)).toBeLessThan(luminance(tint(color, 0.4)));
+    }
+  });
+
+  it('keeps the front-wall clusters low', () => {
+    for (const build of OFFICE_PARK_FRONT_WALL_PROPS)
+      expect(bounds(build()).max.y).toBeLessThanOrEqual(FRONT_PROP_MAX_HEIGHT);
+  });
+
+  it('hangs each strip light on one thin drop to a thin wire', () => {
+    const lamp = OFFICE_PARK_ROOM.lamp;
+    if (!lamp?.wire) throw new Error('no wire');
+    expect(lamp.wire.hang).toBe(STRIP_HANG);
+    // Above the fitting only the drop and its clip: nothing wider than the clip.
+    const fitting = lamp.model().body;
+    const pos = fitting.getAttribute('position');
+    for (let i = 0; i < pos.count; i++)
+      if (pos.getY(i) > 0.06) expect(Math.abs(pos.getX(i))).toBeLessThanOrEqual(0.011);
+    const wire = bounds(
+      stripWireModel([
+        [0, 2],
+        [3, 2],
+        [6, 2],
+      ]),
+    );
+    expect(wire.max.x - wire.min.x).toBeGreaterThan(6);
   });
 });

@@ -154,34 +154,109 @@ export const OFFICE_PARK_WALL_TOP_PROPS: readonly (() => Model)[] = [
   }, 1.4),
 ];
 
-/** Low things lying on the front wall, which the camera looks over: post, cable, a lanyard. */
+/** How tall a cluster on the low front wall may stand, so it never hides a player behind it. */
+export const FRONT_PROP_MAX_HEIGHT = 0.35;
+
+/** A coil of blue network cable lying at (x, z). */
+function cableCoil(b: ModelBuilder, x: number, z: number): void {
+  for (let i = 0; i < 3; i++)
+    b.torus(0.1 - i * 0.008, 0.011, 0x3a6ab8, {
+      at: [x + 0.008 * i, 0.011 + i * 0.011, z],
+      rot: [Math.PI / 2, 0, 0],
+    });
+}
+
+/** A brown delivery box at (x, y, z), its tape across the top. */
+function parcel(
+  b: ModelBuilder,
+  x: number,
+  y: number,
+  z: number,
+  [w, h, d]: readonly [number, number, number],
+  turn = 0,
+): void {
+  b.box(w, h, d, COLOR.cardboard, { at: [x, y + h / 2, z], rot: [0, turn, 0] }, 0.008);
+  b.box(w + 0.002, 0.004, 0.05, 0xc8a878, { at: [x, y + h + 0.001, z], rot: [0, turn, 0] }, 0);
+  b.box(
+    0.07,
+    0.004,
+    0.05,
+    PAPER,
+    {
+      at: [x + 0.04, y + h + 0.003, z + d * 0.25],
+      rot: [0, turn, 0],
+    },
+    0,
+  );
+}
+
+/**
+ * Clusters lying on the low front wall, which the camera looks over (each
+ * under `FRONT_PROP_MAX_HEIGHT`): the deliveries nobody signed for, the new
+ * monitor still in its box beside a rubber plant, and the ring binders with
+ * a mug on them.
+ */
 export const OFFICE_PARK_FRONT_WALL_PROPS: readonly (() => Model)[] = [
   prop((b) => {
-    // A coil of blue network cable.
-    for (let i = 0; i < 3; i++)
-      b.torus(0.12 - i * 0.01, 0.012, 0x3a6ab8, {
-        at: [0.01 * i, 0.012 + i * 0.012, 0],
-        rot: [Math.PI / 2, 0, 0],
-      });
-  }, 1.3),
+    // Two parcels side by side, a third on top, a coil of cable beside them.
+    parcel(b, -0.12, 0, 0, [0.22, 0.11, 0.18], 0.05);
+    parcel(b, 0.1, 0, 0.02, [0.18, 0.09, 0.16], -0.1);
+    parcel(b, -0.06, 0.11, 0, [0.16, 0.08, 0.13], 0.25);
+    cableCoil(b, 0.28, 0.02);
+  }, 1.6),
   prop((b) => {
-    // A small parcel nobody has opened, and a stack of post.
-    b.box(0.22, 0.12, 0.18, COLOR.cardboard, { at: [0, 0.06, 0] }, 0.01);
-    b.box(0.222, 0.004, 0.04, 0xc8a878, { at: [0, 0.121, 0] }, 0);
-    for (let i = 0; i < 3; i++)
+    // The new monitor, still boxed and lying flat, and a rubber plant.
+    b.box(0.36, 0.07, 0.25, 0xd8d2c4, { at: [-0.08, 0.035, 0] }, 0.008);
+    b.box(0.24, 0.004, 0.15, 0x2f3238, { at: [-0.08, 0.071, -0.01] }, 0);
+    b.box(0.02, 0.004, 0.05, 0x2f3238, { at: [-0.08, 0.071, 0.08] }, 0);
+    b.box(0.36, 0.045, 0.004, 0x3a6ab8, { at: [-0.08, 0.035, 0.126] }, 0);
+    b.cylinder(0.06, 0.045, 0.08, 0x4a4d52, { at: [0.22, 0.04, 0.02] }, 14);
+    b.cylinder(0.055, 0.055, 0.01, 0x4a3628, { at: [0.22, 0.077, 0.02] }, 14);
+    b.cylinder(0.006, 0.006, 0.08, 0x4a5a3a, { at: [0.22, 0.12, 0.02] }, 6);
+    for (let i = 0; i < 7; i++) {
+      const t = (i / 7) * Math.PI * 2;
+      const up = 0.1 + (i % 3) * 0.03;
       b.box(
-        0.16,
-        0.008,
+        0.05,
+        0.006,
         0.1,
-        i === 1 ? 0xd8c09a : PAPER,
-        { at: [0.22, 0.004 + i * 0.008, 0], rot: [0, i * 0.2, 0] },
+        i % 2 ? 0x3f6a3a : 0x345a32,
+        {
+          at: [0.22 + Math.cos(t) * 0.05, up, 0.02 + Math.sin(t) * 0.05],
+          rot: [0.5, -t + Math.PI / 2, 0],
+        },
         0,
       );
-  }, 1.3),
+    }
+  }, 1.6),
   prop((b) => {
-    // A visitor lanyard and a stapler.
-    b.box(0.07, 0.004, 0.09, PAPER, { at: [0, 0.004, 0] }, 0);
-    b.torus(0.1, 0.006, 0x3a8a7a, { at: [0, 0.004, -0.1], rot: [Math.PI / 2, 0, 0] });
-    b.box(0.16, 0.035, 0.04, 0x2f3238, { at: [0.22, 0.018, 0.02], rot: [0, 0.4, 0] }, 0.01);
-  }, 1.3),
+    // Ring binders lying in a stack, a mug left on top, an open one beside with a stapler on it.
+    for (let i = 0; i < 2; i++) {
+      const c = nth(FILES, i + 1);
+      b.box(
+        0.3,
+        0.06,
+        0.24,
+        c,
+        { at: [-0.05, 0.03 + i * 0.06, 0], rot: [0, i * 0.12 - 0.1, 0] },
+        0.006,
+      );
+      b.box(
+        0.05,
+        0.03,
+        0.002,
+        0xf1ece0,
+        {
+          at: [-0.05, 0.03 + i * 0.06, 0.121],
+          rot: [0, i * 0.12 - 0.1, 0],
+        },
+        0,
+      );
+    }
+    mug(b, -0.02, 0.12, 0.02, 0xe9e4d8);
+    // One more binder lying open beside the stack.
+    b.box(0.24, 0.025, 0.3, nth(FILES, 0), { at: [0.2, 0.0125, -0.02], rot: [0, 0.3, 0] }, 0.004);
+    b.box(0.2, 0.004, 0.26, PAPER, { at: [0.2, 0.027, -0.02], rot: [0, 0.3, 0] }, 0);
+    b.box(0.16, 0.035, 0.04, 0x2f3238, { at: [0.22, 0.045, 0.0], rot: [0, 0.4, 0] }, 0.01);
+  }, 1.6),
 ];
