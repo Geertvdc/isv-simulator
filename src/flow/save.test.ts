@@ -20,6 +20,7 @@ import {
   parseSave,
   recordResult,
   totalStars,
+  wantsUnlockAll,
   writeSave,
 } from './save';
 
@@ -247,6 +248,17 @@ describe('unlocking', () => {
     recordResult(save, 'garage', { score: 0, stars: 0 });
     expect(isUnlocked(save, IDS, 1)).toBe(true);
     expect(isUnlocked(save, IDS, 2)).toBe(false);
+  });
+
+  it('reads unlockAll from the query string, on by default in dev', () => {
+    const q = (s: string) => new URLSearchParams(s);
+    expect(wantsUnlockAll(q(''), false)).toBe(false);
+    expect(wantsUnlockAll(q('?unlockAll'), false)).toBe(true);
+    expect(wantsUnlockAll(q(''), true)).toBe(true);
+    expect(wantsUnlockAll(q('?locked'), true)).toBe(false);
+    expect(wantsUnlockAll(q('?unlockAll=0'), true)).toBe(false);
+    expect(wantsUnlockAll(q('?unlockAll=false'), true)).toBe(false);
+    expect(wantsUnlockAll(q('?unlockAll&locked'), true)).toBe(false);
   });
 
   it('opens everything with unlockAll', () => {

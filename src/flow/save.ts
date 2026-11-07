@@ -298,3 +298,15 @@ export function isUnlocked(
 export function totalStars(save: SaveData, levelIds: readonly string[]): number {
   return levelIds.reduce((sum, id) => sum + (save.levels[id]?.bestStars ?? 0), 0);
 }
+
+/**
+ * Whether every level starts open, from the page's query string. `?unlockAll`
+ * opens everything; dev builds open everything by default so any level is quick
+ * to test, and `?locked` (or `?unlockAll=0`) brings the normal progression back.
+ */
+export function wantsUnlockAll(params: URLSearchParams, dev: boolean): boolean {
+  if (params.has('locked')) return false;
+  const value = params.get('unlockAll');
+  if (value !== null) return value !== '0' && value !== 'false';
+  return dev;
+}
