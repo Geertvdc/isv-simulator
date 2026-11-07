@@ -42,8 +42,20 @@ export interface Atmosphere {
    * the backdrop instead of ending against it.
    */
   fog?: { color: number; start: number; span: number };
-  /** Screen edges tinted toward `color`; `inner` is where it starts (share of the half-diagonal). */
-  vignette?: { color: number; opacity: number; inner: number };
+  /**
+   * Screen edges tinted toward `color`; `inner` is where it starts (share of
+   * the half-diagonal). `glow` adds a soft wash of light from one edge of the
+   * frame, a low sky's last light: centred at `x`, `y` (shares of the canvas
+   * width and height, so 0, 0.1 is the left edge near the top), gone
+   * `reach` of the canvas width sideways and 1.4 × `reach` of its height
+   * up and down away from there. Plain CSS over the canvas, on every quality.
+   */
+  vignette?: {
+    color: number;
+    opacity: number;
+    inner: number;
+    glow?: { color: number; opacity: number; x: number; y: number; reach: number };
+  };
   /**
    * Warm point lights in a row just inside the back wall (and the front wall
    * of a room at least `frontFrom` rows deep), never over the open middle of
@@ -183,11 +195,50 @@ const CANAL_EVENING: Atmosphere = {
   ambient: { steam: true, smoke: true, ripples: true, halos: true, flicker: 0.05 },
 };
 
+/**
+ * Blue hour on launch night, on a city-centre rooftop: the sun just set in
+ * the west (left), its last rose-amber light grazing in low from the left
+ * and a little behind (about 45° up, so the back row still reads), a deep
+ * blue-violet sky at the frame edges, and cool-white LED pendants along the
+ * back wall keeping the loft bright and clean. Cooler and crisper than the
+ * canal evening: a near-white sky light and fill, so stations stay true.
+ */
+const BLUE_HOUR: Atmosphere = {
+  sun: {
+    color: 0xffd6bc,
+    intensity: 3.3,
+    from: { x: -8.5, y: -2, height: 8.5, perMapSize: false },
+    reach: 0.95,
+  },
+  sky: { sky: 0xcdd8fa, ground: 0x6e7288, intensity: 1.6 },
+  fill: { color: 0xe2e8ff, intensity: 1.4 },
+  environment: 0.14,
+  backdrop: { inner: 0x434f92, outer: 0x1b1d4a },
+  fog: { color: 0x2e3a7a, start: 0.5, span: 11 },
+  vignette: {
+    color: 0x141a4c,
+    opacity: 0.35,
+    inner: 0.7,
+    // The last of the sunset, low in the west.
+    glow: { color: 0xff8a72, opacity: 0.3, x: 0, y: 0.08, reach: 0.4 },
+  },
+  lamps: {
+    color: 0xeef2ff,
+    intensity: 4,
+    distance: 4.5,
+    height: 2,
+    spacing: 4,
+    inset: 0.45,
+    frontFrom: 12,
+  },
+};
+
 /** Presets per `MapLook.scene` id. */
 export const ATMOSPHERES: Readonly<Record<string, Atmosphere>> = {
   garage: GOLDEN_HOUR,
   'open-plan': MONDAY_MORNING,
   'scale-up': CANAL_EVENING,
+  'seed-round': BLUE_HOUR,
 };
 
 /** The light and air for a scene id; the default for none or an unknown one. */

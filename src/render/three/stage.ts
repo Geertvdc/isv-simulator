@@ -219,7 +219,17 @@ export class Stage {
     const mid = cssRgba(vignette.color, vignette.opacity * 0.35);
     const inner = Math.round(vignette.inner * 100);
     const between = Math.round(((1 + vignette.inner) / 2) * 100);
-    style.background = `radial-gradient(ellipse farthest-corner at 50% 48%, transparent ${inner}%, ${mid} ${between}%, ${edge} 100%)`;
+    const edges = `radial-gradient(ellipse farthest-corner at 50% 48%, transparent ${inner}%, ${mid} ${between}%, ${edge} 100%)`;
+    const glow = vignette.glow;
+    if (!glow) {
+      style.background = edges;
+      return;
+    }
+    // The glow over the edges: a wide soft ellipse, strongest at its centre.
+    const at = `${Math.round(glow.x * 100)}% ${Math.round(glow.y * 100)}%`;
+    const rx = Math.round(glow.reach * 100);
+    const half = cssRgba(glow.color, glow.opacity * 0.4);
+    style.background = `radial-gradient(${rx}% ${Math.round(rx * 1.4)}% at ${at}, ${cssRgba(glow.color, glow.opacity)} 0%, ${half} 45%, transparent 100%), ${edges}`;
   }
 
   private applyPixelRatio(): void {
