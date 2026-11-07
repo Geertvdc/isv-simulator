@@ -1,6 +1,10 @@
 # Seed Round environment pass
 
-**Status:** brief written, round 1 in progress. Level 2-1 (`seed-round`, "Seed Round"), the first level of the Startup chapter, gets a hand-built world after the garage ([garage-environment.md](garage-environment.md)), [Open Plan Office](open-plan-environment.md) and [Down the Hall](down-the-hall-environment.md).
+**Status:** two rounds done (build, critic review, fixes). Level 2-1 (`seed-round`, "Seed Round"), the first level of the Startup chapter, gets a hand-built world after the garage ([garage-environment.md](garage-environment.md)), [Open Plan Office](open-plan-environment.md) and [Down the Hall](down-the-hall-environment.md).
+
+| Before                                         | After                                         | After, redesign draft                               |
+| ---------------------------------------------- | --------------------------------------------- | --------------------------------------------------- |
+| ![](images/seed-round-environment/before.webp) | ![](images/seed-round-environment/after.webp) | ![](images/seed-round-environment/after-draft.webp) |
 
 **Goal:** the world around the level tells one story, the way Overcooked 2 levels do. Render only (`src/render/`); the sim, maps and balance don't change.
 
@@ -64,11 +68,19 @@ Three agents in one worktree at once, with strict file ownership. The shared plu
 | **World** | `scenes/seedRound.ts` (+test), `setDressing/rooftop.ts`                                                                                                              |
 | **Light** | `atmosphere.ts` (+test), `stage.ts`, `WorldFx.ts`, `createLights` in `look.ts`                                                                                       |
 
+## Rounds
+
+Round 1 ran three agents at once (Room, World, Light). The critic scored it 6.5/10 (before: 2.5): the rooftop and skyline read at once, but the brown plank desks and wide flat lavender caps made the room read like a kitchen, the YOTTA sign and the crane and aviation lights didn't glow, the terrace grasses read as onions, the draft's lift lobby as a stove and its skylight as a cracked floor.
+
+Round 2, in three chunks: the room (steel-and-glass caps with black posts, dark ply desks, three composed clusters per wall, a 3-tile red incident dashboard, a darker floor with tyre arcs and a cable channel), the world (warm-white YOTTA channel letters with a violet halo, the crane and GIGACORP fully in frame, fountain grasses, a real lift lobby, a glass skylight over a lit office, a cable tray from the ship to the prod rack, real dishes, side-on scooters) and the light (`ScenePiece.hot`: small outside lights keep their glow and bloom; a rotating red incident beacon beside the dashboard; bluer frame edges with a coral glow on the terrace; floor glints). Mean luminance 98 shipped, 100 draft.
+
+Left for later: on the shipped map the beacon and the left end of the back wall sit under the first ticket label; the wall is full there, so the neon logo is dropped. The black cable channel between the desk islands reads a little strong; the tyre arcs are subtle. The front cable tray is a thin line from this camera. The draft's skylight is one of the brighter areas. Not checked on a real GPU.
+
 ## Done when
 
-- [ ] The shot reads as "a startup's rooftop loft in the city at blue hour, launch night" without explanation, and nothing in it reads as food or a kitchen.
-- [ ] The skyline shows the road ahead (a tower going up, a corporate HQ in the distance).
-- [ ] No flat empty ground and no void in the 1440×810 frame.
-- [ ] Stations and players read at a glance; nothing hides them.
-- [ ] Works on the shipped map and on `?draft=seed-round`.
-- [ ] `npm run check` passes; other levels look as before.
+- [x] The shot reads as "a startup's rooftop loft in the city at blue hour, launch night" without explanation, and nothing in it reads as food or a kitchen.
+- [x] The skyline shows the road ahead (a tower going up, a corporate HQ in the distance).
+- [x] No flat empty ground and no void in the 1440×810 frame.
+- [x] Stations and players read at a glance; nothing hides them.
+- [x] Works on the shipped map and on `?draft=seed-round`.
+- [x] `npm run check` passes; other levels look as before.
