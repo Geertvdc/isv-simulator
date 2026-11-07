@@ -2,7 +2,9 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { type LevelMap, parseLevelMap } from '../../sim/level';
 import { ATMOSPHERES, DEFAULT_ATMOSPHERE, sceneOf } from './atmosphere';
-import { ambientAnchors } from './WorldFx';
+import { ambientAnchors, beaconAngle, beaconFlare, beaconSpot } from './WorldFx';
+import { loftRoom } from './rooms/loftRoom';
+import { gridToWorld } from '../projection';
 import { SCENES } from './scenes';
 
 const read = (path: string) =>
@@ -60,4 +62,43 @@ describe('ambient motion', () => {
       }
     });
   }
+});
+
+describe('the incident beacon', () => {
+  const maps = {
+    shipped: read('maps/level-04-seed-round.txt'),
+    draft: read('maps/drafts/seed-round.txt'),
+  };
+  for (const [name, map] of Object.entries(maps)) {
+    it(`sits on the loft's own beacon, right beside the dashboard, on the ${name} map`, () => {
+      const lens = beaconSpot(map);
+      expect(lens).not.toBeNull();
+      if (!lens) return;
+      const art = loftRoom(map).wallArt;
+      const dash = art.find((a) => a.art === 'dashboard');
+      const beacon = art.find((a) => a.art === 'beacon');
+      expect(dash && beacon && beacon.y === dash.y).toBe(true);
+      expect(Math.abs((beacon?.x ?? 0) - (dash?.x ?? 99))).toBeLessThanOrEqual(2.5);
+      // Over the beacon's wall tile, up on the wall and just in front of it.
+      const wall = gridToWorld(beacon?.x ?? 0, beacon?.y ?? 0);
+      expect(lens.x).toBeCloseTo(wall.x);
+      expect(lens.z).toBeGreaterThan(wall.z);
+      expect(lens.z).toBeLessThan(wall.z + 1);
+      expect(lens.y).toBeGreaterThan(0.8);
+    });
+  }
+
+  it('turns once a second, the same way every time', () => {
+    expect(beaconAngle(0, 1)).toBe(0);
+    expect(beaconAngle(250, 1)).toBeCloseTo(Math.PI / 2);
+    expect(beaconAngle(1250, 1)).toBeCloseTo(beaconAngle(250, 1));
+    expect(beaconAngle(500, 2)).toBeCloseTo(0);
+  });
+
+  it('flares only while the beam faces the camera', () => {
+    // A beam along +x turned by -pi/2 (3/4 of a turn) points along +z, at the camera.
+    expect(beaconFlare(beaconAngle(750, 1))).toBeCloseTo(1);
+    expect(beaconFlare(beaconAngle(250, 1))).toBe(0);
+    expect(beaconFlare(0)).toBeCloseTo(0);
+  });
 });

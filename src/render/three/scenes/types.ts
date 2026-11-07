@@ -42,7 +42,8 @@ export type GroundPainter = (b: ModelBuilder, g: GroundPatch, salt: number) => v
  * - `sway`: rocks gently about its foot, about 2°, in the breeze (a shrub,
  *   a feather flag, a weed, washing).
  * - `blink`: on for half a second, off for half a second (a hazard light,
- *   a beacon); give it a bright tint, as the glow layer isn't kept.
+ *   a beacon); give it a bright tint, as the glow layer is kept only
+ *   on a `hot` piece.
  * - `peck`: dips its head down now and then and turns a little (a bird
  *   pecking at crumbs); face it along +z.
  * - `wisp`: rises, swells and twists (smoke, steam); build it as a small

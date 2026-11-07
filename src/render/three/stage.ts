@@ -214,22 +214,7 @@ export class Stage {
   private showVignette(vignette: Atmosphere['vignette']): void {
     const style = this.vignette.style;
     style.display = vignette ? 'block' : 'none';
-    if (!vignette) return;
-    const edge = cssRgba(vignette.color, vignette.opacity);
-    const mid = cssRgba(vignette.color, vignette.opacity * 0.35);
-    const inner = Math.round(vignette.inner * 100);
-    const between = Math.round(((1 + vignette.inner) / 2) * 100);
-    const edges = `radial-gradient(ellipse farthest-corner at 50% 48%, transparent ${inner}%, ${mid} ${between}%, ${edge} 100%)`;
-    const glow = vignette.glow;
-    if (!glow) {
-      style.background = edges;
-      return;
-    }
-    // The glow over the edges: a wide soft ellipse, strongest at its centre.
-    const at = `${Math.round(glow.x * 100)}% ${Math.round(glow.y * 100)}%`;
-    const rx = Math.round(glow.reach * 100);
-    const half = cssRgba(glow.color, glow.opacity * 0.4);
-    style.background = `radial-gradient(${rx}% ${Math.round(rx * 1.4)}% at ${at}, ${cssRgba(glow.color, glow.opacity)} 0%, ${half} 45%, transparent 100%), ${edges}`;
+    if (vignette) style.background = vignetteCss(vignette);
   }
 
   private applyPixelRatio(): void {
@@ -311,6 +296,34 @@ export function applyPose(cam: THREE.PerspectiveCamera, pose: CameraPose): void 
   );
   cam.updateProjectionMatrix();
   cam.updateMatrixWorld();
+}
+
+/** The CSS background of a vignette: its edges, the optional edge band, and the optional glow over them. */
+export function vignetteCss(vignette: NonNullable<Atmosphere['vignette']>): string {
+  const edge = cssRgba(vignette.color, vignette.opacity);
+  const mid = cssRgba(vignette.color, vignette.opacity * 0.35);
+  const inner = Math.round(vignette.inner * 100);
+  const between = Math.round(((1 + vignette.inner) / 2) * 100);
+  let edges = `radial-gradient(ellipse farthest-corner at 50% 48%, transparent ${inner}%, ${mid} ${between}%, ${edge} 100%)`;
+  const band = vignette.band;
+  if (band) {
+    // The sky's color along the top, right and bottom edges (the left is the glow's).
+    const tint = cssRgba(vignette.color, band.opacity);
+    const depth = Math.round(band.depth * 100);
+    edges = [
+      `linear-gradient(to bottom, ${tint}, transparent ${depth}%)`,
+      `linear-gradient(to top, ${tint}, transparent ${depth}%)`,
+      `linear-gradient(to left, ${tint}, transparent ${depth}%)`,
+      edges,
+    ].join(', ');
+  }
+  const glow = vignette.glow;
+  if (!glow) return edges;
+  // The glow over the edges: a wide soft ellipse, strongest at its centre.
+  const at = `${Math.round(glow.x * 100)}% ${Math.round(glow.y * 100)}%`;
+  const rx = Math.round(glow.reach * 100);
+  const half = cssRgba(glow.color, glow.opacity * 0.4);
+  return `radial-gradient(${rx}% ${Math.round(rx * 1.4)}% at ${at}, ${cssRgba(glow.color, glow.opacity)} 0%, ${half} 45%, transparent 100%), ${edges}`;
 }
 
 let stage: Stage | null = null;

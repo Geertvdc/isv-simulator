@@ -9,11 +9,13 @@ import {
   type Atmosphere,
   DEFAULT_ATMOSPHERE,
   type MoteSeed,
+  glintSpots,
   moteSeeds,
   sceneOf,
 } from './atmosphere';
 import { blockHeight, facingYaw, heroPlacement, stationFacing } from './layout';
 import { LAMP_KEY } from './look';
+import { loftRoom } from './rooms/loftRoom';
 import { SCENES } from './scenes';
 import { GROUND, type Scene, type ScenePiece } from './scenes/types';
 import { coffeeVan, narrowboat, quayLamp } from './setDressing/canal';
@@ -55,6 +57,14 @@ const HALO = { color: 0xffb060, size: 0.7, opacity: 0.6 };
 const VAN_HATCH: Vec3 = { x: -0.15, y: 1.12, z: 0.72 };
 const BOAT_CHIMNEY: Vec3 = { x: -2.6, y: 0.62, z: -0.12 };
 const LAMP_HEAD: Vec3 = { x: 0, y: 2.0, z: 0 };
+/**
+ * The middle of the incident beacon's lens on the loft's back wall, from the
+ * wall tile's middle (kept in step with `beacon` in `roomModels/loft.ts`).
+ */
+const BEACON_LENS: Vec3 = { x: 0, y: 1, z: 0.62 };
+/** How bright the beam's core and the flare draw (over white, so they bloom), and the flare's size. */
+const BEACON_BOOST = 2.6;
+const BEACON_FLARE = 0.42;
 /** Moving things keep at least this far (grid units) from the level's outline. */
 const CLEAR_OF_PLAY = 1;
 
@@ -175,6 +185,13 @@ export class WorldFx {
   private readonly ripples: Ripple[] = [];
   private readonly lamps: { light: THREE.PointLight; base: number }[] = [];
   private flicker = 0;
+  /** The incident beacon's beam and its flare, if the atmosphere has one. */
+  private beacon: {
+    beam: THREE.Mesh;
+    flare: THREE.Sprite;
+    turns: number;
+    group: THREE.Group;
+  } | null = null;
   private shake = { untilMs: 0, intensity: 0 };
   shakeEnabled = true;
 
@@ -210,6 +227,7 @@ export class WorldFx {
       this.driftMotes(0);
     }
     this.buildAmbient(world, atmosphere);
+    this.buildFixtures(atmosphere);
     this.rug = new THREE.MeshBasicMaterial({
       color: RUG_COLOR,
       transparent: true,
@@ -260,6 +278,7 @@ export class WorldFx {
   update(timeMs: number, canvas: { width: number; height: number }): { x: number; y: number } {
     this.driftMotes(timeMs);
     this.moveAmbient(timeMs);
+    this.turnBeacon(timeMs);
     for (let i = this.puffs.length - 1; i >= 0; i--) {
       const puff = this.puffs[i];
       if (!puff) continue;
@@ -363,6 +382,89 @@ export class WorldFx {
         this.ambient.add(sprite);
       }
     }
+  }
+
+  /**
+   * The light fixtures' extras, each under its own group that `Stage` hides
+   * on `low`: the incident beacon's sweeping beam, and the lamps' glints on
+   * the floor.
+   */
+  private buildFixtures(atmosphere: Atmosphere): void {
+    const spec = atmosphere.beacon;
+    const lens = spec ? beaconSpot(this.map) : null;
+    if (spec && lens) {
+      const group = new THREE.Group();
+      group.userData[AMBIENT_KEY] = true;
+      putAt(group, lens);
+      this.root.add(group);
+      const color = new THREE.Color(spec.color).multiplyScalar(BEACON_BOOST);
+      const beam = new THREE.Mesh(
+        beamGeometry(spec.reach),
+        new THREE.MeshBasicMaterial({
+          color,
+          vertexColors: true,
+          transparent: true,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          toneMapped: false,
+          fog: false,
+        }),
+      );
+      group.add(beam);
+      const flare = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: haloTexture(),
+          color,
+          transparent: true,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          toneMapped: false,
+          fog: false,
+        }),
+      );
+      // Just in front of the dome, so the dome's own glow never hides it.
+      flare.position.set(0, 0.02, 0.06);
+      flare.scale.setScalar(BEACON_FLARE);
+      group.add(flare);
+      this.beacon = { beam, flare, turns: spec.turns, group };
+      this.turnBeacon(0);
+    }
+    const glints = atmosphere.glints;
+    const spots = glintSpots(atmosphere, this.map);
+    if (glints && spots.length > 0) {
+      const group = new THREE.Group();
+      group.userData[AMBIENT_KEY] = true;
+      this.root.add(group);
+      const geometry = new THREE.PlaneGeometry(glints.size, glints.size).rotateX(-Math.PI / 2);
+      const material = new THREE.MeshBasicMaterial({
+        map: haloTexture(),
+        color: glints.color,
+        transparent: true,
+        opacity: glints.opacity,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        fog: false,
+      });
+      for (const at of spots) {
+        const mesh = new THREE.Mesh(geometry, material);
+        // Just over the floor and the rug, under everything standing on it.
+        mesh.position.set(at.x, 0.006, at.z);
+        mesh.renderOrder = -1;
+        group.add(mesh);
+      }
+    }
+  }
+
+  /** The beacon's beam sweeps round; its flare peaks each time the beam faces the camera. */
+  private turnBeacon(timeMs: number): void {
+    const b = this.beacon;
+    if (!b?.group.visible) return;
+    const angle = beaconAngle(timeMs, b.turns);
+    b.beam.rotation.y = angle;
+    const flare = beaconFlare(angle);
+    b.flare.material.opacity = 0.15 + 0.85 * flare;
+    b.flare.scale.setScalar(BEACON_FLARE * (0.7 + 0.6 * flare));
   }
 
   /** Puffs rise and fade on their loops, streaks slide on the water, lamps flicker. */
@@ -521,6 +623,52 @@ export class WorldFx {
       server,
     };
   }
+}
+
+/**
+ * Where the incident beacon's lens is, in world units: on the loft's own
+ * beacon (`loftRoom`'s back-wall art, right beside the dashboard), or none
+ * when the room has no place for it.
+ */
+export function beaconSpot(map: LevelMap): Vec3 | null {
+  const spot = loftRoom(map).wallArt.find((a) => a.art === 'beacon');
+  if (!spot) return null;
+  const at = gridToWorld(spot.x, spot.y);
+  return { x: at.x + BEACON_LENS.x, y: at.y + BEACON_LENS.y, z: at.z + BEACON_LENS.z };
+}
+
+/**
+ * The beam's turn about the vertical at `timeMs` (radians, as `rotation.y`
+ * of a beam along +x): `turns` whole turns a second, one way round.
+ */
+export function beaconAngle(timeMs: number, turns: number): number {
+  return (((timeMs / 1000) * turns) % 1) * Math.PI * 2;
+}
+
+/** How squarely a beam at `angle` faces the camera (toward +z): 1 head on, 0 side-on and away. */
+export function beaconFlare(angle: number): number {
+  // Turned by `angle`, the beam points along (cos, 0, -sin).
+  return Math.max(0, -Math.sin(angle)) ** 6;
+}
+
+/**
+ * The beacon's beam: a flattened open cone from its tip at the lens out
+ * along +x, bright at the tip and gone by its far end.
+ */
+function beamGeometry(reach: number): THREE.BufferGeometry {
+  const g = new THREE.ConeGeometry(0.13, reach, 16, 4, true);
+  // Tip at the origin, opening along +x, flatter than tall.
+  g.translate(0, -reach / 2, 0)
+    .rotateZ(Math.PI / 2)
+    .scale(1, 0.55, 1);
+  const position = g.getAttribute('position');
+  const colors: number[] = [];
+  for (let i = 0; i < position.count; i++) {
+    const k = (1 - Math.min(1, Math.max(0, position.getX(i) / reach))) ** 2;
+    colors.push(k, k, k);
+  }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  return g;
 }
 
 /** A number in [0, 1) from an index and a salt. */
