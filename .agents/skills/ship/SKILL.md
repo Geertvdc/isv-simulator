@@ -37,8 +37,8 @@ gh pr merge <number> --auto --rebase --delete-branch=false
 
 CI is `.github/workflows/ci.yml` (`npm ci`, `npm run check`, `npm run build`).
 
-- Default: `gh pr checks <number> --watch --fail-fast`, then confirm the PR is merged (`gh pr view <number> --json state`).
-- If your agent has its own PR/CI integration and its rules say not to poll CI, don't wait: report that the PR will merge itself when CI is green, and pull `main` the next time you are asked to do something.
+- Always wait for CI to actually finish before you report back, even when auto-merge is on and even if your agent's own rules say not to poll CI: the user asked for this explicitly. Run `gh pr checks <number> --watch --fail-fast` (in the background if your agent limits command length, and wait for it to exit), then confirm the PR is merged (`gh pr view <number> --json state,mergedAt`; auto-merge can take a few seconds after the check turns green).
+- A ship is only done when the PR is merged **and** `main` is pulled in the main checkout (step 6). Never end with "it will merge itself" or "I'll pull main next time".
 - If auto-merge could not be set, merge yourself once CI is green (step 5).
 - Wait until the `check` job has actually **finished** green on the PR's latest commit. "Pending" is not green: a passing local `npm run check` is not enough, because the CI runner is slower than a laptop and can time out tests that pass locally.
 - `main` is protected: GitHub rejects the merge until `check` is green (admins included). Never bypass it with `--admin` or by pushing to `main` directly.
