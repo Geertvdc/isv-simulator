@@ -30,7 +30,7 @@
 - Load validates everything and falls back to defaults field by field; a save from a newer version is read as far as it can be, never thrown away
 - Migrate the old `isv-simulator.best-stars` key on first load
 - Only progress and settings are saved, never a round in progress
-- Unlocking: a level unlocks when the one before it has at least `STARS_TO_UNLOCK` stars (1, in `balance.ts`). The first level is always open. `?unlockAll` opens everything for testing
+- Unlocking: a level unlocks when the one before it has at least `STARS_TO_UNLOCK` stars (1, in `balance.ts`). The first level is always open. `?unlockAll` opens everything for testing (on by default in dev builds; `?locked` brings progression back)
 
 ## Tests
 

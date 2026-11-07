@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { ProfileAction } from './flow/flow';
 import { loadIdentity, replaceUserId, setDisplayName, uuidFromBytes } from './flow/identity';
-import { loadSave, mergeLevels, type StorageLike, writeSave } from './flow/save';
+import { loadSave, mergeLevels, type StorageLike, wantsUnlockAll, writeSave } from './flow/save';
 import { parseLag } from './net/lag';
 import { REJOIN_KEY } from './net/rejoin';
 import { createProfileApi, serverUrl, syncLevels } from './net/profileApi';
@@ -128,8 +128,9 @@ const profileApi = createProfileApi(gameServerUrl, (url, init) => fetch(url, ini
 const scene = new GameScene({
   storage,
   save,
-  // For testing: every level open, without touching the save.
-  unlockAll: params.has('unlockAll'),
+  // Every level open, without touching the save: `?unlockAll`, and by default in dev
+  // builds (`?locked` to test progression). Scenes are pictures: only when asked.
+  unlockAll: wantsUnlockAll(params, import.meta.env.DEV && !shownScene),
   scene: shownScene,
   practiceLevel,
   draftLevel,
