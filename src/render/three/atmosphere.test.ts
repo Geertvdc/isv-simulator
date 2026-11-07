@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { getTile, isSolid } from '../../sim/level';
 import { parseDraftMap } from '../../sim/draftMap';
-import { DOWN_THE_HALL, GARAGE, LEVELS, OPEN_PLAN } from '../../sim/levels';
+import { DOWN_THE_HALL, GARAGE, LEVELS, OPEN_PLAN, SEED_ROUND } from '../../sim/levels';
 import draftText from '../../../maps/drafts/garage.txt?raw';
 import openPlanDraft from '../../../maps/drafts/open-plan.txt?raw';
 import scaleUpDraft from '../../../maps/drafts/scale-up.txt?raw';
+import seedRoundDraft from '../../../maps/drafts/seed-round.txt?raw';
 import { LEVEL_LOOKS } from '../mapLook';
 import { fitCamera3d, gridToWorld, projectPoint } from '../projection';
 import {
@@ -41,8 +42,13 @@ describe('atmosphereFor', () => {
     expect(atmosphereFor('scale-up')).not.toBe(DEFAULT_ATMOSPHERE);
   });
 
+  it('gives seed-round its blue hour', () => {
+    expect(atmosphereFor(LEVEL_LOOKS[SEED_ROUND.id]?.scene)).toBe(ATMOSPHERES['seed-round']);
+    expect(atmosphereFor('seed-round')).not.toBe(DEFAULT_ATMOSPHERE);
+  });
+
   it('leaves every other level on the default', () => {
-    const lit = new Set([GARAGE.id, 'open-plan', 'scale-up']);
+    const lit = new Set([GARAGE.id, 'open-plan', 'scale-up', SEED_ROUND.id]);
     for (const level of LEVELS) {
       if (lit.has(level.id)) continue;
       expect(atmosphereFor(LEVEL_LOOKS[level.id]?.scene)).toBe(DEFAULT_ATMOSPHERE);
@@ -109,8 +115,38 @@ describe('morning and evening suns', () => {
     }
   });
 
+  it('puts the blue-hour sun low in the west and a little behind, high enough for the back row', () => {
+    for (const map of maps) {
+      const { s, t, elevation } = elevationOf('seed-round', map);
+      expect(s.x).toBeLessThan(t.x);
+      expect(s.z).toBeLessThan(t.z);
+      expect(Math.abs(s.x - t.x)).toBeGreaterThan(Math.abs(s.z - t.z) * 2);
+      expect(elevation).toBeGreaterThan(38);
+      expect(elevation).toBeLessThan(50);
+    }
+  });
+
+  it('keeps the blue hour cool: a blue-violet sky edge and a near-white fill', () => {
+    const a = atmosphereFor('seed-round');
+    const rgb = (c: number) => [(c >> 16) & 255, (c >> 8) & 255, c & 255] as const;
+    for (const c of [a.fog?.color ?? 0, a.backdrop?.inner ?? 0, a.vignette?.color ?? 0]) {
+      const [r, g, b] = rgb(c);
+      expect(b).toBeGreaterThan(r + 40);
+      expect(b).toBeGreaterThan(g + 40);
+    }
+    // Only slightly blue, so yellow stations don't go olive in the shade.
+    for (const c of [a.sky.sky, a.fill.color]) {
+      const [r, , b] = rgb(c);
+      expect(b - r).toBeLessThanOrEqual(50);
+      expect(r).toBeGreaterThan(190);
+    }
+    // The last warm light glows from the left edge, not over the play area.
+    expect(a.vignette?.glow?.x).toBeLessThanOrEqual(0.05);
+    expect(a.vignette?.glow?.opacity).toBeLessThanOrEqual(0.3);
+  });
+
   it('keeps vignettes gentle and lamps along the back wall only', () => {
-    for (const scene of ['open-plan', 'scale-up']) {
+    for (const scene of ['open-plan', 'scale-up', 'seed-round']) {
       const a = atmosphereFor(scene);
       expect(a.vignette?.opacity).toBeLessThanOrEqual(0.36);
       expect(a.vignette?.inner).toBeCloseTo(0.7);
@@ -216,6 +252,23 @@ describe('lampSpots', () => {
           expect(behind === null || isSolid(behind)).toBe(true);
           expect(y).toBeLessThan(map.height * 0.35);
         }
+      }
+    }
+  });
+
+  it('hangs the loft pendants along the back wall on both seed-round maps', () => {
+    for (const map of [SEED_ROUND.map, parseDraftMap(seedRoundDraft)]) {
+      const spots = lampSpots(atmosphereFor('seed-round'), map);
+      expect(spots.length).toBeGreaterThanOrEqual(3);
+      for (const p of spots) {
+        const x = Math.round(p.x);
+        const y = Math.round(p.z);
+        expect(y).toBe(1);
+        const tile = getTile(map, x, y);
+        expect(tile).not.toBeNull();
+        expect(tile).not.toBe('wall');
+        expect(tile).not.toBe('void');
+        expect(p.y).toBeCloseTo(2);
       }
     }
   });
