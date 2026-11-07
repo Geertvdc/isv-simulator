@@ -5,7 +5,14 @@ import { SEED_ROUND } from '../../../sim/levels';
 import draftText from '../../../../maps/drafts/seed-round.txt?raw';
 import { wallPiece } from '../../mapShape';
 import { gridToWorld } from '../../projection';
-import { POLISHED_WEAR, globeFit, loftRoom } from './loftRoom';
+import {
+  LOFT_ART_HALF,
+  LOFT_ART_SPAN,
+  LOFT_CAP_CLUSTERS,
+  POLISHED_WEAR,
+  globeFit,
+  loftRoom,
+} from './loftRoom';
 
 describe('loftRoom', () => {
   const shipped = SEED_ROUND.map;
@@ -36,38 +43,56 @@ describe('loftRoom', () => {
     expect(right?.tiles).toHaveLength(2);
   });
 
-  it('hangs each piece of art once, on back walls facing the room, the wide ones on two tiles', () => {
+  it('hangs each piece of art once, on back walls facing the room, over the tiles it spans', () => {
     for (const m of maps) {
       const art = loftRoom(m).wallArt;
       const names = art.map((a) => a.art);
       expect(new Set(names).size).toBe(names.length);
-      for (const must of ['dashboard', 'cheque', 'growthChart', 'neon'] as const)
+      for (const must of ['dashboard', 'cheque', 'growthChart'] as const)
         expect(names).toContain(must);
       for (const a of art) {
-        const wide = a.art === 'dashboard' || a.art === 'cheque';
-        expect(Number.isInteger(a.x)).toBe(!wide);
-        for (const x of [Math.floor(a.x), Math.ceil(a.x)]) {
+        const span = LOFT_ART_SPAN[a.art];
+        expect(Number.isInteger(a.x)).toBe(span % 2 === 1);
+        for (let i = 0; i < span; i++) {
+          const x = a.x - (span - 1) / 2 + i;
           expect(wallPiece(m, x, a.y)).toBe('wall');
           expect(isOpen(getTile(m, x, a.y - 1))).toBe(false);
-          // Only the neon hangs high enough to show over a counter; the rest want floor in front.
+          // Only the neon and the chart hang high enough to show over a counter.
           const front = getTile(m, x, a.y + 1);
-          if (a.art === 'neon') expect(['floor', 'counter']).toContain(front);
+          if (a.art === 'neon' || a.art === 'growthChart')
+            expect(['floor', 'counter']).toContain(front);
           else expect(front).toBe('floor');
         }
       }
+      // Nothing overlaps on the wall.
+      for (const a of art)
+        for (const b of art)
+          if (a !== b && a.y === b.y)
+            expect(Math.abs(a.x - b.x)).toBeGreaterThan(
+              LOFT_ART_HALF[a.art] + LOFT_ART_HALF[b.art],
+            );
       // The dashboard and the cheque keep a bare tile between them.
       const [dash, cheque] = (['dashboard', 'cheque'] as const).map((n) =>
         art.find((a) => a.art === n),
       );
       if (dash && cheque && dash.y === cheque.y)
-        expect(Math.abs(dash.x - cheque.x)).toBeGreaterThanOrEqual(3);
+        expect(Math.abs(dash.x - cheque.x)).toBeGreaterThanOrEqual(3.5);
     }
-    // On the shipped map the neon goes over the counter in the back corner.
-    expect(loftRoom(shipped).wallArt.find((a) => a.art === 'neon')).toEqual({
+    // The dashboard on the right half of the wall, off the middle where ticket labels pop up.
+    for (const m of maps) {
+      const dash = loftRoom(m).wallArt.find((a) => a.art === 'dashboard');
+      expect(dash?.x).toBeGreaterThanOrEqual((m.width - 1) / 2);
+    }
+    // On the shipped map the wall is full: the growth chart goes over the counter in the corner.
+    expect(loftRoom(shipped).wallArt.find((a) => a.art === 'growthChart')).toEqual({
       x: 12,
       y: 0,
-      art: 'neon',
+      art: 'growthChart',
     });
+    // The draft's longer wall has room for the neon and the second screen, on the right half.
+    const errors = loftRoom(draft).wallArt.find((a) => a.art === 'errors');
+    expect(errors?.x).toBeGreaterThan((draft.width - 1) / 2);
+    expect(loftRoom(draft).wallArt.map((a) => a.art)).toContain('neon');
   });
 
   it('puts wear only on floor, never on a spawn, the tyre marks in from the lift', () => {
@@ -85,8 +110,19 @@ describe('loftRoom', () => {
       }
       const kinds = new Set(Object.values(floorWear));
       expect(kinds.has(POLISHED_WEAR.tyres) || kinds.has(POLISHED_WEAR.tyresX)).toBe(true);
-      expect(kinds.has(POLISHED_WEAR.floorBox)).toBe(true);
+      expect(kinds.has(POLISHED_WEAR.tyresMid) || kinds.has(POLISHED_WEAR.tyresMidX)).toBe(true);
+      expect(kinds.has(POLISHED_WEAR.floorBox) || kinds.has(POLISHED_WEAR.floorBoxZ)).toBe(true);
     }
+  });
+
+  it('runs the cable channel between the two desk islands on the shipped map, a floor box each end', () => {
+    const wear = loftRoom(shipped).floorWear;
+    expect([5, 6, 7, 8].map((x) => wear[`${x},4`])).toEqual([
+      POLISHED_WEAR.floorBox,
+      POLISHED_WEAR.channelX,
+      POLISHED_WEAR.channelX,
+      POLISHED_WEAR.floorBox,
+    ]);
   });
 
   it('lays one 2×2 rug against a wall, at least two tiles from every spawn', () => {
@@ -107,10 +143,19 @@ describe('loftRoom', () => {
     for (const m of maps) {
       const { capProps, frontProps } = loftRoom(m);
       expect(capProps.length).toBeGreaterThanOrEqual(6);
+      expect(capProps.length).toBeLessThanOrEqual(
+        LOFT_CAP_CLUSTERS.back + 2 * LOFT_CAP_CLUSTERS.side,
+      );
       for (const p of capProps) {
         expect(getTile(m, p.x, p.y)).toBe('wall');
         expect(isOpen(getTile(m, p.x, p.y - 1))).toBe(false);
+        // One whole cluster per tile, well apart: the rest of the wall bare.
+        expect(p.toward).toEqual({ dx: 0, dy: 0 });
+        for (const q of capProps)
+          if (q !== p)
+            expect(Math.max(Math.abs(q.x - p.x), Math.abs(q.y - p.y))).toBeGreaterThanOrEqual(2);
       }
+      expect(frontProps.length).toBeLessThanOrEqual(LOFT_CAP_CLUSTERS.front);
       expect(frontProps.length).toBeGreaterThan(0);
       for (const p of frontProps) {
         expect(p.y).toBe(m.height - 1);
@@ -118,6 +163,37 @@ describe('loftRoom', () => {
         expect(isOpen(getTile(m, p.x, p.y - 1))).toBe(true);
       }
     }
+  });
+
+  it('puts one low cluster each side of a ship hatch on the front edge, nothing between', () => {
+    const { frontProps, roofDoor } = loftRoom(shipped);
+    const xs = roofDoor?.tiles.map((t) => t.x) ?? [];
+    expect(frontProps.map((p) => p.x)).toEqual([2, 11]);
+    expect(frontProps.filter((p) => p.x < Math.min(...xs))).toHaveLength(1);
+    expect(frontProps.filter((p) => p.x > Math.max(...xs))).toHaveLength(1);
+  });
+
+  it('stands black steel posts at the corners and every few tiles, clear of doors and art', () => {
+    for (const m of maps) {
+      const { posts, wallArt, liftDoor, roofDoor } = loftRoom(m);
+      expect(posts.length).toBeGreaterThanOrEqual(8);
+      for (const p of posts) {
+        // On a tile edge along its wall.
+        const along = p.side === 'back' ? p.x : p.y;
+        expect(Math.abs(along - Math.floor(along) - 0.5)).toBeLessThan(1e-9);
+        const { x, y } = p;
+        for (const d of [liftDoor, roofDoor])
+          for (const t of d?.tiles ?? [])
+            expect(Math.abs(t.x - x) + Math.abs(t.y - y)).toBeGreaterThan(0.5);
+        if (p.side === 'back')
+          for (const a of wallArt)
+            if (a.y === p.y) expect(Math.abs(a.x - p.x)).toBeGreaterThan(LOFT_ART_HALF[a.art]);
+      }
+    }
+    // The shipped room's four corners each get one.
+    const keys = new Set(loftRoom(shipped).posts.map((p) => `${p.side}:${p.x},${p.y}`));
+    for (const k of ['back:0.5,0', 'left:0,0.5', 'left:0,8.5', 'right:13,0.5', 'right:13,8.5'])
+      expect(keys.has(k)).toBe(true);
   });
 
   it('slides a globe along its row clear of the stations, never off the room', () => {
