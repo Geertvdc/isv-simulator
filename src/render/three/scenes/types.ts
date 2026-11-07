@@ -63,6 +63,13 @@ export interface ScenePiece {
   row: 'near' | 'far';
   /** A living prop, its own mesh that moves; left out for a still one (merged with the rest). */
   alive?: AliveKind;
+  /**
+   * A small light source (a lit sign's letters, an aviation light, a string
+   * bulb): its glow parts keep their full color and bloom on medium and high
+   * instead of being dimmed like the rest of the outside. Never for windows
+   * or big areas.
+   */
+  hot?: boolean;
 }
 
 /**
