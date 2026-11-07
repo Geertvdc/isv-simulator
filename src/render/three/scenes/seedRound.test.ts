@@ -181,6 +181,73 @@ describe('seedRoundScene', () => {
     expect(lit).toBeGreaterThan(0);
   });
 
+  for (const [name, map] of Object.entries(MAPS)) {
+    const scene = seedRoundScene(map);
+    const pose = scenePose(map);
+    /** The screen box of every vertex of `p`'s layers that passes `keep`. */
+    const box = (p: ScenePiece, keep: (v: THREE.Vector3) => boolean = () => true) => {
+      const shown = worldPoints(p)
+        .filter(keep)
+        .map((v) => projectPoint(pose, v));
+      return {
+        x0: Math.min(...shown.map((s) => s.x)),
+        x1: Math.max(...shown.map((s) => s.x)),
+        y0: Math.min(...shown.map((s) => s.y)),
+        y1: Math.max(...shown.map((s) => s.y)),
+      };
+    };
+
+    it(`shows the whole crane and its lights in the top of the frame (${name})`, () => {
+      const crane = scene.pieces.find(
+        (p) => p.row === 'far' && p.piece.size[0] === 1 && p.at.z < -3,
+      );
+      if (!crane) throw new Error('no crane');
+      const lights = scene.pieces.filter((p) => p.piece === rooftop.redLight && p.at.z < -3);
+      expect(lights.length).toBe(2);
+      // Its foot stands in the street canyon behind the back parapet: what shows is above the roof.
+      for (const p of [crane, ...lights]) {
+        const b = box(p, (v) => v.y > GROUND + 0.45);
+        expect(b.x0).toBeGreaterThan(700);
+        expect(b.x1).toBeLessThan(1300);
+        expect(b.y0).toBeGreaterThan(5);
+        expect(b.y1).toBeLessThan(70);
+      }
+    });
+
+    it(`keeps GIGACORP clear of the mute button (${name})`, () => {
+      const corp = scene.pieces.find(
+        (p) => p.row === 'far' && p.piece.size[0] === 2.4 && p.piece.size[1] === 2.4,
+      );
+      if (!corp) throw new Error('no corporate tower');
+      const model = corp.piece.model(0);
+      const pos = model.glow?.getAttribute('position');
+      const shown = [];
+      for (let i = 0; pos && i < pos.count; i++) {
+        // The logo's letters and mark: the glow on the front face at the logo's height.
+        if (Math.abs(pos.getY(i) - 0.45) > 0.2 || pos.getZ(i) < 0.05) continue;
+        shown.push(
+          projectPoint(pose, {
+            x: pos.getX(i) + corp.at.x,
+            y: pos.getY(i) + corp.at.y,
+            z: pos.getZ(i) + corp.at.z,
+          }),
+        );
+      }
+      expect(shown.length).toBeGreaterThan(0);
+      const [x0, , , y1] = HUD_RECTS.mute ?? [0, 0, 0, 0];
+      for (const s of shown) expect(s.x < x0 || s.y > y1).toBe(true);
+      for (const s of shown) expect(s.x).toBeGreaterThan(1150);
+    });
+
+    it(`lights its small emitters hot, and only those (${name})`, () => {
+      const hot = scene.pieces.filter((p) => p.hot);
+      expect(hot.some((p) => p.piece === rooftop.redLight)).toBe(true);
+      expect(hot.some((p) => p.piece === rooftop.logoSign('YOTTA'))).toBe(true);
+      // Never the windows: no city block, tower or core is hot.
+      for (const p of hot) expect(p.piece.size[1]).toBeLessThan(1.1);
+    });
+  }
+
   it('fills the light well of the draft: roof lights and a tree', () => {
     const map = MAPS.draft as LevelMap;
     const scene = seedRoundScene(map);
