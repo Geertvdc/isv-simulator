@@ -5,7 +5,7 @@ import { SLAB_DEPTH, STATION_HEIGHT, WALL_HEIGHT } from '../layout';
 import { FLOOR_COLORS, WALL_COLORS } from '../look';
 import { COLOR } from '../palette';
 import type { CounterRun } from '../rooms/counterRun';
-import { POLISHED_WEAR, POLISHED_WEAR_KINDS } from '../rooms/loftRoom';
+import { LOFT_ART_HALF, POLISHED_WEAR, POLISHED_WEAR_KINDS } from '../rooms/loftRoom';
 import { lettering } from '../setDressing/businessPark';
 import type { StationModel } from '../stationModels';
 
@@ -66,8 +66,8 @@ const CONCRETE = 0x80868a;
 const GALVANISED = 0xa3aaaf;
 /** The founders' kilim rug: muted terracotta, a charcoal border, cream lines, a dusty rose motif. */
 const RUG = { field: 0x9a6a58, border: 0x4a4246, line: 0xd8c8a8, motif: 0xb88a86 } as const;
-/** Dark-stained ply: the desk tops, darker than every station top. */
-export const STAINED_PLY = 0x5a4838;
+/** Dark-stained ply: the desk tops, a near-neutral dark grey-brown, darker than every station top. */
+export const STAINED_PLY = 0x474442;
 
 // ---- Walls ----
 
@@ -76,34 +76,55 @@ const SKIRTING = 0.06;
 const PLY_TOP = 0.46;
 const COURSE = 0.1;
 const BRICK_LENGTH = 0.25;
-/** The cap: cool light coping with a lip, a black steel angle under it. */
+/** The cap's lip past the wall's faces. */
 const CAP = 0.045;
 const CAP_LIP = 0.022;
-/** Looks a wall comes in: a socket and conduit, scuffs and stickers, a patch, a steel column. */
+/** Looks a wall comes in: a socket and conduit, scuffs and stickers, a patch, plain ply. */
 export const LOFT_WALL_LOOKS = 4;
+/** The glazed cap: black steel edges along the run, a mullion every half tile, glass between. */
+const CAP_EDGE = 0.03;
+const MULLION = 0.025;
+const CAP_GLASS = 0x858c92;
+const CAP_SHEEN = 0xafb6bc;
 
 /**
- * The cool light coping on top of a wall `h` tall (shaded a little by
- * `look`): a black steel angle under it, its lip, a groove halfway across
- * and a joint at the tile's edge (along x only on the low front wall).
+ * The steel-and-glass cap on top of a wall `h` tall, its run along x or z:
+ * a cool steel coping slab on a black steel angle, black steel edge strips
+ * along both long edges (down the slab's sides too), a steel mullion across
+ * every half tile, and between them inset glass panels with a lighter sheen
+ * across each, so the wall tops read as the loft's glazing, not a worktop.
  */
-function cap(b: ModelBuilder, h: number, look: number, along: 'x' | 'both'): void {
+function cap(b: ModelBuilder, h: number, along: 'x' | 'z'): void {
   const { top } = WALL_COLORS.loft;
   const body = h - CAP;
-  b.box(1.03, 0.016, 1.03, BLACK_STEEL, { at: [0, body - 0.008, 0] }, 0);
-  b.box(1 + CAP_LIP * 2, CAP, 1 + CAP_LIP * 2, tint(top, 0.12), { at: [0, h - CAP / 2, 0] }, 0);
-  // The top a shade darker than its lip, so it reads as coping; its tone moves a little per stone.
-  const shade = [0, 0.025, -0.02, 0.01][look] ?? 0;
-  b.box(0.97, 0.004, 0.97, tint(top, shade), { at: [0, h + 0.002, 0] }, 0);
-  // One joint at the stone's edge, faint, so the tops never read as a tiled path.
-  const joint = tint(top, -0.18);
   const lip = 1 + CAP_LIP * 2;
-  b.box(0.012, 0.005, lip, joint, { at: [-0.5, h + 0.003, 0] }, 0);
-  b.box(0.012, CAP, 0.004, joint, { at: [-0.5, h - CAP / 2, 0.5 + CAP_LIP + 0.001] }, 0);
-  if (along === 'both') {
-    b.box(lip, 0.005, 0.012, joint, { at: [0, h + 0.003, -0.5] }, 0);
-    for (const s of [-1, 1])
-      b.box(0.004, CAP, 0.012, joint, { at: [s * (0.5 + CAP_LIP + 0.001), h - CAP / 2, -0.5] }, 0);
+  // A box `l` along the run, `w` across it, at (u along, y, v across).
+  const run = (l: number, hh: number, w: number, color: number, u: number, y: number, v: number) =>
+    along === 'x'
+      ? b.box(l, hh, w, color, { at: [u, y, v] }, 0)
+      : b.box(w, hh, l, color, { at: [v, y, u] }, 0);
+  b.box(1.03, 0.016, 1.03, BLACK_STEEL, { at: [0, body - 0.008, 0] }, 0);
+  b.box(lip, CAP, lip, top, { at: [0, h - CAP / 2, 0] }, 0);
+  for (const s of [-1, 1]) {
+    // The long edges: a strip on top and down the slab's side.
+    run(1, 0.008, CAP_EDGE, BLACK_STEEL, 0, h + 0.004, s * (lip / 2 - CAP_EDGE / 2));
+    run(1, CAP + 0.008, 0.006, BLACK_STEEL, 0, h - CAP / 2 + 0.004, s * (lip / 2 + 0.003));
+  }
+  const inner = lip - CAP_EDGE * 2;
+  for (const u of [-0.5, 0]) run(MULLION, 0.007, inner, BLACK_STEEL, u, h + 0.0035, 0);
+  // The glass between: inset a little from the steel, a sheen across it on the slant.
+  const pane = 0.5 - MULLION - 0.024;
+  const across = inner - 0.03;
+  for (const u of [-0.25, 0.25]) {
+    run(pane, 0.003, across, CAP_GLASS, u, h + 0.0015, 0);
+    for (const [du, dv, w, l] of [
+      [-0.04, -0.12, 0.05, 0.3],
+      [0.06, -0.05, 0.018, 0.2],
+    ] as const) {
+      const turn = along === 'x' ? -0.75 : 0.75;
+      const [x, z] = along === 'x' ? [u + du, dv] : [dv, u + du];
+      b.box(w, 0.002, l, CAP_SHEEN, { at: [x, h + 0.0034, z], rot: [0, turn, 0] }, 0);
+    }
   }
 }
 
@@ -233,7 +254,7 @@ export function loftWallModel(piece: WallPiece, look: number): Model {
       );
       b.box(0.4, 0.005, 0.005, tint(BIRCH, -0.08), on(0.15 - 0.3 * (look % 2), 0.1), 0);
     }
-    cap(b, h, look, 'x');
+    cap(b, h, 'x');
     return b.build();
   }
   const h = WALL_HEIGHT;
@@ -273,15 +294,31 @@ export function loftWallModel(piece: WallPiece, look: number): Model {
       // A fresh patch of paint where a shelf came down, one hole never filled.
       mark(0.3, 0.2, tint(face, 0.08), -0.08, PLY_TOP + 0.3);
       mark(0.016, 0.016, 0x3b3833, 0.24, PLY_TOP + 0.32);
-    } else {
-      // A black steel column at the tile's edge, its flanges, a bolted base plate.
-      mark(0.09, body - 0.01, BLACK_STEEL, -0.46, body / 2);
-      mark(0.13, 0.03, tint(BLACK_STEEL, 0.15), -0.46, 0.03);
-      for (const y of [PLY_TOP + 0.18, PLY_TOP + 0.42])
-        mark(0.11, 0.012, tint(BLACK_STEEL, 0.2), -0.46, y);
     }
   });
-  cap(b, h, look, 'both');
+  // A side wall runs down the map (its tiles stacked in z), the rest across.
+  cap(b, h, piece === 'wall-inner' ? 'z' : 'x');
+  return b.build();
+}
+
+/**
+ * A black steel column standing on a wall's inner face (toward +z), its
+ * middle at x = 0: an I-section with lighter flange edges, a bolted base
+ * plate and a cap plate into the coping's steel edge. `rooms/loft` places
+ * them at the corners and every few tiles (`LoftRoom.posts`).
+ */
+export function loftPostModel(): Model {
+  const b = new ModelBuilder();
+  const h = WALL_HEIGHT + 0.012;
+  const z = 0.5 + 0.03;
+  b.box(0.075, h, 0.05, BLACK_STEEL, { at: [0, h / 2, z] }, 0.004);
+  for (const s of [-1, 1])
+    b.box(0.012, h - 0.04, 0.052, tint(BLACK_STEEL, 0.22), { at: [s * 0.032, h / 2, z] }, 0);
+  b.box(0.022, h - 0.06, 0.008, tint(BLACK_STEEL, -0.25), { at: [0, h / 2, z + 0.026] }, 0);
+  b.box(0.14, 0.018, 0.09, BLACK_STEEL, { at: [0, 0.009, z + 0.01] }, 0.003);
+  for (const s of [-1, 1])
+    b.cylinder(0.009, 0.009, 0.01, 0x5a6068, { at: [s * 0.05, 0.022, z + 0.03] }, 8);
+  b.box(0.1, 0.014, 0.08, BLACK_STEEL, { at: [0, h - 0.007, z - 0.012] }, 0.003);
   return b.build();
 }
 
@@ -331,6 +368,17 @@ export function loftPlinthModel(look: number): Model {
 }
 
 // ---- Polished concrete ----
+
+/**
+ * The two scooters' tyre tracks from the lift: how far across the tile each
+ * runs at depth `s` (tiles in from the lift), and where it fades out.
+ */
+const TYRE_ARCS: readonly { at: (s: number) => number; end: number }[] = [
+  { at: (s) => -0.05 - 0.045 * s * s, end: 2.6 },
+  { at: (s) => 0.07 + 0.03 * s * s - 0.02 * s, end: 3 },
+];
+/** The floor-box channel's black steel lid, across. */
+const CHANNEL_WIDTH = 0.06;
 
 /** Mottled looks the concrete comes in, picked per tile by its hash. */
 const POLISHED_MOTTLES = 4;
@@ -410,57 +458,96 @@ export function polishedFloorModel(look: number): Model {
   switch (wear) {
     case POLISHED_WEAR.tyres:
     case POLISHED_WEAR.tyresX:
+    case POLISHED_WEAR.tyresMid:
+    case POLISHED_WEAR.tyresMidX:
     case POLISHED_WEAR.tyresFaint:
     case POLISHED_WEAR.tyresFaintX: {
-      // Two scooters' tyre marks: thin rubber lines, gently curving.
-      const faint = wear === POLISHED_WEAR.tyresFaint || wear === POLISHED_WEAR.tyresFaintX;
-      const turn =
-        wear === POLISHED_WEAR.tyresX || wear === POLISHED_WEAR.tyresFaintX ? Math.PI / 2 : 0;
-      const c = dark(faint ? 0.1 : 0.17);
-      for (const [o, bend] of [
-        [-0.12, 0.06],
-        [0.1, -0.08],
-      ] as const)
-        for (let k = 0; k < 4; k++) {
-          const z = -0.375 + k * 0.25;
-          const x = o + bend * Math.sin((k / 3) * Math.PI);
-          const [px, pz] = turn ? [z, x] : [x, z];
-          if (faint && k === 3) continue;
-          mark(0.022, 0.26, c, px, pz, 0.002, turn + bend * (k - 1.5) * 0.6);
+      // Two scooters' tyre tracks in from the lift, side by side at the door, then arcing
+      // apart; each tile draws its stretch of the arcs (its depth in from the lift), the
+      // third tile fainter and fading out.
+      const depth =
+        wear === POLISHED_WEAR.tyres || wear === POLISHED_WEAR.tyresX
+          ? 0
+          : wear === POLISHED_WEAR.tyresMid || wear === POLISHED_WEAR.tyresMidX
+            ? 1
+            : 2;
+      const across =
+        wear === POLISHED_WEAR.tyresX ||
+        wear === POLISHED_WEAR.tyresMidX ||
+        wear === POLISHED_WEAR.tyresFaintX;
+      for (const arc of TYRE_ARCS) {
+        const steps = 8;
+        for (let k = 0; k < steps; k++) {
+          const s0 = depth + k / steps;
+          const s1 = depth + (k + 1) / steps;
+          if (s1 > arc.end + 1e-9) break;
+          const [a0, a1] = [arc.at(s0), arc.at(s1)];
+          if (Math.abs(a0) > 0.47 || Math.abs(a1) > 0.47) continue;
+          // Along the tile from the lift's side (−) inward (+); across it by the arc.
+          const [z0, z1] = [s0 - depth - 0.5, s1 - depth - 0.5];
+          const fade = depth < 2 ? 0 : (s0 - 2) * 0.7;
+          const c = mix(base, 0x3a3632, (depth < 2 ? 0.36 : 0.26) * (1 - fade));
+          const len = Math.hypot(z1 - z0, a1 - a0) + 0.004;
+          const turn = Math.atan2(a1 - a0, z1 - z0);
+          const [px, pz] = across ? [(z0 + z1) / 2, (a0 + a1) / 2] : [(a0 + a1) / 2, (z0 + z1) / 2];
+          b.box(
+            0.042,
+            0.002,
+            len,
+            c,
+            {
+              at: [px, 0.002, pz],
+              rot: [0, across ? Math.PI / 2 - turn : turn, 0],
+            },
+            0,
+          );
         }
+      }
       break;
     }
     case POLISHED_WEAR.scuffs: {
       // Castor arcs and a dull patch where the chair rolls.
-      mark(0.6, 0.5, tint(base, -0.035), 0.02, 0.04, 0.0018);
+      mark(0.62, 0.52, tint(base, -0.05), 0.02, 0.04, 0.0018);
       for (const [x, z, r] of [
         [-0.14, 0.12, 0.6],
         [0.16, 0.02, -0.5],
         [0.02, -0.16, 0.15],
         [-0.04, 0.24, -0.2],
+        [0.12, 0.2, 1.1],
       ] as const)
-        mark(0.24, 0.014, dark(0.14), x, z, 0.002, r);
+        mark(0.26, 0.016, dark(0.18), x, z, 0.002, r);
       break;
     }
     case POLISHED_WEAR.channelX:
     case POLISHED_WEAR.channelZ:
-    case POLISHED_WEAR.floorBox: {
-      // The floor-box channel: a brushed steel lid flush in the slab, its screws; the box at the desk end.
-      const turn = wear === POLISHED_WEAR.channelZ ? Math.PI / 2 : 0;
-      if (wear === POLISHED_WEAR.floorBox) {
-        b.box(0.3, 0.004, 0.3, 0x8f969c, { at: [0, 0.002, 0] }, 0);
-        b.box(0.26, 0.005, 0.26, 0xa9b0b6, { at: [0, 0.003, 0] }, 0);
+    case POLISHED_WEAR.floorBox:
+    case POLISHED_WEAR.floorBoxZ: {
+      // The floor-box cable channel: a black steel lid flush in the slab, its screws; a floor
+      // box (lid up, cables out) where it meets a desk.
+      const turn =
+        wear === POLISHED_WEAR.channelZ || wear === POLISHED_WEAR.floorBoxZ ? Math.PI / 2 : 0;
+      b.box(1, 0.004, CHANNEL_WIDTH, BLACK_STEEL, { at: [0, 0.002, 0], rot: [0, turn, 0] }, 0);
+      b.box(
+        1,
+        0.0045,
+        0.008,
+        tint(BLACK_STEEL, 0.25),
+        { at: [0, 0.0025, 0], rot: [0, turn, 0] },
+        0,
+      );
+      if (wear === POLISHED_WEAR.floorBox || wear === POLISHED_WEAR.floorBoxZ) {
+        b.box(0.3, 0.005, 0.3, BLACK_STEEL, { at: [0, 0.0025, 0] }, 0);
+        b.box(0.24, 0.006, 0.24, 0x5a6068, { at: [0, 0.003, 0] }, 0);
+        // The lid flipped up on its hinge, a socket's plugs and their leads.
+        b.box(0.24, 0.12, 0.012, 0x5a6068, { at: [0, 0.06, -0.12], rot: [0.25, 0, 0] }, 0.003);
         b.box(0.07, 0.03, 0.05, 0xd8dadc, { at: [0.05, 0.016, 0.02] }, 0.005);
-        b.box(0.012, 0.012, 0.3, 0x2b2f38, { at: [0.05, 0.006, -0.13] }, 0);
-        b.box(0.012, 0.012, 0.22, 0x3a6ab8, { at: [-0.04, 0.006, -0.1], rot: [0, 0.3, 0] }, 0);
-      } else {
-        b.box(1, 0.004, 0.11, 0x8f969c, { at: [0, 0.002, 0], rot: [0, turn, 0] }, 0);
-        b.box(1, 0.005, 0.08, 0xa9b0b6, { at: [0, 0.003, 0], rot: [0, turn, 0] }, 0);
-        for (const u of [-0.45, 0.05]) {
+        b.box(0.012, 0.012, 0.3, 0x2b2f38, { at: [0.05, 0.006, 0.17] }, 0);
+        b.box(0.012, 0.012, 0.22, 0x3a6ab8, { at: [-0.04, 0.006, 0.14], rot: [0, 0.3, 0] }, 0);
+      } else
+        for (const u of [-0.25, 0.25]) {
           const [x, z] = turn ? [0, u] : [u, 0];
-          b.box(0.012, 0.006, 0.09, 0x8f969c, { at: [x, 0.0035, z], rot: [0, turn, 0] }, 0);
+          b.cylinder(0.008, 0.008, 0.006, 0x8a929c, { at: [x, 0.004, z] }, 8);
         }
-      }
       break;
     }
     case POLISHED_WEAR.rugNW:
@@ -546,10 +633,12 @@ function quarterDiamond(
 // ---- Desks ----
 
 const DESK_TOP = 0.05;
+/** The birch ply edge under the desk's stained face. */
+const DESK_BIRCH = 0.015;
 
 /**
  * A desk of the loft: a black steel trestle frame and a dark-stained ply
- * top with its birch ply edge, built from where it sits in its run of
+ * top (one sheet along the run) with a thin birch ply edge on a steel rim, built from where it sits in its run of
  * counters (x along the run). Trestles stand at the run's ends and every
  * second tile, so the legs never read as a row of glyphs; a steel rail runs
  * along under the top between them.
@@ -585,26 +674,20 @@ export function loftDeskCounter(run: CounterRun): StationModel {
       for (const s of [-1, 1]) b.box(0.06, 0.012, 0.06, 0x1d1f23, { at: [x, 0.006, s * 0.37] }, 0);
     }
   }
-  // The top: its birch ply edge (the layers show as lines), the stained face, a seam where tops meet.
-  b.box(len, DESK_TOP, 0.92, BIRCH, { at: [mid, top - DESK_TOP / 2, 0] }, 0.004);
-  for (const y of [-0.016, 0, 0.016])
-    b.box(len + 0.002, 0.004, 0.922, BIRCH_DARK, { at: [mid, top - DESK_TOP / 2 + y, 0] }, 0);
-  b.box(len - 0.016, 0.008, 0.9, STAINED_PLY, { at: [mid, top + 0.001, 0] }, 0);
-  for (const [z, w] of [
-    [-0.3, 0.7],
-    [0.05, 0.55],
-    [0.28, 0.65],
-  ] as const)
-    b.box(
-      Math.min(w, len - 0.1),
-      0.002,
-      0.01,
-      tint(STAINED_PLY, 0.08),
-      { at: [mid + z * 0.2, top + 0.0055, z] },
-      0,
-    );
-  if (!minusEnd)
-    b.box(0.008, 0.002, 0.9, tint(STAINED_PLY, -0.4), { at: [-0.5, top + 0.0055, 0] }, 0);
+  // The top, one sheet along the run: a black steel rim, a thin birch ply edge over it, the
+  // stained face inset so the birch shows as a hairline round it. No seams, no grain.
+  const rim = DESK_TOP - DESK_BIRCH;
+  b.box(len, rim, 0.92, BLACK_STEEL, { at: [mid, top - DESK_BIRCH - rim / 2, 0] }, 0.003);
+  b.box(len, DESK_BIRCH, 0.91, BIRCH, { at: [mid, top - DESK_BIRCH / 2, 0] }, 0);
+  const inset = 0.008;
+  b.box(
+    len - (minusEnd ? inset : 0) - (plusEnd ? inset : 0),
+    0.004,
+    0.91 - inset * 2,
+    STAINED_PLY,
+    { at: [mid + ((minusEnd ? inset : 0) - (plusEnd ? inset : 0)) / 2, top + 0.002, 0] },
+    0,
+  );
   if (run.knob) {
     // A cable grommet, a laptop charger's lead out of it.
     b.cylinder(0.035, 0.035, 0.004, 0x1d1f23, { at: [0.3, top + 0.006, -0.32] }, 14);
@@ -618,6 +701,8 @@ export function loftDeskCounter(run: CounterRun): StationModel {
 /** Muted greens, reds and ambers for the screens and charts: under the stations' own. */
 const SCREEN = 0x172030;
 const ALERT = 0xff4a3a;
+/** A screen washed red by the alert: dark enough for the graph and the figures to read on it. */
+const ALERT_WASH = 0x3a0c10;
 const OK = 0x4ac07a;
 const AMBER = 0xffb347;
 
@@ -628,41 +713,43 @@ const AMBER = 0xffb347;
  */
 export const LOFT_WALL_ART: Readonly<Record<string, () => Model>> = {
   dashboard: () => {
-    // The big status dashboard: prod is on fire. A falling red graph, red tiles, an INCIDENT banner.
+    // The big status dashboard, three tiles wide: prod is on fire. The whole screen washed red,
+    // an INCIDENT banner, a traffic graph climbing then falling off a cliff, 500s in big figures.
     const b = new ModelBuilder();
-    const [w, h, cy] = [1.5, 0.56, 0.8];
+    const w = LOFT_ART_HALF.dashboard * 2 - 0.06;
+    const [h, cy] = [0.58, 0.79];
     b.box(w + 0.06, h + 0.06, 0.04, 0x15171b, { at: [0, cy, 0.52] }, 0.012);
-    b.box(w, h, 0.006, SCREEN, { at: [0, cy, 0.543] }, 0);
+    glowBox(b, w, h, 0.004, ALERT_WASH, { at: [0, cy, 0.542] });
     // The banner across the top.
-    glowBox(b, w - 0.04, 0.07, 0.004, mix(ALERT, SCREEN, 0.25), {
-      at: [0, cy + h / 2 - 0.055, 0.547],
-    });
-    lettering(b, 'PROD INCIDENT', -0.12, cy + h / 2 - 0.055, 0.549, 0.011, 0xfff1ea, 0.003);
-    // The graph: a grid, a line rising then falling off a cliff.
-    const gx0 = -w / 2 + 0.06;
-    const gx1 = 0.22;
-    const gy0 = cy - h / 2 + 0.06;
-    const gy1 = cy + h / 2 - 0.12;
+    const bannerY = cy + h / 2 - 0.06;
+    glowBox(b, w - 0.04, 0.1, 0.004, ALERT, { at: [0, bannerY, 0.546] });
+    lettering(b, 'PROD INCIDENT', -0.35, bannerY, 0.549, 0.016, 0xfff4ee, 0.003);
+    lettering(b, 'SEV 1', 0.78, bannerY, 0.549, 0.014, 0xfff4ee, 0.003);
+    // The graph: a grid, the line rising (green) then falling off a cliff (red).
+    const gx0 = -w / 2 + 0.08;
+    const gx1 = 0.3;
+    const gy0 = cy - h / 2 + 0.07;
+    const gy1 = bannerY - 0.09;
     for (let i = 0; i <= 3; i++)
       b.box(
         gx1 - gx0,
-        0.004,
+        0.005,
         0.003,
-        0x2c3a50,
+        0x5a2a2e,
         { at: [(gx0 + gx1) / 2, gy0 + ((gy1 - gy0) * i) / 3, 0.548] },
         0,
       );
     const pts: [number, number][] = [
-      [0, 0.45],
-      [0.12, 0.55],
-      [0.24, 0.5],
-      [0.36, 0.68],
-      [0.48, 0.72],
-      [0.58, 0.85],
-      [0.68, 0.5],
-      [0.78, 0.22],
-      [0.9, 0.12],
-      [1, 0.05],
+      [0, 0.4],
+      [0.1, 0.5],
+      [0.2, 0.46],
+      [0.3, 0.62],
+      [0.42, 0.7],
+      [0.52, 0.9],
+      [0.62, 0.55],
+      [0.72, 0.22],
+      [0.86, 0.1],
+      [1, 0.03],
     ];
     for (let i = 0; i + 1 < pts.length; i++) {
       const [ax, ay] = pts[i] ?? [0, 0];
@@ -670,19 +757,24 @@ export const LOFT_WALL_ART: Readonly<Record<string, () => Model>> = {
       const p0 = [gx0 + ax * (gx1 - gx0), gy0 + ay * (gy1 - gy0)] as const;
       const p1 = [gx0 + bx * (gx1 - gx0), gy0 + by * (gy1 - gy0)] as const;
       const len = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
-      glowBox(b, len + 0.012, 0.014, 0.004, ax >= 0.58 ? ALERT : OK, {
-        at: [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2, 0.55],
+      const red = ax >= 0.52;
+      glowBox(b, len + 0.02, red ? 0.03 : 0.02, 0.004, red ? 0xff6a5a : OK, {
+        at: [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2, 0.552],
         rot: [0, 0, Math.atan2(p1[1] - p0[1], p1[0] - p0[0])],
       });
     }
-    // The status tiles on the right: most red, one amber, one still green.
-    const tiles = [ALERT, ALERT, AMBER, ALERT, OK, ALERT];
-    tiles.forEach((c, i) => {
-      const tx = 0.36 + (i % 2) * 0.17;
-      const ty = gy1 - 0.04 - Math.floor(i / 2) * 0.12;
-      b.box(0.15, 0.1, 0.003, mix(c, SCREEN, 0.7), { at: [tx, ty, 0.547] }, 0);
-      glowBox(b, 0.1, 0.018, 0.003, c, { at: [tx, ty + 0.015, 0.55] });
-      b.box(0.06, 0.012, 0.003, 0xc8d0dc, { at: [tx - 0.02, ty - 0.025, 0.55] }, 0);
+    // The error count, big, and the status tiles under it: all red but one amber.
+    const rx = (gx1 + w / 2) / 2;
+    glowBox(b, w / 2 - gx1 - 0.08, 0.2, 0.003, mix(ALERT, SCREEN, 0.55), {
+      at: [rx, gy1 - 0.08, 0.547],
+    });
+    lettering(b, '500', rx, gy1 - 0.08, 0.55, 0.03, 0xfff4ee, 0.004);
+    [ALERT, ALERT, AMBER, ALERT].forEach((c, i) => {
+      const tx = rx - 0.27 + i * 0.18;
+      const ty = gy0 + 0.06;
+      glowBox(b, 0.15, 0.1, 0.003, mix(c, SCREEN, 0.45), { at: [tx, ty, 0.547] });
+      glowBox(b, 0.1, 0.02, 0.003, c, { at: [tx, ty + 0.018, 0.55] });
+      b.box(0.06, 0.014, 0.003, 0xf0d8d4, { at: [tx - 0.02, ty - 0.024, 0.55] }, 0);
     });
     // The wall mount's cable dropping to the ply band.
     b.box(
@@ -690,9 +782,29 @@ export const LOFT_WALL_ART: Readonly<Record<string, () => Model>> = {
       cy - h / 2 - 0.47,
       0.012,
       BLACK_STEEL,
-      { at: [0.6, (cy - h / 2 + 0.47) / 2, 0.51] },
+      { at: [w / 2 - 0.15, (cy - h / 2 + 0.47) / 2, 0.51] },
       0,
     );
+    return b.build();
+  },
+  errors: () => {
+    // The second screen: the error rate per minute, the bars climbing into the red, 5XX on top.
+    const b = new ModelBuilder();
+    const w = LOFT_ART_HALF.errors * 2 - 0.06;
+    const [h, cy] = [0.46, 0.8];
+    b.box(w + 0.06, h + 0.06, 0.04, 0x15171b, { at: [0, cy, 0.52] }, 0.01);
+    glowBox(b, w, h, 0.004, ALERT_WASH, { at: [0, cy, 0.542] });
+    const headY = cy + h / 2 - 0.05;
+    glowBox(b, w - 0.03, 0.07, 0.004, mix(ALERT, SCREEN, 0.2), { at: [0, headY, 0.546] });
+    lettering(b, '5XX/MIN', 0, headY, 0.549, 0.011, 0xfff4ee, 0.003);
+    const base = cy - h / 2 + 0.05;
+    const heights = [0.04, 0.05, 0.04, 0.06, 0.05, 0.09, 0.16, 0.24, 0.28];
+    heights.forEach((bh, i) => {
+      const x = -w / 2 + 0.07 + i * ((w - 0.14) / (heights.length - 1));
+      const c = bh > 0.1 ? 0xff6a5a : bh > 0.055 ? AMBER : OK;
+      glowBox(b, 0.045, bh, 0.003, c, { at: [x, base + bh / 2, 0.549] });
+    });
+    b.box(w - 0.08, 0.004, 0.003, 0xf0d8d4, { at: [0, base + 0.12, 0.55] }, 0);
     return b.build();
   },
   cheque: () => {

@@ -8,6 +8,7 @@ import {
   loftDeskCounter,
   loftPendantModel,
   loftPlinthModel,
+  loftPostModel,
   loftWallModel,
   loftWireModel,
   polishedFloorModel,
@@ -22,6 +23,14 @@ import type { RoomDressing } from './types';
 
 /** The turn that puts a door model's back (−z) toward the outside on `side`. */
 const DOOR_YAW: Readonly<Record<Side, number>> = {
+  back: 0,
+  front: Math.PI,
+  left: Math.PI / 2,
+  right: -Math.PI / 2,
+};
+
+/** The turn that puts a post's face (+z) toward the room from a wall on `side`. */
+const POST_YAW: Readonly<Record<Side, number>> = {
   back: 0,
   front: Math.PI,
   left: Math.PI / 2,
@@ -54,7 +63,7 @@ export const LOFT_ROOM: RoomDressing<LoftRoom> = {
     wire: { hang: PENDANT_HANG, model: loftWireModel },
     fit: globeFit,
   },
-  placeStory({ liftDoor, roofDoor, wallArt }, _map, place) {
+  placeStory({ liftDoor, roofDoor, wallArt, posts }, _map, place) {
     if (liftDoor) {
       const span = liftDoor.tiles.length;
       const low = liftDoor.side === 'front';
@@ -74,6 +83,9 @@ export const LOFT_ROOM: RoomDressing<LoftRoom> = {
           yaw: DOOR_YAW[roofDoor.side],
         });
     }
+    // The black steel posts on the walls' inner faces (the model's face is +z, toward the room).
+    for (const { x, y, side } of posts)
+      place('post', loftPostModel, { at: gridToWorld(x, y), yaw: POST_YAW[side] });
     for (const { x, y, art } of wallArt) {
       const model = LOFT_WALL_ART[art];
       if (model) place(`art:${art}`, model, { at: gridToWorld(x, y), yaw: 0 });

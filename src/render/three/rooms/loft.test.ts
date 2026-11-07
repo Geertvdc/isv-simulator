@@ -79,6 +79,18 @@ describe('LOFT_ROOM', () => {
       expect(keys.some((k) => k.startsWith('roofDoor'))).toBe(true);
       expect(keys).toContain('art:dashboard');
       expect(keys).toContain('art:cheque');
+      expect(keys).toContain('post');
+    }
+  });
+
+  it('keeps each wall-top cluster to one tile, two or three things high', () => {
+    expect(LOFT_WALL_TOP_PROPS).toHaveLength(3);
+    for (const build of LOFT_WALL_TOP_PROPS) {
+      const box = bounds(build());
+      for (const v of [box.min.x, box.max.x, box.min.z, box.max.z])
+        expect(Math.abs(v)).toBeLessThanOrEqual(0.6);
+      expect(box.max.y).toBeGreaterThan(0.3);
+      expect(box.max.y).toBeLessThan(0.65);
     }
   });
 
@@ -101,7 +113,10 @@ describe('LOFT_ROOM', () => {
           ).toBeGreaterThan(0);
   });
 
-  it('keeps the desk tops and wall caps darker than every station top', () => {
+  it('keeps the desk tops and wall caps darker than every station top, and near-neutral', () => {
+    const sat = (c: number) => new THREE.Color(c).getHSL({ h: 0, s: 0, l: 0 }).s;
+    expect(sat(STAINED_PLY)).toBeLessThan(0.1);
+    expect(sat(WALL_COLORS.loft.top)).toBeLessThan(0.1);
     for (const color of Object.values(PALETTE.station)) {
       expect(luminance(STAINED_PLY)).toBeLessThan(luminance(tint(color, 0.4)));
       expect(luminance(WALL_COLORS.loft.top)).toBeLessThan(luminance(tint(color, 0.4)));

@@ -125,7 +125,7 @@ export const FLOOR_COLORS: Readonly<Record<FloorTheme, readonly [number, number]
   // Old wide factory floorboards, weathered grey-brown; the second is the dark gaps between them.
   boards: [0x968676, 0x4a3c32],
   // A loft's polished concrete, light warm grey; the second is the saw cuts, thin and darker.
-  polished: [0xb4aea4, 0x8c867c],
+  polished: [0xaaa69e, 0x86827a],
 };
 
 /** Wall colors per theme: face and top. Caps stay darker than stations, so the eye goes to the stations. */
@@ -140,7 +140,7 @@ export const WALL_COLORS: Readonly<Record<WallTheme, { face: number; top: number
   // Red factory brick (over a limewashed band), capped with cool stone coping.
   warehouse: { face: 0x805a4e, top: 0x6e706d },
   // White-painted brick over birch ply, capped with cool light coping.
-  loft: { face: 0xd3d5d2, top: 0x858d93 },
+  loft: { face: 0xd3d5d2, top: 0x72777c },
 };
 
 /** Marks the room's warm lamps, which only `medium` and `high` quality light (see `Stage`). */
