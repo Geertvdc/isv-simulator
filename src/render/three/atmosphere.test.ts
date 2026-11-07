@@ -14,6 +14,7 @@ import {
   atmosphereFor,
   cssRgba,
   fogRange,
+  glintSpots,
   lampSpots,
   moteSeeds,
   sunPlacement,
@@ -140,17 +141,53 @@ describe('morning and evening suns', () => {
       expect(b - r).toBeLessThanOrEqual(50);
       expect(r).toBeGreaterThan(190);
     }
-    // The last warm light glows from the left edge, not over the play area.
+    // The last warm light glows from the left edge, not over the play area...
     expect(a.vignette?.glow?.x).toBeLessThanOrEqual(0.05);
-    expect(a.vignette?.glow?.opacity).toBeLessThanOrEqual(0.3);
+    expect(a.vignette?.glow?.opacity).toBeLessThanOrEqual(0.36);
+    // ...and lands on the terrace, well below the order cards (0–140 of 810 px).
+    expect(a.vignette?.glow?.y).toBeGreaterThanOrEqual(0.3);
+  });
+
+  it('switches the incident beacon and the floor glints on for the blue hour only', () => {
+    for (const [id, a] of Object.entries(ATMOSPHERES)) {
+      expect(a.beacon !== undefined, id).toBe(id === 'seed-round');
+      expect(a.glints !== undefined, id).toBe(id === 'seed-round');
+    }
+    expect(DEFAULT_ATMOSPHERE.beacon).toBeUndefined();
+    const a = atmosphereFor('seed-round');
+    // One turn a second, and a short beam: it sweeps the wall, never the room.
+    expect(a.beacon?.turns).toBe(1);
+    expect(a.beacon?.reach).toBeLessThanOrEqual(0.8);
+    // A glint, not a light: faint, and under the bloom.
+    expect(a.glints?.opacity).toBeLessThanOrEqual(0.35);
   });
 
   it('keeps vignettes gentle and lamps along the back wall only', () => {
     for (const scene of ['open-plan', 'scale-up', 'seed-round']) {
       const a = atmosphereFor(scene);
-      expect(a.vignette?.opacity).toBeLessThanOrEqual(0.36);
+      expect(a.vignette?.opacity).toBeLessThanOrEqual(0.4);
       expect(a.vignette?.inner).toBeCloseTo(0.7);
       expect(a.lamps?.frontFrom).toBeGreaterThanOrEqual(12);
+    }
+  });
+});
+
+describe('glintSpots', () => {
+  it('has none without glints', () => {
+    expect(glintSpots(DEFAULT_ATMOSPHERE, GARAGE.map)).toEqual([]);
+  });
+
+  it("lays the loft pendants' glints on open floor, in front of the lamps, on both seed-round maps", () => {
+    const a = atmosphereFor('seed-round');
+    for (const map of [SEED_ROUND.map, parseDraftMap(seedRoundDraft)]) {
+      const glints = glintSpots(a, map);
+      const lamps = lampSpots(a, map);
+      expect(glints.length).toBeGreaterThan(0);
+      for (const g of glints) {
+        expect(getTile(map, Math.round(g.x), Math.round(g.z))).toBe('floor');
+        expect(g.y).toBe(0);
+        expect(lamps.some((l) => l.x === g.x && g.z > l.z)).toBe(true);
+      }
     }
   });
 });

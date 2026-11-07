@@ -48,13 +48,18 @@ export interface Atmosphere {
    * frame, a low sky's last light: centred at `x`, `y` (shares of the canvas
    * width and height, so 0, 0.1 is the left edge near the top), gone
    * `reach` of the canvas width sideways and 1.4 × `reach` of its height
-   * up and down away from there. Plain CSS over the canvas, on every quality.
+   * up and down away from there. `band` tints the top, right and bottom
+   * edges toward `color` as well, `opacity` at the edge and gone `depth` in
+   * (a share of the canvas's height, or width for the right edge): the sky's color all round the frame,
+   * where the corner-shaped vignette barely reaches the middles of the edges.
+   * Plain CSS over the canvas, on every quality.
    */
   vignette?: {
     color: number;
     opacity: number;
     inner: number;
     glow?: { color: number; opacity: number; x: number; y: number; reach: number };
+    band?: { opacity: number; depth: number };
   };
   /**
    * Warm point lights in a row just inside the back wall (and the front wall
@@ -81,6 +86,20 @@ export interface Atmosphere {
    * room's lamps flickering by `flicker` (a share of their brightness).
    */
   ambient?: { steam: boolean; smoke: boolean; ripples: boolean; halos: boolean; flicker: number };
+  /**
+   * A rotating incident beacon (see `WorldFx`): a fan of `color` light swept
+   * round `turns` times a second from the lens of the room's own beacon on
+   * the back wall, `reach` world units long, bright enough to bloom at its
+   * core and flaring each time it faces the camera. Off on `low`.
+   */
+  beacon?: { color: number; turns: number; reach: number };
+  /**
+   * A faint glint of each lamp (`lampSpots`) on a polished floor: a soft
+   * round patch `size` world units across, `forward` grid units in front of
+   * the lamp (toward the camera, where its reflection shows), and only on
+   * open floor. Under the bloom threshold, off on `low` with the lamps.
+   */
+  glints?: { color: number; opacity: number; size: number; forward: number };
 }
 
 /** Marks what `Stage` hides on `low`: the ambient motion of `Atmosphere.ambient`. */
@@ -205,7 +224,7 @@ const CANAL_EVENING: Atmosphere = {
  */
 const BLUE_HOUR: Atmosphere = {
   sun: {
-    color: 0xffd6bc,
+    color: 0xffe4d0,
     intensity: 3.3,
     from: { x: -8.5, y: -2, height: 8.5, perMapSize: false },
     reach: 0.95,
@@ -214,13 +233,14 @@ const BLUE_HOUR: Atmosphere = {
   fill: { color: 0xe2e8ff, intensity: 1.4 },
   environment: 0.14,
   backdrop: { inner: 0x434f92, outer: 0x1b1d4a },
-  fog: { color: 0x2e3a7a, start: 0.5, span: 11 },
+  fog: { color: 0x2a3c8c, start: 0.5, span: 11 },
   vignette: {
-    color: 0x141a4c,
-    opacity: 0.35,
+    color: 0x1a2a78,
+    opacity: 0.38,
     inner: 0.7,
-    // The last of the sunset, low in the west.
-    glow: { color: 0xff8a72, opacity: 0.3, x: 0, y: 0.08, reach: 0.4 },
+    // The last of the sunset, low in the west: over the terrace, under the order cards.
+    glow: { color: 0xff8a72, opacity: 0.35, x: 0, y: 0.45, reach: 0.38 },
+    band: { opacity: 0.32, depth: 0.1 },
   },
   lamps: {
     color: 0xeef2ff,
@@ -231,6 +251,9 @@ const BLUE_HOUR: Atmosphere = {
     inset: 0.45,
     frontFrom: 12,
   },
+  // Someone switched the incident beacon on: prod is down on launch night.
+  beacon: { color: 0xff3a2a, turns: 1, reach: 0.7 },
+  glints: { color: 0xeef2ff, opacity: 0.3, size: 1.1, forward: 1.2 },
 };
 
 /** Presets per `MapLook.scene` id. */
@@ -361,6 +384,18 @@ function insideSpan(
     x1 = Math.max(x1, x);
   }
   return [x0, x1];
+}
+
+/** Where the lamps' glints lie on the floor (`Atmosphere.glints`): in front of each lamp, on open floor only. */
+export function glintSpots(atmosphere: Atmosphere, map: LevelMap): Vec3[] {
+  const glints = atmosphere.glints;
+  if (!glints) return [];
+  return lampSpots(atmosphere, map).flatMap((lamp) => {
+    const z = lamp.z + glints.forward;
+    return getTile(map, Math.round(lamp.x), Math.round(z)) === 'floor'
+      ? [{ x: lamp.x, y: 0, z }]
+      : [];
+  });
 }
 
 /** Fog near and far for the camera: it starts behind the level's farthest floor corner. */

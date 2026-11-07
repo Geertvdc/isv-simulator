@@ -1,9 +1,13 @@
+import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { parseLevelMap } from '../../sim/level';
 import { CHAPTERS } from '../../sim/levels';
 import { levelSalt } from '../mapShape';
 import { Surroundings, placeSetPieces } from './surroundings';
 import { SETTINGS, WALL_TOP_PROPS } from './setDressing';
+import { GLOW_BOOST, GLOW_BOOST_KEY, ModelBuilder } from './kit';
+import { SCENES } from './scenes';
+import type { AliveKind, Scene, ScenePiece } from './scenes/types';
 
 describe('placeSetPieces', () => {
   for (const setting of Object.keys(SETTINGS)) {
@@ -202,6 +206,91 @@ describe('Surroundings', () => {
     expect(scene.root.children.length).not.toBe(rows.root.children.length);
     rows.destroy();
     scene.destroy();
+  });
+
+  describe('hot pieces', () => {
+    /** A lamp: a post with a red bulb on its glow layer. */
+    const lamp = {
+      size: [1, 1] as [number, number],
+      model: () =>
+        new ModelBuilder()
+          .box(0.1, 0.5, 0.1, 0x333333)
+          .led(0.05, 0xff3030, { at: [0, 0.55, 0] })
+          .build(),
+    };
+    const piece = (x: number, extra: Partial<ScenePiece> = {}): ScenePiece => ({
+      piece: lamp,
+      variant: 0,
+      at: { x, y: 0, z: -3 },
+      yaw: 0,
+      scale: [1, 1, 1],
+      tint: [1, 1, 1],
+      row: 'near',
+      ...extra,
+    });
+    /** Surroundings for a one-off scene of `pieces`. */
+    const world = (pieces: ScenePiece[]) => {
+      const scenes = SCENES as Record<string, (m: typeof map) => Scene>;
+      scenes['test-hot'] = () => ({ horizon: 0x222222, ground: [], pieces, people: [], tufts: [] });
+      try {
+        return new Surroundings(map, undefined, 'test-hot');
+      } finally {
+        delete scenes['test-hot'];
+      }
+    };
+    /** Every glow material in `root` and whether the stage boosts it. */
+    const glows = (root: THREE.Object3D) => {
+      const out: { boosted: boolean; color: number; visible: () => boolean }[] = [];
+      root.traverse((o) => {
+        if (!(o instanceof THREE.Mesh) || !(o.material instanceof THREE.MeshBasicMaterial)) return;
+        const m = o.material;
+        out.push({
+          boosted: m.userData[GLOW_BOOST_KEY] === GLOW_BOOST,
+          color: m.color.r,
+          visible: () => {
+            const hidden: boolean[] = [!o.visible];
+            o.traverseAncestors((a) => hidden.push(!a.visible));
+            return !hidden.includes(true);
+          },
+        });
+      });
+      return out;
+    };
+
+    it('keeps an ordinary outside glow dim and out of the bloom', () => {
+      const w = world([piece(-3)]);
+      const g = glows(w.root);
+      expect(g).toHaveLength(1);
+      expect(g[0]?.boosted).toBe(false);
+      expect(g[0]?.color).toBeLessThan(1);
+      w.destroy();
+    });
+
+    it('gives a hot piece its full, boosted glow, beside the dim one', () => {
+      const w = world([piece(-3), piece(-5, { hot: true })]);
+      const g = glows(w.root);
+      expect(g).toHaveLength(2);
+      expect(g.filter((x) => x.boosted)).toHaveLength(1);
+      expect(g.find((x) => x.boosted)?.color).toBe(GLOW_BOOST);
+      w.destroy();
+    });
+
+    it('drops the glow of a living piece unless it is hot', () => {
+      const still = world([piece(-3, { alive: 'blink' })]);
+      expect(glows(still.root)).toHaveLength(0);
+      still.destroy();
+      const hot = world([piece(-3, { alive: 'blink' as AliveKind, hot: true })]);
+      const [g] = glows(hot.root);
+      expect(g?.boosted).toBe(true);
+      // It blinks with its piece: on half of each second, off the other half.
+      const seen = new Set<boolean>();
+      for (let ms = 10000; ms < 11000; ms += 100) {
+        hot.update(ms, true);
+        seen.add(g?.visible() ?? false);
+      }
+      expect(seen).toEqual(new Set([true, false]));
+      hot.destroy();
+    });
   });
 
   it('salts every level apart by its map', () => {

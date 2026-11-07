@@ -267,6 +267,12 @@ export class Surroundings {
    * that glow softly instead of blooming, so nothing out here outshines the office.
    */
   private readonly materials: KitMaterials = dimmedMaterials();
+  /**
+   * The glow of `hot` pieces (a lit sign's letters, an aviation light): the
+   * kit's own glow, full color and boosted by the stage so it blooms on
+   * medium and high (plain on low). Made on first use.
+   */
+  private hotGlow: THREE.MeshBasicMaterial | null = null;
   /** A hand-built scene's ground: vertex colors, rougher than the props. */
   private groundMaterial: THREE.Material | null = null;
 
@@ -382,6 +388,7 @@ export class Surroundings {
     this.groundMaterial?.dispose();
     const { body, glow, glass, character } = this.materials;
     for (const m of [body, glow, glass, character]) m.dispose();
+    this.hotGlow?.dispose();
     for (const extra of this.extras) for (const g of extra.character.geometries) g.dispose();
   }
 
@@ -427,7 +434,7 @@ export class Surroundings {
         .filter((p) => p.alive === undefined)
         .map((p) => ({ ...p, side: 'front' as const })),
     );
-    for (const p of scene.pieces) if (p.alive) this.addAlive(p, p.alive);
+    for (const p of scene.pieces) if (p.alive) this.addAlive(p, p.alive, p.hot === true);
     scene.people.forEach((p, i) => {
       // Smaller and greyer than the players, so they read as the neighbourhood, not a fifth player.
       const { character } = this.addExtra(i, p.at, p.yaw, p.pose);
@@ -436,15 +443,29 @@ export class Surroundings {
     });
   }
 
-  /** A living prop as its own mesh, so `update` can move it as `kind` says. */
-  private addAlive(p: Omit<Placement, 'side'>, kind: AliveKind): void {
+  /** The hot glow material, made on first use. */
+  private hot(): THREE.MeshBasicMaterial {
+    this.hotGlow ??= kitMaterials().glow;
+    return this.hotGlow;
+  }
+
+  /**
+   * A living prop as its own mesh, so `update` can move it as `kind` says.
+   * A `hot` one keeps its glow parts, as a child that moves (and blinks) with it.
+   */
+  private addAlive(p: Omit<Placement, 'side'>, kind: AliveKind, hot = false): void {
     const model = p.piece.model(p.variant);
-    model.glow?.dispose();
     model.glass?.dispose();
     const body = model.body;
     tintColors(body, p.tint);
     this.geometries.push(body);
     const mesh = new THREE.Mesh(body, this.materials.body);
+    const glow = model.glow;
+    if (hot && glow?.getAttribute('position')) {
+      tintColors(glow, p.tint);
+      this.geometries.push(glow);
+      mesh.add(new THREE.Mesh(glow, this.hot()));
+    } else glow?.dispose();
     put(mesh, p.at);
     mesh.rotation.y = p.yaw;
     mesh.scale.set(...p.scale);
@@ -456,14 +477,14 @@ export class Surroundings {
     this.alive.push({ mesh, kind, yaw: p.yaw, scale: p.scale, y: p.at.y });
   }
 
-  private addProps(placements: readonly Placement[]): void {
+  private addProps(placements: readonly (Placement & { hot?: boolean })[]): void {
     // Every prop is static: all of them merge into one mesh per layer (and per
     // row for the matte layer, as far props cast no shadow: they're outside
     // the sun's shadow map anyway, and it'd cut off with a hard line). Each
     // copy is turned, sized and tinted on its own, for a handful of draw calls.
     const models = new Map<string, Model>();
-    const lists = { near: [], far: [], glow: [], glass: [] } as Record<
-      'near' | 'far' | 'glow' | 'glass',
+    const lists = { near: [], far: [], glow: [], hot: [], glass: [] } as Record<
+      'near' | 'far' | 'glow' | 'hot' | 'glass',
       THREE.BufferGeometry[]
     >;
     const m = new THREE.Matrix4();
@@ -483,7 +504,7 @@ export class Surroundings {
       m.compose(new THREE.Vector3(p.at.x, p.at.y, p.at.z), q, new THREE.Vector3(...p.scale));
       const layers: [THREE.BufferGeometry | null, THREE.BufferGeometry[]][] = [
         [model.body, lists[p.row]],
-        [model.glow, lists.glow],
+        [model.glow, p.hot === true ? lists.hot : lists.glow],
         [model.glass, lists.glass],
       ];
       for (const [geometry, list] of layers) {
@@ -515,6 +536,7 @@ export class Surroundings {
     add(lists.near, this.materials.body, true, true);
     add(lists.far, this.materials.body, false, true);
     add(lists.glow, this.materials.glow, false, false);
+    if (lists.hot.length > 0) add(lists.hot, this.hot(), false, false);
     add(lists.glass, this.materials.glass, false, false);
   }
 
