@@ -14,13 +14,15 @@ import {
   cityBlock,
   condenser,
   corporateTower,
+  corpLogo,
   ductRun,
   grasses,
   hammock,
   liftCore,
   liftLobby,
   liftSign,
-  LOGO_PX,
+  logoSign,
+  logoWidth,
   MEMBRANE,
   mastFlag,
   mushroomVent,
@@ -40,7 +42,6 @@ import {
   solarPanels,
   statusLed,
   stringLights,
-  textWidth,
   tinyCar,
   tinyLamp,
   tinyTree,
@@ -113,7 +114,18 @@ const CORE_GAP = 0.07;
 const CORE_LEFT = 0.9;
 /** The logo: the screen x it starts right of (the order cards), and how wide it runs. */
 const LOGO_LEFT = 720;
-const LOGO_WIDE = textWidth(NAME, true) * LOGO_PX + 0.42 * 2 + 0.5;
+const LOGO_WIDE = logoWidth(NAME);
+/** The uplink dishes: how big, and their aim (toward the top-right sky). */
+const DISH = 1.4;
+const DISH_AIM = -0.6;
+/** The glass tower going up: how high it's got. */
+const TOWER_H = 1.2;
+/** The tower crane: its mast's height and its jib's length. */
+const CRANE = { mast: 0.8, jib: 2.2 } as const;
+/** The screen x the crane's mast stands at (at least), right of the YOTTA sign. */
+const CRANE_LEFT = 1110;
+/** The corporate tower: its width, how high its logo sits (under the crane's jib), and the screen x its logo ends at. */
+const CORP = { w: 2.4, logoY: 0.45, logoRight: 1352 } as const;
 /** The screen the scene is composed for. */
 const VIEW = { width: 1440, height: 810 };
 /** The legend's right edge on screen: low props only left of it in the lower part of the frame. */
@@ -129,6 +141,8 @@ const ALIVE: ReadonlyMap<SetPiece, AliveKind> = new Map<SetPiece, AliveKind>([
   [statusLed, 'blink'],
   [pigeon, 'peck'],
 ]);
+/** The small light sources that keep their glow and bloom (see `ScenePiece.hot`); built-to-measure ones join as they're made. */
+const HOT_PIECES: readonly SetPiece[] = [redLight, statusLed];
 
 type Edge = 'back' | 'front' | 'left' | 'right';
 interface Tile {
@@ -204,6 +218,7 @@ export function seedRoundScene(map: LevelMap): Scene {
   const pieces: ScenePiece[] = [];
   const ground: GroundPatch[] = [];
   const people: ScenePerson[] = [];
+  const hot = new Set<SetPiece>(HOT_PIECES);
   let n = 0;
   /** Puts `piece` with its origin at (x, z), on the ground or `lift` above it, `size` times its size. */
   const put = (
@@ -229,6 +244,7 @@ export function seedRoundScene(map: LevelMap): Scene {
       tint: [bright * (1 - cool), bright, bright * (1 + cool)],
       row,
       ...(alive ? { alive } : {}),
+      ...(hot.has(piece) ? { hot: true } : {}),
     });
   };
   const patch = (kind: string, x0: number, x1: number, z0: number, z1: number) =>
@@ -306,7 +322,6 @@ export function seedRoundScene(map: LevelMap): Scene {
       motor: motorX - cx,
       tank: tankX - cx,
       logo: logo - cx,
-      name: NAME,
     }),
     cx,
     B - CORE_GAP,
@@ -314,6 +329,10 @@ export function seedRoundScene(map: LevelMap): Scene {
     0,
     'far',
   );
+  // The startup's name in lit letters on the core's roof.
+  const sign = logoSign(NAME);
+  hot.add(sign);
+  put(sign, logo, B - CORE_GAP, 0, 0, 'far');
   // A lift lobby on a side of the level when the inbox is there.
   if (inboxEdge === 'left' && inbox.length > 0) {
     put(liftLobby(inbox.length), L - CORE_GAP, mid(inbox, 'z') - 0.25, Math.PI / 2);
@@ -333,19 +352,23 @@ export function seedRoundScene(map: LevelMap): Scene {
   // ---- The skyline beyond: office blocks, the tower going up under its crane, the corporate tower ----
   // The camera looks steeply down, so only the feet of the towers show: everything stands close,
   // the crane in front of its tower so its jib is in frame.
-  const towerX = Math.max(coreR + 1.4, xAt(1070, zc, 1));
-  const corpX = Math.max(towerX + 2.8, xAt(1300, zc, 1));
-  put(towerUnderConstruction(2.2, 2.0, 1.5), towerX, zc - 0.1, 0, 0, 'far');
-  const craneX = towerX - 1.35;
-  const craneZ = zc + 0.35;
-  put(towerCrane(1.05, 2.6), craneX, craneZ, 0, 0, 'far');
-  put(redLight, craneX + 2.55, craneZ, 0, 0, 'far', 1.2);
-  put(redLight, craneX, craneZ, 0, 0, 'far', 1.73);
-  put(corporateTower(2.4, 2.4, 3.5, 0.8), corpX, zc - 0.1, 0, 0, 'far');
+  // The crane stands in the street canyon just right of the core, low enough that its cab, the
+  // jib, the counter-jib, the hook and its lights all sit in the top of the frame; the tower it's
+  // building behind it, the corporate tower past its jib with GIGACORP clear of the mute button.
+  const craneZ = zc + 0.45;
+  const craneX = Math.max(coreR + 0.75, xAt(CRANE_LEFT, craneZ, CRANE.mast));
+  const towerX = craneX + CRANE.jib * 0.5;
+  // GIGACORP's right end lands just left of the mute button.
+  const corpX = xAt(CORP.logoRight, zc - 0.1, CORP.logoY) - corpLogo.right;
+  put(towerUnderConstruction(2.2, 2.0, TOWER_H), towerX, zc - 0.1, 0, 0, 'far');
+  put(towerCrane(CRANE.mast, CRANE.jib), craneX, craneZ, 0, 0, 'far');
+  put(redLight, craneX + CRANE.jib - 0.05, craneZ, 0, 0, 'far', CRANE.mast + 0.32);
+  put(redLight, craneX, craneZ, 0, 0, 'far', CRANE.mast + 0.55);
+  put(corporateTower(CORP.w, CORP.w, 3.5, CORP.logoY), corpX, zc - 0.1, 0, 0, 'far');
   const leftEdge = xAt(0, topZ) - 1.5;
   const rightEdge = xAt(VIEW.width, topZ) + 2;
   const reserved: [number, number][] = [
-    [craneX - 0.3, towerX + 1.2],
+    [craneX - CRANE.jib * 0.35, towerX + 1.2],
     [corpX - 1.3, corpX + 1.3],
   ];
   for (let x = leftEdge, k = 0; x < rightEdge; k++) {
@@ -381,7 +404,9 @@ export function seedRoundScene(map: LevelMap): Scene {
   // String lights across the terrace, on black posts.
   const span = tx1 - 0.25 - (tx0 + 0.25);
   const lightsZ = [B + 1.9, Math.min(B + 4.6, zLeg - 1.6)];
-  for (const z of lightsZ) put(stringLights(span, 1.45), tx0 + 0.25, z, 0, 0, 'far');
+  const bulbs = stringLights(span, 1.45);
+  hot.add(bulbs);
+  for (const z of lightsZ) put(bulbs, tx0 + 0.25, z, 0, 0, 'far');
   // The ping-pong table between the light lines; the founder pacing on the phone beside it.
   const pingZ = ((lightsZ[0] ?? 0) + (lightsZ[1] ?? 0)) / 2;
   put(pingPong, tmid + 0.15, pingZ, Math.PI / 2 + 0.05);
@@ -408,7 +433,8 @@ export function seedRoundScene(map: LevelMap): Scene {
   put(mushroomVent, dx0 + 0.2, B - 0.5, 0);
   put(mushroomVent, roofR - 0.75, B - 0.7, 0);
   // The antenna mast at the back corner: its red light and the startup's flag.
-  const mastH = 2.6;
+  // Short enough that its top and red light stay under GIGACORP on the skyline.
+  const mastH = 1.25;
   const mx = roofR - 0.65;
   const mz = roofB + 0.75;
   put(antennaMast(mastH), mx, mz, 0, 0, 'far');
@@ -424,7 +450,7 @@ export function seedRoundScene(map: LevelMap): Scene {
   put(roofHatch, dx0 + 0.35, solarEnd + 0.75, 0.05);
   put(mushroomVent, roofR - 0.35, solarEnd + 0.6, 0);
   // The big uplink dish past the panels, aimed up over the city.
-  put(satDish, dx0 + 1.45, solarEnd + 1.35, -0.5, 0, 'near', 0, 1.3);
+  put(satDish, dx0 + 1.45, solarEnd + 1.35, DISH_AIM, 0, 'near', 0, DISH * 1.1);
   // A cable tray from the mast down the outer side to the front of the deck.
   const trayZ1 = F - 0.5;
   put(cableTray(trayZ1 - (B + 2.7)), roofR - 0.18, B + 2.7, -Math.PI / 2);
@@ -437,14 +463,15 @@ export function seedRoundScene(map: LevelMap): Scene {
       const rz = F - 0.9;
       put(rackCabinet, R + 1.0, rz, -0.25);
       put(statusLed, R + 1.0 + 0.08, rz + 0.3, -0.25, 0, 'near', 1.02);
-      put(satDish, R + 2.0, rz - 0.5, -0.3, 0, 'near', 0, 1.1);
+      put(satDish, R + 2.05, rz - 0.55, DISH_AIM, 0, 'near', 0, DISH);
       if (shipEdge === 'front') {
-        // Out from under the hatch along the front of the roof, then up the deck to the rack.
-        // Clear of the opening's folded doors.
+        // Out from beside the hatch's folded doors along the front of the roof, then up the deck
+        // to the rack's foot.
         const tz = F + strip / 2;
         const t0 = sx + SHIP_DOORS;
-        if (t0 < R + 0.2) put(cableTray(R + 0.4 - t0), t0, tz);
-        put(cableTray(tz - (rz + 0.35)), R + 0.4, tz, -Math.PI / 2 + Math.PI);
+        const tx = R + 0.72;
+        if (t0 < tx) put(cableTray(tx + 0.1 - t0), t0, tz);
+        put(cableTray(tz - (rz + 0.36)), tx, tz, -Math.PI / 2 + Math.PI);
       }
       person(R + 1.7, rz - 1.7, 0.2, 'carrying');
       put(
@@ -470,7 +497,16 @@ export function seedRoundScene(map: LevelMap): Scene {
         'near',
         1.02,
       );
-      put(satDish, edge + side * 2.0, sz - 0.5, side * 0.3);
+      put(
+        satDish,
+        edge + side * 2.0,
+        sz - 0.5,
+        side > 0 ? DISH_AIM : -DISH_AIM,
+        0,
+        'near',
+        0,
+        DISH,
+      );
       put(cableTray(0.65), side > 0 ? edge : edge - 0.65, sz - 0.25);
       person(edge + side * 1.75, sz + 1.6, side > 0 ? Math.PI + 0.3 : Math.PI - 0.3, 'carrying');
       const yaw = side > 0 ? Math.PI + 0.3 : Math.PI - 0.3;
@@ -531,7 +567,9 @@ export function seedRoundScene(map: LevelMap): Scene {
         (isVoid(t.x + 1, t.z) ? 0 : 2) |
         (isVoid(t.x, t.z + 1) || (tree && tree.x === t.x && tree.z === t.z + 1) ? 0 : 4) |
         (isVoid(t.x - 1, t.z) ? 0 : 8);
-      put(skylightTile(kerbs), t.x, t.z, 0, t.x * 2 + t.z, 'far');
+      const tile = skylightTile(kerbs);
+      hot.add(tile);
+      put(tile, t.x, t.z, 0, t.x * 2 + t.z, 'far');
     }
   }
 

@@ -28,8 +28,10 @@ export const MEMBRANE = 0x4c5360;
 const TIMBER = 0x8a6648;
 const TIMBER_DARK = 0x684a35;
 /** The startup's logo: warm white letters and a violet orbit. */
-const LOGO = 0xfffaf0;
-const LOGO_RING = 0xc890ff;
+const LOGO = 0xfff2dc;
+const LOGO_RING = 0xb07cff;
+/** The faint violet halo behind the letters and round the orbit: the sign's light on the air. */
+const HALO = 0x2c2350;
 /** The aviation and crane lights: bright, as the glow layer isn't kept on living props. */
 const AVIATION = 0xff3a22;
 /** Lit office windows: warm, warmer, and the odd cool screen-lit one. */
@@ -40,7 +42,9 @@ const UNLIT = [0x3c475a, 0x46536a, 0x343e50] as const;
 const FACADES = [0x8a8478, 0x7a5e54, 0x6e747e, 0x48546a, 0x9a948a] as const;
 /** Muted outdoor fabric: slate, sage, ochre, clay, never a player's colour. */
 const FABRIC = [0x5a6a7a, 0x7a8a6a, 0xb08a4a, 0xa0675a, 0x6a5a7a] as const;
-const GRASS = [0x7a9450, 0x96a058, 0x6a8448, 0xa89a58] as const;
+/** Fountain grass: two greens and the straw its tips go to. */
+const GRASS = [0x7f9a6a, 0x9aa77a] as const;
+const STRAW = 0xc8b88a;
 
 /** Built-to-measure pieces are cached, so the same scene gives the same pieces (and tests compare). */
 const made = new Map<string, SetPiece>();
@@ -255,18 +259,17 @@ export interface CorePlan {
   motor: number;
   /** The timber-clad water tank on the roof, by x. */
   tank: number;
-  /** The middle of the logo sign on its frame, by x. */
+  /** The middle of the logo sign on its frame (its own piece, `logoSign`), by x. */
   logo: number;
-  /** The startup's name, in the font's letters. */
-  name: string;
 }
 
 /**
  * The building's stair and lift core, whose front is the level's back wall:
  * white render in panels with black steel trim and flashing, the lift door
  * with its floor indicator and "LOFT 7" plaque, a tall lit stair window; on
- * its roof the lift motor room with louvres, a timber-clad water tank on
- * steel legs and the startup's name in big lit letters on a steel frame.
+ * its roof the lift motor room with louvres and a timber-clad water tank on
+ * steel legs. The startup's name on its roof is its own piece (`logoSign`),
+ * so the scene can light it up.
  */
 export function liftCore(plan: CorePlan): SetPiece {
   return once(`core:${JSON.stringify(plan)}`, () => ({
@@ -414,102 +417,191 @@ function coreModel(plan: CorePlan): Model {
   for (let y = 0.1; y < 1.1; y += 0.14)
     b.box(0.16, 0.015, 0.015, BLACK_STEEL, { at: [tx + 0.52, H + y, -D + 0.7] }, 0);
 
-  // The logo sign: a steel frame on the front of the roof, the name in lit letters, the orbit beside it.
-  const lx = plan.logo;
-  const text = plan.name;
-  const tw = textWidth(text, true) * LOGO_PX;
-  const ring = 0.42;
-  const signW = tw + ring * 2 + 0.5;
-  const ly = H + LOGO_LIFT + LOGO_PX * 2.5;
-  const lz = -0.35;
-  const left = lx - signW / 2;
-  // Posts, rails and braces behind the letters.
-  for (let x = left + 0.1; x < left + signW; x += 0.75) {
-    b.box(
-      0.05,
-      LOGO_LIFT + LOGO_PX * 5.2,
-      0.05,
-      BLACK_STEEL,
-      {
-        at: [x, H + (LOGO_LIFT + LOGO_PX * 5.2) / 2, lz - 0.08],
-      },
-      0,
-    );
-    b.box(0.04, 0.5, 0.04, BLACK_STEEL, { at: [x, H + 0.22, lz - 0.32], rot: [0.75, 0, 0] }, 0);
-  }
-  for (const y of [H + LOGO_LIFT - 0.05, H + LOGO_LIFT + LOGO_PX * 3])
-    b.box(signW, 0.04, 0.04, BLACK_STEEL, { at: [lx, y, lz - 0.06] }, 0);
-  b.box(signW + 0.1, 0.035, 0.3, GALV, { at: [lx, H + 0.18, lz - 0.15] }, 0);
-  // The letters, with a dark backing so they read as channel letters.
-  const tx0 = left + ring * 2 + 0.35 + tw / 2;
-  // Tilted back a little toward the street below, so the letters read from the roofs round about.
-  const tilt = 0.45;
-  b.box(
-    tw + 0.16,
-    LOGO_PX * 5.6,
-    0.03,
-    0x1c1e24,
-    {
-      at: [tx0, ly, lz - 0.005],
-      rot: [-tilt, 0, 0],
-    },
-    0,
-  );
-  letters(b, text, tx0, ly, lz + 0.012, LOGO_PX, LOGO, true, 0.02, 0.88, true, tilt);
-  // The orbit: a lit ring round a planet, tilted.
-  const rx = left + ring + 0.1;
-  b.add(
-    new THREE.TorusGeometry(ring, 0.035, 8, 32),
-    LOGO_RING,
-    {
-      at: [rx, ly, lz + 0.06],
-      rot: [0, 0, 0.5],
-    },
-    'glow',
-  );
-  b.sphere(ring * 0.42, 0x2e2a3a, { at: [rx, ly, lz] });
-  b.add(
-    new THREE.SphereGeometry(ring * 0.36, 14, 10),
-    LOGO_RING,
-    { at: [rx, ly, lz + 0.03] },
-    'glow',
-  );
-  b.add(
-    new THREE.SphereGeometry(0.07, 8, 6),
-    LOGO,
-    {
-      at: [rx + Math.cos(0.5) * ring, ly + Math.sin(0.5) * ring, lz + 0.08],
-    },
-    'glow',
-  );
   return b.build();
+}
+
+/** The logo's orbit's radius. */
+const LOGO_RING_R = 0.42;
+
+/** How wide the logo sign runs for `name`: the letters, the orbit and the margins. */
+export function logoWidth(name: string): number {
+  return textWidth(name, true) * LOGO_PX + LOGO_RING_R * 2 + 0.5;
+}
+
+/**
+ * The startup's name in big lit channel letters on a steel frame, with its
+ * violet orbit beside it, for the core's roof: the origin at the sign's middle
+ * on the core's front face, at the core's foot (place it where the core is,
+ * moved along x). Tilted back a little toward the street. A faint violet halo
+ * board behind the letters so they read lit before the bloom does.
+ */
+export function logoSign(name: string): SetPiece {
+  return once(`logo:${name}`, () =>
+    looks([logoWidth(name), 0.6], 1, (b) => {
+      const H = CORE.height;
+      const tw = textWidth(name, true) * LOGO_PX;
+      const ring = LOGO_RING_R;
+      const signW = logoWidth(name);
+      const ly = H + LOGO_LIFT + LOGO_PX * 2.5;
+      const lz = -0.35;
+      const left = -signW / 2;
+      // Posts, rails and braces behind the letters.
+      for (let x = left + 0.1; x < left + signW; x += 0.75) {
+        const ph = LOGO_LIFT + LOGO_PX * 5.2;
+        b.box(0.05, ph, 0.05, BLACK_STEEL, { at: [x, H + ph / 2, lz - 0.08] }, 0);
+        b.box(0.04, 0.5, 0.04, BLACK_STEEL, { at: [x, H + 0.22, lz - 0.32], rot: [0.75, 0, 0] }, 0);
+      }
+      for (const y of [H + LOGO_LIFT - 0.05, H + LOGO_LIFT + LOGO_PX * 3])
+        b.box(signW, 0.04, 0.04, BLACK_STEEL, { at: [0, y, lz - 0.06] }, 0);
+      b.box(signW + 0.1, 0.035, 0.3, GALV, { at: [0, H + 0.18, lz - 0.15] }, 0);
+      // The letters on a dark backing, so they read as channel letters, a faint halo round it.
+      const tx0 = left + ring * 2 + 0.35 + tw / 2;
+      const tilt = 0.45;
+      // A point `dz` behind the letters' face, on their tilted plane.
+      const behind = (dz: number): [number, number, number] => [
+        tx0,
+        ly - dz * Math.sin(tilt),
+        lz + dz * Math.cos(tilt),
+      ];
+      const rot: [number, number, number] = [-tilt, 0, 0];
+      b.add(
+        new THREE.PlaneGeometry(tw + 0.46, LOGO_PX * 5.6 + 0.3),
+        HALO,
+        { at: behind(-0.03), rot },
+        'glow',
+      );
+      b.box(tw + 0.16, LOGO_PX * 5.6, 0.03, 0x1c1e24, { at: behind(-0.005), rot }, 0);
+      letters(b, name, tx0, ly, lz + 0.012, LOGO_PX, LOGO, true, 0.03, 0.97, true, tilt);
+      // The orbit: a lit ring round a planet, tilted.
+      const rx = left + ring + 0.1;
+      b.add(new THREE.CircleGeometry(ring + 0.12, 28), HALO, { at: [rx, ly, lz - 0.04] }, 'glow');
+      b.add(
+        new THREE.TorusGeometry(ring, 0.045, 8, 32),
+        LOGO_RING,
+        { at: [rx, ly, lz + 0.06], rot: [0, 0, 0.5] },
+        'glow',
+      );
+      b.sphere(ring * 0.42, 0x2e2a3a, { at: [rx, ly, lz] });
+      b.add(
+        new THREE.SphereGeometry(ring * 0.36, 14, 10),
+        LOGO_RING,
+        { at: [rx, ly, lz + 0.03] },
+        'glow',
+      );
+      b.add(
+        new THREE.SphereGeometry(0.08, 8, 6),
+        LOGO,
+        { at: [rx + Math.cos(0.5) * ring, ly + Math.sin(0.5) * ring, lz + 0.08] },
+        'glow',
+      );
+    }),
+  );
 }
 
 /**
  * A lift lobby on a side of the level (the draft's inbox on the left edge):
- * a rendered box with the indicator and "LOFT 7" on the face toward the
- * level (+z), black trim, a lit roof light. `width` along x.
+ * a rendered box with brushed-steel lift doors in a black steel frame on the
+ * face toward the level (+z), the lit floor indicator over them and the
+ * "LOFT 7" plaque beside; on its roof the lift's grey motor housing, set
+ * back, with a louvred vent. `width` along x.
  */
 export function liftLobby(width: number): SetPiece {
   return once(`lobby:${width.toFixed(2)}`, () =>
     looks([width, 1.1], 1, (b) => {
       const H = 1.4;
-      b.box(width, H, 1.1, RENDER, { at: [0, H / 2, -0.55] }, 0);
-      for (let y = 0.32; y < H; y += 0.32)
-        b.box(width, 0.014, 0.008, tint(RENDER, -0.16), { at: [0, y, 0.002] }, 0);
-      for (const z of [0, -1.1])
+      const D = 1.1;
+      b.box(width, H, D, RENDER, { at: [0, H / 2, -D / 2] }, 0);
+      // Render coursing on the faces the camera sees: toward the level and the near end.
+      const seam = tint(RENDER, -0.16);
+      for (let y = 0.32; y < H; y += 0.32) {
+        b.box(width, 0.014, 0.008, seam, { at: [0, y, 0.002] }, 0);
+        b.box(0.008, 0.014, D, seam, { at: [-width / 2 - 0.002, y, -D / 2] }, 0);
+      }
+      // Black steel: flashing round the roof, corner angles, a plinth.
+      for (const z of [0, -D])
         b.box(width + 0.06, 0.08, 0.06, BLACK_STEEL, { at: [0, H + 0.02, z] }, 0);
-      for (const s of [-1, 1])
-        b.box(0.06, 0.08, 1.1, BLACK_STEEL, { at: [s * (width / 2 + 0.01), H + 0.02, -0.55] }, 0);
-      b.box(width - 0.06, 0.02, 1.04, MEMBRANE, { at: [0, H + 0.005, -0.55] }, 0);
-      for (const s of [-1, 1])
+      for (const s of [-1, 1]) {
+        b.box(0.06, 0.08, D, BLACK_STEEL, { at: [s * (width / 2 + 0.01), H + 0.02, -D / 2] }, 0);
         b.box(0.06, H, 0.06, BLACK_STEEL, { at: [s * (width / 2 - 0.02), H / 2, 0] }, 0);
-      b.box(0.5, 0.18, 0.03, 0x15171b, { at: [0, 1.2, 0.02] }, 0);
-      letters(b, '^ 7', 0, 1.2, 0.036, 0.026, 0xffb648, true);
-      b.box(0.5, 0.16, 0.02, 0xf4f2ec, { at: [0.6, 1.2, 0.012] }, 0);
-      letters(b, 'LOFT 7', 0.6, 1.2, 0.022, 0.018, BLACK_STEEL, false, 0.006);
-      b.box(0.5, 0.08, 0.6, RENDER, { at: [0, H + 0.06, -0.55] }, 0);
-      glowBox(b, 0.42, 0.02, 0.52, 0xf0e2c0, [0, H + 0.1, -0.55]);
+      }
+      b.box(width + 0.02, 0.06, D + 0.02, BLACK_STEEL, { at: [0, 0.03, -D / 2] }, 0);
+      // The roof: pale pavers, the motor housing set back on it.
+      b.box(width - 0.06, 0.02, D - 0.06, 0x8e9196, { at: [0, H + 0.005, -D / 2] }, 0);
+      const hw = width - 0.36;
+      const hd = 0.5;
+      const hz = -D + 0.08 + hd / 2;
+      b.box(hw, 0.25, hd, 0x8c9298, { at: [0, H + 0.125, hz] }, 0.01);
+      b.box(hw + 0.04, 0.03, hd + 0.04, 0x6e747a, { at: [0, H + 0.26, hz] }, 0);
+      const vw = Math.min(0.6, hw * 0.5);
+      b.box(vw, 0.16, 0.01, 0x5a6068, { at: [-hw / 4, H + 0.12, hz + hd / 2 + 0.004] }, 0);
+      for (let y = 0.06; y < 0.19; y += 0.035)
+        b.box(
+          vw - 0.02,
+          0.012,
+          0.02,
+          0x40454c,
+          {
+            at: [-hw / 4, H + y, hz + hd / 2 + 0.01],
+            rot: [0.5, 0, 0],
+          },
+          0,
+        );
+      b.box(0.24, 0.2, 0.01, BLACK_STEEL, { at: [hw / 4, H + 0.1, hz + hd / 2 + 0.004] }, 0);
+      // The lift doors: two brushed-steel leaves, a dark seam, in a black steel frame.
+      const dw = Math.min(1.0, width - 0.5);
+      const dh = 1.06;
+      b.box(dw + 0.14, dh + 0.08, 0.04, BLACK_STEEL, { at: [0, (dh + 0.08) / 2, 0.02] }, 0);
+      for (const s of [-1, 1]) {
+        b.box(dw / 2 - 0.01, dh, 0.02, 0xb8c0c8, { at: [(s * dw) / 4, dh / 2, 0.045] }, 0);
+        // Brushed: a few faint vertical streaks.
+        for (const f of [0.25, 0.6])
+          b.box(
+            0.008,
+            dh - 0.06,
+            0.004,
+            0xcfd6dc,
+            {
+              at: [(s * dw) / 4 + (f - 0.5) * (dw / 2), dh / 2, 0.056],
+            },
+            0,
+          );
+      }
+      b.box(0.014, dh, 0.006, 0x2a2d32, { at: [0, dh / 2, 0.057] }, 0);
+      // The near end (−x, toward the camera) shows a second pair of lift doors under the indicator
+      // sign the scene hangs there, so the lift reads from the front too.
+      const ew = 0.62;
+      const ex = -width / 2;
+      b.box(
+        0.04,
+        dh * 0.86 + 0.06,
+        ew + 0.12,
+        BLACK_STEEL,
+        { at: [ex - 0.02, (dh * 0.86 + 0.06) / 2, -D / 2] },
+        0,
+      );
+      for (const s of [-1, 1])
+        b.box(
+          0.02,
+          dh * 0.86,
+          ew / 2 - 0.01,
+          0xb8c0c8,
+          {
+            at: [ex - 0.045, (dh * 0.86) / 2, -D / 2 + (s * ew) / 4],
+          },
+          0,
+        );
+      b.box(0.006, dh * 0.86, 0.014, 0x2a2d32, { at: [ex - 0.057, (dh * 0.86) / 2, -D / 2] }, 0);
+      // The floor indicator over the doors.
+      b.box(0.42, 0.14, 0.03, 0x15171b, { at: [0, dh + 0.17, 0.02] }, 0);
+      letters(b, '^ 7', 0, dh + 0.17, 0.036, 0.024, 0xffb648, true);
+      // "LOFT 7" on a white plaque beside the doors, the call button below it.
+      const px = dw / 2 + 0.2;
+      if (px + 0.12 < width / 2) {
+        b.box(0.22, 0.14, 0.012, 0xf4f2ec, { at: [px, 0.95, 0.006] }, 0);
+        letters(b, 'LOFT 7', px, 0.95, 0.013, 0.008, BLACK_STEEL, false, 0.004);
+        b.box(0.07, 0.14, 0.012, 0x9aa1a8, { at: [px, 0.55, 0.006] }, 0);
+        b.led(0.016, 0xffb648, { at: [px, 0.58, 0.016] });
+      }
     }),
   );
 }
@@ -707,42 +799,60 @@ export function towerCrane(mast: number, jib: number): SetPiece {
       const cj = jib * 0.32;
       b.box(cj, 0.04, 0.18, yel, { at: [-cj / 2, jy, 0] }, 0);
       b.box(0.3, 0.2, 0.22, 0x8a8a84, { at: [-cj + 0.15, jy - 0.06, 0] }, 0);
-      // The tower head and its tie bars down to both jibs.
-      b.box(0.04, 0.5, 0.04, yel, { at: [0, jy + 0.25, 0] }, 0);
-      b.box(
-        Math.hypot(jib * 0.6, 0.45),
-        0.01,
-        0.01,
-        0x6a6a64,
-        {
-          at: [jib * 0.3, jy + 0.27, 0],
-          rot: [0, 0, -Math.atan2(0.45, jib * 0.6)],
-        },
-        0,
-      );
-      b.box(
-        Math.hypot(cj, 0.45),
-        0.01,
-        0.01,
-        0x6a6a64,
-        {
-          at: [-cj / 2, jy + 0.27, 0],
-          rot: [0, 0, Math.atan2(0.45, cj)],
-        },
-        0,
-      );
-      // The trolley, the hook line and a load of steel beams.
+      // The tower head (a short A-frame) and its tie bars down to both jibs.
+      const head = 0.32;
+      b.box(0.04, head, 0.04, yel, { at: [0, jy + head / 2, 0] }, 0);
+      for (const [len, sgn] of [
+        [jib * 0.6, 1],
+        [cj, -1],
+      ] as const)
+        b.box(
+          Math.hypot(len, head - 0.14),
+          0.012,
+          0.012,
+          0x6a6a64,
+          {
+            at: [(sgn * len) / 2, jy + (head + 0.14) / 2, 0],
+            rot: [0, 0, -sgn * Math.atan2(head - 0.14, len)],
+          },
+          0,
+        );
+      // The trolley, the hook line, the hook block in yellow and black, a load of steel beams.
       const hx = jib * 0.62;
+      const drop = 0.32;
       b.box(0.12, 0.05, 0.14, 0x3a3d42, { at: [hx, jy - 0.04, 0] }, 0);
-      b.box(0.008, 0.9, 0.008, 0x3a3d42, { at: [hx, jy - 0.5, 0] }, 0);
-      b.box(0.5, 0.05, 0.1, 0x7a4a3a, { at: [hx, jy - 0.97, 0] }, 0);
+      for (const dz of [-0.025, 0.025])
+        b.box(0.008, drop, 0.008, 0x3a3d42, { at: [hx, jy - 0.06 - drop / 2, dz] }, 0);
+      const hy = jy - 0.06 - drop;
+      b.box(0.1, 0.1, 0.08, 0xd8b040, { at: [hx, hy - 0.04, 0] }, 0.01);
+      for (const y of [-0.02, -0.06])
+        b.box(0.102, 0.016, 0.082, 0x24262a, { at: [hx, hy + y, 0] }, 0);
+      b.torus(0.03, 0.008, 0x3a3d42, { at: [hx, hy - 0.12, 0] }, Math.PI * 1.4);
+      for (const [dx, dz] of [
+        [-0.12, 0],
+        [0.12, 0],
+      ] as const)
+        b.box(
+          Math.hypot(dx, 0.14),
+          0.006,
+          0.006,
+          0x3a3d42,
+          {
+            at: [hx + dx / 2, hy - 0.19, dz],
+            rot: [0, 0, Math.atan2(0.14, dx)],
+          },
+          0,
+        );
+      for (const dz of [-0.03, 0.03])
+        b.box(0.5, 0.04, 0.05, 0x7a4a3a, { at: [hx, hy - 0.28, dz] }, 0);
     }),
   );
 }
 
-/** A red light on the crane's jib or a mast (`blink` alive): bright, the glow layer isn't kept. */
+/** A red light on the crane's jib or a mast (`blink` alive, `hot`): a dark housing, the lamp in the glow layer. */
 export const redLight = looks([0.1, 0.1], 1, (b) => {
-  b.sphere(0.07, AVIATION, { at: [0, 0.07, 0] });
+  b.cylinder(0.05, 0.05, 0.04, 0x24262a, { at: [0, 0.02, 0] }, 8);
+  b.led(0.07, AVIATION, { at: [0, 0.09, 0] });
 });
 
 /** An air handling unit: a long grey box with access panels, a fan housing on top and a duct out of its back. */
@@ -790,20 +900,37 @@ export function corporateTower(w: number, d: number, h: number, logoY: number): 
       glowBox(b, w + 0.02, 0.06, d + 0.02, 0x9ec8ff, [0, h - 0.1, -d / 2]);
       b.box(w * 0.7, 0.3, d * 0.7, glass, { at: [0, h + 0.15, -d / 2] }, 0);
       b.cylinder(0.02, 0.04, 1.2, GALV, { at: [0, h + 0.9, -d / 2] }, 6);
-      // The logo: a white panel with the name and a mark.
-      b.box(w * 0.86, 0.5, 0.04, 0x1a2234, { at: [0, logoY, 0.04] }, 0);
-      letters(b, 'GIGACORP', 0.12, logoY, 0.065, Math.min(0.05, (w * 0.7) / 31), 0x8ad8ff, true);
+      // The logo: the name in lit letters on a dark panel, the mark just left of it.
+      const { px, right } = corpLogo;
+      const tw = textWidth('GIGACORP') * px;
+      const tx = right - tw / 2;
+      const ringX = right - tw - 0.17;
+      b.box(
+        tw + 0.5,
+        px * 5 + 0.14,
+        0.04,
+        0x1a2234,
+        { at: [right - (tw + 0.3) / 2, logoY, 0.04] },
+        0,
+      );
+      letters(b, 'GIGACORP', tx, logoY, 0.065, px, 0x8ad8ff, true);
       b.add(
-        new THREE.TorusGeometry(0.11, 0.03, 8, 20),
+        new THREE.TorusGeometry(px * 2.2, px * 0.6, 8, 20),
         0x8ad8ff,
         {
-          at: [-w * 0.36, logoY, 0.07],
+          at: [ringX, logoY, 0.07],
         },
         'glow',
       );
     }),
   );
 }
+
+/**
+ * The corporate tower's logo: its pixel size, and where its right end is
+ * (from the tower's middle); the GIGACORP mark runs left from there.
+ */
+export const corpLogo = { px: 0.042, right: 0.75 } as const;
 
 // ---- The street far below ----
 
@@ -886,36 +1013,60 @@ export const planterBox = looks([1, 0.4], 2, (b, v) => {
   b.box(0.9, 0.02, 0.3, 0x3e3428, { at: [0, 0.31, 0] }, 0);
 });
 
-/** Ornamental grasses in a planter (`sway` alive): a fountain of thin blades and pale seed heads. */
+/** The turn (as x, y, z Euler angles) that leans something upright by `tilt` toward the heading `around` (0 is +z). */
+function leaning(around: number, tilt: number): [number, number, number] {
+  const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(tilt, around, 0, 'YXZ'));
+  const e = new THREE.Euler().setFromQuaternion(q, 'XYZ');
+  return [e.x, e.y, e.z];
+}
+
+/**
+ * Ornamental grasses in a planter (`sway` alive): tall, slim fountain-grass
+ * tufts, each a fan of thin blades springing from one point and arching out,
+ * the tips gone to straw. No mound at the foot: just blades.
+ */
 export const grasses = looks([1, 0.4], 3, (b, v) => {
-  // A low mound of leaves first, so the planter reads full from above.
-  for (const x of [-0.3, 0, 0.3])
-    b.sphere(0.17, nth(GRASS, v + 1), { at: [x, 0.06, 0] }, [1.1, 0.6, 0.9]);
-  for (let k = 0; k < 22; k++) {
-    const x = -0.42 + (k / 21) * 0.84 + (hash01(k, v, 3) - 0.5) * 0.06;
-    const z = (hash01(k, v, 4) - 0.5) * 0.22;
-    const h = 0.32 + hash01(k, v, 5) * 0.24;
-    const lean = (hash01(k, v, 6) - 0.5) * 0.8;
-    b.box(
-      0.05,
-      h,
-      0.016,
-      nth(GRASS, k + v),
-      {
-        at: [x + Math.sin(lean) * h * 0.5, (h / 2) * Math.cos(lean), z],
-        rot: [(hash01(k, v, 7) - 0.5) * 0.5, 0, -lean],
-      },
-      0,
-    );
-    if (k % 3 === v % 3)
-      b.sphere(
-        0.035,
-        0xd8c890,
-        {
-          at: [x + Math.sin(lean) * h, h * Math.cos(lean) + 0.02, z],
-        },
-        [1, 2, 1],
-      );
+  const tufts = 4 + (v % 2);
+  for (let t = 0; t < tufts; t++) {
+    const tx = -0.36 + ((t + 0.5) / tufts) * 0.72 + (hash01(t, v, 2) - 0.5) * 0.08;
+    const tz = (hash01(t, v, 8) - 0.5) * 0.1;
+    const blades = 8 + Math.floor(hash01(t, v, 9) * 4);
+    const tall = 0.35 + hash01(t, v, 10) * 0.2;
+    const green = nth(GRASS, t + v);
+    for (let k = 0; k < blades; k++) {
+      // Fanned evenly round the tuft, each its own lean and height.
+      const around = (k / blades) * Math.PI * 2 + hash01(k, t + v * 5, 3) * 0.6;
+      const lean = 0.18 + hash01(k, t + v * 5, 4) * 0.32;
+      const h = tall * (0.75 + hash01(k, t + v * 5, 5) * 0.3);
+      const dir: [number, number] = [Math.sin(around), Math.cos(around)];
+      // Two segments: the lower part of the blade green, the arching tip straw.
+      let foot: [number, number, number] = [tx, 0, tz];
+      const seg = (len: number, tilt: number, color: number, w: number) => {
+        const up: [number, number, number] = [
+          dir[0] * Math.sin(tilt),
+          Math.cos(tilt),
+          dir[1] * Math.sin(tilt),
+        ];
+        b.box(
+          w,
+          len,
+          0.01,
+          color,
+          {
+            at: [
+              foot[0] + (up[0] * len) / 2,
+              foot[1] + (up[1] * len) / 2,
+              foot[2] + (up[2] * len) / 2,
+            ],
+            rot: leaning(around, tilt),
+          },
+          0,
+        );
+        foot = [foot[0] + up[0] * len, foot[1] + up[1] * len, foot[2] + up[2] * len];
+      };
+      seg(h * 0.7, lean, green, 0.036);
+      seg(h * 0.3, lean * 1.9, STRAW, 0.026);
+    }
   }
 });
 
@@ -930,10 +1081,10 @@ export const planterTree = looks([0.8, 0.8], 1, (b) => {
   ] as const)
     b.cylinder(0.018, 0.025, 0.7, 0x8a8478, { at: [x, 0.7, z], rot: [r, 0, r * 1.5] }, 6);
   for (const [x, y, z, r, c] of [
-    [0, 1.12, 0, 0.3, 0x5e7a4a],
-    [0.18, 1.0, 0.1, 0.22, 0x6a8452],
-    [-0.16, 1.02, -0.06, 0.22, 0x50703f],
-    [0.05, 1.3, -0.05, 0.18, 0x6a8452],
+    [0, 1.12, 0, 0.3, 0x5f8a4a],
+    [0.18, 1.0, 0.1, 0.22, 0x6c9652],
+    [-0.16, 1.02, -0.06, 0.22, 0x527e3e],
+    [0.05, 1.3, -0.05, 0.18, 0x6c9652],
   ] as const)
     b.sphere(r, c, { at: [x, y, z] }, [1, 0.85, 1]);
 });
@@ -994,22 +1145,81 @@ export const hammock = looks([1.5, 0.6], 1, (b) => {
   b.box(0.2, 0.12, 0.01, 0x9aa0a8, { at: [0.03, 0.42, -0.04], rot: [-0.3, 0.3, 0] }, 0);
 });
 
-/** E-scooters in a black steel rack, a charging lead to the wall: two or three, along x. */
+/**
+ * E-scooters parked in echelon at a black steel charging dock, two or three
+ * along x: each side-on enough that its deck, its two wheels, the stem and
+ * the handlebar read from above, the front wheel in the dock.
+ */
 export const scooterRack = looks([1.2, 0.5], 2, (b, v) => {
-  b.box(1.2, 0.04, 0.08, BLACK_STEEL, { at: [0, 0.02, -0.18] }, 0);
-  b.box(1.2, 0.03, 0.03, BLACK_STEEL, { at: [0, 0.32, -0.2] }, 0);
-  for (const x of [-0.55, 0.55]) b.box(0.03, 0.32, 0.03, BLACK_STEEL, { at: [x, 0.16, -0.2] }, 0);
+  // The dock: a low rail along the back with a charging post at each end.
+  b.box(1.2, 0.05, 0.08, BLACK_STEEL, { at: [0, 0.025, -0.2] }, 0);
+  b.box(1.2, 0.04, 0.03, BLACK_STEEL, { at: [0, 0.18, -0.22] }, 0);
+  for (const x of [-0.58, 0.58]) {
+    b.box(0.06, 0.26, 0.06, BLACK_STEEL, { at: [x, 0.13, -0.22] }, 0);
+    glowBox(b, 0.03, 0.02, 0.01, 0x8af0a8, [x, 0.22, -0.186]);
+  }
   const n = 2 + v;
+  const yaw = 0.5;
+  const c = Math.cos(yaw);
+  const sn = Math.sin(yaw);
   for (let i = 0; i < n; i++) {
-    const x = -0.4 + (i * 0.8) / Math.max(1, n - 1);
-    const c = nth([0x3a3e46, 0x5a6a62, 0xd8d6d0], i + v);
-    const lean = (hash01(i, v, 3) - 0.5) * 0.12;
-    b.box(0.08, 0.035, 0.42, c, { at: [x, 0.07, 0.02], rot: [0, 0, lean] }, 0.01);
-    for (const z of [-0.2, 0.22])
-      b.cylinder(0.05, 0.05, 0.03, 0x1e2024, { at: [x, 0.05, z], rot: [0, 0, Math.PI / 2] }, 12);
-    b.box(0.025, 0.55, 0.025, 0x2a2d32, { at: [x, 0.34, -0.16], rot: [-0.12, 0, lean] }, 0);
-    b.box(0.26, 0.025, 0.025, 0x2a2d32, { at: [x, 0.61, -0.19] }, 0);
-    glowBox(b, 0.03, 0.02, 0.01, 0x8af0a8, [x, 0.5, -0.14]);
+    const ox = -0.38 + (i * 0.76) / Math.max(1, n - 1);
+    const oz = 0.02;
+    const psi = yaw + (hash01(i, v, 3) - 0.5) * 0.12;
+    /** A point u along the deck (+u to the front), y up, w across. */
+    const at = (u: number, y: number, w: number): [number, number, number] => [
+      ox + u * c + w * sn,
+      y,
+      oz - u * sn + w * c,
+    ];
+    const paint = nth([0x3fa08a, 0xe8e6e0, 0x7a5ab0], i + v);
+    // Deck in the scooter's colour with a strip of grip tape, the two wheels, the rear fender.
+    b.box(0.48, 0.04, 0.13, paint, { at: at(0, 0.075, 0), rot: [0, psi, 0] }, 0.01);
+    b.box(0.34, 0.006, 0.07, 0x1a1c20, { at: at(-0.03, 0.097, 0), rot: [0, psi, 0] }, 0);
+    for (const u of [-0.24, 0.24]) {
+      b.cylinder(
+        0.065,
+        0.065,
+        0.04,
+        0x1a1c20,
+        {
+          at: at(u, 0.055, 0),
+          rot: [0, psi + Math.PI / 2, Math.PI / 2],
+        },
+        12,
+      );
+      b.cylinder(
+        0.025,
+        0.025,
+        0.04,
+        0x8a9096,
+        {
+          at: at(u, 0.055, 0),
+          rot: [0, psi + Math.PI / 2, Math.PI / 2],
+        },
+        8,
+      );
+    }
+    b.box(0.12, 0.018, 0.08, paint, { at: at(-0.25, 0.115, 0), rot: [0, psi, 0.25] }, 0);
+    // The stem, raked back a little, in the scooter's colour; the handlebar across, black grips.
+    const lean = 0.18;
+    const sh = 0.56;
+    const top: [number, number] = [0.24 - Math.sin(lean) * sh, 0.06 + Math.cos(lean) * sh];
+    b.box(
+      0.035,
+      sh,
+      0.035,
+      paint,
+      {
+        at: at(0.24 - (Math.sin(lean) * sh) / 2, 0.06 + (Math.cos(lean) * sh) / 2, 0),
+        rot: [0, psi, lean],
+      },
+      0,
+    );
+    b.box(0.035, 0.035, 0.36, 0x2a2d32, { at: at(top[0], top[1], 0), rot: [0, psi, 0] }, 0);
+    for (const w of [-0.15, 0.15])
+      b.box(0.04, 0.04, 0.07, 0x16181c, { at: at(top[0], top[1], w), rot: [0, psi, 0] }, 0);
+    glowBox(b, 0.02, 0.03, 0.04, 0xfff0c8, at(0.23, 0.3, 0), [0, psi, 0]);
   }
 });
 
@@ -1167,7 +1377,12 @@ export const solarPanels = looks([1.2, 0.8], 2, (b, v) => {
   }
 });
 
-/** A satellite dish on a post, aimed up and back: the uplink shipped work goes out on. */
+/**
+ * A satellite dish on a post: the uplink shipped work goes out on. The bowl
+ * faces up and toward −z (turn the piece to aim it), tilted 35° off the
+ * vertical, so from above you look into it: a pale bowl with a darker inside,
+ * a rim, the feed arm out of its middle to the LNB.
+ */
 export const satDish = looks([0.8, 0.8], 1, (b) => {
   b.box(0.5, 0.05, 0.5, BLACK_STEEL, { at: [0, 0.025, 0] }, 0);
   for (const [x, z] of [
@@ -1175,17 +1390,37 @@ export const satDish = looks([0.8, 0.8], 1, (b) => {
     [0.2, 0.2],
   ] as const)
     b.box(0.12, 0.08, 0.12, 0x8e8c86, { at: [x, 0.09, z] }, 0);
-  b.cylinder(0.04, 0.05, 0.6, GALV, { at: [0, 0.32, 0] }, 10);
-  const tilt = 0.75;
-  const dy = 0.72;
-  const dish = new THREE.SphereGeometry(0.4, 20, 8, 0, Math.PI * 2, 0, 0.75);
-  dish.scale(1, 0.55, 1);
-  b.add(dish, 0xe4e4e0, { at: [0, dy - 0.2, 0], rot: [-tilt, 0, 0] });
-  b.cylinder(0.06, 0.06, 0.04, 0xbcbcb8, { at: [0, dy - 0.14, 0.02], rot: [-tilt, 0, 0] }, 12);
-  // The feed arm and LNB.
-  b.box(0.02, 0.5, 0.02, GALV, { at: [0, dy + 0.06, 0.16], rot: [-tilt, 0, 0] }, 0);
-  b.box(0.06, 0.08, 0.06, 0x3a3d42, { at: [0, dy + 0.24, 0.3], rot: [-tilt, 0, 0] }, 0);
-  b.led(0.015, 0x5cf08a, { at: [0.03, dy + 0.26, 0.33] });
+  b.cylinder(0.04, 0.05, 0.42, GALV, { at: [0, 0.23, 0] }, 10);
+  // The bowl's middle, and its aim: 35° off straight up, toward −z.
+  const tilt = (35 * Math.PI) / 180;
+  const c: [number, number, number] = [0, 0.5, 0];
+  const axis: [number, number, number] = [0, Math.cos(tilt), -Math.sin(tilt)];
+  const rot: [number, number, number] = [-tilt, 0, 0];
+  const r = 0.36;
+  const deep = 0.12;
+  /** A point `along` the aim from the bowl's middle. */
+  const out = (along: number): [number, number, number] => [
+    c[0] + axis[0] * along,
+    c[1] + axis[1] * along,
+    c[2] + axis[2] * along,
+  ];
+  // The inside: a cap turned to a bowl, its faces wound to show from above.
+  const inside = new THREE.SphereGeometry(1, 22, 8, 0, Math.PI * 2, 0, 0.9);
+  inside.scale(r / Math.sin(0.9), -deep / (1 - Math.cos(0.9)), r / Math.sin(0.9));
+  inside.translate(0, deep / (1 - Math.cos(0.9)), 0);
+  inside.computeVertexNormals();
+  b.add(inside, 0xc8ccd0, { at: c, rot });
+  // The back of the bowl, seen from below and the side.
+  const back = new THREE.SphereGeometry(1, 22, 8, 0, Math.PI * 2, Math.PI - 0.9, 0.9);
+  back.scale(r / Math.sin(0.9), deep / (1 - Math.cos(0.9)), r / Math.sin(0.9));
+  back.translate(0, deep / (1 - Math.cos(0.9)) - 0.004, 0);
+  b.add(back, 0xa8acb0, { at: c, rot });
+  b.torus(r, 0.014, 0xeceae4, { at: out(deep), rot: [-Math.PI / 2 - tilt, 0, 0] });
+  // The bracket at the back, the feed arm out to the LNB.
+  b.box(0.12, 0.08, 0.12, 0x6e747a, { at: out(-0.03), rot }, 0);
+  b.box(0.018, 0.34, 0.018, GALV, { at: out(0.17), rot }, 0);
+  b.box(0.06, 0.08, 0.06, 0x3a3d42, { at: out(0.36), rot }, 0);
+  b.led(0.015, 0x5cf08a, { at: out(0.41) });
 });
 
 /**
@@ -1298,27 +1533,54 @@ export const rackCabinet = looks([0.7, 0.6], 1, (b) => {
   glowBox(b, 0.5, 0.02, 0.01, 0x5cf08a, [0, 1.06, 0.276]);
 });
 
-/** A status LED on the rack (`blink` alive): bright green. */
+/** A status LED on the rack (`blink` alive, `hot`): a dark bezel, the bright green strip in the glow layer. */
 export const statusLed = looks([0.1, 0.1], 1, (b) => {
-  b.box(0.12, 0.05, 0.03, 0x7cff9a, { at: [0, 0.025, 0] }, 0);
+  b.box(0.14, 0.06, 0.02, 0x1c1e24, { at: [0, 0.025, -0.01] }, 0);
+  glowBox(b, 0.12, 0.05, 0.03, 0x7cff9a, [0, 0.025, 0]);
 });
 
-/** A galvanised ladder cable tray `len` long along +x from x = 0, on low stands, cables in it. */
+/**
+ * A galvanised ladder cable tray `len` long along +x from x = 0, on low
+ * stands, a fat yellow and a black cable in it (the uplink's feed). Under
+ * 0.15 high, so it can run along the front of the roof.
+ */
 export function cableTray(len: number): SetPiece {
   return once(`tray:${len.toFixed(2)}`, () =>
-    looks([len, 0.2], 1, (b) => {
-      const y = 0.07;
-      for (const z of [-0.07, 0.07]) b.box(len, 0.035, 0.012, GALV, { at: [len / 2, y, z] }, 0);
-      for (let x = 0.1; x < len; x += 0.18)
-        b.box(0.015, 0.008, 0.14, GALV, { at: [x, y - 0.012, 0] }, 0);
-      for (let x = 0.3; x < len; x += 0.9)
-        b.box(0.03, y, 0.03, BLACK_STEEL, { at: [x, y / 2 - 0.01, 0] }, 0);
-      for (const [z, c] of [
-        [-0.03, 0x1e2024],
-        [0.0, 0x3a6aa8],
-        [0.03, 0x2a2d32],
-      ] as const)
-        b.box(len, 0.016, 0.022, c, { at: [len / 2, y + 0.002, z] }, 0);
+    looks([len, 0.24], 1, (b) => {
+      const y = 0.09;
+      const w = 0.2;
+      const tray = 0xa3aaaf;
+      for (const z of [-w / 2, w / 2]) b.box(len, 0.045, 0.014, tray, { at: [len / 2, y, z] }, 0);
+      for (let x = 0.08; x < len; x += 0.16)
+        b.box(0.02, 0.01, w, tint(tray, -0.12), { at: [x, y - 0.016, 0] }, 0);
+      for (let x = 0.3; x < len; x += 0.8) {
+        b.box(0.03, y - 0.02, 0.03, BLACK_STEEL, { at: [x, (y - 0.02) / 2, 0] }, 0);
+        b.box(0.14, 0.012, w + 0.04, BLACK_STEEL, { at: [x, y - 0.026, 0] }, 0);
+      }
+      b.cylinder(
+        0.026,
+        0.026,
+        len,
+        0xd8b040,
+        { at: [len / 2, y + 0.005, -0.04], rot: [0, 0, Math.PI / 2] },
+        8,
+      );
+      b.cylinder(
+        0.022,
+        0.022,
+        len,
+        0x1e2024,
+        { at: [len / 2, y + 0.002, 0.03], rot: [0, 0, Math.PI / 2] },
+        8,
+      );
+      b.cylinder(
+        0.014,
+        0.014,
+        len,
+        0x3a6aa8,
+        { at: [len / 2, y + 0.0, 0.075], rot: [0, 0, Math.PI / 2] },
+        6,
+      );
     }),
   );
 }
@@ -1358,41 +1620,65 @@ export const serverBlade = looks([0.5, 0.3], 1, (b) => {
 
 // ---- The light well ----
 
+/** Euler angles (x, y, z) in `order`, as the x, y, z order the kit takes. */
+function inOrder(
+  angles: [number, number, number],
+  order: THREE.EulerOrder,
+): [number, number, number] {
+  const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(...angles, order));
+  const e = new THREE.Euler().setFromQuaternion(q, 'XYZ');
+  return [e.x, e.y, e.z];
+}
+
 /**
- * One tile of the skylight over the light well: the floor below glowing up
- * through a glass roof light in black mullions, and a rendered kerb along
- * every side in `kerbs` (bits: 1 back, 2 right, 4 front, 8 left).
+ * One tile of the skylight over the light well: a pitched glass roof light
+ * (pale blue panes with a sheen on both slopes, thin straight black glazing
+ * bars) over the floor below, lit warm and glowing up through it, the office
+ * on it seen from above: a birch desk, its screen, a chair. A rendered kerb
+ * along every side in `kerbs` (bits: 1 back, 2 right, 4 front, 8 left).
  */
 export function skylightTile(kerbs: number): SetPiece {
   return once(`skylight:${kerbs}`, () =>
     looks([1, 1], 3, (b, v) => {
-      // The floor below, lit warm, and the office on it seen from above: a desk, its glowing screen, a chair.
-      // (Its top over the roof membrane the scene lays under everything.)
-      glowBox(b, 1, 0.01, 1, 0xfff0d0, [0, 0.04, 0]);
+      // The floor below, lit warm. (Its top over the roof membrane the scene lays under everything.)
+      glowBox(b, 1, 0.01, 1, 0xe8c890, [0, 0.04, 0]);
       const flip = v % 2 ? 1 : -1;
       const dz = v === 2 ? 0.3 : 0;
-      b.box(0.44, 0.03, 0.22, 0x3a3430, { at: [flip * 0.14, 0.06, -0.18 + dz] }, 0);
-      glowBox(b, 0.2, 0.012, 0.03, nth([0x8ad8ff, 0x9af0b8, 0xffc890], v), [
+      b.box(0.44, 0.03, 0.22, 0xb8a888, { at: [flip * 0.14, 0.06, -0.18 + dz] }, 0);
+      b.box(0.2, 0.012, 0.03, 0x2a2d32, { at: [flip * 0.14, 0.08, -0.25 + dz] }, 0);
+      glowBox(b, 0.17, 0.006, 0.02, nth([0x8ad8ff, 0x9af0b8, 0xffc890], v), [
         flip * 0.14,
-        0.08,
-        -0.24 + dz,
+        0.087,
+        -0.245 + dz,
       ]);
-      b.cylinder(0.07, 0.07, 0.03, 0x2a2d32, { at: [flip * 0.14, 0.06, 0.04 + dz] }, 10);
-      if (v !== 2) b.box(0.22, 0.02, 0.3, 0x6a5a7a, { at: [-flip * 0.22, 0.052, 0.22] }, 0);
-      // A pitched glass roof light: two slopes up to a ridge along z, black glazing bars.
+      b.cylinder(0.06, 0.06, 0.025, 0x6a6e76, { at: [flip * 0.14, 0.06, 0.03 + dz] }, 10);
+      if (v !== 2) b.box(0.22, 0.015, 0.3, 0x8a7a9a, { at: [-flip * 0.22, 0.05, 0.22] }, 0);
+      // The pitched glass: two slopes up to a ridge along z.
       const ridge = 0.34;
       const eave = 0.22;
       const slope = Math.atan2(ridge - eave, 0.47);
       const run = Math.hypot(0.47, ridge - eave);
+      const mid = (ridge + eave) / 2;
       for (const s of [-1, 1]) {
-        const at: [number, number, number] = [s * 0.235, (ridge + eave) / 2, 0];
-        for (const z of [0])
+        const tiltRot: [number, number, number] = [0, 0, -s * slope];
+        b.pane(run, 0.01, 1, 0xbcd8ec, { at: [s * 0.235, mid + 0.004, 0], rot: tiltRot });
+        // A sheen across each slope, on the diagonal.
+        const across = (v + (s > 0 ? 1 : 0)) % 3;
+        b.pane(0.05, 0.004, run, 0xe8f2f8, {
+          at: [s * 0.235, mid + 0.012, (across - 1) * 0.24],
+          rot: inOrder([0, s * 0.7, -s * slope], 'ZYX'),
+        });
+        // Glazing bars: straight, thin, every half tile down the slope; the eave rail.
+        for (const z of [-0.5, 0, 0.5])
           b.box(
             run,
             0.022,
-            0.022,
+            Math.abs(z) === 0.5 ? 0.011 : 0.022,
             BLACK_STEEL,
-            { at: [at[0], at[1] + 0.008, z], rot: [0, 0, -s * slope] },
+            {
+              at: [s * 0.235, mid + 0.014, z - Math.sign(z) * (Math.abs(z) === 0.5 ? 0.0055 : 0)],
+              rot: tiltRot,
+            },
             0,
           );
         b.box(0.03, 0.03, 1, BLACK_STEEL, { at: [s * 0.47, eave, 0] }, 0);
