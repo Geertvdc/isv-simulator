@@ -81,8 +81,8 @@ export const WALL_DECOS: Readonly<Record<WallTheme, readonly string[]>> = {
   officePark: ['pinboard', 'whiteboard', 'fireExit', 'officeClock', 'thermostat', 'motivation'],
   // The biscuit works hang their own art (see `rooms/warehouseRoom.ts`); this is the fallback.
   warehouse: ['poster', 'clock', 'plants', 'pinboard', 'frames', 'braces'],
-  // For now as glass; the Seed Round Room pass gives the loft its own.
-  loft: ['whiteboard', 'clock', 'dashboard', 'tv', 'plants', 'frames'],
+  // The loft hangs its own art (see `rooms/loftRoom.ts`); this is the fallback.
+  loft: ['whiteboard', 'clock', 'dashboard', 'tv', 'plants'],
 };
 /** No two decorations this close along a wall are the same. */
 export const WALL_DECO_SPREAD = 4;
