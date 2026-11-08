@@ -11,6 +11,18 @@ on:
         options:
           - prod
         default: prod
+      shards:
+        description: Game server shards; default is gameServerShards in infra/main.bicepparam (change it there to keep a count). 1, 2, 3, 4, 6 or 8 spread rooms evenly
+        type: choice
+        options:
+          - default
+          - '1'
+          - '2'
+          - '3'
+          - '4'
+          - '6'
+          - '8'
+        default: default
       what_if:
         description: What-if only (show the infrastructure changes, deploy nothing)
         type: boolean
@@ -44,9 +56,13 @@ jobs:
       - name: Deploy
         env:
           DEPLOY_ENV: ${{ inputs.env }}
+          SHARDS: ${{ inputs.shards }}
           WHAT_IF: ${{ inputs.what_if }}
         run: |
           args=(--env "$DEPLOY_ENV")
+          if [[ -n "$SHARDS" && "$SHARDS" != default ]]; then
+            args+=(--shards "$SHARDS")
+          fi
           if [[ "$WHAT_IF" == "true" ]]; then
             args+=(--what-if)
           fi

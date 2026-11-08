@@ -1,7 +1,9 @@
-// One game server shard: a Container App running the Dockerfile image.
-// Rooms live in the process's memory and join codes are unique per process,
-// so each shard is exactly one replica: a second replica behind the same
-// ingress would get joins for rooms it doesn't have.
+// One game server shard: a Container App running the Dockerfile image, with
+// its own URL. Rooms live in the process's memory, so each shard is exactly one
+// replica: a second replica behind the same ingress would get joins for rooms
+// it doesn't have. The client routes a join to the shard that owns the code
+// (the code's first letter picks the shard, from SHARD_INDEX/SHARD_COUNT);
+// profiles are shared by all shards in Table Storage.
 
 param name string
 param location string
@@ -19,11 +21,24 @@ param minReplicas int
 @description('Origins the server answers (CORS), e.g. https://<static site hostname>.')
 param allowedOrigins array
 
-@description('Name of the environment storage that holds the profiles share.')
-param profilesStorageName string
+@description('This shard\'s index, 0-based.')
+@minValue(0)
+param shardIndex int
+
+@description('Number of shards. Join codes are spread over them by their first letter.')
+@minValue(1)
+param shardCount int
+
+@description('Table Storage endpoint for the profiles, https://<account>.table.core.windows.net.')
+param tableEndpoint string
+
+@description('Name of the profiles table.')
+param tableName string
+
+@description('Client id of the managed identity the server reaches Table Storage with.')
+param identityClientId string
 
 var port = 2567
-var dataPath = '/app/server/data'
 
 resource app 'Microsoft.App/containerApps@2025-01-01' = {
   name: name
@@ -71,13 +86,14 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = {
             { name: 'ALLOWED_ORIGINS', value: join(allowedOrigins, ',') }
             // The ingress adds X-Forwarded-For; the rate limits need the real client IP.
             { name: 'TRUST_PROXY', value: 'true' }
-            { name: 'PROFILE_STORE_PATH', value: '${dataPath}/profiles.json' }
-          ]
-          volumeMounts: [
-            {
-              volumeName: 'profiles'
-              mountPath: dataPath
-            }
+            { name: 'SHARD_INDEX', value: string(shardIndex) }
+            { name: 'SHARD_COUNT', value: string(shardCount) }
+            // Profiles in Table Storage, reached as the user-assigned managed
+            // identity with this client id (no keys or connection strings).
+            { name: 'PROFILE_STORE', value: 'table' }
+            { name: 'PROFILE_TABLE_ENDPOINT', value: tableEndpoint }
+            { name: 'PROFILE_TABLE_NAME', value: tableName }
+            { name: 'AZURE_CLIENT_ID', value: identityClientId }
           ]
           probes: [
             {
@@ -103,17 +119,6 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = {
               failureThreshold: 3
             }
           ]
-        }
-      ]
-      volumes: [
-        {
-          name: 'profiles'
-          storageType: 'AzureFile'
-          storageName: profilesStorageName
-          // SMB has no Unix owners: mount as the image's node user (1000) so
-          // it can write profiles.json, private to that user. nobrl turns off
-          // SMB byte-range locks, which break some Node file writes on Azure Files.
-          mountOptions: 'uid=1000,gid=1000,dir_mode=0700,file_mode=0600,nobrl'
         }
       ]
       scale: {

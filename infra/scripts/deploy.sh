@@ -10,17 +10,20 @@ usage() {
 Usage: infra/scripts/deploy.sh [options]
 
 Builds and deploys everything for one environment:
-  1. infra/main.bicep without the game server (registry, storage, environment, site)
+  1. infra/main.bicep without the game servers (registry, storage, identity, environment, site)
   2. az acr build: the Dockerfile into isv-simulator-server:<git short sha>
-  3. infra/main.bicep with the game server on that image
-  4. VITE_SERVER_URL=<game server URL> npm run build
+  3. infra/main.bicep with the game servers (one per shard) on that image
+  4. VITE_SERVER_URLS=<shard URLs, comma-separated> npm run build
   5. upload dist/ to the Static Web App
-  6. smoke test: <game server>/health answers ok, the site answers 200
+  6. delete the game servers of shards past the shard count (after a scale-down)
+  7. smoke test: every shard's /health answers ok and /shard its index, the site answers 200
 
 Options:
   --env NAME              environment (default: prod)
   --resource-group NAME   resource group (default: rg-isv-simulator-<env>)
   --location REGION       region for the resources (default: the resource group's)
+  --shards N              number of game server shards, 1 to 8 (1, 2, 3, 4, 6 or 8 spread
+                          rooms evenly; default: gameServerShards in infra/main.bicepparam)
   --what-if               show what the Bicep deployment would change, change nothing
   --skip-server           don't build a new server image or update the game server
   --skip-client           don't build or upload the browser game
@@ -43,6 +46,7 @@ env_name=prod
 resource_group=
 location=
 what_if=false
+shards=
 skip_server=false
 skip_client=false
 allow_dirty=false
@@ -59,6 +63,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --location)
       location=${2:?--location needs a value}
+      shift 2
+      ;;
+    --shards)
+      shards=${2:?--shards needs a value}
       shift 2
       ;;
     --what-if)
@@ -90,6 +98,10 @@ done
 
 [[ $env_name =~ ^[a-z0-9]{2,8}$ ]] || die "--env must be 2 to 8 lowercase letters or digits (got '$env_name')"
 resource_group=${resource_group:-rg-isv-simulator-$env_name}
+if [[ -n $shards ]]; then
+  [[ $shards =~ ^[1-8]$ ]] || die "--shards must be 1 to 8 (got '$shards')"
+  [[ $skip_server == false ]] || die "--shards changes the game servers; it can't go with --skip-server"
+fi
 
 # ---- prerequisites (before any Azure call)
 for tool in az node npm git curl; do
@@ -110,7 +122,8 @@ if [[ $what_if == false && $skip_server == false ]] && [[ -n $(git status --porc
   fi
 fi
 
-game_app_name="ca-isv-$env_name-game-0"
+# Game server app of shard n: $game_app_prefix<n>.
+game_app_prefix="ca-isv-$env_name-game-"
 template="$root/infra/main.bicep"
 params="$root/infra/main.bicepparam"
 [[ -f $template && -f $params ]] || die "infra/main.bicep or infra/main.bicepparam is missing"
@@ -129,6 +142,9 @@ common_params=(-p "env=$env_name")
 if [[ -n $location ]]; then
   common_params+=(-p "location=$location")
 fi
+if [[ -n $shards ]]; then
+  common_params+=(-p "gameServerShards=$shards")
+fi
 
 # az deployment group show ... for one output value, as plain text.
 output() {
@@ -136,9 +152,24 @@ output() {
     --query "properties.outputs.$2.value" -o tsv
 }
 
+# Game server apps in the resource group whose shard index is >= $1, one per line:
+# what's left over after the shard count went down.
+leftover_game_apps() {
+  local keep=$1 name
+  az containerapp list -g "$resource_group" --query '[].name' -o tsv | while IFS= read -r name; do
+    name=${name%$'\r'}
+    if [[ $name == "$game_app_prefix"* ]]; then
+      local index=${name#"$game_app_prefix"}
+      if [[ $index =~ ^[0-9]+$ ]] && ((10#$index >= keep)); then
+        printf '%s\n' "$name"
+      fi
+    fi
+  done
+}
+
 # ---- what-if: show the changes and stop
 if [[ $what_if == true ]]; then
-  current_image=$(az containerapp show -n "$game_app_name" -g "$resource_group" \
+  current_image=$(az containerapp show -n "${game_app_prefix}0" -g "$resource_group" \
     --query 'properties.template.containers[0].image' -o tsv 2>/dev/null || true)
   if [[ -z $current_image ]]; then
     current_image="placeholder.azurecr.io/isv-simulator-server:what-if-placeholder"
@@ -149,12 +180,29 @@ if [[ $what_if == true ]]; then
   log "What-if: $template in $resource_group"
   az deployment group what-if -g "$resource_group" -f "$template" -p "$params" \
     "${common_params[@]}" -p deployGameServer=true -p "gameServerImage=$current_image"
+
+  # Bicep never deletes the apps of shards it no longer has; deploy.sh does (step 6).
+  if [[ -n $shards ]]; then
+    shard_count=$shards
+  else
+    shard_count=$(sed -n 's/^param gameServerShards *= *\([0-9][0-9]*\).*/\1/p' "$params")
+    shard_count=${shard_count:-1}
+  fi
+  log "What-if: game servers past $shard_count shard(s)"
+  leftovers=$(leftover_game_apps "$shard_count")
+  if [[ -n $leftovers ]]; then
+    while IFS= read -r name; do
+      info "would delete: $name"
+    done <<<"$leftovers"
+  else
+    info "none"
+  fi
   exit 0
 fi
 
 # ---- 1. foundation: everything but the game server
 foundation_deployment="isv-foundation-$image_tag"
-log "1/6 Foundation deployment ($foundation_deployment, deployGameServer=false)"
+log "1/7 Foundation deployment ($foundation_deployment, deployGameServer=false)"
 az deployment group create -g "$resource_group" -n "$foundation_deployment" \
   -f "$template" -p "$params" "${common_params[@]}" -p deployGameServer=false -o none
 
@@ -170,37 +218,56 @@ info "static site: $static_site_name ($static_site_url)"
 if [[ $skip_server == false ]]; then
   # ---- 2. server image, built in the registry (no local Docker needed)
   image="$registry_login_server/isv-simulator-server:$image_tag"
-  log "2/6 Building the server image in $registry_name: $image"
+  log "2/7 Building the server image in $registry_name: $image"
   az acr build --registry "$registry_name" --image "isv-simulator-server:$image_tag" \
     --file Dockerfile "$root"
 
-  # ---- 3. the game server on that image
+  # ---- 3. the game servers (one Container App per shard) on that image
   server_deployment="isv-gameserver-$image_tag"
-  log "3/6 Game server deployment ($server_deployment, deployGameServer=true)"
+  log "3/7 Game server deployment ($server_deployment, deployGameServer=true)"
   az deployment group create -g "$resource_group" -n "$server_deployment" \
     -f "$template" -p "$params" "${common_params[@]}" \
     -p deployGameServer=true -p "gameServerImage=$image" -o none
-  game_server_url=$(output "$server_deployment" gameServerUrl)
+  # -o tsv prints an array one value per line.
+  server_urls=()
+  while IFS= read -r url; do
+    url=${url%$'\r'}
+    [[ -z $url ]] || server_urls+=("$url")
+  done < <(output "$server_deployment" gameServerUrls)
+  shard_count=$(output "$server_deployment" gameServerShards)
+  [[ ${#server_urls[@]} == "$shard_count" ]] ||
+    die "the game server deployment has ${#server_urls[@]} URLs for $shard_count shard(s)"
 else
-  log "2/6 and 3/6 skipped (--skip-server); reading the running game server's URL"
-  fqdn=$(az containerapp show -n "$game_app_name" -g "$resource_group" \
-    --query 'properties.configuration.ingress.fqdn' -o tsv 2>/dev/null || true)
-  game_server_url=${fqdn:+https://$fqdn}
+  log "2/7 and 3/7 skipped (--skip-server); reading the running game servers' URLs"
+  # Shard n is $game_app_prefix<n>: take them in index order until one is missing.
+  server_urls=()
+  while fqdn=$(az containerapp show -n "$game_app_prefix${#server_urls[@]}" -g "$resource_group" \
+    --query 'properties.configuration.ingress.fqdn' -o tsv 2>/dev/null) && [[ -n $fqdn ]]; do
+    server_urls+=("https://$fqdn")
+  done
+  shard_count=${#server_urls[@]}
 fi
-[[ -n $game_server_url ]] ||
-  die "no game server URL (is $game_app_name deployed? run without --skip-server once)"
-info "game server: $game_server_url"
+((${#server_urls[@]} > 0)) ||
+  die "no game server URL (is ${game_app_prefix}0 deployed? run without --skip-server once)"
+# Shard i is URL i; the client splits this on commas.
+server_urls_csv=$(
+  IFS=,
+  printf '%s' "${server_urls[*]}"
+)
+for ((i = 0; i < ${#server_urls[@]}; i++)); do
+  info "game server shard $i: ${server_urls[i]}"
+done
 
 if [[ $skip_client == false ]]; then
-  # ---- 4. browser game, pointed at the game server
-  log "4/6 Building the browser game (VITE_SERVER_URL=$game_server_url)"
+  # ---- 4. browser game, pointed at the game servers
+  log "4/7 Building the browser game (VITE_SERVER_URLS=$server_urls_csv)"
   if [[ ! -d node_modules ]]; then
     npm ci
   fi
-  VITE_SERVER_URL="$game_server_url" npm run build
+  VITE_SERVER_URLS="$server_urls_csv" npm run build
 
   # ---- 5. upload to the Static Web App; the token stays out of the logs
-  log "5/6 Uploading dist/ to $static_site_name"
+  log "5/7 Uploading dist/ to $static_site_name"
   deploy_token=$(az staticwebapp secrets list --name "$static_site_name" -g "$resource_group" \
     --query properties.apiKey -o tsv)
   [[ -n $deploy_token ]] || die "could not read the Static Web App deployment token"
@@ -208,25 +275,55 @@ if [[ $skip_client == false ]]; then
     npx --yes @azure/static-web-apps-cli@2 deploy ./dist --env production
   unset deploy_token
 else
-  log "4/6 and 5/6 skipped (--skip-client)"
+  log "4/7 and 5/7 skipped (--skip-client)"
 fi
 
-# ---- 6. smoke test, with retries while a new revision starts
-log "6/6 Smoke test"
+# ---- 6. game servers of shards past the shard count (Bicep leaves them). After the
+# upload, so browsers still on the old game had them until the new game was live.
+if [[ $skip_server == false ]]; then
+  log "6/7 Game servers past $shard_count shard(s)"
+  leftovers=$(leftover_game_apps "$shard_count")
+  if [[ -n $leftovers ]]; then
+    while IFS= read -r name; do
+      info "deleting: $name"
+      az containerapp delete -n "$name" -g "$resource_group" --yes -o none
+    done <<<"$leftovers"
+  else
+    info "none"
+  fi
+else
+  log "6/7 skipped (--skip-server)"
+fi
+
+# ---- 7. smoke test, with retries while a new revision starts
+log "7/7 Smoke test"
 attempts=30
 delay=10
 
 check_health() {
-  [[ $(curl -fsS --max-time 10 "$game_server_url/health" 2>/dev/null) == ok ]]
+  [[ $(curl -fsS --max-time 10 "$1/health" 2>/dev/null) == ok ]]
+}
+# /shard answers {"shard": <index>, "shards": <count>}.
+check_shard() {
+  local body
+  body=$(curl -fsS --max-time 10 "$1/shard" 2>/dev/null) || return 1
+  node -e '
+    const [body, shard, shards] = process.argv.slice(1);
+    let j;
+    try { j = JSON.parse(body); } catch { process.exit(1); }
+    process.exit(j.shard === Number(shard) && j.shards === Number(shards) ? 0 : 1);
+  ' "$body" "$2" "$3"
 }
 check_site() {
   [[ $(curl -sS -o /dev/null --max-time 10 -w '%{http_code}' "$static_site_url" 2>/dev/null) == 200 ]]
 }
 
+# retry <what> <check function> [args for it]
 retry() {
   local what=$1 check=$2 i
+  shift 2
   for ((i = 1; i <= attempts; i++)); do
-    if "$check"; then
+    if "$check" "$@"; then
       info "$what: ok"
       return 0
     fi
@@ -236,12 +333,18 @@ retry() {
   die "$what did not answer after $attempts attempts"
 }
 
-retry "game server $game_server_url/health" check_health
+for ((i = 0; i < ${#server_urls[@]}; i++)); do
+  retry "shard $i ${server_urls[i]}/health" check_health "${server_urls[i]}"
+  retry "shard $i ${server_urls[i]}/shard is $i of ${#server_urls[@]}" \
+    check_shard "${server_urls[i]}" "$i" "${#server_urls[@]}"
+done
 retry "site $static_site_url" check_site
 
 log "Deployed ($env_name)"
 info "game:        $static_site_url"
-info "game server: $game_server_url"
+for ((i = 0; i < ${#server_urls[@]}; i++)); do
+  info "game server: ${server_urls[i]} (shard $i)"
+done
 if [[ $skip_server == false ]]; then
   info "image:       $image"
 fi

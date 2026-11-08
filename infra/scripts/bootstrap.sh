@@ -16,7 +16,8 @@ Run once per environment, as an Owner of the subscription (az login first). It:
     service principal
   - adds federated credentials for GitHub Actions on <branch> and in environment <env>
   - gives it, on the resource group only: Contributor, and Role Based Access Control
-    Administrator limited to assigning AcrPull
+    Administrator limited to assigning AcrPull and Storage Table Data Contributor (an
+    existing assignment with an older condition is replaced)
   - prints the GitHub variables to set (it doesn't set them)
 
 Options:
@@ -103,6 +104,8 @@ issuer="https://token.actions.githubusercontent.com"
 branch_subject="repo:$github_repo:ref:refs/heads/$branch"
 env_subject="repo:$github_repo:environment:$env_name"
 acr_pull_role_id="7f951dda-4ed3-4680-a7ca-43fe172d538d"
+table_data_contributor_role_id="0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3"
+rbac_admin_role="Role Based Access Control Administrator"
 providers=(
   Microsoft.App
   Microsoft.ContainerRegistry
@@ -126,7 +129,7 @@ info "resource group:     $resource_group in $location (tags app=isv-simulator e
 info "app registration:   $app_name (+ service principal)"
 info "federated creds:    $branch_subject"
 info "                    $env_subject"
-info "roles on the group: Contributor; Role Based Access Control Administrator (AcrPull only)"
+info "roles on the group: Contributor; $rbac_admin_role (AcrPull and Storage Table Data Contributor only)"
 
 if [[ $assume_yes == false ]]; then
   read -r -p "Create these in subscription $subscription_id? [y/N] " answer
@@ -181,9 +184,11 @@ add_federated_credential "github-branch-${branch//[^A-Za-z0-9-]/-}" "$branch_sub
 add_federated_credential "github-environment-$env_name" "$env_subject"
 
 log "Role assignments on $resource_group"
-# Only AcrPull may be assigned or removed: the Bicep gives the game server's managed
-# identity AcrPull on the registry, and nothing else.
-rbac_condition="((!(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})) OR (@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {$acr_pull_role_id})) AND ((!(ActionMatches{'Microsoft.Authorization/roleAssignments/delete'})) OR (@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {$acr_pull_role_id}))"
+# Only AcrPull and Storage Table Data Contributor may be assigned or removed: the Bicep
+# (infra/modules/identity.bicep) gives the game servers' managed identity AcrPull on the
+# registry and Storage Table Data Contributor on the storage account, and nothing else.
+allowed_role_ids="$acr_pull_role_id, $table_data_contributor_role_id"
+rbac_condition="((!(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})) OR (@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {$allowed_role_ids})) AND ((!(ActionMatches{'Microsoft.Authorization/roleAssignments/delete'})) OR (@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {$allowed_role_ids}))"
 
 assign_role() {
   local role=$1 count
@@ -208,7 +213,18 @@ assign_role() {
   die "could not assign $role"
 }
 assign_role Contributor
-assign_role "Role Based Access Control Administrator" \
+
+# An assignment from an earlier bootstrap may have the older AcrPull-only condition:
+# replace it (delete, then assign_role creates it with the current condition).
+stale_ids=$(az role assignment list --scope "$rg_id" \
+  --query "[?principalId=='$sp_id' && roleDefinitionName=='$rbac_admin_role' && !(contains(condition || '', '$table_data_contributor_role_id'))].id" -o tsv)
+while IFS= read -r stale_id; do
+  [[ -n $stale_id ]] || continue
+  az role assignment delete --ids "$stale_id" -o none
+  info "removed: $rbac_admin_role with the older condition"
+done <<<"$stale_ids"
+
+assign_role "$rbac_admin_role" \
   --condition "$rbac_condition" --condition-version 2.0
 
 log "Done. Set these GitHub variables (Settings > Secrets and variables > Actions > Variables):"
