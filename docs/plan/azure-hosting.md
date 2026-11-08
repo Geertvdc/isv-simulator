@@ -101,7 +101,7 @@ Outputs: `registryName`, `registryLoginServer`, `staticSiteName`, `staticSiteUrl
 
 ### What limits one server
 
-The server is one Node process: the event loop uses one core, whatever the container has. Every room runs its own sim at 60 ticks a second and sends a snapshot to every client 20 times a second. A process holds as many rooms as that one core can tick. Memory is small (a room is a few hundred KB of state).
+The server is one Node process: the event loop uses one core, whatever the container has. Every room runs its own sim at 60 ticks a second and sends a snapshot to every client 20 times a second. A process holds as many rooms as that one core can tick. Memory is small (a room is about 12 KB of heap; games share their level map).
 
 `npm run bench:rooms` measures the cost of one 4-player room on this machine (sim ticks plus snapshot encoding) and the bytes per snapshot. It prints how many rooms fit in a 50%-busy core and the bandwidth per room. The numbers from this branch are in [Capacity](#capacity).
 
@@ -127,9 +127,29 @@ Dedicated game-server hosting (AKS with Agones, or PlayFab Multiplayer Servers) 
 
 ### Capacity
 
-See the numbers from `npm run bench:rooms` below (filled in on this branch).
+`npm run bench:rooms` (defaults: every campaign level, 60 s each, 50 rooms for the memory). It runs the real room logic as `GameRoom.ts` does, without sockets: four members with one player each, every player a bot (`src/sim/bot.ts`) sending one `inputs` message per tick. Timed: the input messages plus `stepRoom` (flow, sim, snapshot building), and encoding each snapshot the way Colyseus does (msgpack, once per broadcast; the same bytes go to all four clients). The server sends msgpack without permessage-deflate (the Colyseus WebSocket transport's default); deflate is listed for reference.
 
-<!-- capacity -->
+Ran on an Azure VM: 4 vCPU Arm Neoverse-N2 (Cobalt 100), Node v24.22.2.
+
+| Per 4-player room                     | Measured                                      |
+| ------------------------------------- | --------------------------------------------- |
+| Tick (inputs + `stepRoom`)            | 43 µs mean, 137 µs p99                        |
+| Snapshot encode (msgpack)             | 56 µs mean, 123 µs p99                        |
+| CPU                                   | 3.7 ms per second of game time (0.37% core)   |
+| Rooms per core at 50% busy            | ~134                                          |
+| Snapshot size                         | 2.8 KB msgpack (3.8 KB JSON); 1.3 KB deflated |
+| Outbound (4 clients × 20 snapshots/s) | ~227 KB/s (1.9 Mbit/s); ~100 KB/s deflated    |
+| Heap per room (mid-round)             | ~11 to 13 KB (levels' maps are shared)        |
+
+What the bench leaves out: the socket writes (80 a second per room), decoding the clients' 240 messages a second, and Colyseus's own work. Count those as about as much again. Container Apps vCPUs are also often slower than a dev machine: halve the numbers as a rule of thumb. Memory is not the limit (sockets and Colyseus add some tens of KB per client; the 1 GiB default is plenty).
+
+So, for planning:
+
+- **1 vCPU shard:** 134 halved for a slower vCPU, halved again for the network work: **~30 rooms, ~120 players** at once, with the core half idle.
+- **0.5 vCPU shard** (the default): half that, **~15 rooms, ~60 players**.
+- Bandwidth at 30 rooms: ~7 MB/s (~55 Mbit/s) outbound; one room uses ~800 MB of egress per hour played (the first 100 GB a month are free).
+
+An internal company game has a handful of rooms at a time, so stage 1 at 0.5 vCPU holds it with a lot of room to spare. Go to 1 vCPU when more than ~15 rooms play at once regularly, and to stage 2 (shards) only past ~30 rooms (~120 players) at the same time.
 
 ## Costs (rough, West Europe, pay-as-you-go)
 
@@ -160,9 +180,9 @@ Not done in this step. When it's time:
 
 ## Done when
 
-- [ ] `infra/` Bicep builds (`az bicep build`) and lints without warnings
-- [ ] `deploy.sh`, `bootstrap.sh` pass `bash -n` and shellcheck
-- [ ] The deploy workflow only runs on `workflow_dispatch`
-- [ ] `npm run bench:rooms` runs and its numbers are in [Capacity](#capacity)
-- [ ] `npm run check`, `npm run format:check` and `npm run build` pass
-- [ ] Nothing deployed
+- [x] `infra/` Bicep builds (`az bicep build`) and lints without warnings
+- [x] `deploy.sh`, `bootstrap.sh` pass `bash -n` and shellcheck
+- [x] The deploy workflow only runs on `workflow_dispatch`
+- [x] `npm run bench:rooms` runs and its numbers are in [Capacity](#capacity)
+- [x] `npm run check`, `npm run format:check` and `npm run build` pass
+- [x] Nothing deployed
