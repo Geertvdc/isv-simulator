@@ -12,6 +12,7 @@
     "start:server": "node dist-server/main.js",
     "preview": "vite preview",
     "sim": "vite-node scripts/sim.ts",
+    "bench:rooms": "vite-node scripts/roomBench.ts",
     "screenshots": "vite-node scripts/screenshots.ts",
     "verify:online": "vite-node scripts/verifyOnline.ts",
     "verify:prediction": "vite-node scripts/verifyPrediction.ts",
