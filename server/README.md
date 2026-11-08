@@ -119,6 +119,8 @@ docker build -t isv-simulator-server .
 docker run --rm -p 2567:2567 isv-simulator-server
 ```
 
+The Azure setup (Container Apps for this server, Static Web Apps for the game, one deploy script) lives in [`infra/`](../infra/README.md). The notes below hold for any host.
+
 The `Dockerfile` bundles `server/` with Vite (`npm run build:server`, which inlines the level maps) into `dist-server/main.js` and runs that with Node 22 and the production dependencies. It runs anywhere that runs a container and allows WebSockets: Azure Container Apps, Fly.io, Render, a VM. Things to know:
 
 - **Profiles on disk.** Mount a volume for the profile file, e.g. `-v isv-profiles:/app/server/data` (or set `PROFILE_STORE_PATH` to a path on one); without it, profiles go with the container.
