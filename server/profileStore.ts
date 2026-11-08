@@ -1,9 +1,10 @@
 /**
  * Online profiles: a display name and level progress per user id, kept on
  * the server. `ProfileStore` is what the HTTP routes and rooms use;
- * `JsonFileProfileStore` keeps everything in one JSON file (fine for an
- * internal game), `MemoryProfileStore` is the same without the file, for
- * tests.
+ * `JsonFileProfileStore` keeps everything in one JSON file (fine for one
+ * server), `MemoryProfileStore` is the same without the file, for tests.
+ * `TableProfileStore` (`tableProfileStore.ts`) is the one several servers
+ * (shards) share; it uses the helpers below for the same rules.
  *
  * Every call runs after the one before has finished (one promise chain), so
  * two merges for the same user never read the same old profile and the file
@@ -65,13 +66,45 @@ export class ProfileLimitError extends Error {
   }
 }
 
-function newProfile(userId: string, now: string): Profile {
+/** A profile for a user who has none yet. */
+export function newProfile(userId: string, now: string): Profile {
   return {
     userId,
     displayName: defaultDisplayName(userId),
     levels: {},
     createdAt: now,
     updatedAt: now,
+  };
+}
+
+/** Applies a `merge`: a new name (when it's a usable one) and the levels merged in. */
+export function applyUpdate(profile: Profile, update: ProfileUpdate): void {
+  const name = update.displayName === undefined ? null : normalizeDisplayName(update.displayName);
+  if (name) profile.displayName = name;
+  if (update.levels) profile.levels = mergeLevels(profile.levels, update.levels);
+}
+
+/** Applies a `recordResult`: the round into its level, and the name when given. */
+export function applyResult(
+  profile: Profile,
+  levelId: string,
+  result: LevelResult,
+  displayName?: string,
+): void {
+  recordLevel(profile.levels, levelId, result);
+  const name = displayName === undefined ? null : normalizeDisplayName(displayName);
+  if (name) profile.displayName = name;
+}
+
+/** A stored profile's fields as a `Profile`; what's missing or broken gets a default. */
+export function parseProfile(userId: string, fields: Record<string, unknown>): Profile {
+  const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
+  return {
+    userId,
+    displayName: normalizeDisplayName(str(fields.displayName) ?? '') ?? defaultDisplayName(userId),
+    levels: parseLevels(fields.levels),
+    createdAt: str(fields.createdAt) ?? EPOCH,
+    updatedAt: str(fields.updatedAt) ?? EPOCH,
   };
 }
 
@@ -93,10 +126,7 @@ export class MemoryProfileStore implements ProfileStore {
   merge(userId: string, update: ProfileUpdate, now: string): Promise<Profile> {
     return this.run(true, () =>
       this.change(userId, now, (profile) => {
-        const name =
-          update.displayName === undefined ? null : normalizeDisplayName(update.displayName);
-        if (name) profile.displayName = name;
-        if (update.levels) profile.levels = mergeLevels(profile.levels, update.levels);
+        applyUpdate(profile, update);
       }),
     );
   }
@@ -110,9 +140,7 @@ export class MemoryProfileStore implements ProfileStore {
   ): Promise<Profile> {
     return this.run(true, () =>
       this.change(userId, now, (profile) => {
-        recordLevel(profile.levels, levelId, result);
-        const name = displayName === undefined ? null : normalizeDisplayName(displayName);
-        if (name) profile.displayName = name;
+        applyResult(profile, levelId, result, displayName);
       }),
     );
   }
@@ -167,15 +195,7 @@ export function parseProfiles(raw: unknown): Map<string, Profile> {
   if (typeof list !== 'object' || list === null) return profiles;
   for (const [userId, value] of Object.entries(list)) {
     if (typeof value !== 'object' || value === null) continue;
-    const p = value as Record<string, unknown>;
-    const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
-    profiles.set(userId, {
-      userId,
-      displayName: normalizeDisplayName(str(p.displayName) ?? '') ?? defaultDisplayName(userId),
-      levels: parseLevels(p.levels),
-      createdAt: str(p.createdAt) ?? EPOCH,
-      updatedAt: str(p.updatedAt) ?? EPOCH,
-    });
+    profiles.set(userId, parseProfile(userId, value as Record<string, unknown>));
   }
   return profiles;
 }
@@ -231,9 +251,4 @@ export class JsonFileProfileStore extends MemoryProfileStore {
     await writeFile(temp, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
     await rename(temp, this.path);
   }
-}
-
-/** The store `npm run server` uses: `PROFILE_STORE_PATH`, or `data/profiles.json`. */
-export function profileStoreFromEnv(env: NodeJS.ProcessEnv = process.env): JsonFileProfileStore {
-  return new JsonFileProfileStore(env.PROFILE_STORE_PATH || DEFAULT_PROFILE_STORE_PATH);
 }
