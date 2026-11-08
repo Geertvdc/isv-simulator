@@ -155,7 +155,29 @@ export async function hostRoom(
   }
 }
 
-/** Joins the room with this (normalized) join code. */
+/**
+ * Hosts on the first of these servers (shards, in the order to try them,
+ * `hostOrder`) that can be reached: a shard that's `unreachable` passes to
+ * the next; any other refusal is the answer.
+ */
+export async function hostRoomOnShards(
+  serverUrls: readonly string[],
+  hello: HelloMessage,
+  options: ConnectOptions = {},
+): Promise<NetConnection> {
+  let last = new JoinError('unreachable', 'no game server to host on');
+  for (const url of serverUrls) {
+    try {
+      return await hostRoom(url, hello, options);
+    } catch (error) {
+      last = toJoinError(error);
+      if (last.code !== 'unreachable') throw last;
+    }
+  }
+  throw last;
+}
+
+/** Joins the room with this (normalized) join code, on the server (shard) holding it. */
 export async function joinRoomByCode(
   serverUrl: string,
   code: string,

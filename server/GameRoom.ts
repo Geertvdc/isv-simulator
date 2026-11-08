@@ -17,6 +17,7 @@
 
 import { randomInt } from 'node:crypto';
 import { type Client, Room, ServerError } from 'colyseus';
+import type { Shard } from '../src/net/joinCode';
 import { type LagSettings, createLagRunner } from '../src/net/lag';
 import {
   NET_FLOOD_KICK_FACTOR,
@@ -49,6 +50,8 @@ export interface GameRoomSettings extends RoomOptions {
   lag?: LagSettings | null;
   /** How long a dropped member may take to reconnect; `NET_RECONNECT_GRACE_MS` by default (tests use less). */
   reconnectGraceMs?: number;
+  /** This server's shard: its join codes name it. The only shard by default. */
+  shard?: Shard;
 }
 
 export class GameRoom extends Room {
@@ -70,7 +73,7 @@ export class GameRoom extends Room {
   };
 
   onCreate(): void {
-    const code = reserveJoinCode();
+    const code = reserveJoinCode(this.settings.shard);
     this.roomId = code;
     this.core = createRoomState(code, randomInt(2 ** 31), this.settings);
     const lag = this.settings.lag;

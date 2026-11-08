@@ -2,8 +2,11 @@
  * The game server: Colyseus with the `game` room, plus HTTP routes.
  *
  * - `GET /health`: `ok`, for load balancers and container checks.
- * - `GET /rooms/:code`: whether a room with this join code is open, any case
- *   (`{ joinCode }` with the code as the server knows it, or 404).
+ * - `GET /shard`: `{ shard, shards }`, this server's shard index and the
+ *   shard count (deploys check the client's URL order with it).
+ * - `GET /rooms/:code`: whether a room with this join code is open here, any
+ *   case (`{ joinCode }` with the code as the server knows it, or 404). Only
+ *   this shard's rooms: other shards' codes are 404s.
  * - `GET` and `PUT /profiles/:userId`: online profiles (`profileRoutes.ts`).
  *
  * Every request passes `httpGuard.ts` first: body size, per-IP rate limits,
@@ -19,7 +22,7 @@ import {
   defineRoom,
   defineServer,
 } from 'colyseus';
-import { normalizeJoinCode } from '../src/net/joinCode';
+import { type Shard, normalizeJoinCode } from '../src/net/joinCode';
 import { NET_SERVER_DEFAULT_PORT } from '../src/sim/balance';
 import type { LagSettings } from '../src/net/lag';
 import { TICKS_PER_SECOND } from '../src/sim/balance';
@@ -32,7 +35,8 @@ import {
   installHttpGuard,
 } from './httpGuard';
 import { isLiveJoinCode } from './joinCodes';
-import { type ProfileStore, profileStoreFromEnv } from './profileStore';
+import type { ProfileStore } from './profileStore';
+import { profileStoreFromEnv } from './profileStoreFromEnv';
 import { profileEndpoints } from './profileRoutes';
 
 export const DEFAULT_PORT = NET_SERVER_DEFAULT_PORT;
@@ -40,6 +44,12 @@ export const DEFAULT_PORT = NET_SERVER_DEFAULT_PORT;
 const health = createEndpoint('/health', { method: 'GET' }, () =>
   Promise.resolve(new Response('ok', { status: 200 })),
 );
+
+function shardEndpoint(shard: Shard) {
+  return createEndpoint('/shard', { method: 'GET' }, () =>
+    Promise.resolve(Response.json({ shard: shard.index, shards: shard.count })),
+  );
+}
 
 const room = createEndpoint('/rooms/:code', { method: 'GET' }, (ctx) => {
   let typed: string;
@@ -76,6 +86,8 @@ export interface GameServerOptions {
   trustProxyHops?: number;
   /** Rate limits and the body size limit; `DEFAULT_HTTP_LIMITS` (from `balance.ts`) by default. */
   limits?: Partial<HttpLimits>;
+  /** Which shard this server is (`SHARD_INDEX`, `SHARD_COUNT`); the only one by default. */
+  shard?: Shard;
 }
 
 /** Starts the game server on `port` (0 picks a free one). */
@@ -84,6 +96,7 @@ export async function startGameServer(
   options: GameServerOptions = {},
 ): Promise<RunningServer> {
   const store = options.store ?? profileStoreFromEnv();
+  const shard = options.shard ?? { index: 0, count: 1 };
   const httpServer = createServer();
   const server = defineServer({
     rooms: {
@@ -95,10 +108,11 @@ export async function startGameServer(
               : undefined,
           lag: options.lag ?? null,
           reconnectGraceMs: options.reconnectGraceMs,
+          shard,
         }),
       ),
     },
-    routes: createRouter({ health, room, ...profileEndpoints(store) }),
+    routes: createRouter({ health, shard: shardEndpoint(shard), room, ...profileEndpoints(store) }),
     transport: new WebSocketTransport({ server: httpServer }),
     greet: false,
     gracefullyShutdown: false,

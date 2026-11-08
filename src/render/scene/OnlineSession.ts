@@ -21,7 +21,7 @@ import { type SaveData, type StorageLike, recordLevel, writeSave } from '../../f
 import {
   type NetConnection,
   helloFor,
-  hostRoom,
+  hostRoomOnShards,
   joinRoomByCode,
   rejoinRoom,
   toJoinError,
@@ -58,6 +58,7 @@ import {
 } from '../../net/prediction';
 import type { ServerMessage } from '../../net/protocol';
 import { parseTicket } from '../../net/rejoin';
+import { hostOrder, shardUrl } from '../../net/shards';
 import type { Snapshot } from '../../net/snapshot';
 import {
   NET_MAX_INPUTS_PER_MESSAGE,
@@ -73,8 +74,12 @@ import { runsFrom, ticketUpdate } from './onlineRules';
 
 /** How the scene reaches the game server; `null` where online play is off (`?scene=`). */
 export interface OnlineOptions {
-  /** The server's http(s) address (`serverUrl` in `profileApi.ts`). */
-  serverUrl: string;
+  /**
+   * The game servers' http(s) addresses, in shard order (`serverUrls` in
+   * `src/net/shards.ts`): hosting tries them from a random one, a join code
+   * (and a reload's rejoin) goes to the shard it names.
+   */
+  serverUrls: readonly string[];
   /** Who this browser is right now: sent in the hello. */
   identity: () => Identity;
   /** Dev only (`?lag=&jitter=`): delays every message in and out. */
@@ -461,8 +466,13 @@ export class OnlineSession {
     const connect = { lag: options.lag };
     const pending =
       role === 'host'
-        ? hostRoom(options.serverUrl, hello, connect)
-        : joinRoomByCode(options.serverUrl, code, hello, connect);
+        ? hostRoomOnShards(
+            // Math.random is fine here: it only spreads rooms over the shards.
+            hostOrder(options.serverUrls, (n) => Math.floor(Math.random() * n)),
+            hello,
+            connect,
+          )
+        : joinRoomByCode(shardUrl(options.serverUrls, code), code, hello, connect);
     pending.then(
       (connection) => {
         if (attempt !== this.attempt) {
@@ -618,7 +628,8 @@ export class OnlineSession {
     const attempt = ++this.attempt;
     this.state = createRejoin(role, joinCode);
     this.dirty = true;
-    rejoinRoom(options.serverUrl, token, { lag: options.lag }).then(
+    // The code names the shard holding the room (a ticket keeps no URL).
+    rejoinRoom(shardUrl(options.serverUrls, joinCode), token, { lag: options.lag }).then(
       (connection) => {
         if (attempt !== this.attempt) {
           void connection.leave();
