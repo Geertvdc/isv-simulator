@@ -4,7 +4,8 @@ import { loadIdentity, replaceUserId, setDisplayName, uuidFromBytes } from './fl
 import { loadSave, mergeLevels, type StorageLike, wantsUnlockAll, writeSave } from './flow/save';
 import { parseLag } from './net/lag';
 import { REJOIN_KEY } from './net/rejoin';
-import { createProfileApi, serverUrl, syncLevels } from './net/profileApi';
+import { createProfileApi, syncLevels } from './net/profileApi';
+import { serverUrls } from './net/shards';
 import { SCREEN_FADE_MS } from './sim/balance';
 import { NO_WEBGL_TEXT } from './sim/content';
 import { sceneById } from './sim/sceneCatalog';
@@ -123,8 +124,13 @@ let identity = loadIdentity(storage, () =>
     ? crypto.randomUUID()
     : uuidFromBytes(crypto.getRandomValues(new Uint8Array(16))),
 );
-const gameServerUrl = serverUrl(import.meta.env.VITE_SERVER_URL, window.location);
-const profileApi = createProfileApi(gameServerUrl, (url, init) => fetch(url, init));
+// The game servers, one per shard. The profile store is shared, so any shard serves profiles.
+const gameServerUrls = serverUrls(
+  import.meta.env.VITE_SERVER_URLS,
+  import.meta.env.VITE_SERVER_URL,
+  window.location,
+);
+const profileApi = createProfileApi(gameServerUrls[0] ?? '', (url, init) => fetch(url, init));
 const scene = new GameScene({
   storage,
   save,
@@ -143,7 +149,7 @@ const scene = new GameScene({
     shownScene || practiceLevel
       ? null
       : {
-          serverUrl: gameServerUrl,
+          serverUrls: gameServerUrls,
           identity: () => identity,
           // Dev tools: `?lag=100&jitter=20` simulates a slow network; `?nethud` shows the ping corner.
           lag: parseLag(params.get('lag'), params.get('jitter')),

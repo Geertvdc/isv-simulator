@@ -10,6 +10,7 @@ import {
   type NetConnection,
   helloFor,
   hostRoom,
+  hostRoomOnShards,
   joinRoomByCode,
   socketUrl,
 } from '../src/net/client';
@@ -174,6 +175,22 @@ describe('network client', () => {
     expect((await joinError(joinRoomByCode(nowhere, 'ABCD', helloFor(ADA)))).code).toBe(
       'unreachable',
     );
+  });
+
+  it('hosts on the next shard when one is unreachable, and on none when all are', async () => {
+    const down = `http://localhost:${await freePort()}`;
+    const host = await hostRoomOnShards([down, url], helloFor(ADA));
+    listen(host);
+    expect(host.joinCode).toMatch(/^[A-HJ-NP-Z]{4}$/);
+    expect((await joinError(hostRoomOnShards([down, down], helloFor(ADA)))).code).toBe(
+      'unreachable',
+    );
+    expect((await joinError(hostRoomOnShards([], helloFor(ADA)))).code).toBe('unreachable');
+  });
+
+  it('stops at a shard that answers with a refusal', async () => {
+    const old = { ...helloFor(ADA), protocol: 0 };
+    expect((await joinError(hostRoomOnShards([url, url], old))).code).toBe('protocolMismatch');
   });
 
   it('leaves: the others see it, and our status closes without an error', async () => {
