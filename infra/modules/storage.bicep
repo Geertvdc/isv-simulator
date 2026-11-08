@@ -1,7 +1,7 @@
-// Storage account with the Azure Files share that holds profiles.json.
-// Shared-key access stays on: Container Apps mounts SMB shares with the
-// account key. The key never leaves Azure as an output; containerEnv.bicep
-// reads it itself.
+// Storage account with the Table Storage table that holds the online profiles
+// (one entity per user). Every game server shard reads and writes it with its
+// managed identity (Storage Table Data Contributor, see identity.bicep), so
+// shared-key access is off: no account key is used anywhere.
 
 param name string
 param location string
@@ -19,21 +19,26 @@ resource account 'Microsoft.Storage/storageAccounts@2025-01-01' = {
     minimumTlsVersion: 'TLS1_2'
     supportsHttpsTrafficOnly: true
     allowBlobPublicAccess: false
+    allowSharedKeyAccess: false
   }
 }
 
-resource fileService 'Microsoft.Storage/storageAccounts/fileServices@2025-01-01' = {
+resource tableService 'Microsoft.Storage/storageAccounts/tableServices@2025-01-01' = {
   parent: account
   name: 'default'
 }
 
-resource share 'Microsoft.Storage/storageAccounts/fileServices/shares@2025-01-01' = {
-  parent: fileService
+resource profilesTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2025-01-01' = {
+  parent: tableService
   name: 'profiles'
-  properties: {
-    shareQuota: 1
-  }
 }
 
+// https://<account>.table.core.windows.net/ without the trailing slash.
+var tableEndpoint = account.properties.primaryEndpoints.table
+
 output accountName string = account.name
-output shareName string = share.name
+output accountId string = account.id
+output tableEndpoint string = endsWith(tableEndpoint, '/')
+  ? take(tableEndpoint, length(tableEndpoint) - 1)
+  : tableEndpoint
+output tableName string = profilesTable.name

@@ -20,9 +20,9 @@ param deployGameServer bool = true
 @description('Full image reference in the registry, e.g. crisvprodabc123.azurecr.io/isv-simulator-server:<git sha>. Required when deployGameServer is true.')
 param gameServerImage string = ''
 
-@description('Number of game server shards (one Container App each). Capped at 1 until the shard-aware join codes and the shared profile store from "Stage 2" in docs/plan/azure-hosting.md exist.')
+@description('Number of game server shards (one Container App with one replica each, see "Scaling" in docs/plan/azure-hosting.md). The first letter of a join code picks its shard; 1, 2, 3, 4, 6 or 8 spread rooms evenly. Changing it moves which shard owns which codes, which is fine: a deploy drops live rooms anyway.')
 @minValue(1)
-@maxValue(1)
+@maxValue(8)
 param gameServerShards int = 1
 
 @description('vCPU per game server, as a string (Bicep has no decimals). More than 1.0 does not help one Node process.')
@@ -79,8 +79,7 @@ module monitoring 'modules/monitoring.bicep' = {
 module registry 'modules/registry.bicep' = {
   name: 'registry'
   params: {
-    registryName: 'crisv${envName}${suffix}'
-    identityName: 'id-isv-${envName}-game'
+    name: 'crisv${envName}${suffix}'
     location: location
     tags: tags
   }
@@ -95,6 +94,19 @@ module storage 'modules/storage.bicep' = {
   }
 }
 
+// The game servers' identity: AcrPull on the registry, Storage Table Data
+// Contributor on the storage account.
+module identity 'modules/identity.bicep' = {
+  name: 'identity'
+  params: {
+    name: 'id-isv-${envName}-game'
+    location: location
+    tags: tags
+    registryName: registry.outputs.name
+    storageAccountName: storage.outputs.accountName
+  }
+}
+
 module containerEnv 'modules/containerEnv.bicep' = {
   name: 'containerEnv'
   params: {
@@ -102,8 +114,6 @@ module containerEnv 'modules/containerEnv.bicep' = {
     location: location
     tags: tags
     workspaceName: monitoring.outputs.name
-    storageAccountName: storage.outputs.accountName
-    shareName: storage.outputs.shareName
   }
 }
 
@@ -119,7 +129,11 @@ module staticSite 'modules/staticSite.bicep' = {
 var staticSiteUrl = 'https://${staticSite.outputs.defaultHostname}'
 
 // One Container App per shard. Skipped entirely on deploy.sh's first pass, so
-// a running app is left as it is until the new image exists.
+// a running app is left as it is until the new image exists. They read the
+// identity module's outputs, so they wait for its role assignments (the first
+// start can pull the image and write profiles). Apps of shards past
+// gameServerShards (after a scale-down) are not touched here; deploy.sh
+// deletes them.
 module gameServer 'modules/gameServer.bicep' = [
   for shard in range(0, gameServerShards): if (deployGameServer) {
     name: 'gameServer-${shard}'
@@ -128,8 +142,12 @@ module gameServer 'modules/gameServer.bicep' = [
       location: location
       tags: tags
       environmentId: containerEnv.outputs.environmentId
-      profilesStorageName: containerEnv.outputs.storageName
-      identityId: registry.outputs.identityId
+      identityId: identity.outputs.id
+      identityClientId: identity.outputs.clientId
+      shardIndex: shard
+      shardCount: gameServerShards
+      tableEndpoint: storage.outputs.tableEndpoint
+      tableName: storage.outputs.tableName
       registryLoginServer: registry.outputs.loginServer
       image: image
       cpu: gameServerCpu
@@ -140,7 +158,7 @@ module gameServer 'modules/gameServer.bicep' = [
   }
 ]
 
-output registryName string = registry.outputs.registryName
+output registryName string = registry.outputs.name
 output registryLoginServer string = registry.outputs.loginServer
 output staticSiteName string = staticSite.outputs.name
 output staticSiteUrl string = staticSiteUrl
@@ -148,4 +166,5 @@ output staticSiteUrl string = staticSiteUrl
 output gameServerUrls array = [
   for shard in range(0, deployGameServer ? gameServerShards : 0): 'https://${gameServer[shard]!.outputs.fqdn}'
 ]
+output gameServerShards int = gameServerShards
 output gameServerUrl string = deployGameServer ? 'https://${gameServer[0]!.outputs.fqdn}' : ''
