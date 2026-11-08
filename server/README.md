@@ -12,15 +12,21 @@ npm run dev:online    # the Vite client and the server together
 curl localhost:2567/health
 ```
 
-| Env var              | Default                                                       | What                                                                                                                                                                                   |
-| -------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PORT`               | `2567`                                                        | Port for HTTP and WebSockets                                                                                                                                                           |
-| `PROFILE_STORE_PATH` | `data/profiles.json` (repo root, outside the watched folders) | The online profiles (gitignored; created on the first write)                                                                                                                           |
-| `ROUND_SECONDS`      | (the level's length)                                          | Dev: every round lasts this long, to reach the results fast                                                                                                                            |
-| `NET_LAG_MS`         | `0`                                                           | Dev: delays every message in and out by this much                                                                                                                                      |
-| `NET_JITTER_MS`      | `0`                                                           | Dev: plus up to this much at random (order is kept)                                                                                                                                    |
-| `ALLOWED_ORIGINS`    | (any origin)                                                  | Comma-separated origins (`https://game.example,http://localhost:5173`) whose pages may call the server; others get no usable CORS answer. Unset allows any (dev); set it in production |
-| `TRUST_PROXY`        | (off)                                                         | `true` (one proxy) or a hop count: take the client IP for the rate limits from `X-Forwarded-For`. Only set it behind a reverse proxy that adds that header                             |
+| Env var                           | Default                                                       | What                                                                                                                                                                                                                                                                                      |
+| --------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PORT`                            | `2567`                                                        | Port for HTTP and WebSockets                                                                                                                                                                                                                                                              |
+| `PROFILE_STORE_PATH`              | `data/profiles.json` (repo root, outside the watched folders) | The online profiles (gitignored; created on the first write)                                                                                                                                                                                                                              |
+| `PROFILE_STORE`                   | `file`                                                        | `file`: profiles in the JSON file at `PROFILE_STORE_PATH` (one server). `table`: Azure Table Storage, shared by every shard                                                                                                                                                               |
+| `PROFILE_TABLE_ENDPOINT`          |                                                               | With `table`: the storage account's table endpoint (`https://<account>.table.core.windows.net`), reached with the managed identity (`AZURE_CLIENT_ID`, a user-assigned identity's client id) or else `DefaultAzureCredential` (`az login`). Needs the Storage Table Data Contributor role |
+| `PROFILE_TABLE_CONNECTION_STRING` |                                                               | With `table`, instead of the endpoint: a connection string (`UseDevelopmentStorage=true` for Azurite). The table is created if it's missing                                                                                                                                               |
+| `PROFILE_TABLE_NAME`              | `profiles`                                                    | With `table`: the table                                                                                                                                                                                                                                                                   |
+| `SHARD_INDEX`                     | `0`                                                           | Which shard this server is, 0-based (see Shards)                                                                                                                                                                                                                                          |
+| `SHARD_COUNT`                     | `1`                                                           | How many shards there are, 1 to 24. A bad index or count stops the server at start-up                                                                                                                                                                                                     |
+| `ROUND_SECONDS`                   | (the level's length)                                          | Dev: every round lasts this long, to reach the results fast                                                                                                                                                                                                                               |
+| `NET_LAG_MS`                      | `0`                                                           | Dev: delays every message in and out by this much                                                                                                                                                                                                                                         |
+| `NET_JITTER_MS`                   | `0`                                                           | Dev: plus up to this much at random (order is kept)                                                                                                                                                                                                                                       |
+| `ALLOWED_ORIGINS`                 | (any origin)                                                  | Comma-separated origins (`https://game.example,http://localhost:5173`) whose pages may call the server; others get no usable CORS answer. Unset allows any (dev); set it in production                                                                                                    |
+| `TRUST_PROXY`                     | (off)                                                         | `true` (one proxy) or a hop count: take the client IP for the rate limits from `X-Forwarded-For`. Only set it behind a reverse proxy that adds that header                                                                                                                                |
 
 `npm run dev:online` leaves `PORT` alone: Vite reads it too, so setting it there would put both on one port.
 
@@ -28,12 +34,13 @@ curl localhost:2567/health
 
 - `roomLogic.ts`: one room as plain data and pure functions (members, host, capacity, the clock, flow, sim, snapshots). Returns the messages to send; tested without any networking.
 - `GameRoom.ts`: the Colyseus room around it. The join code is the room id.
-- `joinCodes.ts`: codes of the rooms alive in this process, so they stay unique.
-- `profileStore.ts`: `ProfileStore` with `JsonFileProfileStore` (one JSON file, read on first use, rewritten through a temp file and a rename after every change, one change at a time; a corrupt file is moved to `<path>.corrupt-<time>` and the store starts empty) and `MemoryProfileStore` for tests.
+- `joinCodes.ts`: codes of the rooms alive in this process, so they stay unique; they start with one of this shard's letters.
+- `profileStore.ts`: `ProfileStore` with `JsonFileProfileStore` (one JSON file, read on first use, rewritten through a temp file and a rename after every change, one change at a time; a corrupt file is moved to `<path>.corrupt-<time>` and the store starts empty) and `MemoryProfileStore` for tests, plus the merge rules every store shares.
+- `tableProfileStore.ts`: `TableProfileStore`, Azure Table Storage for several shards: one entity per user (PartitionKey the user id, RowKey `profile`, the levels as a JSON string). Each change reads the entity with its ETag and writes it back only if nobody changed it meanwhile, else waits a little and tries again (`NET_PROFILE_WRITE_TRIES`). The profile cap is counted once at first use plus this process's creations, so with several shards it's approximate. `profileStoreFromEnv.ts` picks the store from `PROFILE_STORE`.
 - `profileRoutes.ts`: `GET`/`PUT /profiles/:userId`.
 - `httpGuard.ts`: runs before every HTTP request: body size limit, per-IP rate limits (`rateLimit.ts`, a token bucket per key) and the CORS origins.
 - `app.ts`: `startGameServer(port, { store, roundSeconds, lag, allowedOrigins, trustProxyHops, limits })`, with the HTTP routes. `main.ts` is the entry point (reads the env vars above).
-- `roomLogic.test.ts`, `server.test.ts` (a real server on a free port with `@colyseus/sdk` clients), `client.test.ts` (the browser's wrapper against a real server), `round.test.ts` (two browsers' network code play a whole short round, from the lobby to the profiles), `resilience.test.ts` (clients behind a small TCP proxy whose sockets get cut: reconnecting within and after the grace period, a reloaded page rejoining with its token, the host moving while away, floods, room cleanup, shutdown).
+- `roomLogic.test.ts`, `server.test.ts` (a real server on a free port with `@colyseus/sdk` clients), `shard.test.ts` (a server as shard 2 of 3), `client.test.ts` (the browser's wrapper against a real server), `round.test.ts` (two browsers' network code play a whole short round, from the lobby to the profiles), `resilience.test.ts` (clients behind a small TCP proxy whose sockets get cut: reconnecting within and after the grace period, a reloaded page rejoining with its token, the host moving while away, floods, room cleanup, shutdown).
 
 `npm run verify:online` (`scripts/verifyOnline.ts`, not in CI) starts its own server and Vite and drives three headless Chromes through a session with a network drop, a page reload, a late joiner and the host leaving; see the top of the file.
 
@@ -83,7 +90,7 @@ room.send('ping', { type: 'ping', id: 1, clientTimeMs: performance.now() });
 - Each member has a message budget (`NET_MAX_MESSAGES_PER_SECOND`, 120 a second with bursts of `NET_MESSAGE_BURST`, 60); messages past it are dropped. Colyseus disconnects a client at 5 times that.
 - A room where nobody pressed or moved anything for `NET_ROOM_IDLE_MS` (30 min) sends `closing { reason: 'idle' }` and closes. On `SIGTERM`/`SIGINT` every room sends `closing { reason: 'shutdown' }` and closes with code 4001, without waiting for anyone's grace period. A room with nobody connected closes when the last grace period runs out.
 
-HTTP: `GET /health` → `ok`. `GET /rooms/:code` → `{ joinCode }` for an open room (any case, spaces and dashes allowed), 404 otherwise.
+HTTP: `GET /health` → `ok`. `GET /shard` → `{ "shard": 0, "shards": 1 }` (this server's `SHARD_INDEX` and `SHARD_COUNT`). `GET /rooms/:code` → `{ joinCode }` for an open room on this server (any case, spaces and dashes allowed), 404 otherwise (also for another shard's room).
 
 ### Limits
 
@@ -124,12 +131,27 @@ The Azure setup (Container Apps for this server, Static Web Apps for the game, o
 The `Dockerfile` bundles `server/` with Vite (`npm run build:server`, which inlines the level maps) into `dist-server/main.js` and runs that with Node 22 and the production dependencies. It runs anywhere that runs a container and allows WebSockets: Azure Container Apps, Fly.io, Render, a VM. Things to know:
 
 - **Profiles on disk.** Mount a volume for the profile file, e.g. `-v isv-profiles:/app/server/data` (or set `PROFILE_STORE_PATH` to a path on one); without it, profiles go with the container.
-- **One instance.** Rooms live in the process's memory and the join codes are unique per process. Don't scale out (no Redis presence or driver is set up); restarting drops the rooms (players are told "The server is restarting").
-- **WebSockets and sticky sessions.** The platform's ingress must allow WebSocket upgrades. With one instance, no sticky sessions are needed.
-- **TLS.** Let the platform terminate HTTPS; browsers on an `https://` page need `wss://`. The client finds the server through `VITE_SERVER_URL` (13d/13e).
+- **One instance per URL; scale with shards.** Rooms live in the process's memory, so every socket of a room must reach the same process: never put two replicas behind one URL (no Redis presence or driver is set up). For more rooms, run more shards: separate servers, each with one replica and its own URL, all from the same image. See Shards below. Restarting a shard drops its rooms (players are told "The server is restarting").
+- **WebSockets and sticky sessions.** The platform's ingress must allow WebSocket upgrades. With one instance per URL, no sticky sessions are needed.
+- **TLS.** Let the platform terminate HTTPS; browsers on an `https://` page need `wss://`. The client finds the server through `VITE_SERVER_URL`, or the shards through `VITE_SERVER_URLS` (13d/13e).
 - **Health check:** `GET /health`. The platform sets `PORT`; the image defaults to 2567.
 - **CORS.** The browser game is static files hosted somewhere else, so set `ALLOWED_ORIGINS` to its origin (e.g. `-e ALLOWED_ORIGINS=https://isv.example.com`). Unset, any web page may call the server (the server warns at start-up).
 - **Proxy.** Behind the platform's ingress (Azure Container Apps, Fly.io, Render), set `TRUST_PROXY=true` so the rate limits see real client IPs instead of the proxy's.
 - **No auth.** Every message is validated and each client has a message budget, and IPs are rate-limited (see Limits), but anyone who knows a code can join. Fine for an internal game; don't expose it widely.
+
+### Shards
+
+- Each shard is a server with its own URL, `SHARD_INDEX` (0, 1, ...) and the same `SHARD_COUNT`. A shard makes join codes whose first letter names it: the letter's place in the join-code alphabet (24 letters, no I or O) mod `SHARD_COUNT`. 1, 2, 3, 4, 6, 8, 12 or 24 shards split the letters evenly.
+- The game is built with `VITE_SERVER_URLS`, the shards' URLs comma-separated in shard order (URL i must be shard i; `GET /shard` checks that). It hosts on a random shard, moving to the next only when one can't be reached; joins a code at the shard the code names; a reloaded page rejoins at its code's shard; it reads and writes profiles at the first URL.
+- Profiles must be shared: set `PROFILE_STORE=table` on every shard (same table). A JSON file per shard would split each player's progress.
+- `GET /rooms/:code` only knows its own shard's rooms.
+
+```sh
+SHARD_INDEX=0 SHARD_COUNT=2 PORT=2567 npm run server
+SHARD_INDEX=1 SHARD_COUNT=2 PORT=2568 PROFILE_STORE_PATH=data/profiles-1.json npm run server
+VITE_SERVER_URLS=http://localhost:2567,http://localhost:2568 npm run dev
+```
+
+That gives each shard its own profile file. To try the shared store locally, run [Azurite](https://learn.microsoft.com/azure/storage/common/storage-use-azurite) (`docker run -p 10002:10002 mcr.microsoft.com/azure-storage/azurite azurite-table --tableHost 0.0.0.0`) and add `PROFILE_STORE=table PROFILE_TABLE_CONNECTION_STRING=UseDevelopmentStorage=true` to both.
 
 `npm run build` still builds only the browser game.

@@ -29,6 +29,8 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "@azure/data-tables": "^13.3.2",
+    "@azure/identity": "^4.14.1",
     "@colyseus/sdk": "^0.18.5",
     "colyseus": "^0.18.9",
     "n8ao": "^2.0.1",

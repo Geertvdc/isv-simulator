@@ -302,6 +302,13 @@ export const NET_MAX_BODY_BYTES = 64 * 1024;
 export const NET_MAX_DRAIN_BYTES = 1024 * 1024;
 /** Most profiles the server stores; new ones past this are refused, existing ones still update. */
 export const NET_MAX_PROFILES = 10_000;
+/**
+ * The shared (Table Storage) profile store: tries at one profile change when
+ * another server keeps changing the same profile in between (ETag conflicts).
+ */
+export const NET_PROFILE_WRITE_TRIES = 5;
+/** Up to this long (random) before the first retry after such a conflict; doubles each retry. */
+export const NET_PROFILE_RETRY_DELAY_MS = 50;
 /** In the online lobby, a second Esc within this long leaves the room. */
 export const NET_LEAVE_CONFIRM_MS = 3000;
 /**
