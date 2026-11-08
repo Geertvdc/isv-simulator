@@ -1,0 +1,53 @@
+# Deploys the game and the game server to Azure. Run by hand only:
+# Actions > Deploy > Run workflow. See infra/README.md.
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: Environment
+        type: choice
+        options:
+          - prod
+        default: prod
+      what_if:
+        description: What-if only (show the infrastructure changes, deploy nothing)
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-${{ inputs.env }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.env }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Deploy
+        env:
+          DEPLOY_ENV: ${{ inputs.env }}
+          WHAT_IF: ${{ inputs.what_if }}
+        run: |
+          args=(--env "$DEPLOY_ENV")
+          if [[ "$WHAT_IF" == "true" ]]; then
+            args+=(--what-if)
+          fi
+          infra/scripts/deploy.sh "${args[@]}"
