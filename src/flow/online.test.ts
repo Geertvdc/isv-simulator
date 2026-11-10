@@ -163,6 +163,7 @@ describe('online state', () => {
 
   it('maps refused joins to friendly errors', () => {
     expect(onlineErrorFromCode('roomFull')).toBe('roomFull');
+    expect(onlineErrorFromCode('serverFull')).toBe('serverFull');
     expect(onlineErrorFromCode('protocolMismatch')).toBe('protocolMismatch');
     expect(onlineErrorFromCode('wrongCode')).toBe('wrongCode');
     expect(onlineErrorFromCode('badMessage')).toBe('unreachable');

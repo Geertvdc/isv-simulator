@@ -94,6 +94,8 @@ export type OnlineError =
   /** No room with that code. */
   | 'wrongCode'
   | 'roomFull'
+  /** Every game server is full: no room can be hosted right now. */
+  | 'serverFull'
   /** The server runs another version of the game. */
   | 'protocolMismatch'
   /** The server can't be reached. */

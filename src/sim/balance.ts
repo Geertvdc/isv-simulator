@@ -309,6 +309,39 @@ export const NET_MAX_PROFILES = 10_000;
 export const NET_PROFILE_WRITE_TRIES = 5;
 /** Up to this long (random) before the first retry after such a conflict; doubles each retry. */
 export const NET_PROFILE_RETRY_DELAY_MS = 50;
+/**
+ * The shard pool (`src/net/pool.ts`, `server/shardPool.ts`): a fixed set of
+ * game servers; shard 0 is always on, the others sleep (scale to zero) when
+ * they get no HTTP traffic and are woken by a request.
+ *
+ * Rooms one shard holds at most (`SHARD_MAX_ROOMS`); creating another is
+ * refused with `serverFull`. About 15 rooms fit in 0.5 vCPU (`npm run bench:rooms`).
+ */
+export const NET_SHARD_MAX_ROOMS = 15;
+/**
+ * Each shard writes its pool entry (one Table write) when its rooms or
+ * players change, at most once per `NET_SHARD_HEARTBEAT_MIN_MS`, plus once
+ * per `NET_SHARD_HEARTBEAT_MS` even without changes (and once at start-up).
+ */
+export const NET_SHARD_HEARTBEAT_MIN_MS = 1000;
+export const NET_SHARD_HEARTBEAT_MS = 30_000;
+/** A shard counts as awake when its pool entry was written at most this long ago (three refreshes). */
+export const NET_SHARD_AWAKE_MS = 90_000;
+/** A shard reads the pool (for `/pool` and shard 0's manager) at most once per this long, sharing the answer. */
+export const NET_POOL_CACHE_MS = 2000;
+/**
+ * A shard holding rooms requests its own public `/health` this often, so a
+ * scaler that only sees HTTP requests never puts it to sleep under a game.
+ */
+export const NET_SHARD_KEEPALIVE_MS = 60_000;
+/** Shard 0 looks at the pool (and wakes a spare shard if needed) this often. */
+export const NET_POOL_MANAGE_MS = 10_000;
+/** Free room slots shard 0 keeps ready across awake shards, waking a spare when there are fewer. */
+export const NET_POOL_HEADROOM_ROOMS = 5;
+/** A wake-up or keepalive request gives up after this long (a cold start can take a while). */
+export const NET_SHARD_WAKE_TIMEOUT_MS = 30_000;
+/** How long the game waits for the pool (`GET /pool`) before calling the server unreachable. */
+export const NET_POOL_TIMEOUT_MS = 4000;
 /** In the online lobby, a second Esc within this long leaves the room. */
 export const NET_LEAVE_CONFIRM_MS = 3000;
 /**

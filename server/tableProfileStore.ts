@@ -246,45 +246,60 @@ export function azureProfileTable(client: TableClient): ProfileTable {
   };
 }
 
+/** A table client from the env vars, and a way to make sure its table exists. */
+export interface EnvTable {
+  client: TableClient;
+  /** Creates the table if it's missing (local dev only: in Azure, Bicep creates it); a no-op otherwise. */
+  ensureTable: () => Promise<unknown>;
+}
+
 /**
- * A `TableProfileStore` from the env vars: `PROFILE_TABLE_CONNECTION_STRING`
- * (Azurite, local dev: the table is created if missing), or else
- * `PROFILE_TABLE_ENDPOINT` with an Azure identity: the user-assigned managed
- * identity `AZURE_CLIENT_ID` when set (Container Apps), else
- * `DefaultAzureCredential` (az login, other hosts). `PROFILE_TABLE_NAME`
- * defaults to `profiles`.
+ * A client for table `tableName` in the storage account the env vars name:
+ * `PROFILE_TABLE_CONNECTION_STRING` (Azurite, local dev: `ensureTable`
+ * creates the table if missing), or else `PROFILE_TABLE_ENDPOINT` with an
+ * Azure identity: the user-assigned managed identity `AZURE_CLIENT_ID` when
+ * set (Container Apps), else `DefaultAzureCredential` (az login, other
+ * hosts). The profile store and the shard pool (`poolStore.ts`) share it.
  */
-export function tableProfileStoreFromEnv(env: NodeJS.ProcessEnv): TableProfileStore {
-  const tableName = env.PROFILE_TABLE_NAME?.trim() || DEFAULT_PROFILE_TABLE;
+export function tableClientFromEnv(env: NodeJS.ProcessEnv, tableName: string): EnvTable {
   const connectionString = env.PROFILE_TABLE_CONNECTION_STRING?.trim();
   const endpoint = env.PROFILE_TABLE_ENDPOINT?.trim();
-  let client: TableClient;
-  /** Makes sure the table exists (local dev only: in Azure, Bicep creates it). */
-  let ensureTable: () => Promise<unknown> = () => Promise.resolve();
   if (connectionString) {
     const local = /UseDevelopmentStorage=true|https?:\/\/(127\.0\.0\.1|localhost)/i;
-    const devClient = TableClient.fromConnectionString(connectionString, tableName, {
+    const client = TableClient.fromConnectionString(connectionString, tableName, {
       allowInsecureConnection: local.test(connectionString),
     });
-    client = devClient;
     let created: Promise<unknown> | null = null;
     // `createTable` ignores "already exists"; a failure is tried again on the next call.
-    ensureTable = () =>
-      (created ??= devClient.createTable().catch((error: unknown) => {
+    const ensureTable = () =>
+      (created ??= client.createTable().catch((error: unknown) => {
         created = null;
         throw error;
       }));
-  } else if (endpoint) {
+    return { client, ensureTable };
+  }
+  if (endpoint) {
     const clientId = env.AZURE_CLIENT_ID?.trim();
     const credential = clientId
       ? new ManagedIdentityCredential({ clientId })
       : new DefaultAzureCredential();
-    client = new TableClient(endpoint, tableName, credential);
-  } else {
-    throw new Error(
-      'PROFILE_STORE=table needs PROFILE_TABLE_ENDPOINT or PROFILE_TABLE_CONNECTION_STRING',
-    );
+    return {
+      client: new TableClient(endpoint, tableName, credential),
+      ensureTable: () => Promise.resolve(),
+    };
   }
+  throw new Error(
+    'PROFILE_STORE=table needs PROFILE_TABLE_ENDPOINT or PROFILE_TABLE_CONNECTION_STRING',
+  );
+}
+
+/**
+ * A `TableProfileStore` from the env vars (`tableClientFromEnv`);
+ * `PROFILE_TABLE_NAME` defaults to `profiles`.
+ */
+export function tableProfileStoreFromEnv(env: NodeJS.ProcessEnv): TableProfileStore {
+  const tableName = env.PROFILE_TABLE_NAME?.trim() || DEFAULT_PROFILE_TABLE;
+  const { client, ensureTable } = tableClientFromEnv(env, tableName);
   const table = azureProfileTable(client);
   return new TableProfileStore({
     get: async (userId) => {

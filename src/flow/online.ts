@@ -111,6 +111,7 @@ export function onlineErrorFromCode(code: string): OnlineError {
   switch (code) {
     case 'wrongCode':
     case 'roomFull':
+    case 'serverFull':
     case 'protocolMismatch':
       return code;
     default:

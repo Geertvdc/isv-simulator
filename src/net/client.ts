@@ -11,6 +11,11 @@
  * goes quiet without closing (a laptop that slept, a wifi that hangs) is
  * closed after `NET_SILENCE_TIMEOUT_MS`, which starts the same reconnect. A
  * reloaded page gets back in with `rejoinRoom` and the stored token.
+ *
+ * Shards: the game knows one server, the front door (shard 0). Before
+ * hosting, joining or rejoining it reads the shard pool there (`GET /pool`,
+ * `src/net/pool.ts`) to find the shard to talk to: `hostInPool`,
+ * `joinInPool`, `rejoinInPool`.
  */
 
 import { Client, type Room } from '@colyseus/sdk';
@@ -18,7 +23,10 @@ import type { OnlineError } from '../flow/flow';
 import type { Identity } from '../flow/identity';
 import { onlineErrorFromCode } from '../flow/online';
 import { NET_RECONNECT_GRACE_MS, NET_SILENCE_TIMEOUT_MS } from '../sim/balance';
+import { shardOfJoinCode } from './joinCode';
 import { type LagSettings, createLagRunner } from './lag';
+import { type PoolView, fetchPool, hostShardOrder, poolShardUrl } from './pool';
+import type { FetchLike } from './profileApi';
 import {
   type ClientMessage,
   GAME_ROOM,
@@ -127,11 +135,11 @@ export function toJoinError(error: unknown): JoinError {
   const e = error as { code?: unknown; message?: unknown } | null;
   const message = typeof e?.message === 'string' ? e.message : String(error);
   if (e?.code === INVALID_ROOM_ID) return new JoinError('wrongCode', message);
+  const ours = onlineErrorFromCode(message);
+  if (ours !== 'unreachable') return new JoinError(ours, message);
   // A Colyseus room refuses a client past `maxClients` as "locked".
-  if (/locked|full/i.test(message) && message !== 'roomFull') {
-    return new JoinError('roomFull', message);
-  }
-  return new JoinError(onlineErrorFromCode(message), message);
+  if (/locked|full/i.test(message)) return new JoinError('roomFull', message);
+  return new JoinError('unreachable', message);
 }
 
 export interface ConnectOptions {
@@ -156,25 +164,104 @@ export async function hostRoom(
 }
 
 /**
- * Hosts on the first of these servers (shards, in the order to try them,
- * `hostOrder`) that can be reached: a shard that's `unreachable` passes to
- * the next; any other refusal is the answer.
+ * Hosts on the first of these servers (shards, in the order to try them)
+ * that takes the room: a shard that's `unreachable` or `serverFull` passes
+ * to the next; any other refusal is the answer. When none takes it:
+ * `serverFull` if any shard said so, else `unreachable`.
  */
 export async function hostRoomOnShards(
   serverUrls: readonly string[],
   hello: HelloMessage,
   options: ConnectOptions = {},
+  hostOn: typeof hostRoom = hostRoom,
 ): Promise<NetConnection> {
+  let full: JoinError | null = null;
   let last = new JoinError('unreachable', 'no game server to host on');
   for (const url of serverUrls) {
     try {
-      return await hostRoom(url, hello, options);
+      return await hostOn(url, hello, options);
     } catch (error) {
       last = toJoinError(error);
-      if (last.code !== 'unreachable') throw last;
+      if (last.code === 'serverFull') full = last;
+      else if (last.code !== 'unreachable') throw last;
     }
   }
-  throw last;
+  throw full ?? last;
+}
+
+/** The pool from the front door, or `unreachable`. */
+async function loadPool(frontDoor: string, fetchFn: FetchLike): Promise<PoolView> {
+  try {
+    return await fetchPool(frontDoor, fetchFn);
+  } catch (error) {
+    throw new JoinError('unreachable', error instanceof Error ? error.message : String(error));
+  }
+}
+
+/** How the pool functions reach the pool: the global `fetch` unless a test passes another. */
+export interface PoolConnectOptions extends ConnectOptions {
+  fetch?: FetchLike;
+}
+
+const globalFetch: FetchLike = (url, init) => fetch(url, init);
+
+/**
+ * Hosts a room in the shard pool: on the shard the front door's `/pool`
+ * picks, then the others (`hostShardOrder`). `serverFull` straight away
+ * when the pool says every shard is full; `unreachable` without a pool.
+ */
+export async function hostInPool(
+  frontDoor: string,
+  hello: HelloMessage,
+  options: PoolConnectOptions = {},
+  hostOn: typeof hostRoom = hostRoom,
+): Promise<NetConnection> {
+  const pool = await loadPool(frontDoor, options.fetch ?? globalFetch);
+  if (pool.host < 0) throw new JoinError('serverFull', 'every game server is full');
+  const urls = hostShardOrder(pool)
+    .map((i) => poolShardUrl(pool, frontDoor, i))
+    .filter((url) => url !== '');
+  return hostRoomOnShards(urls, hello, options, hostOn);
+}
+
+/**
+ * The URL of the awake shard holding the room with this (normalized) code,
+ * or `null` when that shard sleeps: a sleeping shard has no rooms, so the
+ * code is wrong (and a typo shouldn't wake a server).
+ */
+async function shardFor(
+  frontDoor: string,
+  code: string,
+  fetchFn: FetchLike,
+): Promise<string | null> {
+  const pool = await loadPool(frontDoor, fetchFn);
+  const shard = shardOfJoinCode(code, pool.urls.length);
+  if (!pool.awake[shard]) return null;
+  return poolShardUrl(pool, frontDoor, shard) || null;
+}
+
+/** Joins the room with this (normalized) code at the shard of the pool holding it. */
+export async function joinInPool(
+  frontDoor: string,
+  code: string,
+  hello: HelloMessage,
+  options: PoolConnectOptions = {},
+): Promise<NetConnection> {
+  const url = await shardFor(frontDoor, code, options.fetch ?? globalFetch);
+  if (!url) throw new JoinError('wrongCode', `no room ${code}: its server sleeps`);
+  return joinRoomByCode(url, code, hello, options);
+}
+
+/** `rejoinRoom` at the shard of the pool holding the room with this code. */
+export async function rejoinInPool(
+  frontDoor: string,
+  code: string,
+  token: string,
+  options: PoolConnectOptions = {},
+): Promise<NetConnection> {
+  const url = await shardFor(frontDoor, code, options.fetch ?? globalFetch);
+  if (!url) throw new JoinError('reconnectFailed', `room ${code} is gone: its server sleeps`);
+  return rejoinRoom(url, token, options);
 }
 
 /** Joins the room with this (normalized) join code, on the server (shard) holding it. */
