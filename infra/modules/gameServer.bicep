@@ -61,9 +61,6 @@ param tableName string
 @description('Client id of the managed identity the server reaches Table Storage with.')
 param identityClientId string
 
-@description('true: the environment is an Express environment (no workload profiles). false: the standard environment with the Consumption workload profile.')
-param express bool
-
 var port = 2567
 
 // Every shard's public URL, in shard order (SHARD_URLS).
@@ -81,8 +78,6 @@ resource app 'Microsoft.App/containerApps@2026-07-01' = {
   }
   properties: {
     environmentId: environmentId
-    // Express has no workload profiles; the standard environment runs it on Consumption.
-    ...(express ? {} : { workloadProfileName: 'Consumption' })
     configuration: {
       // A new image means a new revision; the old one gets SIGTERM and its
       // rooms tell the players the server is restarting.
@@ -90,9 +85,8 @@ resource app 'Microsoft.App/containerApps@2026-07-01' = {
       ingress: {
         external: true
         targetPort: port
-        // HTTP/1.1, so the WebSocket upgrade for Colyseus works. Express has no
-        // HTTP/2, so it gets plain http; the standard environment keeps auto.
-        transport: express ? 'http' : 'auto'
+        // HTTP/1.1 (Express has no HTTP/2), so the WebSocket upgrade for Colyseus works.
+        transport: 'http'
         allowInsecure: false
       }
       registries: [
@@ -162,8 +156,7 @@ resource app 'Microsoft.App/containerApps@2026-07-01' = {
         // Never more than one: see the top of this file.
         maxReplicas: 1
         // Scale-in only after 5 minutes without traffic (a shard with live
-        // rooms keeps pinging itself), checked every 15 s. Same on Express (its
-        // types and docs accept HTTP scale rules and these settings).
+        // rooms keeps pinging itself), checked every 15 s.
         cooldownPeriod: 300
         pollingInterval: 15
         rules: [
