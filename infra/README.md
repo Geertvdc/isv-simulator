@@ -40,7 +40,7 @@ infra/scripts/deploy.sh --shards 4      # a pool of at most 4 game server shards
 infra/scripts/deploy.sh --help
 ```
 
-It deploys the infrastructure without the game servers, builds the image `isv-simulator-server:<git short sha>` in the registry, deploys every game server of the pool on it, builds the game with `VITE_SERVER_URL` set to shard 0's URL (the front door; the game reads the rest of the pool from its `/pool`), uploads `dist/`, deletes the game servers of shards past the pool size (after it shrank), and checks shard 0's `/health`, `/shard` and `/pool` (its URLs must equal the deployed ones), the site, and a real game session over shard 0's WebSocket (see [Express or standard](#express-or-standard)). It doesn't touch the other shards, since any request would wake them. It prints the URLs at the end. It refuses uncommitted changes, since the image is tagged with the commit (`--allow-dirty` tags it `<sha>-dirty-<time>`).
+It deploys the infrastructure without the game servers, builds the image `isv-simulator-server:<git short sha>` in the registry, deploys every game server of the pool on it, builds the game with `VITE_SERVER_URL` set to shard 0's URL (the front door; the game reads the rest of the pool from its `/pool`), uploads `dist/`, deletes the game servers of shards past the pool size (after it shrank), and checks shard 0's `/health`, `/shard` and `/pool` (its URLs must equal the deployed ones), the site, and a real game session over shard 0's WebSocket (see [Express](#express)). It doesn't touch the other shards, since any request would wake them. It prints the URLs at the end. It refuses uncommitted changes, since the image is tagged with the commit (`--allow-dirty` tags it `<sha>-dirty-<time>`).
 
 ## What-if
 
@@ -100,30 +100,16 @@ In `main.bicepparam` (each change needs a deploy):
 - `gameServerCpu` / `gameServerMemory`: `'0.5'` / `'1Gi'` by default. Up to `'1.0'` / `'2Gi'`; more cores don't help one Node process.
 - `gameServerMinReplicas`: shard 0 only, `1` by default. `0` scales it to zero too when nobody plays (cheaper, but the first visitor waits for a cold start and a room whose players are briefly away can be lost). The other shards always have 0.
 
-## Express or standard
+## Express
 
-`containerAppsExpress` in `main.bicepparam` picks the kind of Container Apps environment:
+The game servers run in a Container Apps [Express](https://learn.microsoft.com/en-us/azure/container-apps/express-overview) environment: same billing as Consumption, but a sleeping shard starts in under a second, so waking shards is nearly instant (and `gameServerMinReplicas = 0` for shard 0 is reasonable). No workload profiles; images are built `linux/amd64`.
 
-- `true` (the default): an [Express](https://learn.microsoft.com/en-us/azure/container-apps/express-overview) environment. Same billing, but a sleeping shard starts in under a second, so waking shards is nearly instant (and `gameServerMinReplicas = 0` for shard 0 becomes reasonable). No workload profiles; images are built `linux/amd64`.
-- `false`: the standard environment with the Consumption workload profile (cold starts of ~10 to 20 s).
-
-The open question with Express is WebSockets, which the game runs on. So the deploy ends with a smoke test against shard 0: `scripts/smokeOnline.ts` hosts a room over Colyseus, waits for the `welcome`, sends a `ping` a second for 5 s and expects the `pong`s, then leaves (20 s at most; its user id isn't a UUID, so no profile is created). Run it by hand against any server:
+Express doesn't document WebSocket support, and the game runs on WebSockets. So the deploy ends with a smoke test against shard 0: `scripts/smokeOnline.ts` hosts a room over Colyseus, waits for the `welcome`, sends a `ping` a second for 5 s and expects the `pong`s, then leaves (20 s at most; its user id isn't a UUID, so no profile is created). Run it by hand against any server:
 
 ```sh
 npx vite-node scripts/smokeOnline.ts https://ca-isv-prod-game-0.<environment domain>
 npx vite-node scripts/smokeOnline.ts http://localhost:2567   # npm run server
 ```
-
-If it fails on Express ("WebSockets failed: … Express may not support them"), fall back to the standard environment. An environment can't change mode in place, so the old one has to go first (or use a new `--env` name):
-
-```sh
-for n in $(seq 0 7); do az containerapp delete -n ca-isv-prod-game-$n -g rg-isv-simulator-prod --yes; done
-az containerapp env delete -n cae-isv-prod -g rg-isv-simulator-prod --yes
-# set containerAppsExpress = false in infra/main.bicepparam, commit, then:
-infra/scripts/deploy.sh
-```
-
-The same steps, with `true`, switch back to Express. Profiles stay (they are in Table Storage), but the game servers are down until the deploy finishes.
 
 ## Scaling
 

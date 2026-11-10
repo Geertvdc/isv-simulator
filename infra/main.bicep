@@ -1,6 +1,5 @@
 // ISV Simulator on Azure: the browser game on Static Web Apps and the game
-// server on Container Apps (an Express environment by default, see
-// containerAppsExpress). See docs/plan/azure-hosting.md.
+// server on Container Apps Express. See docs/plan/azure-hosting.md.
 //
 // deploy.sh runs this twice: first with deployGameServer=false (the registry
 // must exist before the image can be pushed to it), then with the new image.
@@ -40,8 +39,6 @@ param gameServerMemory string = '1Gi'
 @allowed([0, 1])
 param gameServerMinReplicas int = 1
 
-@description('Run the game servers in a Container Apps Express environment: faster provisioning and sub-second start from zero, so a sleeping shard wakes almost at once (same Consumption billing). false: the standard Consumption workload-profile environment, the fallback if Express falls short (e.g. WebSockets; deploy.sh smoke tests them). An environment can\'t switch mode in place: switching later recreates it, so delete the game server apps and the environment first (az containerapp delete, az containerapp env delete), or use a new env name.')
-param containerAppsExpress bool = true
 
 @description('More origins the game server answers besides the Static Web App, e.g. a custom domain (https://isv.example.com).')
 param extraAllowedOrigins array = []
@@ -122,7 +119,6 @@ module containerEnv 'modules/containerEnv.bicep' = {
     location: location
     tags: tags
     workspaceName: monitoring.outputs.name
-    express: containerAppsExpress
   }
 }
 
@@ -160,8 +156,7 @@ module gameServer 'modules/gameServer.bicep' = [
       environmentId: containerEnv.outputs.environmentId
       identityId: identity.outputs.id
       identityClientId: identity.outputs.clientId
-      express: containerAppsExpress
-      shardIndex: shard
+        shardIndex: shard
       shardCount: gameServerShards
       shardAppNames: gameAppNames
       environmentDefaultDomain: containerEnv.outputs.defaultDomain

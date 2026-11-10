@@ -15,7 +15,7 @@
  *
  * Exit 0 when all of that worked, 1 with the reason otherwise (20 s at most).
  * `infra/scripts/deploy.sh` runs it against shard 0 after a deploy: Container
- * Apps Express may not carry WebSockets (see docs/plan/azure-hosting.md).
+ * Apps Express doesn't document WebSocket support, so this is where we find out.
  */
 
 import { randomBytes } from 'node:crypto';

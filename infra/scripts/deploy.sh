@@ -224,7 +224,7 @@ if [[ $skip_server == false ]]; then
   # ---- 2. server image, built in the registry (no local Docker needed)
   image="$registry_login_server/isv-simulator-server:$image_tag"
   log "2/7 Building the server image in $registry_name: $image"
-  # linux/amd64 is the default, but Container Apps (Express especially) only runs
+  # linux/amd64 is the default, but Container Apps Express only runs
   # amd64 images, so it is spelled out.
   az acr build --registry "$registry_name" --image "isv-simulator-server:$image_tag" \
     --platform linux/amd64 --file Dockerfile "$root"
@@ -383,11 +383,7 @@ if [[ ! -d node_modules ]]; then
   npm ci
 fi
 if ! npx vite-node scripts/smokeOnline.ts "$front_door_url"; then
-  if [[ $(sed -n 's/^param containerAppsExpress *= *\([a-z]*\).*/\1/p' "$params") != false ]]; then
-    info "WebSockets failed: if containerAppsExpress is true, Express may not support them;"
-    info "set containerAppsExpress = false in infra/main.bicepparam and redeploy"
-    info "(switching recreates the environment: see infra/README.md, \"Express or standard\")"
-  fi
+  info "WebSockets failed on Container Apps Express (see \"Express\" in docs/plan/azure-hosting.md)"
   die "the WebSocket smoke test against shard 0 ($front_door_url) failed"
 fi
 
