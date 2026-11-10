@@ -19,6 +19,7 @@ beforeAll(async () => {
   server = await startGameServer(0, {
     store: new MemoryProfileStore(),
     shard: { index: 2, count: 3 },
+    maxRooms: 100,
     limits: { roomCreate: { burst: 100, refillMs: 1000 } },
   });
   baseUrl = `http://localhost:${server.port}`;

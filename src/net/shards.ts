@@ -1,47 +1,13 @@
 /**
- * Several game servers (shards), each with its own URL and its own rooms.
- * The client knows them all (`VITE_SERVER_URLS`, URL i is shard i): it hosts
- * on any of them, joins a code at the shard its first letter names
- * (`shardOfJoinCode`), and talks to the first for profiles (the profile
- * store is shared). One server is one shard. The server reads its own place
- * from `SHARD_INDEX` and `SHARD_COUNT` (`parseShard`).
+ * The server's place in the shard pool, from its env vars: `SHARD_INDEX`
+ * and `SHARD_COUNT` (`parseShard`), every shard's public URL `SHARD_URLS`
+ * (`parseShardUrls`) and its room limit `SHARD_MAX_ROOMS`
+ * (`parseMaxRooms`). Bad values throw, so the server refuses to start.
+ * The pool itself is `pool.ts`.
  */
 
-import { MAX_SHARDS, type Shard, shardOfJoinCode } from './joinCode';
-import { serverUrl } from './profileApi';
-
-/**
- * The shards' URLs in shard order: `VITE_SERVER_URLS` (comma-separated,
- * trailing slashes dropped) when it has any, else the one `serverUrl` gives
- * (`VITE_SERVER_URL`, or this page's host on port 2567).
- */
-export function serverUrls(
-  envUrls: string | undefined,
-  envUrl: string | undefined,
-  location: { protocol: string; hostname: string },
-): string[] {
-  const urls = (envUrls ?? '')
-    .split(',')
-    .map((url) => url.trim().replace(/\/+$/, ''))
-    .filter((url) => url !== '');
-  return urls.length > 0 ? urls : [serverUrl(envUrl, location)];
-}
-
-/** The URL of the shard holding the room with this (normalized) code. */
-export function shardUrl(urls: readonly string[], code: string): string {
-  return urls[shardOfJoinCode(code, urls.length)] ?? urls[0] ?? '';
-}
-
-/**
- * The shards to try for hosting a room, in order: all of them, starting at
- * a random one (`randomInt(n)` is 0 to n - 1), so rooms spread over the
- * shards and a shard that's down is skipped.
- */
-export function hostOrder(urls: readonly string[], randomInt: (n: number) => number): string[] {
-  if (urls.length <= 1) return [...urls];
-  const start = randomInt(urls.length);
-  return urls.map((_, i) => urls[(start + i) % urls.length] ?? '');
-}
+import { NET_SHARD_MAX_ROOMS } from '../sim/balance';
+import { MAX_SHARDS, type Shard } from './joinCode';
 
 /**
  * The server's shard from `SHARD_INDEX` (default 0) and `SHARD_COUNT`
@@ -64,4 +30,40 @@ export function parseShard(indexText: string | undefined, countText: string | un
     throw new Error(`SHARD_INDEX must be below SHARD_COUNT (${count}), got ${index}`);
   }
   return { index, count };
+}
+
+/**
+ * `SHARD_URLS`: every shard's public URL, comma-separated in shard order
+ * (trailing slashes dropped), exactly `count` of them, each http(s). May be
+ * left out with one shard (local dev): then `['']`, this server's URL
+ * unknown. Throws otherwise.
+ */
+export function parseShardUrls(text: string | undefined, count: number): string[] {
+  const urls = (text ?? '')
+    .split(',')
+    .map((url) => url.trim().replace(/\/+$/, ''))
+    .filter((url) => url !== '');
+  if (urls.length === 0) {
+    if (count === 1) return [''];
+    throw new Error(`SHARD_URLS must list the ${count} shards' URLs (SHARD_COUNT is ${count})`);
+  }
+  if (urls.length !== count) {
+    throw new Error(`SHARD_URLS has ${urls.length} URLs, SHARD_COUNT is ${count}`);
+  }
+  for (const url of urls) {
+    if (!/^https?:\/\/[^/\s]+/i.test(url)) {
+      throw new Error(`SHARD_URLS: "${url}" is not an http(s) URL`);
+    }
+  }
+  return urls;
+}
+
+/** `SHARD_MAX_ROOMS`: a whole number from 1, `NET_SHARD_MAX_ROOMS` when unset. Throws otherwise. */
+export function parseMaxRooms(text: string | undefined): number {
+  const trimmed = text?.trim() ?? '';
+  if (trimmed === '') return NET_SHARD_MAX_ROOMS;
+  if (!/^\d+$/.test(trimmed) || Number(trimmed) < 1) {
+    throw new Error(`SHARD_MAX_ROOMS must be a whole number from 1, got "${text}"`);
+  }
+  return Number(trimmed);
 }

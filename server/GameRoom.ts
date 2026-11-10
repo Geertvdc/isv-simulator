@@ -27,6 +27,7 @@ import {
 import { MAX_PLAYERS } from '../src/sim/level';
 import { releaseJoinCode, reserveJoinCode } from './joinCodes';
 import type { ProfileStore } from './profileStore';
+import type { ShardLoad } from './shardLoad';
 import { dropMember, joinRoom, leaveRoom, rejoinMember, setMemberProfile } from './membership';
 import { type Outgoing, type RoomOptions, type RoomState, TICK_MS, createRoomState } from './room';
 import { handleMessage } from './roomLogic';
@@ -36,9 +37,15 @@ export { GAME_ROOM } from '../src/net/protocol';
 
 /**
  * HTTP-style status for a refused join. The SDK rejects the join with this
- * code and our `ErrorCode` (`roomFull`, `protocolMismatch`, ...) as the message.
+ * code and our `ErrorCode` (`roomFull`, `protocolMismatch`, `serverFull`, ...) as the message.
  */
 export const JOIN_REFUSED = 4400;
+
+/**
+ * HTTP status for a refused create (the matchmaker answers the create
+ * request with it, so it must be a real one); the message is `serverFull`.
+ */
+export const SERVER_FULL = 503;
 
 /** Colyseus close codes: a goodbye (the client doesn't try to reconnect), and the server going away. */
 const CONSENTED = 4000;
@@ -52,6 +59,8 @@ export interface GameRoomSettings extends RoomOptions {
   reconnectGraceMs?: number;
   /** This server's shard: its join codes name it. The only shard by default. */
   shard?: Shard;
+  /** This server's rooms against its room limit: a full shard refuses new rooms (`serverFull`). No limit without one. */
+  load?: ShardLoad;
 }
 
 export class GameRoom extends Room {
@@ -73,6 +82,8 @@ export class GameRoom extends Room {
   };
 
   onCreate(): void {
+    // The SDK rejects the create with this as the message; the client tries another shard.
+    if (this.settings.load?.isFull()) throw new ServerError(SERVER_FULL, 'serverFull');
     const code = reserveJoinCode(this.settings.shard);
     this.roomId = code;
     this.core = createRoomState(code, randomInt(2 ** 31), this.settings);
@@ -99,6 +110,9 @@ export class GameRoom extends Room {
       this.writeProfiles();
       if (this.core.closing) this.close();
     }, TICK_MS);
+    this.settings.load?.add(this, () =>
+      this.core.members.reduce((sum, m) => sum + m.localPlayers, 0),
+    );
   }
 
   onJoin(client: Client, options: unknown): void {
@@ -135,7 +149,9 @@ export class GameRoom extends Room {
   }
 
   onDispose(): void {
-    releaseJoinCode(this.core.joinCode);
+    this.settings.load?.remove(this);
+    // A refused create (`serverFull`) is disposed too, before it had a code.
+    if ((this.core as RoomState | undefined) !== undefined) releaseJoinCode(this.core.joinCode);
   }
 
   private closing = false;

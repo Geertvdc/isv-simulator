@@ -612,6 +612,7 @@ export const ONLINE_TEXT = {
     badCode: 'A code is 4 letters, like ABCD.',
     wrongCode: 'No room with that code. Check it with the host.',
     roomFull: 'That room is full (4 players at most).',
+    serverFull: 'All servers are full. Try again in a minute.',
     protocolMismatch: 'That room runs another version of the game. Reload the page and try again.',
     unreachable: 'The server is not reachable. Is it running?',
     disconnected: 'The connection to the room was lost.',

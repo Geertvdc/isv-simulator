@@ -1,61 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { hostOrder, parseShard, serverUrls, shardUrl } from './shards';
-
-const page = { protocol: 'http:', hostname: 'localhost' };
-
-describe('serverUrls', () => {
-  it('reads VITE_SERVER_URLS in order, trimmed, without trailing slashes or empties', () => {
-    expect(
-      serverUrls('https://a.example/, https://b.example ,,https://c.example//', '', page),
-    ).toEqual(['https://a.example', 'https://b.example', 'https://c.example']);
-    expect(serverUrls('https://a.example', 'https://ignored.example', page)).toEqual([
-      'https://a.example',
-    ]);
-  });
-
-  it('falls back to VITE_SERVER_URL, then to this page on port 2567', () => {
-    expect(serverUrls(undefined, 'https://one.example/', page)).toEqual(['https://one.example']);
-    expect(serverUrls(' , ', 'https://one.example', page)).toEqual(['https://one.example']);
-    expect(serverUrls(undefined, undefined, page)).toEqual(['http://localhost:2567']);
-  });
-});
-
-describe('shardUrl', () => {
-  const urls = ['https://s0', 'https://s1', 'https://s2'];
-
-  it("picks the shard named by the code's first letter", () => {
-    expect(shardUrl(urls, 'ABCD')).toBe('https://s0');
-    expect(shardUrl(urls, 'BBCD')).toBe('https://s1');
-    expect(shardUrl(urls, 'CBCD')).toBe('https://s2');
-    expect(shardUrl(urls, 'DBCD')).toBe('https://s0');
-    expect(shardUrl(['https://only'], 'ZZZZ')).toBe('https://only');
-  });
-});
-
-describe('hostOrder', () => {
-  const urls = ['https://s0', 'https://s1', 'https://s2'];
-
-  it('tries every shard once, starting at a random one', () => {
-    expect(hostOrder(urls, () => 0)).toEqual(urls);
-    expect(hostOrder(urls, () => 1)).toEqual(['https://s1', 'https://s2', 'https://s0']);
-    expect(hostOrder(urls, () => 2)).toEqual(['https://s2', 'https://s0', 'https://s1']);
-  });
-
-  it('asks for a number below the shard count, and nothing with one shard', () => {
-    const asked: number[] = [];
-    hostOrder(urls, (n) => {
-      asked.push(n);
-      return 0;
-    });
-    expect(asked).toEqual([3]);
-    expect(
-      hostOrder(['https://only'], () => {
-        throw new Error('not asked');
-      }),
-    ).toEqual(['https://only']);
-    expect(hostOrder([], () => 0)).toEqual([]);
-  });
-});
+import { NET_SHARD_MAX_ROOMS } from '../sim/balance';
+import { parseMaxRooms, parseShard, parseShardUrls } from './shards';
 
 describe('parseShard', () => {
   it('defaults to the only shard', () => {
@@ -77,5 +22,37 @@ describe('parseShard', () => {
     expect(() => parseShard('0', '25')).toThrow('SHARD_COUNT must be from 1 to 24');
     expect(() => parseShard('2', '2')).toThrow('SHARD_INDEX must be below SHARD_COUNT');
     expect(() => parseShard('1', undefined)).toThrow('SHARD_INDEX must be below SHARD_COUNT');
+  });
+});
+
+describe('parseShardUrls', () => {
+  it('reads the URLs in order, trimmed, without trailing slashes or empties', () => {
+    expect(
+      parseShardUrls('https://a.example/, https://b.example ,,http://localhost:2569//', 3),
+    ).toEqual(['https://a.example', 'https://b.example', 'http://localhost:2569']);
+  });
+
+  it('may be left out with one shard only', () => {
+    expect(parseShardUrls(undefined, 1)).toEqual(['']);
+    expect(parseShardUrls(' , ', 1)).toEqual(['']);
+    expect(parseShardUrls('https://one.example', 1)).toEqual(['https://one.example']);
+    expect(() => parseShardUrls(undefined, 2)).toThrow("SHARD_URLS must list the 2 shards' URLs");
+  });
+
+  it('needs exactly one http(s) URL per shard', () => {
+    expect(() => parseShardUrls('https://a', 2)).toThrow('SHARD_URLS has 1 URLs, SHARD_COUNT is 2');
+    expect(() => parseShardUrls('https://a,https://b,https://c', 2)).toThrow('has 3 URLs');
+    expect(() => parseShardUrls('https://a,b.example', 2)).toThrow('"b.example" is not');
+  });
+});
+
+describe('parseMaxRooms', () => {
+  it('defaults to the balance number and reads whole numbers from 1', () => {
+    expect(parseMaxRooms(undefined)).toBe(NET_SHARD_MAX_ROOMS);
+    expect(parseMaxRooms(' ')).toBe(NET_SHARD_MAX_ROOMS);
+    expect(parseMaxRooms(' 2 ')).toBe(2);
+    expect(() => parseMaxRooms('0')).toThrow('SHARD_MAX_ROOMS must be a whole number from 1');
+    expect(() => parseMaxRooms('1.5')).toThrow('SHARD_MAX_ROOMS');
+    expect(() => parseMaxRooms('lots')).toThrow('SHARD_MAX_ROOMS');
   });
 });

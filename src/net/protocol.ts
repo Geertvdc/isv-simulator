@@ -159,6 +159,8 @@ export type ErrorCode =
   | 'protocolMismatch'
   | 'wrongCode'
   | 'roomFull'
+  /** Creating a room on a shard that holds `SHARD_MAX_ROOMS` already (a refused create only). */
+  | 'serverFull'
   | 'roundRunning'
   | 'notHost'
   | 'notOwner';
