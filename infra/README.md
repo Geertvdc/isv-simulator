@@ -36,11 +36,11 @@ From a machine logged in with `az login`:
 infra/scripts/deploy.sh                 # env prod
 infra/scripts/deploy.sh --skip-client   # only the server (and the infrastructure)
 infra/scripts/deploy.sh --skip-server   # only the browser game (and the infrastructure)
-infra/scripts/deploy.sh --shards 3      # 3 game server shards (see Scaling)
+infra/scripts/deploy.sh --shards 4      # a pool of at most 4 game server shards (see Scaling)
 infra/scripts/deploy.sh --help
 ```
 
-It deploys the infrastructure without the game servers, builds the image `isv-simulator-server:<git short sha>` in the registry, deploys one game server per shard on it, builds the game with `VITE_SERVER_URLS` set to the shard URLs (comma-separated, in shard order), uploads `dist/`, deletes the game servers of shards past the shard count (after a scale-down), and checks every shard's `/health` and `/shard` and the site. It prints the URLs at the end. It refuses uncommitted changes, since the image is tagged with the commit (`--allow-dirty` tags it `<sha>-dirty-<time>`).
+It deploys the infrastructure without the game servers, builds the image `isv-simulator-server:<git short sha>` in the registry, deploys every game server of the pool on it, builds the game with `VITE_SERVER_URL` set to shard 0's URL (the front door; the game reads the rest of the pool from its `/pool`), uploads `dist/`, deletes the game servers of shards past the pool size (after it shrank), and checks shard 0's `/health`, `/shard` and `/pool` (its URLs must equal the deployed ones), the site, and a real game session over shard 0's WebSocket (see [Express or standard](#express-or-standard)). It doesn't touch the other shards, since any request would wake them. It prints the URLs at the end. It refuses uncommitted changes, since the image is tagged with the commit (`--allow-dirty` tags it `<sha>-dirty-<time>`).
 
 ## What-if
 
@@ -48,7 +48,7 @@ It deploys the infrastructure without the game servers, builds the image `isv-si
 infra/scripts/deploy.sh --what-if
 ```
 
-Shows what the Bicep would change (with the server image that's running now) and which leftover shards a deploy would delete, and changes nothing. The workflow has a **what-if** checkbox for the same.
+Shows what the Bicep would change (with the server image that's running now) and which shards past the pool size a deploy would delete, and changes nothing. The workflow has a **what-if** checkbox for the same.
 
 ## Roll back
 
@@ -61,7 +61,7 @@ az containerapp update -n ca-isv-prod-game-0 -g rg-isv-simulator-prod \
   --image <registry>.azurecr.io/isv-simulator-server:<older sha>
 ```
 
-`az containerapp update` is quick but only rolls back that one shard (do it for every shard), and the next deploy overwrites it. For the game and the server together, check out the older commit and run `deploy.sh` (or run the workflow on that commit).
+`az containerapp update` is quick but only rolls back that one shard (do it for every shard of the pool, asleep or not), and the next deploy overwrites it. For the game and the server together, check out the older commit and run `deploy.sh` (or run the workflow on that commit).
 
 ## Logs
 
@@ -76,7 +76,7 @@ Older logs are in the Log Analytics workspace `log-isv-prod` (30 days), table `C
 
 ## Profiles
 
-Online profiles are in Azure Table Storage: table `profiles` in the storage account `stisvprod<suffix>`, one entity per user, shared by every shard. The game servers reach it with their managed identity `id-isv-prod-game` (Storage Table Data Contributor). Shared-key access is off on the account, so there are no keys or connection strings; people sign in with Entra ID too.
+Online profiles are in Azure Table Storage: table `profiles` in the storage account `stisvprod<suffix>`, one entity per user, shared by every shard. The same account has the table `shards`, one pool entity per shard (see Scaling). The game servers reach it with their managed identity `id-isv-prod-game` (Storage Table Data Contributor). Shared-key access is off on the account, so there are no keys or connection strings; people sign in with Entra ID too.
 
 To look at them: the Azure portal (the storage account → Storage browser → Tables → `profiles`), or
 
@@ -93,20 +93,59 @@ Reading with `--auth-mode login` needs a data role on the account for you (Stora
 
 ## Scale knobs
 
-In `main.bicepparam`:
+In `main.bicepparam` (each change needs a deploy):
 
+- `gameServerShards`: the pool size, 1 to 8 (default 8). The most game servers that can ever run; see below.
+- `gameServerMaxRooms`: rooms one shard takes before hosting moves on to the next (default 15, for 0.5 vCPU; ~30 for 1 vCPU).
 - `gameServerCpu` / `gameServerMemory`: `'0.5'` / `'1Gi'` by default. Up to `'1.0'` / `'2Gi'`; more cores don't help one Node process.
-- `gameServerMinReplicas`: `1` by default. `0` scales to zero when nobody plays (cheaper, but the first visitor waits for a cold start and a room whose players are briefly away can be lost).
-- `gameServerShards`: number of game servers (shards), 1 to 8, see below.
+- `gameServerMinReplicas`: shard 0 only, `1` by default. `0` scales it to zero too when nobody plays (cheaper, but the first visitor waits for a cold start and a room whose players are briefly away can be lost). The other shards always have 0.
+
+## Express or standard
+
+`containerAppsExpress` in `main.bicepparam` picks the kind of Container Apps environment:
+
+- `true` (the default): an [Express](https://learn.microsoft.com/en-us/azure/container-apps/express-overview) environment. Same billing, but a sleeping shard starts in under a second, so waking shards is nearly instant (and `gameServerMinReplicas = 0` for shard 0 becomes reasonable). No workload profiles; images are built `linux/amd64`.
+- `false`: the standard environment with the Consumption workload profile (cold starts of ~10 to 20 s).
+
+The open question with Express is WebSockets, which the game runs on. So the deploy ends with a smoke test against shard 0: `scripts/smokeOnline.ts` hosts a room over Colyseus, waits for the `welcome`, sends a `ping` a second for 5 s and expects the `pong`s, then leaves (20 s at most; its user id isn't a UUID, so no profile is created). Run it by hand against any server:
+
+```sh
+npx vite-node scripts/smokeOnline.ts https://ca-isv-prod-game-0.<environment domain>
+npx vite-node scripts/smokeOnline.ts http://localhost:2567   # npm run server
+```
+
+If it fails on Express ("WebSockets failed: … Express may not support them"), fall back to the standard environment. An environment can't change mode in place, so the old one has to go first (or use a new `--env` name):
+
+```sh
+for n in $(seq 0 7); do az containerapp delete -n ca-isv-prod-game-$n -g rg-isv-simulator-prod --yes; done
+az containerapp env delete -n cae-isv-prod -g rg-isv-simulator-prod --yes
+# set containerAppsExpress = false in infra/main.bicepparam, commit, then:
+infra/scripts/deploy.sh
+```
+
+The same steps, with `true`, switch back to Express. Profiles stay (they are in Table Storage), but the game servers are down until the deploy finishes.
 
 ## Scaling
 
-One game server (shard) holds ~15 rooms at 0.5 vCPU and ~30 at 1 vCPU. Past that, add shards: each is its own Container App (`ca-isv-<env>-game-<n>`) with its own URL, and the first letter of a join code says which shard has the room. 1, 2, 3, 4, 6 or 8 shards spread rooms evenly.
+The game servers are a fixed pool of `gameServerShards` Container Apps (`ca-isv-<env>-game-0` to `-<N-1>`), each with its own URL and at most one replica. What runs changes by itself; no deploy needed:
 
-- For one deploy: `infra/scripts/deploy.sh --shards 3`, or the **shards** input of the Deploy workflow.
-- To keep it: set `gameServerShards` in `main.bicepparam` and commit it. A deploy without `--shards` (or with the workflow's `default`) uses that value, so a count set only with `--shards` goes back on the next plain deploy.
+- **Shard 0** is always on. It is the front door: the game is built with its URL only and asks its `GET /pool` where to host.
+- **The other shards** sleep (scaled to zero, nothing to pay) until they are needed. Every awake shard writes its entity (rooms, players) to the table `shards` when they change (at most once a second) and every 30 s; it counts as awake for 90 s after a write (a crashed shard can look awake that long; clients that can't reach it move on to the next one). Hosting packs rooms on the lowest shard with a free slot (fewer than `gameServerMaxRooms` rooms). When fewer than 5 slots are left over the awake shards, shard 0 wakes the next one with an HTTP request, so it's warm before it's needed.
+- **Going back to sleep:** a shard with live rooms pings its own URL every 60 s so it isn't scaled in under a game. About 5 minutes (the scale rule's `cooldownPeriod`) after its last room closed, it scales to zero. Higher shards empty first, since new rooms go to the lowest ones.
+- **Full:** with every shard of the pool full, hosting says the server is full. The ceiling is pool size × max rooms: 8 × 15 = 120 rooms (~480 players) at 0.5 vCPU, 240 at 1 vCPU with `gameServerMaxRooms = 30`.
 
-Changing the count rebuilds the game with the new URL list, and the codes map to shards differently; a deploy drops live rooms anyway. Going down, `deploy.sh` deletes the apps of the shards past the new count. A shard that is down only takes its own rooms with it: hosting uses the other shards, and codes of that shard can't be joined until it is back. More in [Scaling](../docs/plan/azure-hosting.md#scaling).
+What still needs a deploy: the pool size (`--shards N` for one deploy, or the **shards** input of the Deploy workflow; set `gameServerShards` in `main.bicepparam` and commit it to keep it), the CPU and memory, and the max rooms. Changing the pool size remaps which shard owns which join code (the first letter of a code picks its shard; 1, 2, 3, 4, 6 or 8 spread them evenly); a deploy drops live rooms anyway. When it shrinks, `deploy.sh` deletes the apps past the new size.
+
+To watch it:
+
+```sh
+# pool entities: one per shard that has been awake (rooms, players, last write)
+az storage entity query --account-name <storage account> --table-name shards --auth-mode login -o table
+# replicas of one shard: empty while it sleeps
+az containerapp replica list -n ca-isv-prod-game-1 -g rg-isv-simulator-prod -o table
+```
+
+(Reading the table needs a data role on the storage account, as for the profiles.) `az containerapp logs show --type system` on a shard shows its scale-out and scale-in events. More in [Scaling](../docs/plan/azure-hosting.md#scaling).
 
 ## Tear down
 

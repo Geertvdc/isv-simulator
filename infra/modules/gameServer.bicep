@@ -1,9 +1,18 @@
-// One game server shard: a Container App running the Dockerfile image, with
-// its own URL. Rooms live in the process's memory, so each shard is exactly one
-// replica: a second replica behind the same ingress would get joins for rooms
-// it doesn't have. The client routes a join to the shard that owns the code
-// (the code's first letter picks the shard, from SHARD_INDEX/SHARD_COUNT);
+// One game server shard of the pool: a Container App running the Dockerfile
+// image, with its own URL. Rooms live in the process's memory, so each shard is
+// at most one replica: a second replica behind the same ingress would get joins
+// for rooms it doesn't have. The client routes a join to the shard that owns the
+// code (the code's first letter picks the shard, from SHARD_INDEX/SHARD_COUNT);
 // profiles are shared by all shards in Table Storage.
+//
+// The pool scales itself (see "Scaling" in docs/plan/azure-hosting.md): shard 0
+// is always on (the front door: GET /pool tells clients where to host); the
+// others have minReplicas 0 and sleep until HTTP traffic wakes them (shard 0
+// wakes the next one ahead of time, a client joining a code wakes its shard).
+// Every awake shard writes its pool entity (rooms, players) to the table
+// `shards` when they change (at most once a second) and every 30 s,
+// and a shard with live rooms pings its own URL so the HTTP scaler doesn't
+// scale it in under a game.
 
 param name string
 param location string
@@ -15,6 +24,7 @@ param image string
 param cpu string
 param memory string
 
+@description('1: always on. 0: asleep (scaled to zero) until HTTP traffic wakes it.')
 @allowed([0, 1])
 param minReplicas int
 
@@ -25,9 +35,22 @@ param allowedOrigins array
 @minValue(0)
 param shardIndex int
 
-@description('Number of shards. Join codes are spread over them by their first letter.')
+@description('Number of shards in the pool. Join codes are spread over them by their first letter.')
 @minValue(1)
 param shardCount int
+
+@description('Container App names of every shard of the pool, in shard order.')
+param shardAppNames array
+
+@description('The Container Apps environment\'s default domain. An external app\'s FQDN is <app name>.<default domain>.')
+param environmentDefaultDomain string
+
+@description('Rooms one shard takes before hosting moves on to the next shard (SHARD_MAX_ROOMS).')
+@minValue(1)
+param maxRooms int
+
+@description('Name of the table the shards write their heartbeats to (POOL_TABLE_NAME).')
+param poolTableName string
 
 @description('Table Storage endpoint for the profiles, https://<account>.table.core.windows.net.')
 param tableEndpoint string
@@ -38,9 +61,15 @@ param tableName string
 @description('Client id of the managed identity the server reaches Table Storage with.')
 param identityClientId string
 
+@description('true: the environment is an Express environment (no workload profiles). false: the standard environment with the Consumption workload profile.')
+param express bool
+
 var port = 2567
 
-resource app 'Microsoft.App/containerApps@2025-01-01' = {
+// Every shard's public URL, in shard order (SHARD_URLS).
+var shardUrls = [for appName in shardAppNames: 'https://${appName}.${environmentDefaultDomain}']
+
+resource app 'Microsoft.App/containerApps@2026-07-01' = {
   name: name
   location: location
   tags: tags
@@ -52,7 +81,8 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = {
   }
   properties: {
     environmentId: environmentId
-    workloadProfileName: 'Consumption'
+    // Express has no workload profiles; the standard environment runs it on Consumption.
+    ...(express ? {} : { workloadProfileName: 'Consumption' })
     configuration: {
       // A new image means a new revision; the old one gets SIGTERM and its
       // rooms tell the players the server is restarting.
@@ -60,8 +90,9 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = {
       ingress: {
         external: true
         targetPort: port
-        // auto: HTTP/1.1, so the WebSocket upgrade for Colyseus works.
-        transport: 'auto'
+        // HTTP/1.1, so the WebSocket upgrade for Colyseus works. Express has no
+        // HTTP/2, so it gets plain http; the standard environment keeps auto.
+        transport: express ? 'http' : 'auto'
         allowInsecure: false
       }
       registries: [
@@ -88,6 +119,11 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = {
             { name: 'TRUST_PROXY', value: 'true' }
             { name: 'SHARD_INDEX', value: string(shardIndex) }
             { name: 'SHARD_COUNT', value: string(shardCount) }
+            // The pool: every shard's URL (to wake the next one and to answer
+            // GET /pool), the rooms per shard, the heartbeat table.
+            { name: 'SHARD_URLS', value: join(shardUrls, ',') }
+            { name: 'SHARD_MAX_ROOMS', value: string(maxRooms) }
+            { name: 'POOL_TABLE_NAME', value: poolTableName }
             // Profiles in Table Storage, reached as the user-assigned managed
             // identity with this client id (no keys or connection strings).
             { name: 'PROFILE_STORE', value: 'table' }
@@ -125,6 +161,11 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = {
         minReplicas: minReplicas
         // Never more than one: see the top of this file.
         maxReplicas: 1
+        // Scale-in only after 5 minutes without traffic (a shard with live
+        // rooms keeps pinging itself), checked every 15 s. Same on Express (its
+        // types and docs accept HTTP scale rules and these settings).
+        cooldownPeriod: 300
+        pollingInterval: 15
         rules: [
           {
             // With minReplicas 0, incoming HTTP/WebSocket traffic wakes it up.

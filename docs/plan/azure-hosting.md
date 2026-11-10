@@ -5,23 +5,24 @@ How the browser game and the online game server run on Azure, as infrastructure 
 ## Goal
 
 - The browser game (static files from `npm run build`) on a public HTTPS URL.
-- The game server (`server/`, the `Dockerfile`) on public `wss://` URLs, one per shard, that the game finds through `VITE_SERVER_URLS`.
+- The game server (`server/`, the `Dockerfile`) on public `wss://` URLs, one per shard of a pool that grows and shrinks by itself. The game is built with shard 0's URL (`VITE_SERVER_URL`, the front door) and asks it for the rest.
 - Online profiles that survive restarts and new versions.
 - One command (or one manual GitHub Actions run) that builds and deploys both, the same every time.
-- A path to more servers when one isn't enough, without changing the infrastructure design.
+- More servers start by themselves when the running ones fill up, and stop when they empty, without a deploy.
 
 ## Architecture
 
 ```
                  browser
        ┌────────────┴─────────────┐
-       │ https                    │ https + wss (Colyseus), to the shard of the join code
+       │ https                    │ https + wss (Colyseus): GET /pool at shard 0, then the shard of the room
        ▼                          ▼
- Azure Static Web Apps     Azure Container Apps (environment, Consumption)
- (Free): dist/             ├─ ca-isv-<env>-game-0      (1 replica each, the Dockerfile image)
-                           ├─ ca-isv-<env>-game-1 …
-                           └─ ca-isv-<env>-game-<N-1>
+ Azure Static Web Apps     Azure Container Apps (Express environment; or standard, Consumption)
+ (Free): dist/             ├─ ca-isv-<env>-game-0      always on: the front door (/pool, profiles, hosting)
+                           ├─ ca-isv-<env>-game-1 …    0 or 1 replica: asleep until needed
+                           └─ ca-isv-<env>-game-<N-1>  (N = pool size, the ceiling)
                                 │  profiles → Azure Table Storage, table "profiles"
+                                │  pool entities (rooms, players per shard) → table "shards"
                                 │  logs → Log Analytics
                                 └─ image ← Azure Container Registry (Basic)
                               one user-assigned managed identity for all shards:
@@ -30,41 +31,63 @@ How the browser game and the online game server run on Azure, as infrastructure 
 
 All in one resource group per environment (`rg-isv-simulator-<env>`, default env `prod`, region `westeurope`).
 
-| Resource                       | Name (env `prod`)      | Why                                                                                                      |
-| ------------------------------ | ---------------------- | -------------------------------------------------------------------------------------------------------- |
-| Log Analytics workspace        | `log-isv-prod`         | Container logs, 30 days                                                                                  |
-| Container registry (Basic)     | `crisvprod<suffix>`    | The server image; admin user off                                                                         |
-| User-assigned managed identity | `id-isv-prod-game`     | Pulls from the registry (AcrPull) and reads/writes profiles (Storage Table Data Contributor); no secrets |
-| Storage account (Standard LRS) | `stisvprod<suffix>`    | Table Storage table `profiles` (one entity per user); shared-key access off                              |
-| Container Apps environment     | `cae-isv-prod`         | Consumption profile                                                                                      |
-| Container App, per shard       | `ca-isv-prod-game-<n>` | The game server: external ingress, port 2567, WebSockets, probes on `/health`, 1 replica                 |
-| Static Web App (Free)          | `swa-isv-prod`         | The browser game                                                                                         |
+| Resource                       | Name (env `prod`)      | Why                                                                                                                                           |
+| ------------------------------ | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Log Analytics workspace        | `log-isv-prod`         | Container logs, 30 days                                                                                                                       |
+| Container registry (Basic)     | `crisvprod<suffix>`    | The server image; admin user off                                                                                                              |
+| User-assigned managed identity | `id-isv-prod-game`     | Pulls from the registry (AcrPull) and reads/writes profiles (Storage Table Data Contributor); no secrets                                      |
+| Storage account (Standard LRS) | `stisvprod<suffix>`    | Table Storage tables `profiles` (one entity per user) and `shards` (one pool entity per shard); shared-key access off                         |
+| Container Apps environment     | `cae-isv-prod`         | Express (`containerAppsExpress = true`, the default): sub-second start from zero; or standard with the Consumption workload profile (`false`) |
+| Container App, per shard       | `ca-isv-prod-game-<n>` | The game server: external ingress, port 2567, WebSockets, probes on `/health`; shard 0 1 replica, the others 0 or 1                           |
+| Static Web App (Free)          | `swa-isv-prod`         | The browser game                                                                                                                              |
 
 `<suffix>` is `uniqueString(resourceGroup().id)`, cut short, so the global names don't collide.
 
 ### Why these services
 
 - **Container Apps** runs the existing `Dockerfile` as is, terminates TLS, allows WebSocket upgrades, restarts on failed health checks, and bills per second. App Service would work too, but it costs more for one small always-on container. AKS is too much to run for an internal game.
+- **Express environment** (by default; see [Express](#express)): the same resource types and Consumption billing, but a shard scaled to zero starts in under a second instead of ~10 to 20 s. That suits a pool of sleeping shards: waking one is nearly instant, so the wake-ahead matters less, and setting shard 0's `gameServerMinReplicas` to 0 becomes reasonable. Whether it carries WebSockets is the open question; the deploy checks it, and `containerAppsExpress = false` falls back to the standard environment.
 - **Static Web Apps (Free)** serves the static build from a global CDN with HTTPS and custom domains, for free. A storage static website plus Front Door costs more and takes more parts.
 - **Azure Table Storage** holds the profiles, one entity per user, for every deployment (even one shard). Several processes can write it at once, which a single `profiles.json` on a file share can't take, and the servers reach it with their managed identity, so the storage account needs no keys at all. It costs next to nothing at this size.
 
 ### Game server settings
 
-| Setting                  | Value                                                                                                                                              |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Ingress                  | external, `targetPort` 2567, transport `auto` (HTTP/1.1 upgrade to WebSocket), HTTPS only                                                          |
-| Replicas                 | min 1, max 1 per shard (see [Scaling](#scaling))                                                                                                   |
-| CPU / memory             | 0.5 vCPU / 1 GiB by default (parameters)                                                                                                           |
-| Probes                   | startup, readiness and liveness: `GET /health` on 2567 (`GET /shard` answers `{"shard": <index>, "shards": <count>}`, for the deploy's smoke test) |
-| `ALLOWED_ORIGINS`        | `https://<swa default hostname>` plus any `extraAllowedOrigins` (custom domain)                                                                    |
-| `TRUST_PROXY`            | `true` (the Container Apps ingress adds `X-Forwarded-For`)                                                                                         |
-| `SHARD_INDEX`            | this shard's index, `0` to `N-1`                                                                                                                   |
-| `SHARD_COUNT`            | `N` (`gameServerShards`)                                                                                                                           |
-| `PROFILE_STORE`          | `table`                                                                                                                                            |
-| `PROFILE_TABLE_ENDPOINT` | `https://<storage account>.table.core.windows.net`                                                                                                 |
-| `PROFILE_TABLE_NAME`     | `profiles`                                                                                                                                         |
-| `AZURE_CLIENT_ID`        | the client id of `id-isv-<env>-game`; the server authenticates to Table Storage as that identity                                                   |
-| Revisions                | single revision mode; a new image means a new revision, and the old one gets `SIGTERM` (rooms send `closing { reason: 'shutdown' }`)               |
+| Setting                  | Value                                                                                                                                                                                     |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ingress                  | external, `targetPort` 2567, transport `http` on Express, `auto` on standard (HTTP/1.1 upgrade to WebSocket), HTTPS only                                                                  |
+| Replicas                 | shard 0: min `gameServerMinReplicas` (1), max 1; shards 1 to N-1: min 0, max 1 (see [Scaling](#scaling))                                                                                  |
+| Scale rule               | HTTP (traffic wakes a sleeping shard); `pollingInterval` 15 s, `cooldownPeriod` 300 s (scale-in 5 minutes after the last request)                                                         |
+| CPU / memory             | 0.5 vCPU / 1 GiB by default (parameters)                                                                                                                                                  |
+| Probes                   | startup, readiness and liveness: `GET /health` on 2567                                                                                                                                    |
+| Routes for the pool      | `GET /shard` answers `{"shard": <index>, "shards": <count>}`; `GET /pool` answers `{"urls": [...], "awake": [...], "host": <index or -1>}` (where to host; `-1` when every shard is full) |
+| `ALLOWED_ORIGINS`        | `https://<swa default hostname>` plus any `extraAllowedOrigins` (custom domain)                                                                                                           |
+| `TRUST_PROXY`            | `true` (the Container Apps ingress adds `X-Forwarded-For`)                                                                                                                                |
+| `SHARD_INDEX`            | this shard's index, `0` to `N-1`                                                                                                                                                          |
+| `SHARD_COUNT`            | `N`, the pool size (`gameServerShards`)                                                                                                                                                   |
+| `SHARD_URLS`             | every shard's `https://` URL in index order, comma-separated: `https://ca-isv-<env>-game-<i>.<environment default domain>` (computed in Bicep, checked by the deploy's smoke test)        |
+| `SHARD_MAX_ROOMS`        | rooms per shard before hosting moves on (`gameServerMaxRooms`, 15)                                                                                                                        |
+| `POOL_TABLE_NAME`        | `shards`                                                                                                                                                                                  |
+| `PROFILE_STORE`          | `table`                                                                                                                                                                                   |
+| `PROFILE_TABLE_ENDPOINT` | `https://<storage account>.table.core.windows.net`                                                                                                                                        |
+| `PROFILE_TABLE_NAME`     | `profiles`                                                                                                                                                                                |
+| `AZURE_CLIENT_ID`        | the client id of `id-isv-<env>-game`; the server authenticates to Table Storage as that identity                                                                                          |
+| Revisions                | single revision mode; a new image means a new revision, and the old one gets `SIGTERM` (rooms send `closing { reason: 'shutdown' }`)                                                      |
+
+### Express
+
+`containerAppsExpress` (default `true`) makes the environment a [Container Apps Express](https://learn.microsoft.com/en-us/azure/container-apps/express-overview) environment ([FAQ](https://learn.microsoft.com/en-us/azure/container-apps/express-faq); GA since 2026-09-23). Same resource types (`Microsoft.App/managedEnvironments`, `Microsoft.App/containerApps`), same Consumption billing; the environment gets `properties.environmentMode: 'Express'` (API version `2026-07-01`, the first GA version with it; the CLI's `az containerapp env create --environment-mode express`).
+
+Why: a shard that is scaled to zero starts in under a second instead of ~10 to 20 s. Waking a sleeping shard becomes nearly instant, so the wake-ahead (shard 0 waking the next shard early) matters less, and `gameServerMinReplicas = 0` for shard 0 becomes reasonable (the first visitor barely waits). It stays 1 by default: a room whose players are all briefly away can still be lost if the replica scales in.
+
+What we use, all supported on Express: the user-assigned managed identity (at runtime for Table Storage, and for pulling from the registry), the HTTP scale rule with min/max replicas and scale to zero, HTTP health probes, external HTTPS ingress on the default `azurecontainerapps.io` domain, Log Analytics (enabled for the environment), environment variables, single revision mode. Images must be `linux/amd64` (`deploy.sh` builds with `--platform linux/amd64`).
+
+Not supported on Express, and not needed here: workload profiles (so the environment has no `workloadProfiles` and the apps no `workloadProfileName`), Azure Files, custom domains on the apps (the custom domain is on the Static Web App), session affinity, HTTP/2 (the ingress transport is `http`, HTTP/1.1, instead of `auto`), insecure ingress, sidecars and init containers, system-assigned identities. The scale settings `cooldownPeriod` and `pollingInterval` are kept: the Bicep types accept them and the docs don't exclude them, but Express applies its own scaling defaults, so the ~5 minute scale-in may differ there.
+
+**The risk: WebSockets.** The Express docs list HTTP ingress but say nothing about WebSockets or long-lived connections, and the game is one long WebSocket per player. So the deploy ends with a real session over the WebSocket against shard 0 (`scripts/smokeOnline.ts`: host a room, get the `welcome`, keep the socket open for 5 s with a `ping` a second and their `pong`s, leave), which proves frames flow both ways, not just the upgrade. If it fails on Express, the deploy says so.
+
+**The fallback:** `containerAppsExpress = false` in `main.bicepparam` gives the standard environment with the Consumption workload profile, as before. An environment can't switch mode in place, so switching means a new environment: delete the game server apps and the environment first (`az containerapp delete`, `az containerapp env delete`), or use a new env name, then deploy. Microsoft also offers archiving an environment and restoring it as Express. Nothing is deployed yet, so the first deploy decides.
+
+The shard URLs are still computed as `<app name>.<environment default domain>`; the deploy's `/pool` check catches it if Express names them differently.
 
 ## Files
 
@@ -76,9 +99,9 @@ infra/
     monitoring.bicep         Log Analytics
     registry.bicep           ACR
     identity.bicep           the game servers' managed identity: AcrPull on the registry, Storage Table Data Contributor on the storage account
-    storage.bicep            storage account (no shared keys) + table `profiles`
-    containerEnv.bicep       Container Apps environment
-    gameServer.bicep         one Container App (one shard)
+    storage.bicep            storage account (no shared keys) + tables `profiles` and `shards`
+    containerEnv.bicep       Container Apps environment, Express or standard (outputs its default domain, for the shard URLs)
+    gameServer.bicep         one Container App (one shard of the pool)
     staticSite.bicep         Static Web App
   scripts/
     bootstrap.sh             once per subscription: resource group + GitHub OIDC app registration and role assignments
@@ -87,23 +110,24 @@ infra/
 .github/workflows/deploy.yml manual (workflow_dispatch) only: azure/login with OIDC, then infra/scripts/deploy.sh
 public/staticwebapp.config.json  cache headers for the static site
 scripts/roomBench.ts         `npm run bench:rooms`: CPU per room and snapshot bytes, for capacity planning
+scripts/smokeOnline.ts       WebSocket smoke test of one server: host a room, welcome, ping/pong for 5 s, leave (deploy step 7)
 ```
 
 ### `main.bicep` contract
 
-Parameters: `env` (default `prod`), `location` (default the resource group's), `deployGameServer` (bool, default `true`), `gameServerImage` (string, the full image reference in the registry), `gameServerShards` (int, 1 to 8, default 1; 1, 2, 3, 4, 6 or 8 spread rooms evenly), `gameServerCpu` (string, `'0.5'`), `gameServerMemory` (string, `'1Gi'`), `gameServerMinReplicas` (int, 0 or 1, default 1), `extraAllowedOrigins` (array, default `[]`), `staticSiteLocation` (default `westeurope`; Static Web Apps only exists in a few regions).
+Parameters: `env` (default `prod`), `location` (default the resource group's), `deployGameServer` (bool, default `true`), `gameServerImage` (string, the full image reference in the registry), `gameServerShards` (int, 1 to 8, default 8: the pool size, the most shards that can run; 1, 2, 3, 4, 6 or 8 spread rooms evenly), `gameServerMaxRooms` (int, default 15: rooms per shard, ~30 at 1 vCPU), `gameServerCpu` (string, `'0.5'`), `gameServerMemory` (string, `'1Gi'`), `gameServerMinReplicas` (int, 0 or 1, default 1, shard 0 only; the others are always 0), `containerAppsExpress` (bool, default `true`: an Express environment; `false`: the standard Consumption workload-profile environment), `extraAllowedOrigins` (array, default `[]`), `staticSiteLocation` (default `westeurope`; Static Web Apps only exists in a few regions).
 
-Outputs: `registryName`, `registryLoginServer`, `staticSiteName`, `staticSiteUrl` (`https://…`), `gameServerUrls` (array of `https://…` FQDNs in shard order, empty when `deployGameServer` is false), `gameServerShards` (int), `gameServerUrl` (the first, or `''`).
+Outputs: `registryName`, `registryLoginServer`, `staticSiteName`, `staticSiteUrl` (`https://…`), `gameServerUrls` (array of `https://…` FQDNs in shard order, read from the apps, empty when `deployGameServer` is false), `gameServerShards` (int, the pool size), `gameServerUrl` (shard 0, the front door, or `''`).
 
 ### `deploy.sh` steps
 
 1. `az deployment group create` with `deployGameServer=false` (registry, storage and table, identity and its role assignments, environment and site exist; the running apps, if any, are untouched because the module is skipped). This first pass is needed because the image can't be pushed before the registry exists.
-2. `az acr build` the `Dockerfile` into `isv-simulator-server:<git sha>` (built in Azure; no local Docker needed).
-3. `az deployment group create` with `deployGameServer=true` and that image (`--shards N` passes `gameServerShards`; without it the value in `main.bicepparam` is used).
-4. `VITE_SERVER_URLS=<gameServerUrls, comma-separated> npm run build`. With `--skip-server` the URLs come from the existing apps `ca-isv-<env>-game-0`, `-1`, … in order, up to the first one missing.
+2. `az acr build --platform linux/amd64` the `Dockerfile` into `isv-simulator-server:<git sha>` (built in Azure; no local Docker needed; Express only runs amd64 images).
+3. `az deployment group create` with `deployGameServer=true` and that image: every app of the pool (`--shards N` passes `gameServerShards`; without it the value in `main.bicepparam` is used).
+4. `VITE_SERVER_URL=<gameServerUrls[0]> npm run build`: the game only knows the front door and reads the pool from its `/pool` at runtime. With `--skip-server` the pool size is shard 0's `SHARD_COUNT` and the URLs come from the existing apps (management plane only, nothing is woken).
 5. Fetch the Static Web App deployment token with `az staticwebapp secrets list` and upload `dist/` with `npx @azure/static-web-apps-cli deploy --env production`.
-6. Delete leftover game servers from a scale-down: apps `ca-isv-<env>-game-<n>` with `n` ≥ the shard count (Bicep never deletes them). After the upload, so the old game in open browsers kept its shards until the new game was live.
-7. Smoke test: for every shard, `curl <url>/health` answers `ok` and `<url>/shard` answers its own index and the shard count; the site answers 200.
+6. Delete leftover game servers after the pool shrank: apps `ca-isv-<env>-game-<n>` with `n` ≥ the pool size (Bicep never deletes them). After the upload, so the old game in open browsers kept its shards until the new game was live.
+7. Smoke test, on shard 0 only (a request to any other shard would wake it): `/health` answers `ok`, `/shard` answers index 0 of the pool size, and `/pool`'s `urls` equal `gameServerUrls` (catches a wrong computed `SHARD_URLS`); the site answers 200. Then `npx vite-node scripts/smokeOnline.ts <shard 0>`: a real session over the WebSocket (host a room, `welcome`, a `ping` a second for 5 s with their `pong`s, leave; 20 s at most). Its user id isn't a UUID v4, so no profile is written. When it fails with `containerAppsExpress = true`, the deploy says Express may not support WebSockets and how to fall back.
 
 `deploy.sh --what-if` runs `az deployment group what-if` instead, lists the leftover game servers it would delete, and changes nothing.
 
@@ -117,29 +141,35 @@ The server is one Node process: the event loop uses one core, whatever the conta
 
 ### Stage 1: one server (the default)
 
-- One shard: one Container App, one replica, `minReplicas = maxReplicas = 1`. Rooms live in the process's memory, so a second replica behind the same ingress would break joining: the ingress would send a join to a replica that doesn't have the room.
+- One shard (`gameServerShards = 1`): one Container App, one replica, `minReplicas = maxReplicas = 1`. Rooms live in the process's memory, so a second replica behind the same ingress would break joining: the ingress would send a join to a replica that doesn't have the room.
 - Grow vertically up to 1 vCPU (more cores don't help one Node process): set `gameServerCpu = '1.0'`, `gameServerMemory = '2Gi'`.
-- `gameServerMinReplicas = 0` makes it scale to zero when nobody is connected (cheaper; the first visitor waits for a cold start of ~10 to 20 s). It stays at 1 by default, because a room whose players are all briefly away (the 20 s reconnect grace) would be lost if the replica scaled in.
+- `gameServerMinReplicas = 0` makes it scale to zero when nobody is connected (cheaper; the first visitor waits for a cold start: ~10 to 20 s on the standard environment, under a second on Express). It stays at 1 by default, because a room whose players are all briefly away (the 20 s reconnect grace) would be lost if the replica scaled in.
 
-### Stage 2: shards (built)
+### Stage 2: an autoscaling pool of shards (built)
 
-Each shard is a separate Container App (`ca-isv-<env>-game-<n>`) with its own URL, one replica, the same image and the same settings. `gameServerShards` (1 to 8) sets how many.
+A fixed pool of `gameServerShards` Container Apps (`ca-isv-<env>-game-0` to `-<N-1>`, default 8), each with its own URL, at most one replica, the same image and the same settings. The pool size is the ceiling, not what runs: shard 0 is always on, the others sleep (scaled to zero) and start and stop by themselves as rooms come and go. No deploy is needed to add or remove a server.
 
 How it works:
 
-1. **Shard in the join code.** Each server gets `SHARD_INDEX` and `SHARD_COUNT` from Bicep and only makes join codes whose first letter maps to its own shard: the letter's index in the 24-letter join-code alphabet, mod `SHARD_COUNT`. 24 divides evenly by 1, 2, 3, 4, 6 and 8, so those counts spread rooms evenly; 5 or 7 work but give some shards one more letter than others.
-2. **The client knows every shard.** The build gets `VITE_SERVER_URLS` (the `gameServerUrls` output, comma-separated, URL `i` is shard `i`). Joining goes to the shard named by the code's first letter; hosting picks a shard. Reconnects already go back to the same URL.
-3. **One profile store for all.** Profiles are in Table Storage, one entity per user, so any shard can read and write any profile; a player's stars follow them whichever shard their room is on.
+1. **Shard in the join code.** Each server gets `SHARD_INDEX` and `SHARD_COUNT` (the pool size) from Bicep and only makes join codes whose first letter maps to its own shard: the letter's index in the 24-letter join-code alphabet, mod `SHARD_COUNT`. 24 divides evenly by 1, 2, 3, 4, 6 and 8, so those sizes spread codes evenly; 5 or 7 work but give some shards one more letter than others.
+2. **Pool entities.** Every awake shard writes its entity (its rooms and players, and the time) to the Table Storage table `shards` when its rooms or players change (at most once a second), plus a refresh every 30 s. A shard counts as awake when its entity was written in the last 90 s. Reads of the pool are cached for ~2 s. A crashed shard can look awake for up to 90 s; that's harmless, since a client that finds a shard unreachable falls over to the next one.
+3. **Shard 0 is the front door.** The game is built with only shard 0's URL (`VITE_SERVER_URL`). To host, it asks `GET /pool` there: `{ "urls": [...], "awake": [...], "host": <index> }`. `host` is the lowest awake shard with a free room slot (fewer than `SHARD_MAX_ROOMS` rooms), so rooms are packed on the lowest shards and the higher ones drain and go back to sleep. When every shard is full, `host` is `-1` and the game says `serverFull`.
+4. **Adding a shard.** Shard 0 watches the free room slots over the awake shards. When fewer than 5 are left (the wake-ahead headroom), it sends a request to the next sleeping shard's URL (from `SHARD_URLS`); the Container Apps HTTP scaler starts it, and it is warm by the time hosting needs it. Only if the wake-ahead is outrun does a host wait for a cold start (~10 to 20 s on the standard environment; under a second on Express, where the wake-ahead matters much less).
+5. **Joining.** The code's first letter names the shard. A code of a sleeping shard can't have a room, so it is answered as a wrong code without waking that shard. Reconnects go back to the same URL.
+6. **Removing a shard.** A shard with live rooms pings its own public URL every 60 s, so the HTTP scaler keeps seeing requests and doesn't scale it in under a game (the game itself is WebSocket messages on long-open connections). Once its last room closes (when everyone leaves, or 30 minutes after the last input), the pings stop, and after the scale rule's cooldown (`cooldownPeriod` 300 s, polled every 15 s) the replica goes to zero: about 5 minutes after the last room closed. Shard 0 stays on.
+7. **One profile store for all.** Profiles are in Table Storage, one entity per user, so any shard can read and write any profile; a player's stars follow them whichever shard their room is on.
 
-When to add shards: past what one 1 vCPU shard holds, **~30 rooms (~120 players) at once** (see [Capacity](#capacity)). Before that, go from 0.5 to 1 vCPU (~15 to ~30 rooms). Each shard adds the same again: 4 shards at 1 vCPU hold ~120 rooms, 8 hold ~240. With `deploy.sh --shards N` or the **shards** input of the Deploy workflow for one deploy; set `gameServerShards` in `main.bicepparam` to keep it, since a deploy without `--shards` uses that value.
+Capacity: the ceiling is pool size × `gameServerMaxRooms`. With the defaults that's 8 × 15 = **120 rooms, ~480 players** at 0.5 vCPU (see [Capacity](#capacity)); at 1 vCPU (`gameServerCpu = '1.0'`, `gameServerMemory = '2Gi'`) with `gameServerMaxRooms = 30` it is double, 240 rooms. Those three, and the pool size, are what still needs a deploy.
 
-When the shard count changes:
+When the pool size changes (`deploy.sh --shards N`, the **shards** input of the Deploy workflow, or `gameServerShards` in `main.bicepparam` to keep it):
 
-- Which shard owns which first letter changes, so every code means something else. That's fine: a deploy restarts every server and drops live rooms anyway (players see the server restarting), and new codes are made for the new count.
-- The new game is built with the new URL list. Browsers that still have the old game open keep using the old list until they reload.
-- Going down: `deploy.sh` deletes the apps of shards past the new count after the new game is uploaded.
+- Which shard owns which first letter changes, so every code means something else. That's fine: a deploy restarts every server and drops live rooms anyway (players see the server restarting), and new codes are made for the new size.
+- The game itself doesn't change (it only knows shard 0); it reads the new pool from `/pool`.
+- Going down: `deploy.sh` deletes the apps of shards past the new size after the new game is uploaded.
 
-A shard being down only affects its own rooms: hosting skips it and uses another, and joining a code of that shard fails until it is back. The other shards and their rooms carry on.
+Shard 0 is the single point for hosting and joining lookups (`/pool`) and, like every shard, reads and writes profiles. If it is down, nobody can host until it is back; rooms already on other shards carry on. A higher shard being down only affects its own rooms: its entity stops being refreshed, so hosting skips it after at most 90 s (until then a client that can't reach it falls over to the next shard).
+
+Why a pre-made pool and not creating Container Apps on the fly: the server would need write rights on the resource group (a game process that can create and delete resources), and creating an app takes 30 to 60 s, far longer than waking a sleeping one. A sleeping app costs nothing on the Consumption profile, so the pool is free until it's used.
 
 Why shards and not Colyseus's Redis presence with several replicas behind one URL: a room lives in one process, so every WebSocket must reach that process. Colyseus does that by giving each process its own public address. Container Apps replicas behind one ingress can't be addressed one by one, and sticky sessions there are cookie-based, which cross-origin WebSockets can't rely on. A shard per Container App gives each process its own address with no extra parts (no Redis to pay for or run).
 
@@ -171,20 +201,25 @@ So, for planning:
 - **0.5 vCPU shard** (the default): half that, **~15 rooms, ~60 players**.
 - Bandwidth at 30 rooms: ~7 MB/s (~55 Mbit/s) outbound; one room uses ~800 MB of egress per hour played (the first 100 GB a month are free).
 
-An internal company game has a handful of rooms at a time, so one shard at 0.5 vCPU holds it with a lot of room to spare. Go to 1 vCPU when more than ~15 rooms play at once regularly, and to more shards only past ~30 rooms (~120 players) at the same time.
+An internal company game has a handful of rooms at a time, so shard 0 at 0.5 vCPU holds it with a lot of room to spare, and the other shards of the pool only wake for a busy day. Go to 1 vCPU (and `gameServerMaxRooms = 30`) only if more than the pool's 120 rooms (~480 players) ever play at once.
 
 ## Costs (rough, West Europe, pay-as-you-go)
 
-| Part                                                 | Per month                                              |
-| ---------------------------------------------------- | ------------------------------------------------------ |
-| Per shard: Container App 0.5 vCPU / 1 GiB, always on | ~€30 (the monthly free grant covers part of the first) |
-| Per shard: Container App at 1 vCPU / 2 GiB           | ~€60                                                   |
-| Container registry Basic                             | ~€5                                                    |
-| Storage (a small table)                              | < €1                                                   |
-| Log Analytics (a few hundred MB)                     | ~€1 to €3                                              |
-| Static Web Apps Free                                 | €0                                                     |
+| Part                                               | Per month                                       |
+| -------------------------------------------------- | ----------------------------------------------- |
+| Shard 0: Container App 0.5 vCPU / 1 GiB, always on | ~€30 (the monthly free grant covers part of it) |
+| Shard 0 at 1 vCPU / 2 GiB                          | ~€60                                            |
+| Every other shard of the pool, while awake         | ~€0.05 an hour at 0.5 vCPU; €0 while asleep     |
+| Container registry Basic                           | ~€5                                             |
+| Storage (two small tables, pool entity writes)     | < €1 (see below)                                |
+| Log Analytics (a few hundred MB)                   | ~€1 to €3                                       |
+| Static Web Apps Free                               | €0                                              |
 
-So N shards cost about N times the server line. Scale-to-zero (`gameServerMinReplicas = 0`) brings each shard to near €0 when nobody plays on it.
+Table writes for the pool: worst case, all 8 shards awake 24/7, a refresh every 30 s is 8 × 2 × 60 × 24 × 30 ≈ 0.7 million writes a month, plus one per change (at most one a second per shard, only while rooms change). At Table Storage's price per 10,000 transactions that is cents.
+
+The Express environment bills the same as Consumption (per second, same free grant; no environment fee).
+
+So the pool costs about one shard when the game is quiet, and more only while extra shards are awake (each stays up ~5 minutes after its last room). Scale-to-zero for shard 0 too (`gameServerMinReplicas = 0`) brings the servers to near €0 when nobody plays, at the cost of a cold start for the first visitor.
 
 ## Security
 
@@ -209,7 +244,7 @@ Not done in this step. When it's time:
 - [x] `npm run check`, `npm run format:check` and `npm run build` pass
 - [x] Nothing deployed
 
-Stage 2 (shards):
+Stage 2 (shards; the fixed shard count, `VITE_SERVER_URLS` and the every-shard smoke test were later replaced by the autoscaling pool, Stage 2b):
 
 - [x] `gameServerShards` goes from 1 to 8; every shard gets `SHARD_INDEX`, `SHARD_COUNT` and the Table Storage settings
 - [x] Profiles in Table Storage with the managed identity (Storage Table Data Contributor); no file share, shared-key access off
@@ -221,3 +256,23 @@ Stage 2 (shards):
 - [x] The client joins a code at its shard, hosts on a random shard and moves on to the next when one is unreachable, and a reloaded page rejoins at the right shard
 - [x] `TableProfileStore` (ETag retries, shared merge rules) is tested with a fake table and was checked by hand against Azurite with two stores racing
 - [x] Nothing deployed
+
+Stage 2b (autoscaling pool):
+
+- [ ] `gameServerShards` is the pool size (default 8); shard 0 has `gameServerMinReplicas`, shards 1 to N-1 have min 0, max 1; the HTTP scale rule has `cooldownPeriod` 300 and `pollingInterval` 15
+- [ ] Every shard gets `SHARD_URLS` (computed from the app names and the environment's default domain), `SHARD_MAX_ROOMS` (`gameServerMaxRooms`, 15) and `POOL_TABLE_NAME=shards`; the table `shards` exists next to `profiles`
+- [ ] `deploy.sh` builds the game with only `VITE_SERVER_URL` (shard 0) and smoke tests shard 0 only: `/health`, `/shard`, and `/pool`'s urls equal `gameServerUrls`
+- [ ] Awake shards write their pool entity (rooms, players) to `shards` when it changes (at most once a second) and every 30 s, and count as awake for 90 s after a write; `GET /pool` packs rooms on the lowest shard with a free slot and answers `host: -1` (`serverFull`) when all are full
+- [ ] Shard 0 wakes the next shard when fewer than 5 room slots are free; a sleeping shard's codes are answered as wrong without waking it
+- [ ] A shard with live rooms pings its own URL every 60 s and scales in ~5 minutes after its last room closes
+- [ ] Bicep builds and lints without warnings with 1, 3 and 8 shards; shellcheck and actionlint pass
+- [ ] Nothing deployed
+
+Express (`containerAppsExpress`):
+
+- [ ] `containerAppsExpress` (default `true`) makes the environment Express (`environmentMode: 'Express'`, API `2026-07-01`) with no workload profiles; `false` keeps the standard environment with the Consumption workload profile and the apps' `workloadProfileName`
+- [ ] Bicep builds and lints without warnings with `containerAppsExpress` `true` and `false`; shellcheck passes
+- [ ] `deploy.sh` builds the image with `--platform linux/amd64` and ends with `scripts/smokeOnline.ts` against shard 0, with the fallback hint when it fails
+- [ ] `scripts/smokeOnline.ts` passes against a local server (welcome, pings answered, leave) and fails with a clear message when the server is unreachable
+- [ ] WebSockets work on an Express shard (the deploy's smoke test passes), or the deploy falls back to `containerAppsExpress = false`
+- [ ] Nothing deployed

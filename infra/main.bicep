@@ -1,5 +1,6 @@
 // ISV Simulator on Azure: the browser game on Static Web Apps and the game
-// server on Container Apps. See docs/plan/azure-hosting.md.
+// server on Container Apps (an Express environment by default, see
+// containerAppsExpress). See docs/plan/azure-hosting.md.
 //
 // deploy.sh runs this twice: first with deployGameServer=false (the registry
 // must exist before the image can be pushed to it), then with the new image.
@@ -20,10 +21,14 @@ param deployGameServer bool = true
 @description('Full image reference in the registry, e.g. crisvprodabc123.azurecr.io/isv-simulator-server:<git sha>. Required when deployGameServer is true.')
 param gameServerImage string = ''
 
-@description('Number of game server shards (one Container App with one replica each, see "Scaling" in docs/plan/azure-hosting.md). The first letter of a join code picks its shard; 1, 2, 3, 4, 6 or 8 spread rooms evenly. Changing it moves which shard owns which codes, which is fine: a deploy drops live rooms anyway.')
+@description('Size of the game server pool: the most shards that can ever run (one Container App with at most one replica each, see "Scaling" in docs/plan/azure-hosting.md). Shard 0 is always on; the others sleep (scaled to zero, nothing to pay on Consumption) and wake by themselves when the awake ones fill up. So this is the ceiling, not what runs. The first letter of a join code picks its shard (24 letters, so 1, 2, 3, 4, 6 or 8 spread rooms evenly); changing it remaps join codes and needs a deploy.')
 @minValue(1)
 @maxValue(8)
-param gameServerShards int = 1
+param gameServerShards int = 8
+
+@description('Rooms one shard takes before hosting moves on to the next shard. 15 fits 0.5 vCPU (see "Capacity" in docs/plan/azure-hosting.md); ~30 for 1 vCPU.')
+@minValue(1)
+param gameServerMaxRooms int = 15
 
 @description('vCPU per game server, as a string (Bicep has no decimals). More than 1.0 does not help one Node process.')
 param gameServerCpu string = '0.5'
@@ -31,9 +36,12 @@ param gameServerCpu string = '0.5'
 @description('Memory per game server, e.g. 1Gi. Must match the CPU (0.5 vCPU: 1Gi, 1.0 vCPU: 2Gi).')
 param gameServerMemory string = '1Gi'
 
-@description('1: always on. 0: scale to zero when nobody plays (cold start for the first visitor, and rooms in their reconnect grace can be lost).')
+@description('Shard 0 (the front door): 1 always on, 0 scale to zero when nobody plays (cold start for the first visitor, and rooms in their reconnect grace can be lost). The other shards always have 0 and wake when needed.')
 @allowed([0, 1])
 param gameServerMinReplicas int = 1
+
+@description('Run the game servers in a Container Apps Express environment: faster provisioning and sub-second start from zero, so a sleeping shard wakes almost at once (same Consumption billing). false: the standard Consumption workload-profile environment, the fallback if Express falls short (e.g. WebSockets; deploy.sh smoke tests them). An environment can\'t switch mode in place: switching later recreates it, so delete the game server apps and the environment first (az containerapp delete, az containerapp env delete), or use a new env name.')
+param containerAppsExpress bool = true
 
 @description('More origins the game server answers besides the Static Web App, e.g. a custom domain (https://isv.example.com).')
 param extraAllowedOrigins array = []
@@ -114,6 +122,7 @@ module containerEnv 'modules/containerEnv.bicep' = {
     location: location
     tags: tags
     workspaceName: monitoring.outputs.name
+    express: containerAppsExpress
   }
 }
 
@@ -128,31 +137,43 @@ module staticSite 'modules/staticSite.bicep' = {
 
 var staticSiteUrl = 'https://${staticSite.outputs.defaultHostname}'
 
-// One Container App per shard. Skipped entirely on deploy.sh's first pass, so
-// a running app is left as it is until the new image exists. They read the
-// identity module's outputs, so they wait for its role assignments (the first
-// start can pull the image and write profiles). Apps of shards past
-// gameServerShards (after a scale-down) are not touched here; deploy.sh
-// deletes them.
+// Every shard gets every shard's URL. They can't be read from the apps (that
+// would be a cycle), so gameServer.bicep computes them from these names and
+// the environment's default domain; deploy.sh's smoke test checks them against
+// the real FQDNs (gameServerUrls).
+var gameAppNames = [for shard in range(0, gameServerShards): 'ca-isv-${envName}-game-${shard}']
+
+// The pool: one Container App per shard. Skipped entirely on deploy.sh's first
+// pass, so a running app is left as it is until the new image exists. They
+// read the identity module's outputs, so they wait for its role assignments
+// (the first start can pull the image and write profiles). Shard 0 is always on
+// (gameServerMinReplicas); the others sleep until traffic wakes them. Apps of
+// shards past gameServerShards (after the pool shrank) are not touched here;
+// deploy.sh deletes them.
 module gameServer 'modules/gameServer.bicep' = [
   for shard in range(0, gameServerShards): if (deployGameServer) {
     name: 'gameServer-${shard}'
     params: {
-      name: 'ca-isv-${envName}-game-${shard}'
+      name: gameAppNames[shard]
       location: location
       tags: tags
       environmentId: containerEnv.outputs.environmentId
       identityId: identity.outputs.id
       identityClientId: identity.outputs.clientId
+      express: containerAppsExpress
       shardIndex: shard
       shardCount: gameServerShards
+      shardAppNames: gameAppNames
+      environmentDefaultDomain: containerEnv.outputs.defaultDomain
+      maxRooms: gameServerMaxRooms
       tableEndpoint: storage.outputs.tableEndpoint
       tableName: storage.outputs.tableName
+      poolTableName: storage.outputs.poolTableName
       registryLoginServer: registry.outputs.loginServer
       image: image
       cpu: gameServerCpu
       memory: gameServerMemory
-      minReplicas: gameServerMinReplicas
+      minReplicas: shard == 0 ? gameServerMinReplicas : 0
       allowedOrigins: concat([staticSiteUrl], extraAllowedOrigins)
     }
   }
@@ -167,4 +188,5 @@ output gameServerUrls array = [
   for shard in range(0, deployGameServer ? gameServerShards : 0): 'https://${gameServer[shard]!.outputs.fqdn}'
 ]
 output gameServerShards int = gameServerShards
+// Shard 0, the front door the browser game is built with (VITE_SERVER_URL).
 output gameServerUrl string = deployGameServer ? 'https://${gameServer[0]!.outputs.fqdn}' : ''

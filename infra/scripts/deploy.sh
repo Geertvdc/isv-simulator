@@ -12,18 +12,23 @@ Usage: infra/scripts/deploy.sh [options]
 Builds and deploys everything for one environment:
   1. infra/main.bicep without the game servers (registry, storage, identity, environment, site)
   2. az acr build: the Dockerfile into isv-simulator-server:<git short sha>
-  3. infra/main.bicep with the game servers (one per shard) on that image
-  4. VITE_SERVER_URLS=<shard URLs, comma-separated> npm run build
+  3. infra/main.bicep with the game server pool (one app per shard) on that image
+  4. VITE_SERVER_URL=<shard 0's URL> npm run build (the client asks shard 0's /pool
+     where to host at runtime)
   5. upload dist/ to the Static Web App
-  6. delete the game servers of shards past the shard count (after a scale-down)
-  7. smoke test: every shard's /health answers ok and /shard its index, the site answers 200
+  6. delete the game servers of shards past the pool size (after it shrank)
+  7. smoke test, shard 0 only (the others sleep until needed; this doesn't wake them):
+     /health is ok, /shard is 0 of the pool size, /pool lists the deployed URLs; the
+     site answers 200; then a game session over the WebSocket (scripts/smokeOnline.ts:
+     host a room, welcome, ping/pong for a few seconds, leave)
 
 Options:
   --env NAME              environment (default: prod)
   --resource-group NAME   resource group (default: rg-isv-simulator-<env>)
   --location REGION       region for the resources (default: the resource group's)
-  --shards N              number of game server shards, 1 to 8 (1, 2, 3, 4, 6 or 8 spread
-                          rooms evenly; default: gameServerShards in infra/main.bicepparam)
+  --shards N              game server pool size, 1 to 8: the most shards that can run; they
+                          start and stop by themselves (1, 2, 3, 4, 6 or 8 spread rooms
+                          evenly; default: gameServerShards in infra/main.bicepparam)
   --what-if               show what the Bicep deployment would change, change nothing
   --skip-server           don't build a new server image or update the game server
   --skip-client           don't build or upload the browser game
@@ -100,7 +105,7 @@ done
 resource_group=${resource_group:-rg-isv-simulator-$env_name}
 if [[ -n $shards ]]; then
   [[ $shards =~ ^[1-8]$ ]] || die "--shards must be 1 to 8 (got '$shards')"
-  [[ $skip_server == false ]] || die "--shards changes the game servers; it can't go with --skip-server"
+  [[ $skip_server == false ]] || die "--shards changes the game server pool; it can't go with --skip-server"
 fi
 
 # ---- prerequisites (before any Azure call)
@@ -153,7 +158,7 @@ output() {
 }
 
 # Game server apps in the resource group whose shard index is >= $1, one per line:
-# what's left over after the shard count went down.
+# what's left over after the pool size went down.
 leftover_game_apps() {
   local keep=$1 name
   az containerapp list -g "$resource_group" --query '[].name' -o tsv | while IFS= read -r name; do
@@ -181,14 +186,14 @@ if [[ $what_if == true ]]; then
   az deployment group what-if -g "$resource_group" -f "$template" -p "$params" \
     "${common_params[@]}" -p deployGameServer=true -p "gameServerImage=$current_image"
 
-  # Bicep never deletes the apps of shards it no longer has; deploy.sh does (step 6).
+  # Bicep never deletes the apps of shards the pool no longer has; deploy.sh does (step 6).
   if [[ -n $shards ]]; then
     shard_count=$shards
   else
     shard_count=$(sed -n 's/^param gameServerShards *= *\([0-9][0-9]*\).*/\1/p' "$params")
     shard_count=${shard_count:-1}
   fi
-  log "What-if: game servers past $shard_count shard(s)"
+  log "What-if: game servers past the pool of $shard_count shard(s)"
   leftovers=$(leftover_game_apps "$shard_count")
   if [[ -n $leftovers ]]; then
     while IFS= read -r name; do
@@ -219,10 +224,12 @@ if [[ $skip_server == false ]]; then
   # ---- 2. server image, built in the registry (no local Docker needed)
   image="$registry_login_server/isv-simulator-server:$image_tag"
   log "2/7 Building the server image in $registry_name: $image"
+  # linux/amd64 is the default, but Container Apps (Express especially) only runs
+  # amd64 images, so it is spelled out.
   az acr build --registry "$registry_name" --image "isv-simulator-server:$image_tag" \
-    --file Dockerfile "$root"
+    --platform linux/amd64 --file Dockerfile "$root"
 
-  # ---- 3. the game servers (one Container App per shard) on that image
+  # ---- 3. the game server pool (one Container App per shard) on that image
   server_deployment="isv-gameserver-$image_tag"
   log "3/7 Game server deployment ($server_deployment, deployGameServer=true)"
   az deployment group create -g "$resource_group" -n "$server_deployment" \
@@ -238,33 +245,40 @@ if [[ $skip_server == false ]]; then
   [[ ${#server_urls[@]} == "$shard_count" ]] ||
     die "the game server deployment has ${#server_urls[@]} URLs for $shard_count shard(s)"
 else
-  log "2/7 and 3/7 skipped (--skip-server); reading the running game servers' URLs"
-  # Shard n is $game_app_prefix<n>: take them in index order until one is missing.
+  log "2/7 and 3/7 skipped (--skip-server); reading the running pool's URLs"
+  # The pool size is shard 0's SHARD_COUNT; the URLs come from the apps' settings
+  # (management plane only, so sleeping shards stay asleep).
+  shard_count=$(az containerapp show -n "${game_app_prefix}0" -g "$resource_group" \
+    --query "properties.template.containers[0].env[?name=='SHARD_COUNT'].value | [0]" \
+    -o tsv 2>/dev/null || true)
+  shard_count=${shard_count%$'\r'}
+  [[ $shard_count =~ ^[1-9][0-9]*$ ]] ||
+    die "could not read the pool size (SHARD_COUNT of ${game_app_prefix}0; is it deployed? run without --skip-server once)"
   server_urls=()
-  while fqdn=$(az containerapp show -n "$game_app_prefix${#server_urls[@]}" -g "$resource_group" \
-    --query 'properties.configuration.ingress.fqdn' -o tsv 2>/dev/null) && [[ -n $fqdn ]]; do
+  for ((i = 0; i < shard_count; i++)); do
+    fqdn=$(az containerapp show -n "$game_app_prefix$i" -g "$resource_group" \
+      --query 'properties.configuration.ingress.fqdn' -o tsv 2>/dev/null || true)
+    fqdn=${fqdn%$'\r'}
+    [[ -n $fqdn ]] || die "game server $game_app_prefix$i of the pool of $shard_count is missing"
     server_urls+=("https://$fqdn")
   done
-  shard_count=${#server_urls[@]}
 fi
 ((${#server_urls[@]} > 0)) ||
   die "no game server URL (is ${game_app_prefix}0 deployed? run without --skip-server once)"
-# Shard i is URL i; the client splits this on commas.
-server_urls_csv=$(
-  IFS=,
-  printf '%s' "${server_urls[*]}"
-)
-for ((i = 0; i < ${#server_urls[@]}; i++)); do
-  info "game server shard $i: ${server_urls[i]}"
+# The front door: the game only knows shard 0 and asks its /pool for the rest.
+front_door_url=${server_urls[0]}
+info "pool: $shard_count shard(s); front door (shard 0): $front_door_url"
+for ((i = 1; i < ${#server_urls[@]}; i++)); do
+  info "game server shard $i (sleeps until needed): ${server_urls[i]}"
 done
 
 if [[ $skip_client == false ]]; then
-  # ---- 4. browser game, pointed at the game servers
-  log "4/7 Building the browser game (VITE_SERVER_URLS=$server_urls_csv)"
+  # ---- 4. browser game, pointed at the front door
+  log "4/7 Building the browser game (VITE_SERVER_URL=$front_door_url)"
   if [[ ! -d node_modules ]]; then
     npm ci
   fi
-  VITE_SERVER_URLS="$server_urls_csv" npm run build
+  VITE_SERVER_URL="$front_door_url" npm run build
 
   # ---- 5. upload to the Static Web App; the token stays out of the logs
   log "5/7 Uploading dist/ to $static_site_name"
@@ -278,10 +292,10 @@ else
   log "4/7 and 5/7 skipped (--skip-client)"
 fi
 
-# ---- 6. game servers of shards past the shard count (Bicep leaves them). After the
+# ---- 6. game servers of shards past the pool size (Bicep leaves them). After the
 # upload, so browsers still on the old game had them until the new game was live.
 if [[ $skip_server == false ]]; then
-  log "6/7 Game servers past $shard_count shard(s)"
+  log "6/7 Game servers past the pool of $shard_count shard(s)"
   leftovers=$(leftover_game_apps "$shard_count")
   if [[ -n $leftovers ]]; then
     while IFS= read -r name; do
@@ -314,6 +328,26 @@ check_shard() {
     process.exit(j.shard === Number(shard) && j.shards === Number(shards) ? 0 : 1);
   ' "$body" "$2" "$3"
 }
+# /pool answers {"urls": [...], "awake": [...], "host": <index or -1>}. Its urls are
+# what Bicep computed for SHARD_URLS (<app name>.<environment domain>); they must be
+# the apps' real URLs ($2..., in shard order), or clients would host where nobody is.
+check_pool() {
+  local url=$1 body
+  shift
+  body=$(curl -fsS --max-time 10 "$url/pool" 2>/dev/null) || return 1
+  node -e '
+    const [body, ...want] = process.argv.slice(1);
+    let j;
+    try { j = JSON.parse(body); } catch { process.exit(1); }
+    const urls = Array.isArray(j.urls) ? j.urls : [];
+    const same = urls.length === want.length && urls.every((u, i) => u === want[i]);
+    if (!same) {
+      console.error("    /pool urls: " + JSON.stringify(urls));
+      console.error("    expected:   " + JSON.stringify(want));
+    }
+    process.exit(same ? 0 : 1);
+  ' "$body" "$@"
+}
 check_site() {
   [[ $(curl -sS -o /dev/null --max-time 10 -w '%{http_code}' "$static_site_url" 2>/dev/null) == 200 ]]
 }
@@ -333,18 +367,33 @@ retry() {
   die "$what did not answer after $attempts attempts"
 }
 
-for ((i = 0; i < ${#server_urls[@]}; i++)); do
-  retry "shard $i ${server_urls[i]}/health" check_health "${server_urls[i]}"
-  retry "shard $i ${server_urls[i]}/shard is $i of ${#server_urls[@]}" \
-    check_shard "${server_urls[i]}" "$i" "${#server_urls[@]}"
-done
+# Only shard 0: a request to any other shard would wake it (and keep it awake for the
+# scale-in cooldown), which is the pool's job, not the deploy's.
+retry "shard 0 $front_door_url/health" check_health "$front_door_url"
+retry "shard 0 $front_door_url/shard is 0 of $shard_count" check_shard "$front_door_url" 0 "$shard_count"
+retry "shard 0 $front_door_url/pool lists the ${#server_urls[@]} deployed shard URLs" \
+  check_pool "$front_door_url" "${server_urls[@]}"
 retry "site $static_site_url" check_site
+
+# A real game session over the WebSocket at shard 0: host a room, get the welcome,
+# ping/pong a few seconds, leave (scripts/smokeOnline.ts). The checks above are
+# plain HTTP; this proves the ingress carries WebSocket frames both ways.
+log "7/7 WebSocket smoke test: $front_door_url"
+if [[ ! -d node_modules ]]; then
+  npm ci
+fi
+if ! npx vite-node scripts/smokeOnline.ts "$front_door_url"; then
+  if [[ $(sed -n 's/^param containerAppsExpress *= *\([a-z]*\).*/\1/p' "$params") != false ]]; then
+    info "WebSockets failed: if containerAppsExpress is true, Express may not support them;"
+    info "set containerAppsExpress = false in infra/main.bicepparam and redeploy"
+    info "(switching recreates the environment: see infra/README.md, \"Express or standard\")"
+  fi
+  die "the WebSocket smoke test against shard 0 ($front_door_url) failed"
+fi
 
 log "Deployed ($env_name)"
 info "game:        $static_site_url"
-for ((i = 0; i < ${#server_urls[@]}; i++)); do
-  info "game server: ${server_urls[i]} (shard $i)"
-done
+info "game server: $front_door_url (shard 0 of a pool of $shard_count)"
 if [[ $skip_server == false ]]; then
   info "image:       $image"
 fi
