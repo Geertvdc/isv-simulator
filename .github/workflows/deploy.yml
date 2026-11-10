@@ -12,7 +12,7 @@ on:
           - prod
         default: prod
       shards:
-        description: Game server shards; default is gameServerShards in infra/main.bicepparam (change it there to keep a count). 1, 2, 3, 4, 6 or 8 spread rooms evenly
+        description: Game server pool size, the most shards that can run (they start and stop by themselves; sleeping ones cost nothing). Default is gameServerShards in infra/main.bicepparam (change it there to keep a size). 1, 2, 3, 4, 6 or 8 spread rooms evenly; changing it remaps join codes
         type: choice
         options:
           - default
