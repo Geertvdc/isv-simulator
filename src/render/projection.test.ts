@@ -86,6 +86,11 @@ describe('3D projection', () => {
 
   for (const viewport of [
     { width: 1920, height: 1080 },
+    // MacBooks: 16:10 and a bit taller.
+    { width: 1440, height: 900 },
+    { width: 1512, height: 982 },
+    { width: 1728, height: 1117 },
+    { width: 1280, height: 800 },
     { width: 1024, height: 768 },
     { width: 3440, height: 1440 },
     { width: 390, height: 844 },
