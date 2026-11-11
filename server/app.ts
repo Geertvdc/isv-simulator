@@ -11,6 +11,9 @@
  *   case (`{ joinCode }` with the code as the server knows it, or 404). Only
  *   this shard's rooms: other shards' codes are 404s.
  * - `GET` and `PUT /profiles/:userId`: online profiles (`profileRoutes.ts`).
+ * - `GET /admin`, `/admin/api/state`, `/admin/api/history`: the open,
+ *   read-only ops dashboard (`admin.ts`), on shard 0 only; answered before
+ *   Colyseus sees the request. Shard 0 also records the pool's history.
  *
  * Every request passes `httpGuard.ts` first: body size, per-IP rate limits,
  * and CORS restricted to `allowedOrigins`.
@@ -37,9 +40,13 @@ import {
   installCors,
   installHttpGuard,
 } from './httpGuard';
+import { createAdminHandler } from './admin';
+import { HistoryRecorder } from './historyRecorder';
+import { HistoryStore, MemoryHistoryTable } from './historyStore';
 import { isLiveJoinCode } from './joinCodes';
 import { MemoryPoolStore, type PoolStore } from './poolStore';
 import { ShardLoad } from './shardLoad';
+import { type MetricsSources, ShardMetrics } from './shardMetrics';
 import { ShardPool, type ShardPoolOptions } from './shardPool';
 import type { ProfileStore } from './profileStore';
 import { profileStoreFromEnv } from './profileStoreFromEnv';
@@ -109,6 +116,12 @@ export interface GameServerOptions {
   maxRooms?: number;
   /** The shard pool; a pool of this server alone (in memory, URL unknown) by default. */
   pool?: PoolSettings;
+  /** The build this server runs (`APP_VERSION`), reported in its heartbeat; `dev` by default. */
+  version?: string;
+  /** Where CPU, event loop and memory numbers come from (tests); Node's by default. */
+  metricsSources?: MetricsSources;
+  /** Shard 0: where the pool's history goes (`historyStoreFromEnv`); in memory by default. */
+  history?: HistoryStore;
 }
 
 export interface PoolSettings {
@@ -134,6 +147,7 @@ export async function startGameServer(
   const store = options.store ?? profileStoreFromEnv();
   const shard = options.shard ?? { index: 0, count: 1 };
   const load = new ShardLoad(options.maxRooms);
+  const metrics = new ShardMetrics({ version: options.version, sources: options.metricsSources });
   const pool = new ShardPool({
     store: options.pool?.store ?? new MemoryPoolStore(),
     urls: options.pool?.urls ?? Array.from({ length: shard.count }, () => ''),
@@ -143,7 +157,20 @@ export async function startGameServer(
     cacheMs: options.pool?.cacheMs,
     fetch: options.pool?.fetch,
     now: options.pool?.now,
+    ops: () => metrics.ops(load),
   });
+  const urls = options.pool?.urls ?? Array.from({ length: shard.count }, () => '');
+  // Shard 0 keeps the pool's history and serves the ops dashboard.
+  const history =
+    shard.index === 0
+      ? new HistoryRecorder({
+          store: options.history ?? new HistoryStore(new MemoryHistoryTable()),
+          pool,
+          poolSize: shard.count,
+          version: metrics.version,
+          now: options.pool?.now,
+        })
+      : null;
   const httpServer = createServer();
   const server = defineServer({
     rooms: {
@@ -173,6 +200,20 @@ export async function startGameServer(
   });
   await server.listen(port);
   installCors(options.allowedOrigins ?? null);
+  if (history) {
+    // Inside the guard below, so the guard's checks see the dashboard's requests first.
+    installHttpGuard(
+      httpServer,
+      createAdminHandler({
+        shard,
+        urls,
+        pool,
+        history,
+        headroom: options.pool?.headroom,
+        now: options.pool?.now,
+      }),
+    );
+  }
   installHttpGuard(
     httpServer,
     createHttpGuard({
@@ -183,9 +224,13 @@ export async function startGameServer(
   );
   // Right after listening, so a shard that was just woken shows up at once.
   pool.start();
+  metrics.start();
+  history?.start();
   return {
     port: (httpServer.address() as AddressInfo).port,
     close: async () => {
+      history?.stop();
+      metrics.stop();
       await pool.stop();
       await server.gracefullyShutdown(false);
     },

@@ -40,6 +40,51 @@ export interface PoolEntry {
   maxRooms: number;
   /** When it wrote this (ms since the epoch, its clock); 0 when it shut down. */
   updatedAt: number;
+  /** How the shard is doing, for the ops dashboard; missing from shards that don't report it. */
+  ops?: ShardOps;
+}
+
+/** One open room on a shard, as the ops dashboard lists it. */
+export interface RoomSummary {
+  /** The join code, masked (`AB••`): the dashboard is public. */
+  code: string;
+  /** Machines in the room (connected or reconnecting). */
+  members: number;
+  /** Couch players over all members. */
+  players: number;
+  /** The room's flow screen (`lobby`, `levelSelect`, `playing`, `results`, ...). */
+  screen: string;
+  /** The loaded round's level, `null` in the menus. */
+  levelId: string | null;
+  /** Seconds since the room opened. */
+  ageS: number;
+  /** Seconds since anyone in it pressed or moved anything. */
+  idleS: number;
+}
+
+/** A shard's operational numbers, carried by its heartbeat. Plain JSON. */
+export interface ShardOps {
+  /** The build it runs (`APP_VERSION`, the image tag). */
+  version: string;
+  /** When this process started (ISO time). */
+  startedAt: string;
+  uptimeS: number;
+  /** Process CPU over the last sample, in % of one core. */
+  cpuPct: number;
+  /** Share of the last sample the event loop was busy, 0 to 1. */
+  eventLoopUtil: number;
+  /** 99th percentile event loop delay over the last sample. */
+  loopDelayP99Ms: number;
+  rssMb: number;
+  heapUsedMb: number;
+  /** Open client sockets in its rooms. */
+  connections: number;
+  /** Rounds started since the process started. */
+  roundsStarted: number;
+  /** Rooms refused for being full (`serverFull`) since the process started. */
+  serverFullRefusals: number;
+  /** Its open rooms (at most `NET_SHARD_ROOM_LIST_MAX`). */
+  roomList: RoomSummary[];
 }
 
 /**

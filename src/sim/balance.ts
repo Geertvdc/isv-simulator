@@ -342,6 +342,31 @@ export const NET_POOL_HEADROOM_ROOMS = 5;
 export const NET_SHARD_WAKE_TIMEOUT_MS = 30_000;
 /** How long the game waits for the pool (`GET /pool`) before calling the server unreachable. */
 export const NET_POOL_TIMEOUT_MS = 4000;
+/**
+ * The ops dashboard (`server/admin.ts`, open, on shard 0): each
+ * shard measures its CPU, event loop and memory this often (the heartbeat
+ * carries the latest sample; the loop delay histogram restarts per sample).
+ */
+export const NET_SHARD_METRICS_MS = 5000;
+/** Rooms listed in a shard's heartbeat at most (each one's code, players, screen, ...). */
+export const NET_SHARD_ROOM_LIST_MAX = 40;
+/** Shard 0 looks at the pool for history events (woke, slept, restarted, ...) this often. */
+export const NET_HISTORY_OBSERVE_MS = 10_000;
+/** Shard 0 writes one snapshot of the pool to the history this often. */
+export const NET_HISTORY_SNAPSHOT_MS = 60_000;
+/** History older than this many days is deleted (checked once a day by shard 0). */
+export const NET_HISTORY_RETENTION_DAYS = 14;
+/** How often shard 0 deletes old history, and how long after starting it first does. */
+export const NET_HISTORY_PURGE_EVERY_MS = 24 * 60 * 60 * 1000;
+export const NET_HISTORY_PURGE_FIRST_MS = 5 * 60 * 1000;
+/** Old history rows deleted per run at most (the rest go the next day). */
+export const NET_HISTORY_PURGE_BATCH = 5000;
+/** A history read (one range) is reused for this long. */
+export const NET_HISTORY_CACHE_MS = 10_000;
+/** Events a history answer lists at most (the newest). */
+export const NET_HISTORY_MAX_EVENTS = 300;
+/** The dashboard page reloads the pool's state this often. */
+export const NET_ADMIN_REFRESH_MS = 5000;
 /** In the online lobby, a second Esc within this long leaves the room. */
 export const NET_LEAVE_CONFIRM_MS = 3000;
 /**

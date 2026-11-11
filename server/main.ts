@@ -18,12 +18,18 @@
  * `table` the pool's heartbeats go to the table `POOL_TABLE_NAME` (default
  * `shards`) in the same account, else they stay in memory (`poolStore.ts`).
  * Bad values stop the server at start-up.
+ *
+ * Ops: `APP_VERSION` (the image tag) goes into this shard's heartbeat.
+ * Shard 0 serves the open, read-only ops dashboard at `/admin`; its history
+ * goes to the table `HISTORY_TABLE_NAME` (default `poolhistory`) with
+ * `PROFILE_STORE=table`, else stays in memory.
  */
 
 import type { Shard } from '../src/net/joinCode';
 import { parseLag } from '../src/net/lag';
 import { parseMaxRooms, parseShard, parseShardUrls } from '../src/net/shards';
 import { DEFAULT_PORT, startGameServer } from './app';
+import { type HistoryStore, historyStoreFromEnv } from './historyStore';
 import { parseAllowedOrigins, parseTrustProxy } from './httpGuard';
 import { type PoolStore, poolStoreFromEnv } from './poolStore';
 import type { ProfileStore } from './profileStore';
@@ -34,12 +40,14 @@ let shardUrls: string[];
 let maxRooms: number;
 let store: ProfileStore;
 let poolStore: PoolStore;
+let history: HistoryStore | undefined;
 try {
   shard = parseShard(process.env.SHARD_INDEX, process.env.SHARD_COUNT);
   shardUrls = parseShardUrls(process.env.SHARD_URLS, shard.count);
   maxRooms = parseMaxRooms(process.env.SHARD_MAX_ROOMS);
   store = profileStoreFromEnv(process.env);
   poolStore = poolStoreFromEnv(process.env);
+  if (shard.index === 0) history = historyStoreFromEnv(process.env);
 } catch (error) {
   console.error(`Not starting: ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
@@ -59,6 +67,8 @@ const server = await startGameServer(port, {
   lag,
   allowedOrigins,
   trustProxyHops,
+  version: process.env.APP_VERSION,
+  history,
 });
 console.log(`ISV Simulator server listening on port ${server.port}`);
 const tables = process.env.PROFILE_STORE?.trim().toLowerCase() === 'table';
@@ -78,6 +88,12 @@ if (roundSeconds) console.log(`Rounds last ${roundSeconds} s (ROUND_SECONDS)`);
 if (allowedOrigins) console.log(`Allowed origins: ${allowedOrigins.join(', ')}`);
 else console.warn('ALLOWED_ORIGINS is not set: any web page may call this server (fine for dev)');
 if (trustProxyHops) console.log(`Trusting X-Forwarded-For from ${trustProxyHops} proxy hop(s)`);
+console.log(`Version ${process.env.APP_VERSION?.trim() || 'dev'} (APP_VERSION)`);
+if (shard.index === 0) {
+  console.log(
+    `Ops dashboard at /admin (open, read-only), history ${tables ? 'in Azure Table Storage' : 'in memory'}`,
+  );
+}
 if (lag) console.log(`Simulating ${lag.lagMs} ms lag + ${lag.jitterMs} ms jitter each way`);
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

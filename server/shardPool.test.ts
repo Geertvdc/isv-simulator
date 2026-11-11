@@ -119,6 +119,50 @@ describe('ShardPool heartbeat', () => {
   });
 });
 
+describe('ShardPool ops', () => {
+  it('carries the ops numbers in every heartbeat, cleared of rooms at shutdown', async () => {
+    let cpuPct = 5;
+    const ops = () => ({
+      version: 'abc',
+      startedAt: '2026-11-11T10:00:00.000Z',
+      uptimeS: 10,
+      cpuPct,
+      eventLoopUtil: 0.1,
+      loopDelayP99Ms: 2,
+      rssMb: 60,
+      heapUsedMb: 20,
+      connections: 1,
+      roundsStarted: 2,
+      serverFullRefusals: 0,
+      roomList: [
+        { code: 'AB••', members: 1, players: 1, screen: 'lobby', levelId: null, ageS: 1, idleS: 0 },
+      ],
+    });
+    const { pool, store, load } = setup({ ops });
+    load.add(room(), () => 1);
+    await pool.heartbeat();
+    expect((await store.list())[0]?.ops).toEqual(ops());
+    cpuPct = 50;
+    // Metrics alone don't trigger a write; they ride along on the next one.
+    expect(await pool.beatIfDue()).toBe(false);
+    expect((await store.list())[0]?.ops?.cpuPct).toBe(5);
+    await pool.stop();
+    expect((await store.list())[0]?.ops).toMatchObject({
+      cpuPct: 50,
+      connections: 0,
+      roomList: [],
+    });
+  });
+
+  it('remembers which spares its last round was waking', async () => {
+    const { pool, store, now } = setup({ maxRooms: 1 });
+    await store.put(other(1, 0, now(), AWAKE_WINDOW_MS + 1));
+    expect(pool.waking).toEqual([]);
+    await pool.manage();
+    expect(pool.waking).toEqual([1]);
+  });
+});
+
 describe('ShardPool beatIfDue', () => {
   it('writes when rooms or players change, and on the refresh interval otherwise', async () => {
     const { pool, store, load, advance } = setup();

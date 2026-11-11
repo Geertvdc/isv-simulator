@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { playerIdsOf } from './lobby';
 import { createRoomState } from './room';
-import { handleMessage } from './roomLogic';
+import { handleMessage, summarizeRoom } from './roomLogic';
 import { join, menu, messages, playingRoom, press, steps } from './testing';
 
 describe('messages', () => {
@@ -59,5 +59,26 @@ describe('renaming', () => {
       { message: { type: 'error', code: 'badMessage' } },
     ]);
     expect(room.members[0]?.displayName).toBe('a');
+  });
+});
+
+describe('summarizeRoom', () => {
+  it('lists the masked code, who is in, the screen, the level and how long', () => {
+    const room = createRoomState('ABCD', 1);
+    join(room, 'a', 2);
+    join(room, 'b');
+    steps(room, 125);
+    expect(summarizeRoom(room)).toEqual({
+      code: 'AB••',
+      members: 2,
+      players: 3,
+      screen: 'lobby',
+      levelId: null,
+      ageS: 2,
+      idleS: 2,
+    });
+    const playing = summarizeRoom(playingRoom());
+    expect(playing.screen).not.toBe('lobby');
+    expect(typeof playing.levelId).toBe('string');
   });
 });
