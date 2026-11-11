@@ -71,7 +71,11 @@ export interface GameHud {
  * The in-game HUD: order bar on top, score and clock below. The results
  * screen is its own view.
  */
-export function mountGameHud(root: HTMLElement): GameHud {
+export function mountGameHud(
+  root: HTMLElement,
+  /** Whether the player list shows (Settings → Player list). */
+  showPlayerList: () => boolean,
+): GameHud {
   const orders = el('div', 'orders');
   const score = el('div', 'hud-score');
   const scoreValue = el('span', 'hud-score-value', '0');
@@ -204,6 +208,7 @@ export function mountGameHud(root: HTMLElement): GameHud {
         return;
       }
       const { state } = frame;
+      roster.hidden = !showPlayerList();
       const rosterKey = JSON.stringify([
         state.players.map((p) => [p.id, p.roleId]),
         state.workFeedback,

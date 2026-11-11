@@ -15,6 +15,7 @@ import {
   localBindings,
   onlineConnected,
   onlineMenuPresses,
+  roomMenuOpen,
   setOnlineStatus,
 } from '../../flow/online';
 import { type SaveData, type StorageLike, recordLevel, writeSave } from '../../flow/save';
@@ -349,7 +350,8 @@ export class OnlineSession {
     if (target === null || bindings.length === 0) return;
     const inputs = stampInputs(
       this.stamper,
-      buildInputCommands(bindings, frame.readings, target),
+      // The room menu is open: this machine's players stand still while it's used.
+      buildInputCommands(bindings, roomMenuOpen(online) ? new Map() : frame.readings, target),
       target,
     );
     if (inputs.length === 0) return;

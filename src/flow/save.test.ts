@@ -55,11 +55,19 @@ describe('loadSave and writeSave', () => {
         sfxVolume: DEFAULT_SFX_VOLUME,
         musicVolume: DEFAULT_MUSIC_VOLUME,
         screenShake: true,
+        playerList: false,
         graphics: 'auto',
         muted: false,
       },
       tutorialDone: false,
     });
+  });
+
+  it('hides the player list by default; older saves keep it hidden', () => {
+    expect(createSave().settings.playerList).toBe(false);
+    const storage = memoryStorage();
+    storage.setItem('isv-simulator.save', JSON.stringify({ version: 1, settings: {} }));
+    expect(loadSave(storage).settings.playerList).toBe(false);
   });
 
   it('round-trips', () => {
@@ -70,6 +78,7 @@ describe('loadSave and writeSave', () => {
       sfxVolume: 3,
       musicVolume: 0,
       screenShake: false,
+      playerList: true,
       graphics: 'low',
       muted: true,
     };
@@ -100,6 +109,7 @@ describe('loadSave and writeSave', () => {
         sfxVolume: SFX_VOLUME_MAX,
         musicVolume: 0,
         screenShake: true,
+        playerList: false,
         graphics: 'auto',
         muted: false,
       },
@@ -123,6 +133,7 @@ describe('loadSave and writeSave', () => {
       sfxVolume: 4,
       musicVolume: DEFAULT_MUSIC_VOLUME,
       screenShake: false,
+      playerList: false,
       graphics: 'auto',
       muted: false,
     });
@@ -188,6 +199,7 @@ describe('loadSave and writeSave', () => {
       sfxVolume: 4,
       musicVolume: 7,
       screenShake: false,
+      playerList: false,
       graphics: 'auto',
       muted: false,
     });
@@ -202,6 +214,7 @@ describe('loadSave and writeSave', () => {
       settings: {
         sfxVolume: 5,
         screenShake: false,
+        playerList: false,
         musicVolume: 7,
         voiceVolume: 2,
         graphics: 'auto',

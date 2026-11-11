@@ -63,6 +63,18 @@ describe('settings', () => {
     expect(update.effects.map((e) => e.type)).toContain('saveChanged');
   });
 
+  it('toggles the player list with left, right or confirm; off to start with', () => {
+    const c = ctx();
+    const flow = fromPause(c);
+    flow.menuIndex = menuItems(flow).indexOf('playerList');
+    expect(c.save.settings.playerList).toBe(false);
+    const update = updateFlow(flow, right(), c);
+    expect(c.save.settings.playerList).toBe(true);
+    expect(update.effects.map((e) => e.type)).toContain('saveChanged');
+    updateFlow(flow, confirm(), c);
+    expect(c.save.settings.playerList).toBe(false);
+  });
+
   it('steps Graphics through auto, high, medium and low, wrapping round', () => {
     const c = ctx();
     const flow = fromPause(c);

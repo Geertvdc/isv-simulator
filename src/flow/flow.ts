@@ -56,11 +56,16 @@ export type MenuItem =
   | 'levelSelect'
   | 'changePlayers'
   | 'quit'
+  /** Online: this browser leaves the room (the room plays on without it). */
+  | 'leaveRoom'
+  /** Online, the room menu: close it and play on. */
+  | 'keepPlaying'
   | 'next'
   | 'retry'
   | 'volume'
   | 'music'
   | 'shake'
+  | 'playerList'
   | 'graphics'
   | 'profile'
   | ProfileAction
@@ -256,12 +261,16 @@ export function menuItems(flow: Flow): MenuItem[] {
       return flow.awake ? [...TITLE_ITEMS] : [];
     case 'paused':
       return flow.online
-        ? ['resume', 'restart', 'levelSelect', 'changePlayers']
+        ? ['resume', 'restart', 'levelSelect', 'changePlayers', 'leaveRoom']
         : ['resume', 'restart', 'settings', 'levelSelect', 'changePlayers', 'quit'];
-    case 'results':
-      return flow.results?.canGoNext ? ['next', 'retry', 'levelSelect'] : ['retry', 'levelSelect'];
+    case 'results': {
+      const items: MenuItem[] = flow.results?.canGoNext
+        ? ['next', 'retry', 'levelSelect']
+        : ['retry', 'levelSelect'];
+      return flow.online ? [...items, 'leaveRoom'] : items;
+    }
     case 'settings':
-      return ['volume', 'music', 'shake', 'graphics', 'profile', 'back'];
+      return ['volume', 'music', 'shake', 'playerList', 'graphics', 'profile', 'back'];
     case 'profile':
       return ['copyId', 'changeName', 'changeId', 'back'];
     case 'credits':

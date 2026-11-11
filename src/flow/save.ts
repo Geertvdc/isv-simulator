@@ -44,6 +44,8 @@ export interface Settings {
   /** 0 (off) to `SFX_VOLUME_MAX`, separate from the sound effects. */
   musicVolume: number;
   screenShake: boolean;
+  /** The list of players and their roles in the bottom left during a round; off by default. */
+  playerList: boolean;
   graphics: Graphics;
   /** All sound and music off, from the speaker button or M. */
   muted: boolean;
@@ -63,6 +65,7 @@ export function defaultSettings(): Settings {
     sfxVolume: DEFAULT_SFX_VOLUME,
     musicVolume: DEFAULT_MUSIC_VOLUME,
     screenShake: true,
+    playerList: false,
     graphics: 'auto',
     muted: false,
   };
@@ -150,6 +153,9 @@ export function parseSave(raw: unknown): SaveData {
     if (music !== null) save.settings.musicVolume = music;
     if (typeof raw.settings.screenShake === 'boolean') {
       save.settings.screenShake = raw.settings.screenShake;
+    }
+    if (typeof raw.settings.playerList === 'boolean') {
+      save.settings.playerList = raw.settings.playerList;
     }
     // Saves from before phase 14g have no Graphics line: they stay on auto.
     const rawGraphics = raw.settings.graphics;

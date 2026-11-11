@@ -396,9 +396,15 @@ describe("a room's flow (online)", () => {
     expect(flow.screen).toBe('levelSelect');
   });
 
-  it('has no settings or quit in the pause menu', () => {
+  it('has no settings or quit in the pause menu, but Leave room', () => {
     const flow = roomLobby();
     flow.screen = 'paused';
-    expect(menuItems(flow)).toEqual(['resume', 'restart', 'levelSelect', 'changePlayers']);
+    expect(menuItems(flow)).toEqual([
+      'resume',
+      'restart',
+      'levelSelect',
+      'changePlayers',
+      'leaveRoom',
+    ]);
   });
 });

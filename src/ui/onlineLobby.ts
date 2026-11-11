@@ -8,8 +8,9 @@
  * - the online bar on every other online screen: the room code, the
  *   connection, "Host is choosing a level" for guests on the host's screens,
  *   who is reconnecting, "you're watching" for someone without a player in
- *   the round, and Leave. During a round it moves to the bottom left, out of
- *   the orders' way.
+ *   the round. During a round it moves to the bottom left, out of the
+ *   orders' way. Leaving is in the menus: the host's pause and results menus,
+ *   and a guest's own room menu (Esc or Start).
  * - a banner over everything while this browser reconnects.
  */
 
@@ -20,12 +21,15 @@ import {
   isOnlineHost,
   isSpectating,
   membersWithPlayers,
+  ROOM_MENU_ITEMS,
   reconnectingMembers,
+  roomMenuOpen,
 } from '../flow/online';
 import { NET_MAX_NAME_LENGTH } from '../sim/balance';
-import { ONLINE_TEXT, WINDOW_FILES } from '../sim/content';
+import { MENU_HINT, MENU_LABELS, ONLINE_TEXT, WINDOW_FILES } from '../sim/content';
 import { type Mounted, button, el, mountScreen } from './dom';
 import { deviceLabel } from './lobby';
+import { createMenu } from './menu';
 import { copyText } from './profile';
 import type { ScreenView } from './screens';
 import { statusBar } from './statusBar';
@@ -276,7 +280,7 @@ export function mountOnlineLobby(root: HTMLElement, deps: OnlineLobbyDeps): Onli
 }
 
 /** The strip on top of the online screens other than the lobby. */
-export function mountOnlineBar(root: HTMLElement, deps: OnlineDeps): ScreenView & Mounted {
+export function mountOnlineBar(root: HTMLElement): ScreenView & Mounted {
   const bar = el('div', 'online-bar');
   bar.hidden = true;
   const room = el('span', 'online-bar-room');
@@ -284,18 +288,34 @@ export function mountOnlineBar(root: HTMLElement, deps: OnlineDeps): ScreenView 
   const away = el('span', 'online-bar-away');
   const banner = el('div', 'online-banner', ONLINE_TEXT.reconnectingBanner);
   banner.hidden = true;
-  const { scope, unmount } = mountScreen(root, bar, banner);
+  bar.append(room, waiting, away);
+  // A guest's own menu: the room's pause menu is the host's.
+  const roomMenu = el('div', 'screen room-menu-screen');
+  roomMenu.hidden = true;
+  const menu = createMenu(WINDOW_FILES.roomMenu);
+  roomMenu.append(
+    el('h1', 'screen-title', ONLINE_TEXT.roomMenuTitle),
+    menu.root,
+    statusBar(`${MENU_HINT} · ${ONLINE_TEXT.roomMenuHint}`),
+  );
+  const { scope, unmount } = mountScreen(root, bar, banner, roomMenu);
   scope.add(() => {
     root.classList.remove('online-round', 'with-online-bar');
   });
-  const leave = button(scope, ONLINE_TEXT.leave, deps.onLeave, 'online-bar-leave');
-  bar.append(room, waiting, away, leave);
+
   return {
     unmount,
     render: (view) => {
       const online = view?.online ?? null;
       bar.hidden = !online || showsLobby(online);
       banner.hidden = bar.hidden || online?.status !== 'reconnecting';
+      roomMenu.hidden = bar.hidden || online === null || !roomMenuOpen(online);
+      if (online && !roomMenu.hidden) {
+        menu.render(
+          ROOM_MENU_ITEMS.map((item) => ({ label: MENU_LABELS[item] })),
+          online.roomMenu ?? 0,
+        );
+      }
       // The screens under it move down to make room.
       const screen = online?.flow?.screen;
       const inRound = screen === 'countdown' || screen === 'playing';

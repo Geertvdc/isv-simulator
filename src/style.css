@@ -2663,9 +2663,14 @@ body {
   padding: 0.3em 0.6em;
 }
 
-.online-leave,
-.online-bar-leave {
+.online-leave {
   pointer-events: auto;
+}
+
+/* A guest's own room menu: the round plays on behind it, so a lighter scrim than pause. */
+.room-menu-screen {
+  z-index: 6;
+  background: rgba(10, 16, 30, 0.55);
 }
 
 .online-bar {

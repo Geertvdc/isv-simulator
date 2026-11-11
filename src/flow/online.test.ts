@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { DevicePress } from '../input/controller';
 import { PROTOCOL_VERSION, type LobbyMember } from '../net/protocol';
 import { NET_LEAVE_CONFIRM_MS } from '../sim/balance';
-import { createFlow } from './flow';
+import { createFlow, menuItems } from './flow';
 import {
   type OnlineState,
   applyServerMessage,
@@ -20,6 +20,7 @@ import {
   onlineMenuPresses,
   onlineNowMs,
   reconnectingMembers,
+  roomMenuOpen,
   setOnlineStatus,
 } from './online';
 
@@ -243,6 +244,71 @@ describe('online presses', () => {
       leave: false,
       changed: false,
     });
+  });
+});
+
+describe('leaving from the menus', () => {
+  /** In the room as `me` on `screen`. */
+  function on(screen: 'playing' | 'paused' | 'results', me = 'guest'): OnlineState {
+    const state = inRoom(me);
+    if (state.flow) state.flow.screen = screen;
+    return state;
+  }
+
+  it("lets the host leave from the room's pause menu, and only that browser", () => {
+    const state = on('paused', 'host');
+    const flow = state.flow;
+    if (!flow) throw new Error('no flow');
+    expect(menuItems(flow)).toContain('leaveRoom');
+    flow.menuIndex = menuItems(flow).indexOf('resume');
+    expect(onlineMenuPresses(state, [press({ interact: true })], 0).leave).toBe(false);
+    flow.menuIndex = menuItems(flow).indexOf('leaveRoom');
+    expect(onlineMenuPresses(state, [press({ interact: true })], 0)).toEqual({
+      send: [],
+      leave: true,
+      changed: false,
+    });
+  });
+
+  it('offers Leave room on the online results too, not offline', () => {
+    const state = on('results', 'host');
+    const flow = state.flow;
+    if (!flow) throw new Error('no flow');
+    expect(menuItems(flow).at(-1)).toBe('leaveRoom');
+    expect(menuItems({ ...flow, online: false })).not.toContain('leaveRoom');
+  });
+
+  it("opens a guest's own room menu on Esc or Start, sending nothing", () => {
+    const state = on('playing');
+    expect(onlineMenuPresses(state, [press({ menu: true })], 0)).toEqual({
+      send: [],
+      leave: false,
+      changed: true,
+    });
+    expect(roomMenuOpen(state)).toBe(true);
+    // Moving and confirming stay in the menu: Keep playing closes it.
+    expect(onlineMenuPresses(state, [press({ nav: { x: 0, y: 1 } })], 0).send).toEqual([]);
+    expect(state.roomMenu).toBe(1);
+    expect(onlineMenuPresses(state, [press({ nav: { x: 0, y: -1 } })], 0).changed).toBe(true);
+    onlineMenuPresses(state, [press({ interact: true })], 0);
+    expect(roomMenuOpen(state)).toBe(false);
+  });
+
+  it('leaves from the room menu, and back closes it', () => {
+    const state = on('playing');
+    onlineMenuPresses(state, [press({ menu: true })], 0);
+    onlineMenuPresses(state, [press({ dash: true })], 0);
+    expect(roomMenuOpen(state)).toBe(false);
+    onlineMenuPresses(state, [press({ menu: true })], 0);
+    onlineMenuPresses(state, [press({ nav: { x: 0, y: 1 } })], 0);
+    expect(onlineMenuPresses(state, [press({ join: true })], 0).leave).toBe(true);
+  });
+
+  it("sends the host's Esc to the server: it pauses the room", () => {
+    const state = on('playing', 'host');
+    const esc = press({ menu: true });
+    expect(onlineMenuPresses(state, [esc], 0).send).toEqual([esc]);
+    expect(roomMenuOpen(state)).toBe(false);
   });
 });
 

@@ -174,7 +174,7 @@ const ui = getElement('ui');
 ui.style.setProperty('--screen-fade', `${SCREEN_FADE_MS}ms`);
 const hud = mountHud(ui);
 game.events.on(TILE_HOVER_EVENT, hud.setHover);
-const gameHud = mountGameHud(ui);
+const gameHud = mountGameHud(ui, () => save.settings.playerList);
 game.events.on(GAME_FRAME_EVENT, gameHud.render);
 
 const roster = (command: FlowCommand): void => {
@@ -227,7 +227,7 @@ const onlineLobby = mountOnlineLobby(ui, {
   changeName,
   onDialog: (open) => game.events.emit(DIALOG_EVENT, open),
 });
-const onlineBar = mountOnlineBar(ui, leaveOnline);
+const onlineBar = mountOnlineBar(ui);
 const netHud = mountNetHud(ui);
 game.events.on(NET_STATS_EVENT, netHud.render);
 const soundToggle = mountSoundToggle(ui, () => {

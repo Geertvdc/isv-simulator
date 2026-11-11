@@ -65,8 +65,7 @@ const HUD_RECTS: Record<string, [number, number, number, number]> = {
 /** The park's boundary hedge may run under the HUD; story props may not. */
 const BOUNDARY = new Set([parkHedge]);
 
-const poseFor = (map: LevelMap) =>
-  fitCamera3d(levelBox(map), VIEW, roundInsets(VIEW));
+const poseFor = (map: LevelMap) => fitCamera3d(levelBox(map), VIEW, roundInsets(VIEW));
 
 describe('openPlanScene', () => {
   it("is the open-plan level's scene", () => {

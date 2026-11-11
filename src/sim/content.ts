@@ -331,11 +331,14 @@ export const MENU_LABELS = {
   levelSelect: 'Level select',
   changePlayers: 'Change players',
   quit: 'Quit to title',
+  leaveRoom: 'Leave room',
+  keepPlaying: 'Keep playing',
   next: 'Next level',
   retry: 'Retry',
   volume: 'Sound volume',
   music: 'Music volume',
   shake: 'Screen shake',
+  playerList: 'Player list',
   graphics: 'Graphics',
   profile: 'Online profile',
   copyId: 'Copy ID',
@@ -362,6 +365,7 @@ export const WINDOW_FILES = {
   profile: 'profile.json',
   profileMenu: 'profile.ts',
   roomCode: 'room.code',
+  roomMenu: 'room.ts',
   profileDialog: 'prompt.txt',
 } as const;
 
@@ -577,6 +581,8 @@ export const ONLINE_TEXT = {
   hostJoinFirst: 'Host: join a player first, then start',
   guestWaitHint: 'Waiting for the host to start',
   leaveHint: 'Esc or gamepad B: leave the room',
+  roomMenuTitle: 'Room',
+  roomMenuHint: 'The room plays on while this is open',
   closedHint: 'Esc or gamepad B: back to the title',
   roomLabel: 'Room',
   /** The ping corner (dev, `N` toggles it). */
