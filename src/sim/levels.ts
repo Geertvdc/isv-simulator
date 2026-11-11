@@ -22,8 +22,11 @@ import labShapesMap from '../../maps/lab-shapes.txt?raw';
 import labDevMap from '../../maps/lab-dev.txt?raw';
 import {
   CHAPTER_STAR_GATES,
+  MAX_OPEN_ORDERS,
   ORDER_RATE_BY_PLAYERS,
   REVIEWERS_NEEDED,
+  STAR_ROUNDING,
+  STAR_SHARES,
   TICKS_PER_SECOND,
 } from './balance';
 import { CHAPTER_NAMES, LEVEL_NAMES } from './content';
@@ -84,8 +87,14 @@ export interface MeetingSchedule {
 export interface LevelSettings {
   durationTicks: number;
   orderSchedule: OrderSchedule;
-  /** Score needed for 1, 2 and 3 stars. */
+  /** Score needed for 1, 2 and 3 stars (solo; `settingsForPlayers` gives them for a team). */
   starThresholds: [number, number, number];
+  /**
+   * The perfect bots' average score with 1, 2, 3 and 4 players, measured with
+   * `npm run sim -- --calibrate`: the stars for each team size are shares of it
+   * (`STAR_SHARES`). Without it, the solo thresholds scale by the order rate.
+   */
+  botScores?: BotScores;
   /** Share of feature orders that need a code review (0 to 1). Always 0 solo: a review needs two. */
   reviewShare: number;
   /** Production incidents, or `null` for none. The same for any number of players. */
@@ -102,6 +111,9 @@ export interface LevelSettings {
   domainSchedule?: DomainSchedule;
 }
 
+/** A bot score per team size, solo first. */
+export type BotScores = readonly [number, number, number, number];
+
 export interface Level extends LevelSettings {
   id: string;
   name: string;
@@ -114,19 +126,30 @@ const GARAGE_SETTINGS: LevelSettings = {
   durationTicks: 180 * SECOND,
   orderSchedule: {
     firstOrderTick: 0,
-    intervalTicks: 20 * SECOND,
+    intervalTicks: 26 * SECOND,
     jitterTicks: 4 * SECOND,
     maxOpenOrders: 3,
     timeLimitTicks: 75 * SECOND,
     bugTimeLimitTicks: 45 * SECOND,
   },
-  // Solo numbers; `settingsForPlayers` scales them. Tuned with `npm run sim`:
-  // perfect bots average ~205 solo, ~355 with two, ~510 with three, ~635 with four.
+  // Solo numbers; `settingsForPlayers` scales them. Campaign levels set `botScores` instead.
   starThresholds: [60, 120, 180],
   reviewShare: 0,
   incidents: null,
   meetings: null,
 };
+
+/** Star thresholds at `STAR_SHARES` of a bot score, rounded. */
+export function thresholdsFor(botScore: number): [number, number, number] {
+  const at = (share: number) =>
+    Math.max(STAR_ROUNDING, Math.round((botScore * share) / STAR_ROUNDING) * STAR_ROUNDING);
+  return [at(STAR_SHARES[0]), at(STAR_SHARES[1]), at(STAR_SHARES[2])];
+}
+
+/** A level's measured bot scores and the solo stars that follow from them. */
+function calibrated(botScores: BotScores): Pick<LevelSettings, 'botScores' | 'starThresholds'> {
+  return { botScores, starThresholds: thresholdsFor(botScores[0]) };
+}
 
 /** A level from its id, map text and settings; the name comes from `content.ts`. */
 function level(id: string, mapText: string, settings: LevelSettings): Level {
@@ -141,17 +164,16 @@ function level(id: string, mapText: string, settings: LevelSettings): Level {
  */
 export const GARAGE: Level = level('garage', garageMap, {
   ...GARAGE_SETTINGS,
-  orderSchedule: { ...GARAGE_SETTINGS.orderSchedule, intervalTicks: 15 * SECOND, maxOpenOrders: 4 },
-  // Tuned with `npm run sim`: perfect bots average ~220 solo, ~435 with two, ~540 with three,
-  // ~650 with four. Three stars ask for about the perfect-bot score.
-  starThresholds: [80, 150, 220],
+  orderSchedule: { ...GARAGE_SETTINGS.orderSchedule, intervalTicks: 20 * SECOND, maxOpenOrders: 4 },
+  // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
+  ...calibrated([205, 355, 475, 570]),
 });
 
 /** Split down the middle by a counter wall: code on the left, test and ship on the right. */
 export const OPEN_PLAN: Level = level('open-plan', openPlanMap, {
   ...GARAGE_SETTINGS,
-  // Tuned with `npm run sim`: perfect bots average ~160 solo, ~270 with two.
-  starThresholds: [45, 90, 135],
+  // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
+  ...calibrated([160, 255, 360, 430]),
   reviewShare: 0.3,
 });
 
@@ -162,9 +184,8 @@ export const OPEN_PLAN: Level = level('open-plan', openPlanMap, {
  */
 export const DOWN_THE_HALL: Level = level('scale-up', downTheHallMap, {
   ...GARAGE_SETTINGS,
-  // Tuned with `npm run sim` for two or more: perfect bots average ~270 with two.
-  // Solo has no reviews and scores more (~215).
-  starThresholds: [45, 90, 135],
+  // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
+  ...calibrated([175, 250, 360, 420]),
   reviewShare: 0.5,
 });
 
@@ -188,16 +209,16 @@ const INCIDENTS: IncidentSchedule = {
 /** Open loft, a desk island in the middle: incidents and nothing else new. */
 export const SEED_ROUND: Level = level('seed-round', seedRoundMap, {
   ...GARAGE_SETTINGS,
-  // Perfect bots average ~235 solo, ~395 with two (`npm run sim`).
-  starThresholds: [65, 130, 200],
+  // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
+  ...calibrated([200, 320, 410, 460]),
   incidents: CALM_INCIDENTS,
 });
 
 /** A counter wall across the room, one gap on the right: throw it over. Reviews too. */
 export const DEMO_DAY: Level = level('demo-day', demoDayMap, {
   ...GARAGE_SETTINGS,
-  // Perfect bots average ~190 solo, ~305 with two (`npm run sim`).
-  starThresholds: [50, 100, 155],
+  // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
+  ...calibrated([150, 245, 355, 440]),
   reviewShare: 0.3,
   incidents: INCIDENTS,
 });
@@ -205,8 +226,8 @@ export const DEMO_DAY: Level = level('demo-day', demoDayMap, {
 /** A ring corridor around the review room: long walks while production burns. */
 export const ON_CALL: Level = level('on-call', onCallMap, {
   ...GARAGE_SETTINGS,
-  // Perfect bots average ~155 solo, ~255 with two (`npm run sim`).
-  starThresholds: [45, 90, 130],
+  // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
+  ...calibrated([140, 210, 285, 410]),
   reviewShare: 0.4,
   incidents: INCIDENTS,
 });
@@ -216,23 +237,23 @@ export const ON_CALL: Level = level('on-call', onCallMap, {
 /** Wide aisles, one manager: the manager and nothing else new. */
 export const MIDDLE_MANAGEMENT: Level = level('middle-management', middleManagementMap, {
   ...GARAGE_SETTINGS,
-  // Perfect bots average ~195 solo, ~370 with two (`npm run sim`).
-  starThresholds: [55, 115, 170],
+  // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
+  ...calibrated([170, 300, 385, 455]),
 });
 
 /** Two rooms joined by two narrow doors, a manager who likes standing in them, and incidents. */
 export const HYPERGROWTH: Level = level('hypergrowth', hypergrowthMap, {
   ...GARAGE_SETTINGS,
-  // Perfect bots average ~180 solo, ~385 with two (`npm run sim`).
-  starThresholds: [50, 100, 155],
+  // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
+  ...calibrated([160, 295, 400, 460]),
   incidents: INCIDENTS,
 });
 
 /** Rows of desks, two managers in the aisles, reviews and incidents. */
 export const HOT_DESKING: Level = level('hot-desking', hotDeskingMap, {
   ...GARAGE_SETTINGS,
-  // Perfect bots average ~175 solo, ~330 with two (`npm run sim`).
-  starThresholds: [50, 100, 155],
+  // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
+  ...calibrated([190, 255, 350, 435]),
   reviewShare: 0.3,
   incidents: INCIDENTS,
 });
@@ -259,16 +280,16 @@ const MEETINGS: MeetingSchedule = {
 /** A meeting room in the corner of a calm office: meetings and nothing else new. */
 export const BACK_TO_BACK: Level = level('back-to-back', backToBackMap, {
   ...GARAGE_SETTINGS,
-  // Perfect bots average ~155 solo, ~335 with two (`npm run sim`).
-  starThresholds: [50, 100, 145],
+  // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
+  ...calibrated([165, 290, 380, 435]),
   meetings: CALM_MEETINGS,
 });
 
 /** The meeting room is up a corridor, a manager wanders it, and production still breaks. */
 export const SYNERGY: Level = level('synergy', synergyMap, {
   ...GARAGE_SETTINGS,
-  // Perfect bots average ~160 solo, ~295 with two (`npm run sim`).
-  starThresholds: [45, 90, 135],
+  // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
+  ...calibrated([100, 285, 390, 415]),
   incidents: INCIDENTS,
   meetings: MEETINGS,
 });
@@ -276,8 +297,8 @@ export const SYNERGY: Level = level('synergy', synergyMap, {
 /** Everything at once: reviews, incidents, a manager and meetings. */
 export const THE_REORG: Level = level('the-reorg', theReorgMap, {
   ...GARAGE_SETTINGS,
-  // Perfect bots average ~180 solo, ~305 with two (`npm run sim`).
-  starThresholds: [45, 90, 140],
+  // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
+  ...calibrated([170, 275, 390, 450]),
   reviewShare: 0.3,
   incidents: INCIDENTS,
   meetings: MEETINGS,
@@ -297,20 +318,21 @@ function chapter(id: string, index: number, levels: readonly Level[]): Chapter {
 }
 
 // ---- Big Tech: atriums, belts, design, merges and pairing ----
-// Star thresholds from bot runs: the bots walk everywhere (no throws, belts or
-// pairing on purpose) and land on about 2 stars; 3 stars is ~1.1x their average,
-// so the finale chapter wants the new tricks.
+// The bots walk everywhere (no throws, belts or pairing on purpose): the new
+// tricks are how a human team keeps up with them here.
 
 /** Two office halves across an atrium: throw across it, use the belts, or walk the long way round. */
 export const THE_ATRIUM: Level = level('the-atrium', theAtriumMap, {
   ...GARAGE_SETTINGS,
-  starThresholds: [80, 155, 230],
+  // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
+  ...calibrated([155, 270, 350, 435]),
 });
 
 /** An L-shaped floor round a courtyard: whiteboards first, keyboards built for pairs. */
 export const DESIGN_SPRINT: Level = level('design-sprint', designSprintMap, {
   ...GARAGE_SETTINGS,
-  starThresholds: [90, 175, 260],
+  // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
+  ...calibrated([170, 325, 420, 500]),
   designShare: 0.6,
   pairing: true,
 });
@@ -318,8 +340,9 @@ export const DESIGN_SPRINT: Level = level('design-sprint', designSprintMap, {
 /** Front-end and back-end sides split by an atrium, the merge station where they meet. */
 export const MONOREPO: Level = level('monorepo', monorepoMap, {
   ...GARAGE_SETTINGS,
-  orderSchedule: { ...GARAGE_SETTINGS.orderSchedule, intervalTicks: 24 * SECOND },
-  starThresholds: [90, 175, 265],
+  orderSchedule: { ...GARAGE_SETTINGS.orderSchedule, intervalTicks: 30 * SECOND },
+  // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
+  ...calibrated([165, 300, 420, 475]),
   fullstackShare: 0.6,
   pairing: true,
 });
@@ -327,7 +350,8 @@ export const MONOREPO: Level = level('monorepo', monorepoMap, {
 /** A long belt round a courtyard, ending on a counter, and everything new at once, with incidents. */
 export const HACKATHON: Level = level('hackathon', hackathonMap, {
   ...GARAGE_SETTINGS,
-  starThresholds: [90, 180, 270],
+  // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
+  ...calibrated([220, 360, 460, 530]),
   designShare: 0.3,
   fullstackShare: 0.4,
   pairing: true,
@@ -414,6 +438,19 @@ export function orderRate(playerCount: number): number {
   return ORDER_RATE_BY_PLAYERS[i] ?? 1;
 }
 
+/** Stars for a team of `playerCount`: shares of the bots' score for that team, or the solo ones scaled. */
+function starThresholdsFor(level: LevelSettings, playerCount: number): [number, number, number] {
+  const count = Math.min(Math.max(playerCount, 1), 4);
+  const bot = level.botScores?.[count - 1];
+  if (bot !== undefined) return thresholdsFor(bot);
+  const rate = orderRate(playerCount);
+  return level.starThresholds.map((t) => Math.round((t * rate) / 10) * 10) as [
+    number,
+    number,
+    number,
+  ];
+}
+
 /**
  * The level's solo settings scaled for `playerCount` players: feature orders
  * come faster, more may be open at once and stars need more points.
@@ -427,13 +464,9 @@ export function settingsForPlayers(level: LevelSettings, playerCount: number): L
       ...s,
       intervalTicks: Math.round(s.intervalTicks / rate),
       jitterTicks: Math.round(s.jitterTicks / rate),
-      maxOpenOrders: Math.round(s.maxOpenOrders * rate),
+      maxOpenOrders: Math.min(Math.round(s.maxOpenOrders * rate), MAX_OPEN_ORDERS),
     },
-    starThresholds: level.starThresholds.map((t) => Math.round((t * rate) / 10) * 10) as [
-      number,
-      number,
-      number,
-    ],
+    starThresholds: starThresholdsFor(level, playerCount),
     reviewShare: playerCount >= REVIEWERS_NEEDED ? level.reviewShare : 0,
     designShare: level.designShare ?? 0,
     fullstackShare: level.fullstackShare ?? 0,

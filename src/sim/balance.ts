@@ -161,10 +161,21 @@ export const INCIDENT_EXPIRED_PENALTY = 30;
 
 /**
  * How many times more often feature orders arrive, by number of players
- * (index 0 = solo). The level's schedule and star thresholds are for one
- * player; open-order cap and stars scale by the same factor.
+ * (index 0 = solo). The level's schedule is for one player; the open-order
+ * cap scales by the same factor. Less than one more player's worth each:
+ * people bump into each other, bots don't.
  */
-export const ORDER_RATE_BY_PLAYERS: readonly number[] = [1, 1.7, 2.3, 2.8];
+export const ORDER_RATE_BY_PLAYERS: readonly number[] = [1, 1.6, 2.1, 2.5];
+/** Never more feature orders open than this, whatever the player count: the order bar stays readable. */
+export const MAX_OPEN_ORDERS = 6;
+/**
+ * Share of the perfect bots' average score (a level's `botScores`) each star
+ * asks for: 3 stars at 90% of what tireless bots manage, so a good human team
+ * gets there without a perfect run.
+ */
+export const STAR_SHARES: readonly [number, number, number] = [0.35, 0.65, 0.9];
+/** Star thresholds are rounded to this many points. */
+export const STAR_ROUNDING = 5;
 
 /** Chance that a fully tested ticket comes back as a bug after shipping. */
 export const BUG_CHANCE = 0.25;
