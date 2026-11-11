@@ -15,6 +15,7 @@ Run once per environment, as an Owner of the subscription (az login first). It:
   - creates (or reuses) the app registration github-isv-simulator-deploy-<env> and its
     service principal
   - adds federated credentials for GitHub Actions on <branch> and in environment <env>
+    (both subject forms: repo:OWNER/REPO and the immutable-id repo:OWNER@id/REPO@id)
   - gives it, on the resource group only: Contributor, and Role Based Access Control
     Administrator limited to assigning AcrPull and Storage Table Data Contributor (an
     existing assignment with an older condition is replaced)
@@ -103,6 +104,31 @@ app_name="github-isv-simulator-deploy-$env_name"
 issuer="https://token.actions.githubusercontent.com"
 branch_subject="repo:$github_repo:ref:refs/heads/$branch"
 env_subject="repo:$github_repo:environment:$env_name"
+
+# GitHub sends the subject either as repo:OWNER/REPO:... or, on repositories set to use
+# immutable identifiers, as repo:OWNER@<owner id>/REPO@<repo id>:... Entra matches the
+# subject exactly, so register both. The ids come from the GitHub API (gh, else curl for
+# a public repository); without them only the first form is registered.
+github_ids() {
+  local ids=
+  if command -v gh >/dev/null 2>&1; then
+    ids=$(gh api "repos/$github_repo" --jq '"\(.owner.id) \(.id)"' 2>/dev/null) || ids=
+  fi
+  if [[ -z $ids ]]; then
+    ids=$(curl -fsS "https://api.github.com/repos/$github_repo" 2>/dev/null |
+      node -e 'let t="";process.stdin.on("data",d=>t+=d).on("end",()=>{try{const r=JSON.parse(t);if(r.owner&&r.owner.id&&r.id)console.log(r.owner.id+" "+r.id)}catch{}})') || ids=
+  fi
+  printf '%s' "$ids"
+}
+read -r github_owner_id github_repo_id <<<"$(github_ids)" || true
+if [[ -n ${github_owner_id:-} && -n ${github_repo_id:-} ]]; then
+  ids_prefix="repo:${github_repo%%/*}@${github_owner_id}/${github_repo#*/}@${github_repo_id}"
+  branch_subject_ids="${ids_prefix}:ref:refs/heads/${branch}"
+  env_subject_ids="${ids_prefix}:environment:${env_name}"
+else
+  branch_subject_ids=
+  env_subject_ids=
+fi
 acr_pull_role_id="7f951dda-4ed3-4680-a7ca-43fe172d538d"
 table_data_contributor_role_id="0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3"
 rbac_admin_role="Role Based Access Control Administrator"
@@ -129,6 +155,12 @@ info "resource group:     $resource_group in $location (tags app=isv-simulator e
 info "app registration:   $app_name (+ service principal)"
 info "federated creds:    $branch_subject"
 info "                    $env_subject"
+if [[ -n $branch_subject_ids ]]; then
+  info "                    $branch_subject_ids"
+  info "                    $env_subject_ids"
+else
+  info "                    (no immutable-id subjects: could not read the repository's ids from GitHub)"
+fi
 info "roles on the group: Contributor; $rbac_admin_role (AcrPull and Storage Table Data Contributor only)"
 
 if [[ $assume_yes == false ]]; then
@@ -182,6 +214,10 @@ add_federated_credential() {
 }
 add_federated_credential "github-branch-${branch//[^A-Za-z0-9-]/-}" "$branch_subject"
 add_federated_credential "github-environment-$env_name" "$env_subject"
+if [[ -n $branch_subject_ids ]]; then
+  add_federated_credential "github-branch-${branch//[^A-Za-z0-9-]/-}-ids" "$branch_subject_ids"
+  add_federated_credential "github-environment-$env_name-ids" "$env_subject_ids"
+fi
 
 log "Role assignments on $resource_group"
 # Only AcrPull and Storage Table Data Contributor may be assigned or removed: the Bicep
