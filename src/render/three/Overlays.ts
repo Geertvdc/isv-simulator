@@ -1,8 +1,7 @@
 import Phaser from 'phaser';
-import type { HintId } from '../../flow/hints';
+import { type HintId, hintLabel } from '../../flow/hints';
 import { stationWorkStep } from '../../sim/interact';
 import {
-  HINT_TEXTS,
   MEETING_ROOM_TEXT,
   TICKET_EXPIRED_STAMP,
   commitHead,
@@ -398,7 +397,7 @@ export class Overlays {
       let marker = this.hints.get(id);
       if (!marker) {
         const origin = hintLabelOrigin(anchor.tileX, this.map);
-        marker = createHintMarker(this.scene, HINT_TEXTS[id], origin);
+        marker = createHintMarker(this.scene, hintLabel(id), origin);
         this.hints.set(id, marker);
       }
       marker.setVisible(visible);
