@@ -30,7 +30,7 @@ import type { ProfileStore } from './profileStore';
 import type { ShardLoad } from './shardLoad';
 import { dropMember, joinRoom, leaveRoom, rejoinMember, setMemberProfile } from './membership';
 import { type Outgoing, type RoomOptions, type RoomState, TICK_MS, createRoomState } from './room';
-import { handleMessage } from './roomLogic';
+import { handleMessage, summarizeRoom } from './roomLogic';
 import { advanceRoom, takeProfileWrites } from './round';
 
 export { GAME_ROOM } from '../src/net/protocol';
@@ -83,7 +83,10 @@ export class GameRoom extends Room {
 
   onCreate(): void {
     // The SDK rejects the create with this as the message; the client tries another shard.
-    if (this.settings.load?.isFull()) throw new ServerError(SERVER_FULL, 'serverFull');
+    if (this.settings.load?.isFull()) {
+      this.settings.load.serverFullRefusals++;
+      throw new ServerError(SERVER_FULL, 'serverFull');
+    }
     const code = reserveJoinCode(this.settings.shard);
     this.roomId = code;
     this.core = createRoomState(code, randomInt(2 ** 31), this.settings);
@@ -106,12 +109,16 @@ export class GameRoom extends Room {
     // accumulator rather than `setFixedTimestep`, so tests can drive it).
     this.setTimestep((deltaMs) => {
       if (this.closing) return;
+      const round = this.core.roundId;
       this.deliver(advanceRoom(this.core, deltaMs));
+      if (this.settings.load) this.settings.load.roundsStarted += this.core.roundId - round;
       this.writeProfiles();
       if (this.core.closing) this.close();
     }, TICK_MS);
-    this.settings.load?.add(this, () =>
-      this.core.members.reduce((sum, m) => sum + m.localPlayers, 0),
+    this.settings.load?.add(
+      this,
+      () => this.core.members.reduce((sum, m) => sum + m.localPlayers, 0),
+      () => ({ connections: this.clients.length, summary: summarizeRoom(this.core) }),
     );
   }
 

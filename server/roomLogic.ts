@@ -4,10 +4,12 @@
  * (`round.ts`). See `room.ts` for the room's state.
  */
 
+import type { RoomSummary } from '../src/net/pool';
 import { parseClientMessage } from '../src/net/protocol';
+import { TICKS_PER_SECOND } from '../src/sim/balance';
 import { configurePlayer, queuePresses, takeOverSlot } from './lobby';
 import { renameMember, spendMessage, updateMember } from './membership';
-import { type Outgoing, type RoomState, errorTo } from './room';
+import { type Outgoing, type RoomState, errorTo, playerCount } from './room';
 import { bufferInputs } from './round';
 
 /** A message from a member: checked first, refused with an `error` when it doesn't parse. */
@@ -48,4 +50,21 @@ export function handleMessage(room: RoomState, sessionId: string, raw: unknown):
     case 'rename':
       return renameMember(room, member, message.displayName);
   }
+}
+
+/**
+ * The room as the ops dashboard lists it (`RoomSummary`): who's in, where
+ * they are, how long. The dashboard is public, so the join code is masked
+ * (`AB••`: anyone with the full code could join) and no names or ids go out.
+ */
+export function summarizeRoom(room: RoomState): RoomSummary {
+  return {
+    code: `${room.joinCode.slice(0, 2)}••`,
+    members: room.members.length,
+    players: playerCount(room),
+    screen: room.flow.screen,
+    levelId: room.game?.levelId ?? null,
+    ageS: Math.floor(room.serverTick / TICKS_PER_SECOND),
+    idleS: Math.floor(Math.max(0, room.serverTick - room.lastActivityTick) / TICKS_PER_SECOND),
+  };
 }

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>ISV Simulator ops</title>
+    <link rel="stylesheet" href="/admin/app.css" />
+    <script src="/admin/app.js" defer></script>
+  </head>
+  <body>
+    <header class="top">
+      <div>
+        <h1>ISV Simulator ops</h1>
+        <p id="subtitle">Game server shard pool</p>
+      </div>
+      <div class="refresh">
+        <span id="updated" aria-live="polite">Loading…</span>
+        <button type="button" class="btn" id="pause" aria-pressed="false">Pause</button>
+      </div>
+    </header>
+    <main>
+      <section aria-labelledby="now-title">
+        <h2 id="now-title">Now</h2>
+        <div id="state-error" class="error" hidden></div>
+        <div class="tiles" id="tiles"></div>
+        <p class="note" id="freshness"></p>
+      </section>
+
+      <section aria-labelledby="shards-title">
+        <h2 id="shards-title">Shards</h2>
+        <div class="grid" id="shards"></div>
+        <p class="note">Select a shard to list its rooms.</p>
+        <div id="rooms" hidden></div>
+      </section>
+
+      <section aria-labelledby="history-title">
+        <h2 id="history-title">History</h2>
+        <div class="filters">
+          <div class="segmented" role="group" aria-label="Time range" id="ranges">
+            <button type="button" data-range="1h" aria-pressed="true">Last hour</button>
+            <button type="button" data-range="24h" aria-pressed="false">24 hours</button>
+            <button type="button" data-range="7d" aria-pressed="false">7 days</button>
+          </div>
+          <label class="check"><input type="checkbox" id="table-view" /> Table view</label>
+          <span class="note" id="history-note"></span>
+        </div>
+        <div id="history-error" class="error" hidden></div>
+        <div class="charts" id="charts"></div>
+        <div id="history-tables" hidden></div>
+        <h3 class="events-title" id="events-title">Events</h3>
+        <div class="table-wrap" id="events"></div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -7,7 +7,9 @@
  * - `TablePoolStore`: Azure Table Storage, shared by every shard. One entity
  *   per shard: PartitionKey `pool`, RowKey the shard index (`0`, `1`, ...),
  *   fields `rooms`, `players`, `maxRooms` (numbers), `url` and `updatedAt`
- *   (ISO time; the epoch after a shutdown). Each shard only ever writes its
+ *   (ISO time; the epoch after a shutdown), plus the ops dashboard's numbers
+ *   (`ShardOps`: `version`, `startedAt`, `cpuPct`, ..., and `roomList` as a
+ *   JSON string). Each shard only ever writes its
  *   own row (an upsert), so there are no conflicts to handle. The Azure SDK
  *   sits behind `PoolTable`, so the tests use a fake.
  *
@@ -17,7 +19,7 @@
  */
 
 import { type TableClient, odata } from '@azure/data-tables';
-import type { PoolEntry } from '../src/net/pool';
+import type { PoolEntry, RoomSummary, ShardOps } from '../src/net/pool';
 import { tableClientFromEnv } from './tableProfileStore';
 
 export interface PoolStore {
@@ -44,6 +46,19 @@ export class MemoryPoolStore implements PoolStore {
 export const POOL_PARTITION = 'pool';
 export const DEFAULT_POOL_TABLE = 'shards';
 
+/** The `ShardOps` numbers, stored as columns of the same names. */
+const OPS_NUMBERS = [
+  'uptimeS',
+  'cpuPct',
+  'eventLoopUtil',
+  'loopDelayP99Ms',
+  'rssMb',
+  'heapUsedMb',
+  'connections',
+  'roundsStarted',
+  'serverFullRefusals',
+] as const;
+
 /** A pool entity as stored (property names as in the table). */
 export interface PoolRow {
   rowKey: string;
@@ -52,6 +67,66 @@ export interface PoolRow {
   maxRooms: unknown;
   url: unknown;
   updatedAt: unknown;
+  /** The ops columns (`version`, `startedAt`, the numbers, `roomList` as JSON); missing from older shards. */
+  ops?: Record<string, unknown>;
+}
+
+function opsToColumns(ops: ShardOps): Record<string, unknown> {
+  const columns: Record<string, unknown> = {
+    version: ops.version,
+    startedAt: ops.startedAt,
+    roomList: JSON.stringify(ops.roomList),
+  };
+  for (const key of OPS_NUMBERS) columns[key] = ops[key];
+  return columns;
+}
+
+function roomFrom(raw: unknown): RoomSummary | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+  if (typeof r.code !== 'string') return null;
+  return {
+    code: r.code,
+    members: num(r.members),
+    players: num(r.players),
+    screen: typeof r.screen === 'string' ? r.screen : '?',
+    levelId: typeof r.levelId === 'string' ? r.levelId : null,
+    ageS: num(r.ageS),
+    idleS: num(r.idleS),
+  };
+}
+
+/** `ShardOps` from the ops columns, or `undefined` when there are none (an older shard). Lenient. */
+export function opsFromColumns(columns: Record<string, unknown> | undefined): ShardOps | undefined {
+  if (!columns || typeof columns.version !== 'string') return undefined;
+  let rooms: unknown;
+  try {
+    rooms = typeof columns.roomList === 'string' ? JSON.parse(columns.roomList) : [];
+  } catch {
+    rooms = [];
+  }
+  const ops: ShardOps = {
+    version: columns.version,
+    startedAt: typeof columns.startedAt === 'string' ? columns.startedAt : '',
+    uptimeS: 0,
+    cpuPct: 0,
+    eventLoopUtil: 0,
+    loopDelayP99Ms: 0,
+    rssMb: 0,
+    heapUsedMb: 0,
+    connections: 0,
+    roundsStarted: 0,
+    serverFullRefusals: 0,
+    roomList: Array.isArray(rooms)
+      ? rooms.map(roomFrom).filter((r): r is RoomSummary => r !== null)
+      : [],
+  };
+  for (const key of OPS_NUMBERS) {
+    const v = columns[key];
+    if (typeof v === 'number' && Number.isFinite(v)) ops[key] = v;
+  }
+  return ops;
 }
 
 /** The two table operations the pool needs. */
@@ -70,6 +145,7 @@ function toRow(entry: PoolEntry): PoolRow {
     maxRooms: entry.maxRooms,
     url: entry.url,
     updatedAt: new Date(entry.updatedAt).toISOString(),
+    ...(entry.ops ? { ops: opsToColumns(entry.ops) } : {}),
   };
 }
 
@@ -84,7 +160,8 @@ export function fromRow(row: PoolRow): PoolEntry | null {
   const updatedAt = typeof row.updatedAt === 'string' ? Date.parse(row.updatedAt) : NaN;
   if (index === null || rooms === null || players === null || maxRooms === null) return null;
   if (typeof row.url !== 'string' || Number.isNaN(updatedAt)) return null;
-  return { index, url: row.url, rooms, players, maxRooms, updatedAt };
+  const ops = opsFromColumns(row.ops);
+  return { index, url: row.url, rooms, players, maxRooms, updatedAt, ...(ops ? { ops } : {}) };
 }
 
 export class TablePoolStore implements PoolStore {
@@ -113,6 +190,7 @@ export function azurePoolTable(client: TableClient): PoolTable {
           maxRooms: row.maxRooms,
           url: row.url,
           updatedAt: row.updatedAt,
+          ...row.ops,
         },
         'Replace',
       );
@@ -130,6 +208,7 @@ export function azurePoolTable(client: TableClient): PoolTable {
           maxRooms: e.maxRooms,
           url: e.url,
           updatedAt: e.updatedAt,
+          ops: e,
         });
       }
       return rows;

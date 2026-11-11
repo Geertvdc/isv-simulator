@@ -45,6 +45,14 @@ describe('a sharded game server', () => {
     expect(await (await fetch(`${baseUrl}/health`)).text()).toBe('ok');
   });
 
+  it('serves no ops dashboard: that is shard 0 only', async () => {
+    for (const path of ['/admin', '/admin/api/state', '/admin/api/history?range=1h']) {
+      const res = await fetch(`${baseUrl}${path}`);
+      expect(res.status).toBe(404);
+      await res.body?.cancel();
+    }
+  });
+
   it('only hands out join codes of its own shard', async () => {
     const rooms: Room[] = [];
     try {

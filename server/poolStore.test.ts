@@ -126,3 +126,58 @@ describe('poolStoreFromEnv', () => {
     );
   });
 });
+
+describe('ops columns', () => {
+  const ops = {
+    version: 'abc123',
+    startedAt: '2026-11-11T10:00:00.000Z',
+    uptimeS: 60,
+    cpuPct: 12.5,
+    eventLoopUtil: 0.25,
+    loopDelayP99Ms: 11.2,
+    rssMb: 99.5,
+    heapUsedMb: 33,
+    connections: 4,
+    roundsStarted: 7,
+    serverFullRefusals: 1,
+    roomList: [
+      {
+        code: 'AB••',
+        members: 2,
+        players: 3,
+        screen: 'playing',
+        levelId: 'l2',
+        ageS: 90,
+        idleS: 2,
+      },
+    ],
+  };
+
+  it('stores them as columns (the room list as JSON) and reads them back', async () => {
+    const table = fakeTable();
+    const store = new TablePoolStore(table);
+    await store.put(entry(1, { ops }));
+    const row = table.rows.get('1');
+    expect(row?.ops).toMatchObject({
+      version: 'abc123',
+      cpuPct: 12.5,
+    });
+    expect(typeof row?.ops?.roomList).toBe('string');
+    expect(JSON.stringify(row?.ops).length).toBeLessThan(64 * 1024);
+    expect(await store.list()).toEqual([entry(1, { ops })]);
+  });
+
+  it('reads rows without them (older shards) and survives broken ones', () => {
+    const base = {
+      rowKey: '0',
+      rooms: 1,
+      players: 1,
+      maxRooms: 2,
+      url: '',
+      updatedAt: '2026-11-11T10:00:00.000Z',
+    };
+    expect(fromRow(base)?.ops).toBeUndefined();
+    const broken = fromRow({ ...base, ops: { version: 'x', cpuPct: 'lots', roomList: '{nope' } });
+    expect(broken?.ops).toMatchObject({ version: 'x', cpuPct: 0, roomList: [] });
+  });
+});

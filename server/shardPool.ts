@@ -18,7 +18,13 @@
  *   spare `shardsToWake` names: that wakes a sleeping one, and keeps an
  *   empty one awake while its free slots are needed. Shards it doesn't need
  *   get nothing from it, so they fall asleep.
- * - `view()`: the `GET /pool` answer.
+ * - `view()`: the `GET /pool` answer; `entries()` the pool as read (the ops
+ *   dashboard), `waking` the shards the manager's last round requested
+ *   while they were asleep.
+ *
+ * With an `ops` source (`shardMetrics.ts`) every heartbeat also carries the
+ * shard's operational numbers (`ShardOps`); they ride along on the writes the
+ * rules above make (writes stay keyed on rooms and players only).
  *
  * Reads of the pool are cached for `NET_POOL_CACHE_MS` (shared by `/pool`
  * and the manager), with this shard's own entry always replaced by its live
@@ -34,6 +40,7 @@ import type { Shard } from '../src/net/joinCode';
 import {
   type PoolEntry,
   type PoolView,
+  type ShardOps,
   entriesByIndex,
   isAwake,
   poolHeadroom,
@@ -72,6 +79,8 @@ export interface ShardPoolOptions {
   log?: (message: string) => void;
   /** Where wake-ups are reported; `console.log` by default. */
   info?: (message: string) => void;
+  /** This shard's operational numbers for its heartbeat; none by default. */
+  ops?: () => ShardOps;
 }
 
 export class ShardPool {
@@ -91,6 +100,8 @@ export class ShardPool {
   /** The last read of the pool and when it was started. */
   private cached: { entries: Promise<PoolEntry[]>; at: number } | null = null;
   private stopped = false;
+  /** The spares the manager's last round requested while they were asleep (ascending). */
+  private wakingNow: number[] = [];
 
   constructor(private readonly options: ShardPoolOptions) {
     this.now = options.now ?? (() => Date.now());
@@ -122,7 +133,13 @@ export class ShardPool {
       players: load.players,
       maxRooms: load.maxRooms,
       updatedAt: this.now(),
+      ...(this.options.ops ? { ops: this.options.ops() } : {}),
     };
+  }
+
+  /** The shards the manager's last round requested while they were asleep: being woken. */
+  get waking(): readonly number[] {
+    return this.wakingNow;
   }
 
   /** Writes this shard's entry now. Never rejects. */
@@ -185,12 +202,15 @@ export class ShardPool {
     const wake = shardsToWake(entries, now, shard.count, headroom, this.options.load.maxRooms);
     const pinged = wake.filter((i) => Boolean(urls[i]));
     const byIndex = entriesByIndex(entries, shard.count);
+    const waking: number[] = [];
     for (const i of pinged) {
       if (!isAwake(byIndex[i], now)) {
         this.info(`Pool: ${poolHeadroom(entries, now)} free room slots, waking shard ${i}`);
+        waking.push(i);
       }
       this.ping(urls[i] ?? '');
     }
+    this.wakingNow = waking;
     return pinged;
   }
 
@@ -221,7 +241,9 @@ export class ShardPool {
     this.stopped = true;
     for (const timer of this.timers.splice(0)) clearInterval(timer);
     try {
-      await this.options.store.put({ ...this.entry(), rooms: 0, players: 0, updatedAt: 0 });
+      const last = this.entry();
+      const ops = last.ops ? { ops: { ...last.ops, connections: 0, roomList: [] } } : {};
+      await this.options.store.put({ ...last, rooms: 0, players: 0, updatedAt: 0, ...ops });
     } catch (error) {
       this.log(`Pool: could not write the shutdown entry: ${describe(error)}`);
     }
@@ -230,8 +252,12 @@ export class ShardPool {
   /**
    * The pool's entries, read from the store at most once per
    * `NET_POOL_CACHE_MS` (a failed read isn't kept), with this shard's own
-   * entry replaced by its live numbers.
+   * entry replaced by its live numbers. Rejects when the store can't be read.
    */
+  entries(): Promise<PoolEntry[]> {
+    return this.readPool();
+  }
+
   private async readPool(): Promise<PoolEntry[]> {
     const now = this.now();
     if (!this.cached || now - this.cached.at >= (this.options.cacheMs ?? NET_POOL_CACHE_MS)) {
