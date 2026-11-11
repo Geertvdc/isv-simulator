@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { DEMO_BOTS, ORDER_RATE_BY_PLAYERS } from './balance';
+import { DEMO_BOTS, MAX_OPEN_ORDERS, ORDER_RATE_BY_PLAYERS, STAR_SHARES } from './balance';
 import { MAX_PLAYERS, getTile } from './level';
-import { DEMO_LEVEL_IDS, GARAGE, LEVELS, levelById, orderRate, settingsForPlayers } from './levels';
+import {
+  DEMO_LEVEL_IDS,
+  GARAGE,
+  LEVELS,
+  levelById,
+  levelWithMap,
+  orderRate,
+  settingsForPlayers,
+  thresholdsFor,
+} from './levels';
 import { createGame } from './state';
 
 describe('settingsForPlayers', () => {
@@ -64,6 +73,40 @@ describe('settingsForPlayers', () => {
     expect(four?.intervalTicks).toBe(Math.round(2800 / orderRate(4)));
     expect(four?.timeLimitTicks).toBe(1200);
     expect(four?.attendTicks).toBe(240);
+  });
+
+  it('never opens more feature orders than the order bar holds', () => {
+    for (const level of LEVELS) {
+      for (const count of [1, 2, 3, 4]) {
+        expect(settingsForPlayers(level, count).orderSchedule.maxOpenOrders).toBeLessThanOrEqual(
+          MAX_OPEN_ORDERS,
+        );
+      }
+    }
+  });
+
+  it("puts every campaign level's stars at shares of the bots' score for that team size", () => {
+    for (const level of LEVELS) {
+      const bots = level.botScores;
+      if (!bots) throw new Error(`${level.id} has no bot scores`);
+      for (const [i, bot] of bots.entries()) {
+        const count = i + 1;
+        const stars = settingsForPlayers(level, count).starThresholds;
+        expect(stars).toEqual(thresholdsFor(bot));
+        // Three stars without a perfect run: within rounding of 90% of the bots' average.
+        expect(Math.abs(stars[2] - bot * STAR_SHARES[2])).toBeLessThanOrEqual(2.5);
+        expect(stars[2]).toBeLessThan(bot);
+      }
+      expect(level.starThresholds).toEqual(thresholdsFor(bots[0]));
+    }
+  });
+
+  it('scales the solo stars by the order rate for a level without bot scores', () => {
+    const level = levelWithMap(GARAGE.map, { starThresholds: [60, 120, 180] });
+    expect(settingsForPlayers(level, 1).starThresholds).toEqual([60, 120, 180]);
+    expect(settingsForPlayers(level, 4).starThresholds[2]).toBe(
+      Math.round((180 * orderRate(4)) / 10) * 10,
+    );
   });
 
   it('clamps the player count to the table', () => {

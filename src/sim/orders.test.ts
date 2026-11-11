@@ -398,7 +398,7 @@ describe('scoring', () => {
 describe('level end', () => {
   it('ends at durationTicks with the score and stars, then stops', () => {
     const state = createGame(
-      { ...GARAGE, durationTicks: 100, starThresholds: [10, 20, 30] },
+      { ...GARAGE, durationTicks: 100, starThresholds: [10, 20, 30], botScores: undefined },
       1,
       [1],
     );

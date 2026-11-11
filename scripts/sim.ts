@@ -10,6 +10,9 @@ import { readFileSync, writeFileSync } from 'node:fs';
  * `--drafts [runs=5] [firstSeed=1] [--level=<id>] [--bots=1,2,3,4]` plays every
  * level redesign draft (`maps/drafts/`, phase 23, each reorg phase for the whole
  * round) and its current map with 1 to 4 bots and prints a markdown table.
+ * `--calibrate [runs=10] [firstSeed=1] [--level=<id>]` measures every campaign level's
+ * (or one level's) `botScores`: the bots' average score with 1, 2, 3 and 4 players,
+ * printed as lines to paste into `src/sim/levels.ts`.
  */
 
 import { PIPELINE_BUILD_TICKS, TICKS_PER_SECOND, WORK_RATE } from '../src/sim/balance';
@@ -32,6 +35,7 @@ const skipTests = args.includes('--skip-tests');
 const roleLab = args.includes('--role-lab');
 const roleBench = args.includes('--role-bench');
 const drafts = args.includes('--drafts');
+const calibrate = args.includes('--calibrate');
 const levelArg = args.find((a) => a.startsWith('--level='))?.slice('--level='.length);
 const levelId = levelArg ?? 'garage';
 const policyArg = args.find((a) => a.startsWith('--policy='))?.slice('--policy='.length);
@@ -639,8 +643,28 @@ function runDrafts(): void {
   );
 }
 
+/** The bots' average score per team size, for a level's `botScores`. */
+function runCalibrate(): void {
+  const count = positional[0] ?? 10;
+  const first = positional[1] ?? 1;
+  const levels = levelArg ? [levelById(levelArg)] : LEVELS;
+  for (const level of levels) {
+    if (!level) throw new Error(`No level '${levelArg}'`);
+    const scores = [1, 2, 3, 4].map((players) => {
+      let total = 0;
+      for (let seed = first; seed < first + count; seed++) {
+        total += runBots(level, seed, players, { assignmentPolicy }).result.score;
+      }
+      return Math.round(total / count / 5) * 5;
+    });
+    console.log(`${level.id}: ...calibrated([${scores.join(', ')}]),`);
+  }
+}
+
 if (drafts) {
   runDrafts();
+} else if (calibrate) {
+  runCalibrate();
 } else if (roleBench) {
   runRoleBench();
 } else if (roleLab) {
