@@ -55,11 +55,21 @@ export function navigate(
     toggleShake(ctx, update);
     return true;
   }
+  if (item === 'playerList') {
+    togglePlayerList(ctx, update);
+    return true;
+  }
   if (item === 'graphics') {
     stepGraphics(ctx, update, Math.sign(x));
     return true;
   }
   return false;
+}
+
+function togglePlayerList(ctx: FlowContext, update: FlowUpdate): void {
+  ctx.save.settings.playerList = !ctx.save.settings.playerList;
+  update.effects.push({ type: 'saveChanged' });
+  update.changed = true;
 }
 
 function toggleShake(ctx: FlowContext, update: FlowUpdate): void {
@@ -185,6 +195,9 @@ export function confirm(flow: Flow, ctx: FlowContext, update: FlowUpdate): void 
     case 'shake':
       toggleShake(ctx, update);
       return;
+    case 'playerList':
+      togglePlayerList(ctx, update);
+      return;
     case 'graphics':
       stepGraphics(ctx, update, 1);
       return;
@@ -199,6 +212,11 @@ export function confirm(flow: Flow, ctx: FlowContext, update: FlowUpdate): void 
       return;
     case 'back':
       back(flow, update);
+      return;
+    // The browser that picked it leaves the room on its own (`onlineMenuPresses`);
+    // the room's flow plays on.
+    case 'leaveRoom':
+    case 'keepPlaying':
       return;
     case 'volume':
     case 'music':

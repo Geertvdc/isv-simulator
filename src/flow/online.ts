@@ -12,7 +12,14 @@ import type { DevicePress } from '../input/controller';
 import type { LobbyMember, ServerMessage } from '../net/protocol';
 import { NET_LEAVE_CONFIRM_MS, TICKS_PER_SECOND } from '../sim/balance';
 import type { PlayerId } from '../sim/state';
-import type { Flow, OnlineError, Screen } from './flow';
+import {
+  type Flow,
+  type MenuItem,
+  type OnlineError,
+  type Screen,
+  isConfirm,
+  menuItems,
+} from './flow';
 import type { LevelRecord } from './save';
 
 /** How this browser got into the room. */
@@ -51,6 +58,12 @@ export interface OnlineState {
   leaveArmedAtMs: number | null;
   /** Why the server said it is closing the room, if it did. */
   closing: 'idle' | 'shutdown' | null;
+  /**
+   * This browser's own room menu (`ROOM_MENU_ITEMS`), open on its highlighted
+   * line, or `null` when closed. For a guest: the room's pause menu is the
+   * host's, so Esc or Start opens this one to leave from.
+   */
+  roomMenu: number | null;
   setupError?: string | null;
 }
 
@@ -68,8 +81,12 @@ export function createOnline(role: OnlineRole): OnlineState {
     levelId: null,
     leaveArmedAtMs: null,
     closing: null,
+    roomMenu: null,
   };
 }
+
+/** The lines of a guest's own room menu. */
+export const ROOM_MENU_ITEMS: readonly MenuItem[] = ['keepPlaying', 'leaveRoom'];
 
 /** A reloaded page on its way back into room `joinCode`. */
 export function createRejoin(role: OnlineRole, joinCode: string): OnlineState {
@@ -280,6 +297,7 @@ export function onlineMenuPresses(
     return { send: [], leave: back, changed: false };
   }
   if (state.flow.screen === 'lobby') {
+    state.roomMenu = null;
     const send = presses.filter((p) => !isBack(p));
     let changed = false;
     if (state.leaveArmedAtMs !== null && !leaveArmed(state, nowMs)) {
@@ -292,5 +310,43 @@ export function onlineMenuPresses(
     return { send, leave: false, changed: true };
   }
   if (state.leaveArmedAtMs !== null) state.leaveArmedAtMs = null;
+  if (state.roomMenu !== null) return roomMenuPresses(state, presses);
+  // The host picked Leave room in the room's pause or results menu: only this browser goes.
+  const item = menuItems(state.flow)[state.flow.menuIndex];
+  if (item === 'leaveRoom' && isOnlineHost(state) && presses.some(isConfirm)) {
+    return { send: [], leave: true, changed: false };
+  }
+  // A guest's Esc or Start opens their own room menu; the server would ignore it anyway.
+  if (!isOnlineHost(state) && presses.some((p) => p.menu)) {
+    state.roomMenu = 0;
+    return { send: [], leave: false, changed: true };
+  }
   return { send: [...presses], leave: false, changed: false };
+}
+
+/** Moving through and picking from the open room menu; nothing goes to the server. */
+function roomMenuPresses(
+  state: OnlineState,
+  presses: readonly DevicePress[],
+): { send: DevicePress[]; leave: boolean; changed: boolean } {
+  const at = state.roomMenu ?? 0;
+  if (presses.some(isBack)) {
+    state.roomMenu = null;
+    return { send: [], leave: false, changed: true };
+  }
+  if (presses.some(isConfirm)) {
+    if (ROOM_MENU_ITEMS[at] === 'leaveRoom') return { send: [], leave: true, changed: false };
+    state.roomMenu = null;
+    return { send: [], leave: false, changed: true };
+  }
+  const step = presses.reduce((sum, p) => sum + p.nav.y, 0);
+  const next = Math.min(Math.max(at + Math.sign(step), 0), ROOM_MENU_ITEMS.length - 1);
+  if (next === at) return { send: [], leave: false, changed: false };
+  state.roomMenu = next;
+  return { send: [], leave: false, changed: true };
+}
+
+/** Whether this browser's room menu is open: its players stand still meanwhile. */
+export function roomMenuOpen(state: OnlineState): boolean {
+  return state.roomMenu !== null;
 }

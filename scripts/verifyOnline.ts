@@ -22,8 +22,9 @@
  * 3. The guest reloads the page mid-round: back in the same round with
  *    their player, walking.
  * 4. A third browser joins mid-round: it watches ("you're watching").
- * 5. The host leaves mid-round: the guest is host and pauses and resumes,
- *    the round ends, the late joiner joins on the results, the guest starts
+ * 5. The guest's Esc opens their own room menu (the round plays on) and Esc
+ *    closes it. The host pauses and picks Leave room: the guest is host,
+ *    resumes, the round ends, the late joiner joins on the results, the guest starts
  *    the next round and the late joiner plays in it.
  * 6. The late joiner is offline past the grace period: they're told they
  *    couldn't get back in, go back to the title, and the room lets them go.
@@ -323,24 +324,41 @@ async function main(): Promise<void> {
 
   // 5. The host leaves mid-round.
   const hostId = await host.eval<string>(`localStorage.getItem('isv-simulator.userId')`);
-  await step('the host leaves mid-round; the guest can pause, resume and finish', async () => {
-    await host.eval(`document.querySelector('.online-bar-leave').click()`);
-    await host.waitFor(`!document.querySelector('.online-bar:not([hidden])')`, 'the host out');
-    await sleep(500);
-    await guest.key('Escape');
-    await guest.waitFor(`window.isvNet?.screen === 'paused'`, 'the guest pausing');
-    const lateSees = await late.waitFor<string>(
-      `(() => { const t = document.querySelector('.online-bar-waiting')?.textContent ?? ''; return t.includes('Paused') ? t : ''; })()`,
-      'the late joiner seeing the pause',
-    );
-    await shot(guest, '05-guest-host-paused');
-    await guest.key('Escape');
-    await guest.waitFor(`window.isvNet?.screen === 'playing'`, 'the guest resuming');
-    await guest.waitFor(`window.isvNet?.screen === 'results'`, 'the results', 40_000);
-    await late.waitFor(`window.isvNet?.screen === 'results'`, 'the results on the late joiner');
-    await shot(guest, '06-results');
-    return lateSees.includes('Paused') ? true : lateSees;
-  });
+  await step(
+    'the host leaves from the pause menu; the guest takes over, resumes and finishes',
+    async () => {
+      // A guest's Esc opens their own room menu; the room keeps playing.
+      await guest.key('Escape');
+      await guest.waitFor(
+        `!!document.querySelector('.room-menu-screen:not([hidden])') && window.isvNet?.screen === 'playing'`,
+        "the guest's room menu",
+      );
+      await shot(guest, '05-guest-room-menu');
+      await guest.key('Escape');
+      await guest.waitFor(
+        `!document.querySelector('.room-menu-screen:not([hidden])')`,
+        'the room menu closed',
+      );
+      // Pause, then the menu's last line: Leave room.
+      await host.key('Escape');
+      await host.waitFor(`window.isvNet?.screen === 'paused'`, 'the host pausing');
+      const lateSees = await late.waitFor<string>(
+        `(() => { const t = document.querySelector('.online-bar-waiting')?.textContent ?? ''; return t.includes('Paused') ? t : ''; })()`,
+        'the late joiner seeing the pause',
+      );
+      for (let i = 0; i < 4; i++) await host.key('ArrowDown');
+      await host.key('Enter');
+      await host.waitFor(`!document.querySelector('.online-bar:not([hidden])')`, 'the host out');
+      await sleep(500);
+      await shot(guest, '05-guest-host-paused');
+      await guest.key('Escape');
+      await guest.waitFor(`window.isvNet?.screen === 'playing'`, 'the guest resuming');
+      await guest.waitFor(`window.isvNet?.screen === 'results'`, 'the results', 40_000);
+      await late.waitFor(`window.isvNet?.screen === 'results'`, 'the results on the late joiner');
+      await shot(guest, '06-results');
+      return lateSees.includes('Paused') ? true : lateSees;
+    },
+  );
 
   await step('the late joiner joins on the results and plays the next round', async () => {
     await sleep(1500);
