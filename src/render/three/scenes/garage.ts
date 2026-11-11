@@ -255,7 +255,7 @@ export function garageScene(map: LevelMap): Scene {
   put(catLoaf, carX + 0.12, carZ + 0.1, 2.3, 0, 'near', CAR_ROOF);
   // The hoop against the hedge, facing the pad, the ball under the car.
   put(hoop, hedgeX + 0.75, padZ0 + 0.6, Math.PI / 2 - 0.25, 0);
-  put(bushes, hedgeX + 0.85, F - 0.6, 0.3, 1);
+  put(bushes, hedgeX + 0.5, F - 0.6, 0.3, 1);
 
   // ---- Front: the driveway apron, the sidewalk, the curb and the street ----
   // The apron runs across both garage doors: the open one and the closed one beside it.

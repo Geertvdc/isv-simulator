@@ -9,6 +9,12 @@ export const TICKS_PER_SECOND = 60;
 export const CAMERA_FIT_PADDING = 32;
 /** Share of the screen height kept free below the level for score and timer. */
 export const CAMERA_HUD_BOTTOM = 0.06;
+/**
+ * The band kept free above the level for the order cards, in the HUD's rem
+ * (see `hudRemPx`): a card reaches 7.9rem down, plus a little air, so the back
+ * row of stations is never under a card.
+ */
+export const CAMERA_HUD_TOP_REM = 8.3;
 
 /** Player movement, in tiles and seconds. */
 export const PLAYER_MAX_SPEED = 5;

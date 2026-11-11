@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import monorepoText from '../../maps/level-15-monorepo.txt?raw';
-import { CAMERA_FIT_PADDING, CAMERA_HUD_BOTTOM, PLAYER_RADIUS } from '../sim/balance';
+import { PLAYER_RADIUS } from '../sim/balance';
 import { parseLevelMap } from '../sim/level';
 import { DEFAULT_LOOK, LEVEL_LOOKS } from '../render/mapLook';
 import { playerColor } from '../render/playerColors';
-import { type CameraPose, fitCamera3d, projectPoint } from '../render/projection';
+import { type CameraPose, fitCamera3d, projectPoint, roundInsets } from '../render/projection';
 import {
   STUDY_NAMES,
   STUDY_STYLES,
@@ -255,12 +255,7 @@ function resize(): void {
         },
     { width, height },
     office
-      ? {
-          top: CAMERA_FIT_PADDING + height * 0.1,
-          right: CAMERA_FIT_PADDING,
-          bottom: CAMERA_FIT_PADDING + height * CAMERA_HUD_BOTTOM,
-          left: CAMERA_FIT_PADDING,
-        }
+      ? roundInsets({ width, height })
       : { top: controls.offsetHeight + 20, right: 30, bottom: 72, left: 30 },
   );
   stage.setPose(cameraPose);

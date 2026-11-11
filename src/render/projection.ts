@@ -5,6 +5,8 @@
  * The sim never sees any of this: it works in plain grid coordinates.
  */
 
+import { CAMERA_FIT_PADDING, CAMERA_HUD_BOTTOM, CAMERA_HUD_TOP_REM } from '../sim/balance';
+
 export interface Point {
   x: number;
   y: number;
@@ -166,6 +168,30 @@ export interface Insets3 {
   right: number;
   bottom: number;
   left: number;
+}
+
+/**
+ * One rem of the DOM HUD in pixels on a screen `height` pixels tall: the
+ * `html { font-size }` rule in `style.css` (16px at 720p, 24px at 1080p,
+ * 16 to 32px), kept in step by hand.
+ */
+export function hudRemPx(height: number): number {
+  return Math.min(Math.max(height / 45, 16), 32);
+}
+
+/** How far down the HUD's order cards reach on a screen `height` pixels tall. */
+export function hudTopBand(height: number): number {
+  return hudRemPx(height) * CAMERA_HUD_TOP_REM;
+}
+
+/** The space a round keeps free around the level: the order cards on top, score and clock below. */
+export function roundInsets(viewport: Size2): Insets3 {
+  return {
+    top: hudTopBand(viewport.height),
+    right: CAMERA_FIT_PADDING,
+    bottom: CAMERA_FIT_PADDING + viewport.height * CAMERA_HUD_BOTTOM,
+    left: CAMERA_FIT_PADDING,
+  };
 }
 
 /**

@@ -3,9 +3,12 @@ import {
   type Box3,
   fitCamera3d,
   gridToWorld,
+  hudRemPx,
+  hudTopBand,
   pixelsPerUnit,
   projectPoint,
   projectedBounds,
+  roundInsets,
   screenToGround,
   screenDirToGrid,
 } from './projection';
@@ -102,6 +105,32 @@ describe('3D projection', () => {
       // Centered in the free space.
       expect((b.top + b.bottom) / 2).toBeCloseTo(insets.top + availH / 2, 0);
       expect((b.left + b.right) / 2).toBeCloseTo(insets.left + availW / 2, 0);
+    });
+  }
+});
+
+describe('roundInsets', () => {
+  it('follows the HUD font size: 16px at 720p, 24px at 1080p, capped at 32px', () => {
+    expect(hudRemPx(600)).toBe(16);
+    expect(hudRemPx(720)).toBe(16);
+    expect(hudRemPx(1080)).toBe(24);
+    expect(hudRemPx(2160)).toBe(32);
+  });
+
+  // The order cards reach 7.9rem down (measured in the browser): the level stays under them.
+  for (const viewport of [
+    { width: 800, height: 600 },
+    { width: 1280, height: 720 },
+    { width: 1440, height: 810 },
+    { width: 1920, height: 1080 },
+    { width: 2560, height: 1080 },
+    { width: 3840, height: 2160 },
+  ]) {
+    it(`keeps the level below the order cards at ${viewport.width}x${viewport.height}`, () => {
+      const box: Box3 = { min: { x: -0.5, y: -0.5, z: -0.5 }, max: { x: 15.5, y: 1.85, z: 10.5 } };
+      const b = projectedBounds(fitCamera3d(box, viewport, roundInsets(viewport)), box);
+      expect(hudTopBand(viewport.height)).toBeGreaterThan(hudRemPx(viewport.height) * 7.9);
+      expect(b.top).toBeGreaterThanOrEqual(hudTopBand(viewport.height) - 1);
     });
   }
 });

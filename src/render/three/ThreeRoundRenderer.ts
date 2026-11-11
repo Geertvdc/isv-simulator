@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 import * as THREE from 'three';
 import type { Graphics } from '../../flow/save';
-import { CAMERA_FIT_PADDING, CAMERA_HUD_BOTTOM } from '../../sim/balance';
 import { type LevelMap, getTile, isWorkSurface } from '../../sim/level';
 import { type PlayerId, targetTile } from '../../sim/state';
 import type { TicketKind } from '../../sim/tickets';
@@ -15,7 +14,9 @@ import {
   fitCamera3d,
   focalLength,
   gridToWorld,
+  hudTopBand,
   projectPoint,
+  roundInsets,
   screenToGround,
 } from '../projection';
 import type { RoundFrame, RoundRenderer } from '../RoundRenderer';
@@ -32,14 +33,6 @@ import { ticketModel } from './ticketModels';
 import { type Stage, disposeTree, getStage } from './stage';
 
 const HOVER_COLOR = 0xffffff;
-/**
- * The top band the 3D camera keeps free, as a share of the height. Less than
- * the order cards' band: they only cover the left of it, and the back wall
- * may reach under it.
- */
-const HUD_TOP_3D = 0.1;
-/** How far down the HUD's order cards reach, as a share of the height. */
-const HUD_ORDERS_BAND = 0.135;
 /** About how tall an overlay drawn up from its point is (a card and its title), in overlay pixels. */
 const OVERLAY_TALL = 52;
 
@@ -218,7 +211,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
     const f = focalLength(pose);
     // The HUD's order cards cover the top band: overlays over the back row are pushed
     // down to stay under it (most are drawn up from their point, about this tall).
-    const hudBottom = pose.viewport.height * HUD_ORDERS_BAND;
+    const hudBottom = hudTopBand(pose.viewport.height);
     return (p) => {
       const s = projectPoint(pose, p);
       const scale = overlayScale(f / s.depth);
@@ -234,16 +227,8 @@ export class ThreeRoundRenderer implements RoundRenderer {
   /** Frames the level between the HUD bands, and fits the fog to that camera. */
   private fit(): CameraPose {
     const { width, height } = this.scene.scale;
-    const pose = fitCamera3d(
-      levelBox(this.map),
-      { width, height },
-      {
-        top: CAMERA_FIT_PADDING + height * HUD_TOP_3D,
-        right: CAMERA_FIT_PADDING,
-        bottom: CAMERA_FIT_PADDING + height * CAMERA_HUD_BOTTOM,
-        left: CAMERA_FIT_PADDING,
-      },
-    );
+    const viewport = { width, height };
+    const pose = fitCamera3d(levelBox(this.map), viewport, roundInsets(viewport));
     const fog = fogRange(this.atmosphere, this.map, pose);
     if (fog && this.world.fog instanceof THREE.Fog) {
       this.world.fog.near = fog.near;
