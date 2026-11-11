@@ -13,6 +13,10 @@
 // `shards` when they change (at most once a second) and every 30 s,
 // and a shard with live rooms pings its own URL so the HTTP scaler doesn't
 // scale it in under a game.
+//
+// Shard 0 also serves the ops dashboard (/admin: open and read-only, no login;
+// the other shards answer 404 there) and writes its history to the table
+// `poolhistory`.
 
 param name string
 param location string
@@ -52,6 +56,9 @@ param maxRooms int
 @description('Name of the table the shards write their heartbeats to (POOL_TABLE_NAME).')
 param poolTableName string
 
+@description('Name of the table shard 0 writes the ops dashboard\'s history to (HISTORY_TABLE_NAME): a pool snapshot a minute and events, 14 days.')
+param historyTableName string
+
 @description('Table Storage endpoint for the profiles, https://<account>.table.core.windows.net.')
 param tableEndpoint string
 
@@ -62,6 +69,9 @@ param tableName string
 param identityClientId string
 
 var port = 2567
+
+// The image tag (the git short sha) is the version the server reports (APP_VERSION).
+var appVersion = last(split(image, ':'))
 
 // Every shard's public URL, in shard order (SHARD_URLS).
 var shardUrls = [for appName in shardAppNames: 'https://${appName}.${environmentDefaultDomain}']
@@ -107,6 +117,7 @@ resource app 'Microsoft.App/containerApps@2026-07-01' = {
           }
           env: [
             { name: 'PORT', value: string(port) }
+            { name: 'APP_VERSION', value: appVersion }
             { name: 'NODE_ENV', value: 'production' }
             { name: 'ALLOWED_ORIGINS', value: join(allowedOrigins, ',') }
             // The ingress adds X-Forwarded-For; the rate limits need the real client IP.
@@ -118,6 +129,9 @@ resource app 'Microsoft.App/containerApps@2026-07-01' = {
             { name: 'SHARD_URLS', value: join(shardUrls, ',') }
             { name: 'SHARD_MAX_ROOMS', value: string(maxRooms) }
             { name: 'POOL_TABLE_NAME', value: poolTableName }
+            // The ops dashboard's history (written by shard 0 only; the
+            // dashboard at /admin is shard 0's, open and read-only).
+            { name: 'HISTORY_TABLE_NAME', value: historyTableName }
             // Profiles in Table Storage, reached as the user-assigned managed
             // identity with this client id (no keys or connection strings).
             { name: 'PROFILE_STORE', value: 'table' }

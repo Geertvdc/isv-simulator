@@ -23,6 +23,7 @@ How the browser game and the online game server run on Azure, as infrastructure 
                            └─ ca-isv-<env>-game-<N-1>  (N = pool size, the ceiling)
                                 │  profiles → Azure Table Storage, table "profiles"
                                 │  pool entities (rooms, players per shard) → table "shards"
+                                │  ops dashboard history (shard 0 only) → table "poolhistory"
                                 │  logs → Log Analytics
                                 └─ image ← Azure Container Registry (Basic)
                               one user-assigned managed identity for all shards:
@@ -31,15 +32,15 @@ How the browser game and the online game server run on Azure, as infrastructure 
 
 All in one resource group per environment (`rg-isv-simulator-<env>`, default env `prod`, region `westeurope`).
 
-| Resource                       | Name (env `prod`)      | Why                                                                                                                   |
-| ------------------------------ | ---------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Log Analytics workspace        | `log-isv-prod`         | Container logs, 30 days                                                                                               |
-| Container registry (Basic)     | `crisvprod<suffix>`    | The server image; admin user off                                                                                      |
-| User-assigned managed identity | `id-isv-prod-game`     | Pulls from the registry (AcrPull) and reads/writes profiles (Storage Table Data Contributor); no secrets              |
-| Storage account (Standard LRS) | `stisvprod<suffix>`    | Table Storage tables `profiles` (one entity per user) and `shards` (one pool entity per shard); shared-key access off |
-| Container Apps environment     | `cae-isv-prod`         | Express: sub-second start from zero                                                                                   |
-| Container App, per shard       | `ca-isv-prod-game-<n>` | The game server: external ingress, port 2567, WebSockets, probes on `/health`; shard 0 1 replica, the others 0 or 1   |
-| Static Web App (Free)          | `swa-isv-prod`         | The browser game                                                                                                      |
+| Resource                       | Name (env `prod`)      | Why                                                                                                                                                                                  |
+| ------------------------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Log Analytics workspace        | `log-isv-prod`         | Container logs, 30 days                                                                                                                                                              |
+| Container registry (Basic)     | `crisvprod<suffix>`    | The server image; admin user off                                                                                                                                                     |
+| User-assigned managed identity | `id-isv-prod-game`     | Pulls from the registry (AcrPull) and reads/writes profiles (Storage Table Data Contributor); no secrets                                                                             |
+| Storage account (Standard LRS) | `stisvprod<suffix>`    | Table Storage tables `profiles` (one entity per user), `shards` (one pool entity per shard) and `poolhistory` (the [ops dashboard](#ops-dashboard)'s history); shared-key access off |
+| Container Apps environment     | `cae-isv-prod`         | Express: sub-second start from zero                                                                                                                                                  |
+| Container App, per shard       | `ca-isv-prod-game-<n>` | The game server: external ingress, port 2567, WebSockets, probes on `/health`; shard 0 1 replica, the others 0 or 1                                                                  |
+| Static Web App (Free)          | `swa-isv-prod`         | The browser game                                                                                                                                                                     |
 
 `<suffix>` is `uniqueString(resourceGroup().id)`, cut short, so the global names don't collide.
 
@@ -66,6 +67,9 @@ All in one resource group per environment (`rg-isv-simulator-<env>`, default env
 | `SHARD_COUNT`            | `N`, the pool size (`gameServerShards`)                                                                                                                                                   |
 | `SHARD_URLS`             | every shard's `https://` URL in index order, comma-separated: `https://ca-isv-<env>-game-<i>.<environment default domain>` (computed in Bicep, checked by the deploy's smoke test)        |
 | `SHARD_MAX_ROOMS`        | rooms per shard before hosting moves on (`gameServerMaxRooms`, 15)                                                                                                                        |
+| `HISTORY_TABLE_NAME`     | `poolhistory`, every shard (only shard 0 writes it: the [ops dashboard](#ops-dashboard)'s history)                                                                                        |
+| Ops dashboard            | shard 0 only, open and read-only (no login): `GET /admin`, `/admin/api/state`, `/admin/api/history`; the other shards answer 404 there (see [Ops dashboard](#ops-dashboard))              |
+| `APP_VERSION`            | the image tag (the part after the last `:` of `gameServerImage`, the git short sha), every shard                                                                                          |
 | `POOL_TABLE_NAME`        | `shards`                                                                                                                                                                                  |
 | `PROFILE_STORE`          | `table`                                                                                                                                                                                   |
 | `PROFILE_TABLE_ENDPOINT` | `https://<storage account>.table.core.windows.net`                                                                                                                                        |
@@ -97,9 +101,9 @@ infra/
     monitoring.bicep         Log Analytics
     registry.bicep           ACR
     identity.bicep           the game servers' managed identity: AcrPull on the registry, Storage Table Data Contributor on the storage account
-    storage.bicep            storage account (no shared keys) + tables `profiles` and `shards`
+    storage.bicep            storage account (no shared keys) + tables `profiles`, `shards` and `poolhistory`
     containerEnv.bicep       Container Apps Express environment (outputs its default domain, for the shard URLs)
-    gameServer.bicep         one Container App (one shard of the pool)
+    gameServer.bicep         one Container App (one shard of the pool); shard 0 also serves the ops dashboard
     staticSite.bicep         Static Web App
   scripts/
     bootstrap.sh             once per subscription: resource group + GitHub OIDC app registration and role assignments
@@ -125,7 +129,7 @@ Outputs: `registryName`, `registryLoginServer`, `staticSiteName`, `staticSiteUrl
 4. `VITE_SERVER_URL=<gameServerUrls[0]> npm run build`: the game only knows the front door and reads the pool from its `/pool` at runtime. With `--skip-server` the pool size is shard 0's `SHARD_COUNT` and the URLs come from the existing apps (management plane only, nothing is woken).
 5. Fetch the Static Web App deployment token with `az staticwebapp secrets list` and upload `dist/` with `npx @azure/static-web-apps-cli deploy --env production`.
 6. Delete leftover game servers after the pool shrank: apps `ca-isv-<env>-game-<n>` with `n` ≥ the pool size (Bicep never deletes them). After the upload, so the old game in open browsers kept its shards until the new game was live.
-7. Smoke test, on shard 0 only (a request to any other shard would wake it): `/health` answers `ok`, `/shard` answers index 0 of the pool size, and `/pool`'s `urls` equal `gameServerUrls` (catches a wrong computed `SHARD_URLS`); the site answers 200. Then `npx vite-node scripts/smokeOnline.ts <shard 0>`: a real session over the WebSocket (host a room, `welcome`, a `ping` a second for 5 s with their `pong`s, leave; 20 s at most). Its user id isn't a UUID v4, so no profile is written. When it fails, the deploy fails and says WebSockets didn't work on Express.
+7. Smoke test, on shard 0 only (a request to any other shard would wake it): `/health` answers `ok`, `/shard` answers index 0 of the pool size, and `/pool`'s `urls` equal `gameServerUrls` (catches a wrong computed `SHARD_URLS`); the [ops dashboard](#ops-dashboard) is open: `/admin/api/state` answers 200 without credentials, with `Cache-Control: no-store` and `poolSize` equal to `gameServerShards`, and `/admin` answers 200 with the HTML page; the site answers 200. Then `npx vite-node scripts/smokeOnline.ts <shard 0>`: a real session over the WebSocket (host a room, `welcome`, a `ping` a second for 5 s with their `pong`s, leave; 20 s at most). Its user id isn't a UUID v4, so no profile is written. When it fails, the deploy fails and says WebSockets didn't work on Express.
 
 `deploy.sh --what-if` runs `az deployment group what-if` instead, lists the leftover game servers it would delete, and changes nothing.
 
@@ -209,11 +213,11 @@ An internal company game has a handful of rooms at a time, so shard 0 at 0.5 vCP
 | Shard 0 at 1 vCPU / 2 GiB                          | ~€60                                            |
 | Every other shard of the pool, while awake         | ~€0.05 an hour at 0.5 vCPU; €0 while asleep     |
 | Container registry Basic                           | ~€5                                             |
-| Storage (two small tables, pool entity writes)     | < €1 (see below)                                |
+| Storage (small tables, pool and history writes)    | < €1 (see below)                                |
 | Log Analytics (a few hundred MB)                   | ~€1 to €3                                       |
 | Static Web Apps Free                               | €0                                              |
 
-Table writes for the pool: worst case, all 8 shards awake 24/7, a refresh every 30 s is 8 × 2 × 60 × 24 × 30 ≈ 0.7 million writes a month, plus one per change (at most one a second per shard, only while rooms change). At Table Storage's price per 10,000 transactions that is cents.
+Table writes for the pool: worst case, all 8 shards awake 24/7, a refresh every 30 s is 8 × 2 × 60 × 24 × 30 ≈ 0.7 million writes a month, plus one per change (at most one a second per shard, only while rooms change). At Table Storage's price per 10,000 transactions that is cents. The [ops dashboard](#ops-dashboard)'s history adds one snapshot a minute from shard 0 (60 × 24 × 30 ≈ 44,000 writes a month) plus a few events: cents too.
 
 The Express environment bills the same as Consumption (per second, same free grant; no environment fee).
 
@@ -224,7 +228,19 @@ So the pool costs about one shard when the game is quiet, and more only while ex
 - Deploys log in with GitHub OIDC (a federated credential on an app registration): no client secret in GitHub. The app registration has Contributor and Role Based Access Control Administrator (limited to granting AcrPull and Storage Table Data Contributor) on the one resource group only.
 - One user-assigned managed identity for all shards, with two roles: AcrPull on the registry (the registry has no admin user) and Storage Table Data Contributor on the storage account. No passwords, keys or connection strings anywhere.
 - The storage account: HTTPS only, TLS 1.2, no public blob access, shared-key access off (everything uses Entra ID: the servers their identity, people `--auth-mode login`).
+- The ops dashboard on shard 0 (`/admin`) is open, with no login, on purpose: it is read-only and used for demos. It shows nothing that lets anyone into a room or identifies anyone: join codes are masked (`AB••`) and there are no user ids, names or IPs. It only answers GET, sends `Cache-Control: no-store` and a strict Content-Security-Policy, and has no CORS headers. Its reads are cached (the pool 2 s, the history 10 s per range), so many viewers don't add table reads. The other shards answer 404 for `/admin`.
 - The server already validates every message, rate-limits by IP (`TRUST_PROXY=true` makes that the real client IP) and only answers the game's origin (`ALLOWED_ORIGINS`). Anyone with a join code can join, as before.
+
+## Ops dashboard
+
+An operations page for the pool, served by shard 0 itself (no extra resource): `https://<shard 0>/admin`.
+
+- **Access:** open and read-only, no login, public on purpose (it's used for demos). Join codes are masked (`AB••`) and there are no user ids, names or IPs, so nothing on it lets anyone into a room. Only shard 0 serves it; the other shards answer 404 for `/admin` paths.
+- **Routes (shard 0):** `/admin` (the page), `/admin/api/state` (the live state as JSON), `/admin/api/history?range=1h|24h|7d`.
+- **What it shows:** a grid of the pool's shards with each one's live load, CPU, memory, event-loop delay and rooms; the pool totals; which shard hosts next and which shards are being woken; history charts over 1 h, 24 h and 7 days; an event log (shards waking and sleeping, the pool full, and so on). Every shard reports `APP_VERSION` (the image tag).
+- **Freshness:** shard 0's own numbers are live; the other shards' come from their pool entities in the table `shards`, so they are up to 30 s old (the heartbeat refresh). Sleeping shards are shown as asleep; the dashboard never wakes them.
+- **History:** in the table `poolhistory` (`HISTORY_TABLE_NAME`, set on every shard; the identity's Storage Table Data Contributor on the account covers it). Only shard 0 writes it: a snapshot of the pool a minute plus events, kept 14 days. So while shard 0 is asleep (`gameServerMinReplicas = 0`) there is no history for that time; that's fine, since a sleeping shard 0 means nobody plays.
+- **Cost:** ~44,000 snapshot writes a month (one a minute) plus the events: cents. Reads are cached (the pool 2 s, the history 10 s per range), so many viewers don't add table reads.
 
 ## Deploying
 
@@ -264,6 +280,16 @@ Stage 2b (autoscaling pool):
 - [ ] Shard 0 wakes the next shard when fewer than 5 room slots are free; a sleeping shard's codes are answered as wrong without waking it
 - [ ] A shard with live rooms pings its own URL every 60 s and scales in ~5 minutes after its last room closes
 - [ ] Bicep builds and lints without warnings with 1, 3 and 8 shards; shellcheck and actionlint pass
+- [ ] Nothing deployed
+
+Ops dashboard:
+
+- [ ] The dashboard is open and read-only on shard 0 (no login, no token or secret in the infrastructure); the other shards answer 404 for `/admin`
+- [ ] Every shard gets `APP_VERSION` (the image tag) and `HISTORY_TABLE_NAME=poolhistory`; the table `poolhistory` exists next to `profiles` and `shards`
+- [ ] The end of `deploy.sh` prints the dashboard URL (`<shard 0>/admin`)
+- [ ] The smoke test checks shard 0 without credentials: `/admin/api/state` answers 200 with `Cache-Control: no-store` and `poolSize` equal to `gameServerShards`, and `/admin` answers 200 with HTML
+- [ ] `/admin` shows masked join codes and no user ids, names or IPs; it shows the shard grid (load, CPU, memory, event-loop delay, rooms), the pool totals, the next host and the shards being woken, history charts (1 h, 24 h, 7 d) and the event log
+- [ ] Bicep builds and lints without warnings; shellcheck passes
 - [ ] Nothing deployed
 
 Express:

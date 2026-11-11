@@ -18,9 +18,13 @@ Builds and deploys everything for one environment:
   5. upload dist/ to the Static Web App
   6. delete the game servers of shards past the pool size (after it shrank)
   7. smoke test, shard 0 only (the others sleep until needed; this doesn't wake them):
-     /health is ok, /shard is 0 of the pool size, /pool lists the deployed URLs; the
+     /health is ok, /shard is 0 of the pool size, /pool lists the deployed URLs, the ops
+     dashboard (/admin and /admin/api/state, open, no login) answers with the pool; the
      site answers 200; then a game session over the WebSocket (scripts/smokeOnline.ts:
      host a room, welcome, ping/pong for a few seconds, leave)
+
+The ops dashboard (https://<shard 0>/admin) is open and read-only: no login, join codes
+masked, no user ids, names or IPs.
 
 Options:
   --env NAME              environment (default: prod)
@@ -348,6 +352,37 @@ check_pool() {
     process.exit(same ? 0 : 1);
   ' "$body" "$@"
 }
+# The ops dashboard on shard 0, open (no credentials): /admin/api/state answers 200,
+# not cached (Cache-Control: no-store), with poolSize the pool size ($2); /admin
+# answers 200 with the HTML page.
+check_admin() {
+  node -e '
+    const [url, shards] = process.argv.slice(1);
+    (async () => {
+      const res = await fetch(url + "/admin/api/state", { signal: AbortSignal.timeout(10000) });
+      if (res.status !== 200) {
+        console.error("    /admin/api/state: " + res.status + ", expected 200");
+        process.exit(1);
+      }
+      const cache = res.headers.get("cache-control") ?? "";
+      if (!cache.includes("no-store")) {
+        console.error("    /admin/api/state Cache-Control: " + JSON.stringify(cache) + ", expected no-store");
+        process.exit(1);
+      }
+      const j = await res.json();
+      if (j.poolSize !== Number(shards)) {
+        console.error("    poolSize " + JSON.stringify(j.poolSize) + ", expected " + shards);
+        process.exit(1);
+      }
+      const page = await fetch(url + "/admin", { signal: AbortSignal.timeout(10000) });
+      const type = page.headers.get("content-type") ?? "";
+      if (page.status !== 200 || !type.includes("text/html")) {
+        console.error("    /admin: " + page.status + " " + JSON.stringify(type) + ", expected 200 text/html");
+        process.exit(1);
+      }
+    })().catch(() => process.exit(1));
+  ' "$1" "$2"
+}
 check_site() {
   [[ $(curl -sS -o /dev/null --max-time 10 -w '%{http_code}' "$static_site_url" 2>/dev/null) == 200 ]]
 }
@@ -373,6 +408,8 @@ retry "shard 0 $front_door_url/health" check_health "$front_door_url"
 retry "shard 0 $front_door_url/shard is 0 of $shard_count" check_shard "$front_door_url" 0 "$shard_count"
 retry "shard 0 $front_door_url/pool lists the ${#server_urls[@]} deployed shard URLs" \
   check_pool "$front_door_url" "${server_urls[@]}"
+retry "shard 0 $front_door_url/admin (open): the page, and the pool of $shard_count in its API" \
+  check_admin "$front_door_url" "$shard_count"
 retry "site $static_site_url" check_site
 
 # A real game session over the WebSocket at shard 0: host a room, get the welcome,
@@ -393,3 +430,4 @@ info "game server: $front_door_url (shard 0 of a pool of $shard_count)"
 if [[ $skip_server == false ]]; then
   info "image:       $image"
 fi
+info "dashboard:   $front_door_url/admin"

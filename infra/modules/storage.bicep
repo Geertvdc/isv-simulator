@@ -1,6 +1,8 @@
 // Storage account with the Table Storage tables: `profiles` holds the online
 // profiles (one entity per user), `shards` the game server pool's heartbeats
-// (one entity per awake shard: rooms, players). Every game server shard reads and writes it with its
+// (one entity per awake shard: rooms, players), `poolhistory` the ops
+// dashboard's history (shard 0 writes a pool snapshot a minute and events,
+// keeps 14 days). Every game server shard reads and writes it with its
 // managed identity (Storage Table Data Contributor, see identity.bicep), so
 // shared-key access is off: no account key is used anywhere.
 
@@ -39,6 +41,11 @@ resource shardsTable 'Microsoft.Storage/storageAccounts/tableServices/tables@202
   name: 'shards'
 }
 
+resource historyTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2025-01-01' = {
+  parent: tableService
+  name: 'poolhistory'
+}
+
 // https://<account>.table.core.windows.net/ without the trailing slash.
 var tableEndpoint = account.properties.primaryEndpoints.table
 
@@ -49,3 +56,4 @@ output tableEndpoint string = endsWith(tableEndpoint, '/')
   : tableEndpoint
 output tableName string = profilesTable.name
 output poolTableName string = shardsTable.name
+output historyTableName string = historyTable.name

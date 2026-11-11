@@ -40,7 +40,19 @@ infra/scripts/deploy.sh --shards 4      # a pool of at most 4 game server shards
 infra/scripts/deploy.sh --help
 ```
 
-It deploys the infrastructure without the game servers, builds the image `isv-simulator-server:<git short sha>` in the registry, deploys every game server of the pool on it, builds the game with `VITE_SERVER_URL` set to shard 0's URL (the front door; the game reads the rest of the pool from its `/pool`), uploads `dist/`, deletes the game servers of shards past the pool size (after it shrank), and checks shard 0's `/health`, `/shard` and `/pool` (its URLs must equal the deployed ones), the site, and a real game session over shard 0's WebSocket (see [Express](#express)). It doesn't touch the other shards, since any request would wake them. It prints the URLs at the end. It refuses uncommitted changes, since the image is tagged with the commit (`--allow-dirty` tags it `<sha>-dirty-<time>`).
+It deploys the infrastructure without the game servers, builds the image `isv-simulator-server:<git short sha>` in the registry, deploys every game server of the pool on it, builds the game with `VITE_SERVER_URL` set to shard 0's URL (the front door; the game reads the rest of the pool from its `/pool`), uploads `dist/`, deletes the game servers of shards past the pool size (after it shrank), and checks shard 0's `/health`, `/shard` and `/pool` (its URLs must equal the deployed ones), the [ops dashboard](#ops-dashboard) (open: `/admin` and `/admin/api/state` answer without credentials, with the pool), the site, and a real game session over shard 0's WebSocket (see [Express](#express)). It doesn't touch the other shards, since any request would wake them. It prints the URLs at the end, the dashboard's too. It refuses uncommitted changes, since the image is tagged with the commit (`--allow-dirty` tags it `<sha>-dirty-<time>`).
+
+## Ops dashboard
+
+Shard 0 serves an operations page for the pool:
+
+```
+https://ca-isv-prod-game-0.<environment domain>/admin
+```
+
+`deploy.sh` prints the URL at the end. The dashboard is open and read-only: no login, public on purpose (it's used for demos). Join codes are masked (`AB••`) and it shows no user ids, names or IPs, so nothing on it lets anyone into a room. Only shard 0 serves it; the other shards answer 404 there. Reads are cached (the pool 2 s, the history 10 s), so many viewers don't add table reads.
+
+What's there: a grid of the shards with each one's load, CPU, memory, event-loop delay and rooms (shard 0 live, the others up to 30 s old, sleeping ones shown asleep and never woken); the pool totals; which shard hosts next and which are being woken; history charts over 1 h, 24 h and 7 days; and an event log. The history is in the table `poolhistory`: shard 0 writes a snapshot a minute plus events and keeps 14 days (none while shard 0 sleeps, if `gameServerMinReplicas` is 0; that's fine, a sleeping shard 0 means nobody plays). The JSON behind it: `/admin/api/state` and `/admin/api/history?range=1h|24h|7d`. More in [Ops dashboard](../docs/plan/azure-hosting.md#ops-dashboard).
 
 ## What-if
 
@@ -76,7 +88,7 @@ Older logs are in the Log Analytics workspace `log-isv-prod` (30 days), table `C
 
 ## Profiles
 
-Online profiles are in Azure Table Storage: table `profiles` in the storage account `stisvprod<suffix>`, one entity per user, shared by every shard. The same account has the table `shards`, one pool entity per shard (see Scaling). The game servers reach it with their managed identity `id-isv-prod-game` (Storage Table Data Contributor). Shared-key access is off on the account, so there are no keys or connection strings; people sign in with Entra ID too.
+Online profiles are in Azure Table Storage: table `profiles` in the storage account `stisvprod<suffix>`, one entity per user, shared by every shard. The same account has the table `shards`, one pool entity per shard (see Scaling), and `poolhistory`, the ops dashboard's history. The game servers reach it with their managed identity `id-isv-prod-game` (Storage Table Data Contributor). Shared-key access is off on the account, so there are no keys or connection strings; people sign in with Entra ID too.
 
 To look at them: the Azure portal (the storage account → Storage browser → Tables → `profiles`), or
 
