@@ -1,10 +1,12 @@
 /**
- * First-level hints: the first time the Garage is played, labels point at
- * the inbox, the keyboard and the ship hatch until each has been used once.
+ * First-level hints: the first time the Garage is played, a label points at
+ * the inbox, then the keyboard, then the ship hatch: one step at a time, so
+ * labels never pile up over the stations, each gone once it was followed.
  * Once all three were used the save remembers it and they never show again.
  * Pure: the scene feeds in the sim's events and state every frame.
  */
 
+import { HINT_TEXTS } from '../sim/content';
 import type { GameEvent } from '../sim/orders';
 import type { GameState } from '../sim/state';
 import type { SaveData } from './save';
@@ -56,4 +58,14 @@ export function updateHints(
   if (open.length === 0) return { open: [], finished: false };
   const left = open.filter((id) => !used(id, events, state));
   return { open: left, finished: left.length === 0 };
+}
+
+/** The hints on screen: only the next step, so a new player knows what to do first. */
+export function shownHints(open: readonly HintId[]): HintId[] {
+  return open.slice(0, 1);
+}
+
+/** A hint's label, numbered as a step: `1/3 Grab a ticket here`. */
+export function hintLabel(id: HintId): string {
+  return `${HINT_IDS.indexOf(id) + 1}/${HINT_IDS.length}  ${HINT_TEXTS[id]}`;
 }

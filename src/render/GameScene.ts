@@ -12,7 +12,7 @@ import {
   onlineEnded,
 } from '../flow/flow';
 import { onlineNowMs } from '../flow/online';
-import { type HintId, startHints, updateHints } from '../flow/hints';
+import { type HintId, shownHints, startHints, updateHints } from '../flow/hints';
 import { type SaveData, type StorageLike, writeSave } from '../flow/save';
 import { DEMO_BOTS, SCREEN_FADE_MS } from '../sim/balance';
 import { type LevelMap, type Tile, getTile } from '../sim/level';
@@ -384,7 +384,7 @@ export class GameScene extends Phaser.Scene {
     this.roundRenderer.syncRound({
       view,
       events,
-      hints: this.hints,
+      hints: shownHints(this.hints),
       hintsVisible: screen === 'countdown' || screen === 'playing',
       timeMs: time,
     });

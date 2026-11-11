@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest';
 import type { GameEvent } from '../sim/orders';
 import { COL, holdWork, newTestGame, press, standAt } from '../sim/testing';
 import { enqueueTicket } from '../sim/tickets';
-import { HINT_IDS, type HintId, TUTORIAL_LEVEL_ID, startHints, updateHints } from './hints';
+import {
+  HINT_IDS,
+  type HintId,
+  TUTORIAL_LEVEL_ID,
+  hintLabel,
+  shownHints,
+  startHints,
+  updateHints,
+} from './hints';
 import { createSave } from './save';
 
 const shipped: GameEvent = {
@@ -63,5 +71,20 @@ describe('first-level hints', () => {
     const state = newTestGame();
     const update = updateHints(HINT_IDS, [shipped], state);
     expect(update.open).toEqual(['inbox', 'keyboard']);
+  });
+});
+
+describe('shown hints', () => {
+  it('show one step at a time, in the order a ticket meets them', () => {
+    expect(shownHints(['inbox', 'keyboard', 'ship'])).toEqual(['inbox']);
+    expect(shownHints(['keyboard', 'ship'])).toEqual(['keyboard']);
+    expect(shownHints(['ship'])).toEqual(['ship']);
+    expect(shownHints([])).toEqual([]);
+  });
+
+  it('number each label as a step', () => {
+    expect(hintLabel('inbox')).toMatch(/^1\/3 /);
+    expect(hintLabel('keyboard')).toMatch(/^2\/3 /);
+    expect(hintLabel('ship')).toMatch(/^3\/3 /);
   });
 });
