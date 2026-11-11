@@ -39,7 +39,6 @@ param gameServerMemory string = '1Gi'
 @allowed([0, 1])
 param gameServerMinReplicas int = 1
 
-
 @description('More origins the game server answers besides the Static Web App, e.g. a custom domain (https://isv.example.com).')
 param extraAllowedOrigins array = []
 
@@ -156,7 +155,7 @@ module gameServer 'modules/gameServer.bicep' = [
       environmentId: containerEnv.outputs.environmentId
       identityId: identity.outputs.id
       identityClientId: identity.outputs.clientId
-        shardIndex: shard
+      shardIndex: shard
       shardCount: gameServerShards
       shardAppNames: gameAppNames
       environmentDefaultDomain: containerEnv.outputs.defaultDomain
@@ -164,6 +163,7 @@ module gameServer 'modules/gameServer.bicep' = [
       tableEndpoint: storage.outputs.tableEndpoint
       tableName: storage.outputs.tableName
       poolTableName: storage.outputs.poolTableName
+      historyTableName: storage.outputs.historyTableName
       registryLoginServer: registry.outputs.loginServer
       image: image
       cpu: gameServerCpu
