@@ -1,11 +1,11 @@
 import type { LevelMap } from '../../../sim/level';
 import { getTile } from '../../../sim/level';
-import { CAMERA_FIT_PADDING, CAMERA_HUD_BOTTOM } from '../../../sim/balance';
 import {
   type CameraPose,
   fitCamera3d,
   gridToWorld,
   projectPoint,
+  roundInsets,
   screenToGround,
 } from '../../projection';
 import { firstGroup, tileHash } from '../../mapShape';
@@ -97,9 +97,8 @@ const SIGN_LEFT = 720;
 const FACTORY_GAP = 0.06;
 /** How far the factory and the cobbles run out past the level on each side. */
 const OUT = 6;
-/** The screen the scene is composed for, and the HUD's top band (`HUD_TOP_3D` in `ThreeRoundRenderer`). */
+/** The screen the scene is composed for. */
 const VIEW = { width: 1440, height: 810 };
-const HUD_TOP = 0.1;
 /** The living props: the cat asleep on the boat's roof, the ducks bobbing on the water. */
 const ALIVE: ReadonlyMap<SetPiece, AliveKind> = new Map<SetPiece, AliveKind>([
   [catLoaf, 'purr'],
@@ -123,12 +122,7 @@ function unit(a: number, b: number, salt: number): number {
 
 /** The camera pose the game uses for this map on a 1440×810 screen. */
 export function scenePose(map: LevelMap): CameraPose {
-  return fitCamera3d(levelBox(map), VIEW, {
-    top: CAMERA_FIT_PADDING + VIEW.height * HUD_TOP,
-    right: CAMERA_FIT_PADDING,
-    bottom: CAMERA_FIT_PADDING + VIEW.height * CAMERA_HUD_BOTTOM,
-    left: CAMERA_FIT_PADDING,
-  });
+  return fitCamera3d(levelBox(map), VIEW, roundInsets(VIEW));
 }
 
 /** Which edge of the map a group of tiles sits on (the inbox, the ship). */

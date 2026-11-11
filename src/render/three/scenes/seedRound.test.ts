@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { type LevelMap, getTile, parseLevelMap } from '../../../sim/level';
-import { projectPoint } from '../../projection';
+import { hudTopBand, projectPoint } from '../../projection';
 import { WALL_HEIGHT } from '../layout';
 import { SCENES } from '.';
 import { scenePose } from './downTheHall';
@@ -57,7 +57,7 @@ const VIEW = { width: 1440, height: 810 };
 /** Screen rectangles the HUD covers at 1440×810: (x0, y0, x1, y1). */
 const HUD_RECTS: Record<string, [number, number, number, number]> = {
   orders: [0, 0, 690, 140],
-  legend: [0, 610, 220, 745],
+  legend: [14, 619, 218, 734],
   score: [0, 755, 135, 810],
   timer: [1320, 755, 1440, 810],
   mute: [1370, 0, 1440, 60],
@@ -210,7 +210,8 @@ describe('seedRoundScene', () => {
         expect(b.x0).toBeGreaterThan(700);
         expect(b.x1).toBeLessThan(1300);
         expect(b.y0).toBeGreaterThan(5);
-        expect(b.y1).toBeLessThan(70);
+        // In the band the order cards keep free above the level, right of the cards.
+        expect(b.y1).toBeLessThan(hudTopBand(810));
       }
     });
 

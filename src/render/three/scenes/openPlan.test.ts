@@ -1,9 +1,8 @@
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { CAMERA_FIT_PADDING, CAMERA_HUD_BOTTOM } from '../../../sim/balance';
 import { type LevelMap, getTile, parseLevelMap } from '../../../sim/level';
-import { fitCamera3d, projectPoint } from '../../projection';
+import { fitCamera3d, projectPoint, roundInsets } from '../../projection';
 import { FRONT_WALL_HEIGHT, WALL_HEIGHT, levelBox } from '../layout';
 import { courierVan, parkHedge } from '../setDressing/businessPark';
 import { SCENES } from '.';
@@ -52,13 +51,11 @@ function onSlab(map: LevelMap, x: number, z: number, inset = 0.02): boolean {
 
 /** The screenshot size, and the camera framing `ThreeRoundRenderer.fit` uses for it. */
 const VIEW = { width: 1440, height: 810 };
-/** `HUD_TOP_3D` in `ThreeRoundRenderer` (kept in step by hand: it's private there). */
-const HUD_TOP = 0.1;
 
 /** Screen rectangles the HUD covers at 1440×810: (x0, y0, x1, y1). */
 const HUD_RECTS: Record<string, [number, number, number, number]> = {
   orders: [0, 0, 460, 140],
-  legend: [0, 610, 220, 745],
+  legend: [14, 619, 218, 734],
   score: [0, 755, 135, 810],
   timer: [1320, 755, 1440, 810],
   mute: [1370, 0, 1440, 60],
@@ -69,12 +66,7 @@ const HUD_RECTS: Record<string, [number, number, number, number]> = {
 const BOUNDARY = new Set([parkHedge]);
 
 const poseFor = (map: LevelMap) =>
-  fitCamera3d(levelBox(map), VIEW, {
-    top: CAMERA_FIT_PADDING + VIEW.height * HUD_TOP,
-    right: CAMERA_FIT_PADDING,
-    bottom: CAMERA_FIT_PADDING + VIEW.height * CAMERA_HUD_BOTTOM,
-    left: CAMERA_FIT_PADDING,
-  });
+  fitCamera3d(levelBox(map), VIEW, roundInsets(VIEW));
 
 describe('openPlanScene', () => {
   it("is the open-plan level's scene", () => {
