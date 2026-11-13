@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { type LevelMap, parseLevelMap } from '../../sim/level';
 import { ATMOSPHERES, DEFAULT_ATMOSPHERE, sceneOf } from './atmosphere';
-import { ambientAnchors, beaconAngle, beaconFlare, beaconSpot } from './WorldFx';
+import { ambientAnchors, beaconAngle, beaconFlare, beaconSpot, chaseLevel } from './WorldFx';
 import { loftRoom } from './rooms/loftRoom';
 import { gridToWorld } from '../projection';
 import { SCENES } from './scenes';
@@ -100,5 +100,23 @@ describe('the incident beacon', () => {
     expect(beaconFlare(beaconAngle(750, 1))).toBeCloseTo(1);
     expect(beaconFlare(beaconAngle(250, 1))).toBe(0);
     expect(beaconFlare(0)).toBeCloseTo(0);
+  });
+});
+
+describe("the lamps' chase", () => {
+  it('stays in [0, 1] and repeats every period', () => {
+    for (let t = 0; t < 12000; t += 370) {
+      for (let i = 0; i < 5; i++) {
+        const k = chaseLevel(t, 6, i, 5);
+        expect(k).toBeGreaterThanOrEqual(0);
+        expect(k).toBeLessThanOrEqual(1);
+        expect(chaseLevel(t + 6000, 6, i, 5)).toBeCloseTo(k);
+      }
+    }
+  });
+
+  it('runs along the row: the next lamp follows a step behind', () => {
+    expect(chaseLevel(1200, 6, 1, 5)).toBeCloseTo(chaseLevel(0, 6, 0, 5));
+    expect(chaseLevel(0, 6, 0, 5)).not.toBeCloseTo(chaseLevel(0, 6, 2, 5));
   });
 });

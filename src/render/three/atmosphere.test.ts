@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { getTile, isSolid } from '../../sim/level';
 import { parseDraftMap } from '../../sim/draftMap';
-import { DOWN_THE_HALL, GARAGE, LEVELS, OPEN_PLAN, SEED_ROUND } from '../../sim/levels';
+import { DEMO_DAY, DOWN_THE_HALL, GARAGE, LEVELS, OPEN_PLAN, SEED_ROUND } from '../../sim/levels';
 import draftText from '../../../maps/drafts/garage.txt?raw';
 import openPlanDraft from '../../../maps/drafts/open-plan.txt?raw';
 import scaleUpDraft from '../../../maps/drafts/scale-up.txt?raw';
 import seedRoundDraft from '../../../maps/drafts/seed-round.txt?raw';
+import demoDayDraft from '../../../maps/drafts/demo-day.txt?raw';
 import { LEVEL_LOOKS } from '../mapLook';
 import { fitCamera3d, gridToWorld, projectPoint } from '../projection';
 import {
@@ -15,9 +16,12 @@ import {
   cssRgba,
   fogRange,
   glintSpots,
+  lampColor,
   lampSpots,
   moteSeeds,
+  sideLightSpots,
   sunPlacement,
+  washPlacement,
 } from './atmosphere';
 
 const SHIPPED = { width: 14, height: 10 };
@@ -48,8 +52,13 @@ describe('atmosphereFor', () => {
     expect(atmosphereFor('seed-round')).not.toBe(DEFAULT_ATMOSPHERE);
   });
 
+  it('gives demo-day its stage lighting', () => {
+    expect(atmosphereFor(LEVEL_LOOKS[DEMO_DAY.id]?.scene)).toBe(ATMOSPHERES['demo-day']);
+    expect(atmosphereFor('demo-day')).not.toBe(DEFAULT_ATMOSPHERE);
+  });
+
   it('leaves every other level on the default', () => {
-    const lit = new Set([GARAGE.id, 'open-plan', 'scale-up', SEED_ROUND.id]);
+    const lit = new Set([GARAGE.id, 'open-plan', 'scale-up', SEED_ROUND.id, DEMO_DAY.id]);
     for (const level of LEVELS) {
       if (lit.has(level.id)) continue;
       expect(atmosphereFor(LEVEL_LOOKS[level.id]?.scene)).toBe(DEFAULT_ATMOSPHERE);
@@ -148,10 +157,10 @@ describe('morning and evening suns', () => {
     expect(a.vignette?.glow?.y).toBeGreaterThanOrEqual(0.3);
   });
 
-  it('switches the incident beacon and the floor glints on for the blue hour only', () => {
+  it('switches the incident beacon on for the blue hour only, the floor glints for polished floors', () => {
     for (const [id, a] of Object.entries(ATMOSPHERES)) {
       expect(a.beacon !== undefined, id).toBe(id === 'seed-round');
-      expect(a.glints !== undefined, id).toBe(id === 'seed-round');
+      expect(a.glints !== undefined, id).toBe(id === 'seed-round' || id === 'demo-day');
     }
     expect(DEFAULT_ATMOSPHERE.beacon).toBeUndefined();
     const a = atmosphereFor('seed-round');
@@ -163,12 +172,146 @@ describe('morning and evening suns', () => {
   });
 
   it('keeps vignettes gentle and lamps along the back wall only', () => {
-    for (const scene of ['open-plan', 'scale-up', 'seed-round']) {
+    for (const scene of ['open-plan', 'scale-up', 'seed-round', 'demo-day']) {
       const a = atmosphereFor(scene);
       expect(a.vignette?.opacity).toBeLessThanOrEqual(0.4);
       expect(a.vignette?.inner).toBeCloseTo(0.7);
       expect(a.lamps?.frontFrom).toBeGreaterThanOrEqual(12);
     }
+  });
+});
+
+describe('stage lighting', () => {
+  const a = atmosphereFor('demo-day');
+  const rgb = (c: number) => [(c >> 16) & 255, (c >> 8) & 255, c & 255] as const;
+  const maps = [DEMO_DAY.map, parseDraftMap(demoDayDraft)];
+
+  it('lights the stage from the front of house, high enough for the back row', () => {
+    for (const map of [...maps, SHIPPED, { width: 19, height: 11 }]) {
+      const { position: s, target: t } = sunPlacement(a, map);
+      // From the audience's side, mostly head on.
+      expect(s.z).toBeGreaterThan(t.z);
+      expect(s.z - t.z).toBeGreaterThan(Math.abs(s.x - t.x) * 2);
+      const elevation = Math.atan2(s.y, Math.hypot(s.x - t.x, s.z - t.z)) * (180 / Math.PI);
+      expect(elevation).toBeGreaterThan(40);
+      expect(elevation).toBeLessThan(55);
+    }
+  });
+
+  it('keeps the wash warm white and the fill only slightly blue', () => {
+    const [r, g, b] = rgb(a.sun.color);
+    expect(r).toBeGreaterThanOrEqual(b);
+    expect(Math.min(r, g, b)).toBeGreaterThan(210);
+    for (const c of [a.sky.sky, a.fill.color]) {
+      const [cr, , cb] = rgb(c);
+      expect(cb - cr).toBeLessThanOrEqual(50);
+      expect(cr).toBeGreaterThan(190);
+    }
+  });
+
+  it('keeps the hall dark and cool round the stage, with glows at the edges and the top', () => {
+    for (const c of [a.backdrop?.outer ?? 0, a.fog?.color ?? 0, a.vignette?.color ?? 0]) {
+      const [r, g, b] = rgb(c);
+      expect(b).toBeGreaterThan(r);
+      expect(b).toBeGreaterThan(g);
+      expect(Math.max(r, g, b)).toBeLessThan(0x70);
+    }
+    const glows = [a.vignette?.glow, ...(a.vignette?.glows ?? [])].filter((g) => g !== undefined);
+    expect(glows.length).toBeGreaterThanOrEqual(3);
+    for (const g of glows) {
+      // Faint, and only at an edge: never over the middle of the stage.
+      expect(g.opacity).toBeLessThanOrEqual(0.35);
+      expect(Math.min(g.x, 1 - g.x, g.y, 1 - g.y)).toBeLessThanOrEqual(0.05);
+    }
+  });
+
+  it('hangs gelled par cans along the back wall on both demo-day maps, chasing gently', () => {
+    const lamps = a.lamps;
+    expect(lamps?.frontFrom).toBeGreaterThanOrEqual(12);
+    expect(lamps?.chase?.depth).toBeLessThanOrEqual(0.25);
+    expect(lamps?.chase?.seconds).toBeGreaterThanOrEqual(4);
+    expect(lamps?.halo?.opacity).toBeLessThanOrEqual(0.6);
+    for (const map of maps) {
+      const spots = lampSpots(a, map);
+      expect(spots.length).toBeGreaterThanOrEqual(3);
+      for (const p of spots) {
+        const tile = getTile(map, Math.round(p.x), Math.round(p.z));
+        expect(tile).not.toBeNull();
+        expect(tile).not.toBe('wall');
+        expect(tile).not.toBe('void');
+        expect(Math.round(p.z)).toBeLessThan(map.height * 0.35);
+      }
+      // Neighbours differ in color, like a row of gelled cans.
+      const colors = spots.map((_, i) => lampColor(a, i));
+      expect(new Set(colors).size).toBeGreaterThan(1);
+    }
+  });
+});
+
+describe('the stage wash and the side lights', () => {
+  const a = atmosphereFor('demo-day');
+
+  it('leaves every other level without a wash, side lights or an occlusion override', () => {
+    for (const [id, other] of Object.entries(ATMOSPHERES)) {
+      if (id === 'demo-day') continue;
+      expect(washPlacement(other, SHIPPED), id).toBeNull();
+      expect(sideLightSpots(other, SHIPPED), id).toEqual([]);
+      expect(other.occlusion, id).toBeUndefined();
+    }
+    expect(washPlacement(DEFAULT_ATMOSPHERE, SHIPPED)).toBeNull();
+    expect(DEFAULT_ATMOSPHERE.occlusion).toBeUndefined();
+  });
+
+  it('washes the stage from the front, its cone about as wide as the map', () => {
+    for (const map of [DEMO_DAY.map, parseDraftMap(demoDayDraft)]) {
+      const w = washPlacement(a, map);
+      expect(w).not.toBeNull();
+      if (!w) continue;
+      expect(w.position.z).toBeGreaterThan(w.target.z);
+      expect(w.target).toEqual(gridToWorld((map.width - 1) / 2, (map.height - 1) / 2));
+      const distance = Math.hypot(
+        w.position.x - w.target.x,
+        w.position.y - w.target.y,
+        w.position.z - w.target.z,
+      );
+      const across = 2 * distance * Math.tan(w.angle);
+      expect(across).toBeGreaterThan(Math.max(map.width, map.height) * 0.8);
+      expect(across).toBeLessThan(Math.max(map.width, map.height) * 1.3);
+    }
+  });
+
+  it('puts the blue and violet working lights in the world beside the room, never over it', () => {
+    for (const map of [DEMO_DAY.map, parseDraftMap(demoDayDraft)]) {
+      const spots = sideLightSpots(a, map);
+      expect(spots.length).toBeGreaterThanOrEqual(2);
+      for (const { at, color } of spots) {
+        const left = at.x < 0;
+        // At least two tiles outside the outline, so their light barely reaches the stations.
+        expect(left ? -0.5 - at.x : at.x - (map.width - 0.5)).toBeGreaterThanOrEqual(2);
+        expect(at.z).toBeGreaterThan(-0.5);
+        expect(at.z).toBeLessThan(map.height - 0.5);
+        const b = color & 255;
+        expect(b).toBeGreaterThan((color >> 16) & 255);
+        expect(color).toBe(left ? a.sides?.left : a.sides?.right);
+      }
+    }
+  });
+});
+
+describe('lampColor', () => {
+  it('uses the one lamp color without a cycle', () => {
+    const garage = atmosphereFor('garage');
+    expect(lampColor(garage, 0)).toBe(garage.lamps?.color);
+    expect(lampColor(garage, 3)).toBe(garage.lamps?.color);
+  });
+
+  it('cycles the colors along the lamps', () => {
+    const a = atmosphereFor('demo-day');
+    const colors = a.lamps?.colors ?? [];
+    expect(colors.length).toBeGreaterThan(1);
+    expect(lampColor(a, 0)).toBe(colors[0]);
+    expect(lampColor(a, 1)).toBe(colors[1]);
+    expect(lampColor(a, colors.length)).toBe(colors[0]);
   });
 });
 

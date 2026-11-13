@@ -30,8 +30,35 @@ export interface Atmosphere {
   };
   /** Hemisphere light: sky color from above, bounce color from the ground. */
   sky: { sky: number; ground: number; intensity: number };
+  /**
+   * A follow-spot style wash on the level only, no shadows: a spot light from
+   * `from` (like the sun's) at the map's center, its cone just wide enough
+   * for a circle `spread` × the map's longer side across, soft at the rim, so
+   * the room is brighter than the world round it (a lit stage in a dark hall).
+   */
+  wash?: { color: number; intensity: number; from: SunPlacement; spread: number };
+  /**
+   * Working light in the world beside the room, never on it: `perSide` point
+   * lights down each side, `out` grid units outside the outline and `height`
+   * up, `left` and `right` colored, reaching `distance`. No shadows, off on `low`.
+   */
+  sides?: {
+    left: number;
+    right: number;
+    intensity: number;
+    distance: number;
+    height: number;
+    out: number;
+    perSide: number;
+  };
   /** A weak light from the camera side that lifts the shadow sides. */
   fill: { color: number; intensity: number };
+  /**
+   * Ambient occlusion's strength instead of the stage's usual 3.5 (high and
+   * medium only): lower for a dark set, where full occlusion turns its
+   * corners and stacked cases to soot.
+   */
+  occlusion?: number;
   /** How much the soft room reflections show on materials. */
   environment: number;
   /** Behind the diorama, a radial gradient; none for the menus' dark blue. */
@@ -60,6 +87,8 @@ export interface Atmosphere {
     inner: number;
     glow?: { color: number; opacity: number; x: number; y: number; reach: number };
     band?: { opacity: number; depth: number };
+    /** More glows like `glow`, drawn over it in order: a second edge, a haze under the top. */
+    glows?: { color: number; opacity: number; x: number; y: number; reach: number }[];
   };
   /**
    * Warm point lights in a row just inside the back wall (and the front wall
@@ -75,6 +104,18 @@ export interface Atmosphere {
     spacing: number;
     inset: number;
     frontFrom: number;
+    /** Colors cycled along the lamps (`lampSpots` order) instead of `color`: a stage's gelled par cans. */
+    colors?: number[];
+    /**
+     * A soft glow round each lamp's lens (see `WorldFx`), in the lamp's own
+     * color: `size` world units across, under the bloom. Off on `low`.
+     */
+    halo?: { size: number; opacity: number };
+    /**
+     * The lamps swell and dim in a slow wave along the row, a share `depth`
+     * of their brightness, once every `seconds`: a live show's chase. Off on `low`.
+     */
+    chase?: { depth: number; seconds: number };
   };
   /** Dust drifting in the room's light: `perTile` motes per floor tile, faint and below bloom. */
   motes?: { color: number; opacity: number; perTile: number };
@@ -164,7 +205,7 @@ const MONDAY_MORNING: Atmosphere = {
     from: { x: 8, y: 3.5, height: 11.5, perMapSize: false },
     reach: 0.95,
   },
-  sky: { sky: 0xb4ccff, ground: 0x857a6c, intensity: 1.4 },
+  sky: { sky: 0xb4ccff, ground: 0x857a6c, intensity: 1.8 },
   fill: { color: 0xc4d4f4, intensity: 0.65 },
   environment: 0.05,
   backdrop: { inner: 0xc4dcf2, outer: 0x8fb2d6 },
@@ -256,12 +297,78 @@ const BLUE_HOUR: Atmosphere = {
   glints: { color: 0xeef2ff, opacity: 0.3, size: 1.1, forward: 1.2 },
 };
 
+/**
+ * Stage lighting at the accelerator's Demo Day: a strong warm-white front
+ * wash (the front-of-house key light, from the front and high, about 47° up,
+ * so shadows fall upstage behind people and props and the back row stays
+ * lit), a near-white fill so stations stay true, a dark hall all round with
+ * blue working light in the wings, YOTTA-violet back light at the right edge
+ * and a faint haze glowing under the truss at the top. Par cans on the truss
+ * along the back wall, warm white and violet, swell in a slow chase.
+ */
+const STAGE_LIGHTS: Atmosphere = {
+  sun: {
+    color: 0xfff0da,
+    intensity: 5.6,
+    from: { x: -2.5, y: 7.5, height: 8.5, perMapSize: false },
+    reach: 0.95,
+  },
+  wash: {
+    color: 0xfff4e4,
+    intensity: 3.2,
+    from: { x: 0, y: 9, height: 10, perMapSize: false },
+    spread: 1.05,
+  },
+  sides: {
+    left: 0x5a86ff,
+    right: 0x8e64ff,
+    intensity: 60,
+    distance: 5,
+    height: 2.2,
+    out: 2.8,
+    perSide: 2,
+  },
+  sky: { sky: 0xf6f2f0, ground: 0x5a5670, intensity: 1.4 },
+  fill: { color: 0xeef0ff, intensity: 1.2 },
+  occlusion: 2.2,
+  environment: 0.14,
+  backdrop: { inner: 0x2c2658, outer: 0x0e0c20 },
+  fog: { color: 0x1c1a40, start: 0.5, span: 10 },
+  vignette: {
+    color: 0x120e2c,
+    opacity: 0.38,
+    inner: 0.7,
+    // Blue working light in the wings (left)...
+    glow: { color: 0x4a7cff, opacity: 0.32, x: 0, y: 0.55, reach: 0.3 },
+    glows: [
+      // ...YOTTA-violet back light on the tech side (right)...
+      { color: 0x8a5cff, opacity: 0.3, x: 1, y: 0.55, reach: 0.3 },
+      // ...and haze glowing under the truss, in front of the LED wall.
+      { color: 0xc8b8ff, opacity: 0.3, x: 0.62, y: 0.04, reach: 0.5 },
+    ],
+  },
+  lamps: {
+    color: 0xfff0dc,
+    intensity: 5,
+    distance: 4.5,
+    height: 2.2,
+    spacing: 3,
+    inset: 0.45,
+    frontFrom: 12,
+    colors: [0xfff0dc, 0xb8a4ff],
+    halo: { size: 0.6, opacity: 0.5 },
+    chase: { depth: 0.18, seconds: 6 },
+  },
+  glints: { color: 0xfff0dc, opacity: 0.12, size: 1.5, forward: 1.2 },
+};
+
 /** Presets per `MapLook.scene` id. */
 export const ATMOSPHERES: Readonly<Record<string, Atmosphere>> = {
   garage: GOLDEN_HOUR,
   'open-plan': MONDAY_MORNING,
   'scale-up': CANAL_EVENING,
   'seed-round': BLUE_HOUR,
+  'demo-day': STAGE_LIGHTS,
 };
 
 /** The light and air for a scene id; the default for none or an unknown one. */
@@ -274,6 +381,43 @@ export function atmosphereFor(scene: string | undefined): Atmosphere {
 /** The scene id whose preset `atmosphere` is, if it is one. */
 export function sceneOf(atmosphere: Atmosphere): string | undefined {
   return Object.keys(ATMOSPHERES).find((id) => ATMOSPHERES[id] === atmosphere);
+}
+
+/** The wash's spot light for a map: where it stands, where it points, and its cone's half-angle. */
+export function washPlacement(
+  atmosphere: Atmosphere,
+  map: Pick<LevelMap, 'width' | 'height'>,
+): { position: Vec3; target: Vec3; angle: number } | null {
+  const wash = atmosphere.wash;
+  if (!wash) return null;
+  const { width, height } = map;
+  const cx = (width - 1) / 2;
+  const cy = (height - 1) / 2;
+  const { from } = wash;
+  const sx = from.perMapSize ? width : 1;
+  const sy = from.perMapSize ? height : 1;
+  const position = gridToWorld(cx + from.x * sx, cy + from.y * sy, from.height);
+  const target = gridToWorld(cx, cy);
+  const distance = Math.hypot(position.x - target.x, position.y - target.y, position.z - target.z);
+  const radius = (Math.max(width, height) * wash.spread) / 2;
+  return { position, target, angle: Math.atan2(radius, distance) };
+}
+
+/** Where the side working lights stand (`Atmosphere.sides`), each with its color. */
+export function sideLightSpots(
+  atmosphere: Atmosphere,
+  map: Pick<LevelMap, 'width' | 'height'>,
+): { at: Vec3; color: number }[] {
+  const sides = atmosphere.sides;
+  if (!sides) return [];
+  const n = Math.max(1, sides.perSide);
+  return [-1, 1].flatMap((side) =>
+    Array.from({ length: n }, (_, i) => {
+      const x = side < 0 ? -0.5 - sides.out : map.width - 0.5 + sides.out;
+      const y = -0.5 + (map.height * (i + 0.5)) / n;
+      return { at: gridToWorld(x, y, sides.height), color: side < 0 ? sides.left : sides.right };
+    }),
+  );
 }
 
 /** The sun's world position and where it points for a map. */
@@ -323,6 +467,14 @@ export function lampSpots(
       gridToWorld(x0 - 0.5 + (length * (i + 0.5)) / count, y, lamps.height),
     );
   });
+}
+
+/** The color of the lamp at `index` in `lampSpots`: `colors` in turn, or `color`. */
+export function lampColor(atmosphere: Atmosphere, index: number): number {
+  const lamps = atmosphere.lamps;
+  if (!lamps) return 0xffffff;
+  const colors = lamps.colors ?? [];
+  return colors.length > 0 ? (colors[index % colors.length] ?? lamps.color) : lamps.color;
 }
 
 /**

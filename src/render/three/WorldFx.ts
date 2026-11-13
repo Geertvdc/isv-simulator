@@ -14,7 +14,7 @@ import {
   sceneOf,
 } from './atmosphere';
 import { blockHeight, facingYaw, heroPlacement, stationFacing } from './layout';
-import { LAMP_KEY } from './look';
+import { LAMP_INDEX_KEY, LAMP_KEY } from './look';
 import { loftRoom } from './rooms/loftRoom';
 import { SCENES } from './scenes';
 import { GROUND, type Scene, type ScenePiece } from './scenes/types';
@@ -192,6 +192,17 @@ export class WorldFx {
     turns: number;
     group: THREE.Group;
   } | null = null;
+  /**
+   * The lamps' slow chase (`Atmosphere.lamps.chase`): each lamp with its base
+   * brightness and its halo, if it has one.
+   */
+  private chase: {
+    depth: number;
+    seconds: number;
+    haloOpacity: number;
+    lamps: { light: THREE.PointLight; base: number; halo: THREE.Sprite | null }[];
+    group: THREE.Group;
+  } | null = null;
   private shake = { untilMs: 0, intensity: 0 };
   shakeEnabled = true;
 
@@ -228,6 +239,7 @@ export class WorldFx {
     }
     this.buildAmbient(world, atmosphere);
     this.buildFixtures(atmosphere);
+    this.buildLampGlow(world, atmosphere);
     this.rug = new THREE.MeshBasicMaterial({
       color: RUG_COLOR,
       transparent: true,
@@ -279,6 +291,7 @@ export class WorldFx {
     this.driftMotes(timeMs);
     this.moveAmbient(timeMs);
     this.turnBeacon(timeMs);
+    this.runChase(timeMs);
     for (let i = this.puffs.length - 1; i >= 0; i--) {
       const puff = this.puffs[i];
       if (!puff) continue;
@@ -454,6 +467,65 @@ export class WorldFx {
         group.add(mesh);
       }
     }
+  }
+
+  /**
+   * A soft glow round each lamp's lens in its own color, and the lamps'
+   * slow chase (`Atmosphere.lamps`), under one group that `Stage` hides on `low`.
+   */
+  private buildLampGlow(world: THREE.Scene, atmosphere: Atmosphere): void {
+    const spec = atmosphere.lamps;
+    if (!spec || (!spec.halo && !spec.chase)) return;
+    const lights: THREE.PointLight[] = [];
+    world.traverse((obj) => {
+      if (obj instanceof THREE.PointLight && typeof obj.userData[LAMP_INDEX_KEY] === 'number')
+        lights.push(obj);
+    });
+    if (lights.length === 0) return;
+    const group = new THREE.Group();
+    group.userData[AMBIENT_KEY] = true;
+    this.root.add(group);
+    const texture = spec.halo ? haloTexture() : null;
+    const lamps = lights.map((light) => {
+      let halo: THREE.Sprite | null = null;
+      if (spec.halo && texture) {
+        halo = new THREE.Sprite(
+          new THREE.SpriteMaterial({
+            map: texture,
+            color: light.color,
+            transparent: true,
+            opacity: spec.halo.opacity,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            fog: false,
+          }),
+        );
+        halo.position.copy(light.position);
+        halo.scale.setScalar(spec.halo.size);
+        group.add(halo);
+      }
+      return { light, base: light.intensity, halo };
+    });
+    this.chase = {
+      depth: spec.chase?.depth ?? 0,
+      seconds: spec.chase?.seconds ?? 1,
+      haloOpacity: spec.halo?.opacity ?? 0,
+      lamps,
+      group,
+    };
+    this.runChase(0);
+  }
+
+  /** The lamps swell and dim in a slow wave along the row, their halos with them. */
+  private runChase(timeMs: number): void {
+    const c = this.chase;
+    if (!c || c.depth === 0 || !c.group.visible) return;
+    const n = c.lamps.length;
+    c.lamps.forEach(({ light, base, halo }, i) => {
+      const k = chaseLevel(timeMs, c.seconds, i, n);
+      light.intensity = base * (1 - c.depth + c.depth * k);
+      if (halo) halo.material.opacity = c.haloOpacity * (0.55 + 0.45 * k);
+    });
   }
 
   /** The beacon's beam sweeps round; its flare peaks each time the beam faces the camera. */
@@ -635,6 +707,15 @@ export function beaconSpot(map: LevelMap): Vec3 | null {
   if (!spot) return null;
   const at = gridToWorld(spot.x, spot.y);
   return { x: at.x + BEACON_LENS.x, y: at.y + BEACON_LENS.y, z: at.z + BEACON_LENS.z };
+}
+
+/**
+ * How far up its slow chase the lamp `index` of `count` is at `timeMs`, in
+ * [0, 1]: one smooth wave along the row every `seconds`.
+ */
+export function chaseLevel(timeMs: number, seconds: number, index: number, count: number): number {
+  const phase = timeMs / 1000 / seconds - index / Math.max(1, count);
+  return 0.5 + 0.5 * Math.sin(phase * Math.PI * 2);
 }
 
 /**

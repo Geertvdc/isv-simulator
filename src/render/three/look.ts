@@ -3,7 +3,15 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import type { BlockTile, LevelMap } from '../../sim/level';
 import type { FloorTheme, WallTheme } from '../mapLook';
 import { gridToWorld } from '../projection';
-import { type Atmosphere, DEFAULT_ATMOSPHERE, lampSpots, sunPlacement } from './atmosphere';
+import {
+  type Atmosphere,
+  DEFAULT_ATMOSPHERE,
+  lampColor,
+  lampSpots,
+  sideLightSpots,
+  sunPlacement,
+  washPlacement,
+} from './atmosphere';
 import { COLOR } from './palette';
 
 /**
@@ -143,12 +151,14 @@ export const WALL_COLORS: Readonly<Record<WallTheme, { face: number; top: number
   warehouse: { face: 0x805a4e, top: 0x6e706d },
   // White-painted brick over birch ply, capped with cool light coping.
   loft: { face: 0xd3d5d2, top: 0x72777c },
-  // Charcoal scenery flats, capped with brushed aluminium.
-  stageSet: { face: 0x3a3b42, top: 0x8a9098 },
+  // Charcoal scenery flats, capped with brushed aluminium rails round a mid-grey channel.
+  stageSet: { face: 0x3a3b42, top: 0x5c6068 },
 };
 
 /** Marks the room's warm lamps, which only `medium` and `high` quality light (see `Stage`). */
 export const LAMP_KEY = 'lamp';
+/** A lamp's place in `lampSpots`, on the lamps of the row only (not the side lights). */
+export const LAMP_INDEX_KEY = 'lampIndex';
 
 /**
  * Lights for a level: sky, sun with soft shadows fitted to the map, a fill
@@ -190,15 +200,38 @@ export function createLights(
   put(fill, gridToWorld(cx + width * 0.6, cy + height * 1.2, 6));
   put(fill.target, gridToWorld(cx, cy));
 
+  // A stage's wash: brighter on the room than on the world round it, no shadows.
+  const washed = washPlacement(atmosphere, map);
+  const wash: THREE.Object3D[] = [];
+  if (washed && atmosphere.wash) {
+    const spot = new THREE.SpotLight(atmosphere.wash.color, atmosphere.wash.intensity);
+    spot.angle = washed.angle;
+    spot.penumbra = 0.55;
+    spot.decay = 0;
+    put(spot, washed.position);
+    put(spot.target, washed.target);
+    wash.push(spot, spot.target);
+  }
+
   // Bare bulbs: cheap point lights with a short reach and no shadows.
-  const lamps = lampSpots(atmosphere, map).map((p) => {
+  const lamps = lampSpots(atmosphere, map).map((p, i) => {
     const spec = atmosphere.lamps;
-    const lamp = new THREE.PointLight(spec?.color, spec?.intensity, spec?.distance, 2);
+    const color = lampColor(atmosphere, i);
+    const lamp = new THREE.PointLight(color, spec?.intensity, spec?.distance, 2);
     put(lamp, p);
     lamp.userData[LAMP_KEY] = true;
+    lamp.userData[LAMP_INDEX_KEY] = i;
     return lamp;
   });
-  return [sky, sun, sun.target, fill, fill.target, ...lamps];
+  // Working light in the world beside the room: hidden on `low` like the lamps, but no lamp of the row.
+  const sides = sideLightSpots(atmosphere, map).map(({ at, color }) => {
+    const spec = atmosphere.sides;
+    const light = new THREE.PointLight(color, spec?.intensity, spec?.distance, 2);
+    put(light, at);
+    light.userData[LAMP_KEY] = true;
+    return light;
+  });
+  return [sky, sun, sun.target, fill, fill.target, ...wash, ...lamps, ...sides];
 }
 
 let environment: THREE.Texture | null = null;
@@ -214,6 +247,8 @@ export function roomEnvironment(renderer: THREE.WebGLRenderer): THREE.Texture {
 
 /** Where a scene keeps its vignette for `Stage` (an `Atmosphere['vignette']`). */
 export const VIGNETTE_KEY = 'vignette';
+/** Where a scene keeps its ambient occlusion strength for `Stage` (`Atmosphere.occlusion`). */
+export const OCCLUSION_KEY = 'occlusion';
 
 /**
  * Dresses `scene` with the room reflections, the backdrop and the
@@ -230,6 +265,7 @@ export function dressScene(
   scene.background = backdrop(atmosphere.backdrop);
   if (atmosphere.fog) scene.fog = new THREE.Fog(atmosphere.fog.color);
   if (atmosphere.vignette) scene.userData[VIGNETTE_KEY] = atmosphere.vignette;
+  if (atmosphere.occlusion !== undefined) scene.userData[OCCLUSION_KEY] = atmosphere.occlusion;
 }
 
 /** A radial gradient behind the diorama, so it doesn't float in flat black. */
