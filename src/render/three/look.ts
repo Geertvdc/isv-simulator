@@ -126,6 +126,8 @@ export const FLOOR_COLORS: Readonly<Record<FloorTheme, readonly [number, number]
   boards: [0x968676, 0x4a3c32],
   // A loft's polished concrete, light warm grey; the second is the saw cuts, thin and darker.
   polished: [0xaaa69e, 0x86827a],
+  // Painted stage decks, a dark grey; the second is the joints between the decks.
+  stageDeck: [0x4a4c55, 0x5c5e68],
 };
 
 /** Wall colors per theme: face and top. Caps stay darker than stations, so the eye goes to the stations. */
@@ -141,6 +143,8 @@ export const WALL_COLORS: Readonly<Record<WallTheme, { face: number; top: number
   warehouse: { face: 0x805a4e, top: 0x6e706d },
   // White-painted brick over birch ply, capped with cool light coping.
   loft: { face: 0xd3d5d2, top: 0x72777c },
+  // Charcoal scenery flats, capped with brushed aluminium.
+  stageSet: { face: 0x3a3b42, top: 0x8a9098 },
 };
 
 /** Marks the room's warm lamps, which only `medium` and `high` quality light (see `Stage`). */

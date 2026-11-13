@@ -5,7 +5,8 @@ import type { BlockTile } from '../sim/level';
  * the room as a converted garage: roll-up door at the ship hatch, house door
  * at the inbox, pegboard and paint tins, counters as doors on sawhorses.
  * `officePark` is a business-park unit (Open Plan Office), `warehouse` an old
- * brick factory (Down the Hall), `loft` a startup's rooftop loft (Seed Round). A theme's room dressing, if it has one, is
+ * brick factory (Down the Hall), `loft` a startup's rooftop loft (Seed Round),
+ * `stageSet` the demo set on the Demo Day stage. A theme's room dressing, if it has one, is
  * in `src/render/three/rooms/`.
  */
 export const WALL_THEMES = [
@@ -16,13 +17,15 @@ export const WALL_THEMES = [
   'officePark',
   'warehouse',
   'loft',
+  'stageSet',
 ] as const;
 export type WallTheme = (typeof WALL_THEMES)[number];
 
 /**
  * Floor looks a level can pick. `slab` is a garage's sealed concrete, joints,
  * oil stain and all; `carpetTiles` an office's carpet tiles, `boards` old
- * timber floorboards, `polished` a loft's polished concrete.
+ * timber floorboards, `polished` a loft's polished concrete, `stageDeck`
+ * painted black-grey stage decks.
  */
 export const FLOOR_THEMES = [
   'concrete',
@@ -32,6 +35,7 @@ export const FLOOR_THEMES = [
   'carpetTiles',
   'boards',
   'polished',
+  'stageDeck',
 ] as const;
 export type FloorTheme = (typeof FLOOR_THEMES)[number];
 
@@ -57,7 +61,8 @@ export const LEVEL_LOOKS: Readonly<Record<string, MapLook>> = {
   'scale-up': { walls: 'warehouse', floor: 'boards', scene: 'scale-up' },
   // Startup: a rooftop loft in the city.
   'seed-round': { walls: 'loft', floor: 'polished', scene: 'seed-round' },
-  'demo-day': { walls: 'plaster', floor: 'parquet' },
+  // Demo Day: building it live on the accelerator's stage.
+  'demo-day': { walls: 'stageSet', floor: 'stageDeck', scene: 'demo-day' },
   'on-call': { walls: 'wood', floor: 'carpet' },
   // Scale-Up: glass walls go in.
   'middle-management': { walls: 'glass', floor: 'concrete' },
