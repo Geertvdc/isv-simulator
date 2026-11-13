@@ -71,4 +71,24 @@ describe('vignetteCss', () => {
     // The glow comes first, so it draws over the band.
     expect(css.startsWith('radial-gradient(38% 53% at 0% 45%')).toBe(true);
   });
+
+  it('draws extra glows over the first one, the last on top', () => {
+    const css = vignetteCss({
+      color: 0x120e2c,
+      opacity: 0.38,
+      inner: 0.7,
+      glow: { color: 0x3a6cff, opacity: 0.3, x: 0, y: 0.5, reach: 0.3 },
+      glows: [
+        { color: 0x7a4cff, opacity: 0.28, x: 1, y: 0.5, reach: 0.3 },
+        { color: 0xb8a8ff, opacity: 0.18, x: 0.5, y: 0.02, reach: 0.55 },
+      ],
+    });
+    const top = css.indexOf('at 50% 2%');
+    const right = css.indexOf('at 100% 50%');
+    const left = css.indexOf('at 0% 50%');
+    expect(top).toBe(css.indexOf('radial-gradient(55% 77%') + 'radial-gradient(55% 77% '.length);
+    expect(top).toBeLessThan(right);
+    expect(right).toBeLessThan(left);
+    expect(left).toBeLessThan(css.indexOf('farthest-corner'));
+  });
 });

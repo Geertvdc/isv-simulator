@@ -13,7 +13,7 @@ import type { Graphics } from '../../flow/save';
 import { type CameraPose, cameraPosition } from '../projection';
 import { AMBIENT_KEY, type Atmosphere, cssRgba } from './atmosphere';
 import { GLOW_BOOST_KEY } from './kit';
-import { LAMP_KEY, VIGNETTE_KEY } from './look';
+import { LAMP_KEY, OCCLUSION_KEY, VIGNETTE_KEY } from './look';
 import {
   type FrameWatch,
   type Quality,
@@ -247,7 +247,8 @@ export class Stage {
     const ao = new N8AOPostPass(scene, this.camera, width, height);
     ao.configuration.aoRadius = AO.radius;
     ao.configuration.distanceFalloff = AO.falloff;
-    ao.configuration.intensity = AO.intensity;
+    const occlusion: unknown = scene.userData[OCCLUSION_KEY];
+    ao.configuration.intensity = typeof occlusion === 'number' ? occlusion : AO.intensity;
     ao.configuration.halfRes = true;
     ao.configuration.gammaCorrection = false;
     ao.configuration.transparencyAware = true;
@@ -317,13 +318,18 @@ export function vignetteCss(vignette: NonNullable<Atmosphere['vignette']>): stri
       edges,
     ].join(', ');
   }
-  const glow = vignette.glow;
-  if (!glow) return edges;
-  // The glow over the edges: a wide soft ellipse, strongest at its centre.
+  const glows = [vignette.glow, ...(vignette.glows ?? [])].filter((g) => g !== undefined);
+  if (glows.length === 0) return edges;
+  // The glows over the edges, the last on top: wide soft ellipses, strongest at their centres.
+  return [...glows.reverse().map(glowCss), edges].join(', ');
+}
+
+/** One glow: a wide soft ellipse, strongest at its centre. */
+function glowCss(glow: NonNullable<NonNullable<Atmosphere['vignette']>['glow']>): string {
   const at = `${Math.round(glow.x * 100)}% ${Math.round(glow.y * 100)}%`;
   const rx = Math.round(glow.reach * 100);
   const half = cssRgba(glow.color, glow.opacity * 0.4);
-  return `radial-gradient(${rx}% ${Math.round(rx * 1.4)}% at ${at}, ${cssRgba(glow.color, glow.opacity)} 0%, ${half} 45%, transparent 100%), ${edges}`;
+  return `radial-gradient(${rx}% ${Math.round(rx * 1.4)}% at ${at}, ${cssRgba(glow.color, glow.opacity)} 0%, ${half} 45%, transparent 100%)`;
 }
 
 let stage: Stage | null = null;
