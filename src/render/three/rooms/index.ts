@@ -2,6 +2,7 @@ import type { FloorTheme, WallTheme } from '../../mapLook';
 import { GARAGE_ROOM } from './garage';
 import { LOFT_ROOM } from './loft';
 import { OFFICE_PARK_ROOM } from './officePark';
+import { STAGE_SET_ROOM } from './stageSet';
 import type { FloorDressing, RoomDressing } from './types';
 import { WAREHOUSE_ROOM } from './warehouse';
 
@@ -14,6 +15,7 @@ export const ROOMS: Partial<Record<WallTheme, RoomDressing>> = {
   officePark: OFFICE_PARK_ROOM,
   warehouse: WAREHOUSE_ROOM,
   loft: LOFT_ROOM,
+  stageSet: STAGE_SET_ROOM,
 };
 
 /**
