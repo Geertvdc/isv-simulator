@@ -135,10 +135,12 @@ function monitorWedge(b: ModelBuilder, x: number, y: number, z: number, turn = 0
     0.32,
     0.004,
     0.2,
-    0x3a3c42,
+    0x5a5d66,
     { at: [x + 0.06 * sn, y + 0.125, z + 0.06 * c], rot: [-0.55, turn, 0] },
     0,
   );
+  // The aluminium trim along its top edge, catching the wash.
+  b.box(0.364, 0.012, 0.012, ALU, { at: [x - 0.13 * sn, y + 0.165, z - 0.13 * c], rot }, 0);
   for (let i = 0; i < 4; i++)
     b.box(
       0.3,
@@ -237,10 +239,67 @@ export const STAGE_WALL_TOP_PROPS: readonly (() => Model)[] = [
     b.led(0.006, 0x2ea05a, { at: [-0.1, 0.146, 0.14] });
     tapeRoll(b, 0.16, 0.12, -0.1, TAPES[3], 0.045);
   }, 1.35),
+  prop((b) => {
+    // Two AUDIO cases stacked square, a YOTTA swag box on the lid, a coil of XLR and tape.
+    flightCase(b, -0.02, 0, 0, [0.48, 0.15, 0.34], 0, 'AUDIO');
+    flightCase(b, -0.04, 0.15, -0.01, [0.44, 0.13, 0.3], 0.06, 'VIDEO');
+    swagBox(b, -0.08, 0.28, -0.02, [0.2, 0.11, 0.17], -0.2);
+    b.torus(0.08, 0.012, 0x26272c, { at: [0.2, 0.2, 0.17], rot: [0.3, 0, 0.2] });
+    tapeRoll(b, 0.15, 0.28, 0.02, TAPES[4], 0.045);
+  }, 1.3),
 ];
 
 /** How tall a cluster on the low front wall may stand, so it never hides a player behind it. */
 export const STAGE_FRONT_PROP_MAX_HEIGHT = 0.3;
+
+/**
+ * The stage monitor wedge at each end of the low front wall, facing in at
+ * the stage (its grille toward −z), a gaffer roll and its cable beside it.
+ */
+export const STAGE_FRONT_WEDGE: () => Model = prop((b) => {
+  monitorWedge(b, 0, 0, 0, Math.PI);
+  b.box(0.04, 0.03, 0.06, 0x3a3c42, { at: [0.13, 0.03, 0.12] }, 0.006);
+  b.torus(0.06, 0.009, 0x26272c, { at: [0.2, 0.01, 0.1], rot: [Math.PI / 2, 0, 0] });
+  tapeRoll(b, -0.24, 0, 0.06, TAPES[0], 0.045);
+}, 1.3);
+
+/**
+ * A flat cluster lying on a low inner wall, which the players look over
+ * (well under `STAGE_FRONT_PROP_MAX_HEIGHT`): gaffer rolls, a coil of
+ * cable, the running order taped down flat.
+ */
+export const STAGE_INNER_LOW_PROP: () => Model = prop((b) => {
+  tapeRoll(b, -0.22, 0, -0.05, TAPES[0], 0.05);
+  tapeRoll(b, -0.22, 0.045, -0.05, TAPES[3], 0.045);
+  tapeRoll(b, -0.1, 0, 0.1, TAPES[2], 0.045);
+  b.torus(0.07, 0.01, 0x26272c, { at: [0.2, 0.01, -0.08], rot: [Math.PI / 2, 0, 0] });
+  // The running order, printed, taped flat, a strip of gaffer over each end.
+  b.box(0.2, 0.004, 0.26, 0xd2cfc4, { at: [0.08, 0.002, 0.08], rot: [0, 0.25, 0] }, 0);
+  for (let i = 0; i < 4; i++)
+    b.box(
+      0.12,
+      0.002,
+      0.012,
+      0x4a4b52,
+      {
+        at: [0.08 - 0.03 * Math.sin(0.25) * i, 0.005, 0.02 + 0.04 * i],
+        rot: [0, 0.25, 0],
+      },
+      0,
+    );
+  for (const dz of [-0.13, 0.13])
+    b.box(
+      0.08,
+      0.004,
+      0.03,
+      TAPES[1],
+      {
+        at: [0.08 + dz * Math.sin(0.25), 0.006, 0.08 + dz * Math.cos(0.25)],
+        rot: [0, 0.25, 0],
+      },
+      0,
+    );
+}, 1.2);
 
 /**
  * Low clusters lying on the low front wall, which the camera looks over
@@ -253,6 +312,14 @@ export const STAGE_FRONT_WALL_PROPS: readonly (() => Model)[] = [
     monitorWedge(b, -0.04, 0, 0.02, Math.PI);
     tapeRoll(b, 0.24, 0, 0.06, TAPES[0], 0.05);
     tapeRoll(b, 0.24, 0.045, 0.06, TAPES[3], 0.045);
+  }, 1.3),
+  prop((b) => {
+    // A low case, a YOTTA swag box and the lanyard box on it, a gaffer roll.
+    flightCase(b, -0.04, 0, 0, [0.46, 0.1, 0.3], 0.06, 'YOTTA');
+    swagBox(b, -0.12, 0.1, -0.02, [0.18, 0.08, 0.15], 0.15);
+    b.box(0.14, 0.05, 0.11, 0x3a3c42, { at: [0.1, 0.125, 0.0], rot: [0, -0.2, 0] }, 0.006);
+    b.box(0.1, 0.004, 0.016, VIOLET, { at: [0.1, 0.152, 0.0], rot: [0, -0.2, 0] }, 0);
+    tapeRoll(b, 0.24, 0, 0.12, TAPES[4], 0.045);
   }, 1.3),
   prop((b) => {
     laptop(b, 0, 0, 0, 0.1, 0x8a9098);

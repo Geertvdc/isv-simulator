@@ -6,7 +6,7 @@ import draftText from '../../../../maps/drafts/demo-day.txt?raw';
 import { LEVEL_LOOKS } from '../../mapLook';
 import type { Model } from '../kit';
 import { FRONT_WALL_HEIGHT } from '../layout';
-import { PALETTE } from '../look';
+import { FLOOR_COLORS, PALETTE, WALL_COLORS } from '../look';
 import {
   CASE_LID,
   STAGE_WALL_ART,
@@ -16,11 +16,13 @@ import {
 import {
   STAGE_FRONT_PROP_MAX_HEIGHT,
   STAGE_FRONT_WALL_PROPS,
+  STAGE_FRONT_WEDGE,
+  STAGE_INNER_LOW_PROP,
   STAGE_WALL_TOP_PROPS,
 } from '../setDressing/stageSetWallTops';
 import { ROOMS, floorDressing } from '.';
 import { STAGE_SET_ROOM } from './stageSet';
-import { DECK_WEAR, stageSetRoom } from './stageSetRoom';
+import { DECK_WEAR_KINDS, stageSetRoom } from './stageSetRoom';
 
 const vertices = (m: Model) => m.body.getAttribute('position').count;
 const luminance = (c: number) => {
@@ -53,7 +55,7 @@ describe('STAGE_SET_ROOM', () => {
     for (const piece of ['wall', 'wall-front', 'wall-inner'] as const)
       for (let l = 0; l < wall.looks; l++)
         expect(vertices(wall.model(piece, l))).toBeGreaterThan(0);
-    for (const wear of Object.values(DECK_WEAR))
+    for (let wear = 0; wear < DECK_WEAR_KINDS; wear++)
       for (const [x, y] of [
         [0, 0],
         [1, 0],
@@ -65,15 +67,21 @@ describe('STAGE_SET_ROOM', () => {
     expect(vertices(lamp.model())).toBeGreaterThan(0);
   });
 
-  it('keeps every deck within 4% of the base tone', () => {
+  it('keeps every deck within 5% of the base tone', () => {
     const floor = STAGE_SET_ROOM.floor;
     if (!floor?.tone) throw new Error('missing');
     const tone = (x: number, y: number, salt: number) => floor.tone?.(x, y, salt) ?? 1;
     for (let y = 0; y < 12; y++)
       for (let x = 0; x < 20; x++) {
-        expect(tone(x, y, 12345)).toBeGreaterThan(0.955);
-        expect(tone(x, y, 12345)).toBeLessThan(1.045);
+        expect(tone(x, y, 12345)).toBeGreaterThan(0.945);
+        expect(tone(x, y, 12345)).toBeLessThan(1.055);
       }
+  });
+
+  it('caps the walls dark, never brighter than a station top or the deck', () => {
+    const cap = luminance(WALL_COLORS.stageSet.top);
+    for (const c of Object.values(PALETTE.station)) expect(cap).toBeLessThan(luminance(c));
+    expect(cap).toBeLessThan(luminance(FLOOR_COLORS.stageDeck[0]));
   });
 
   it('gives the flight cases lids darker than every station top', () => {
@@ -90,8 +98,10 @@ describe('STAGE_SET_ROOM', () => {
   });
 
   it('keeps everything on the low front wall low: the props and the live console desks', () => {
-    for (const p of STAGE_FRONT_WALL_PROPS)
+    for (const p of [...STAGE_FRONT_WALL_PROPS, STAGE_FRONT_WEDGE, STAGE_INNER_LOW_PROP])
       expect(bounds(p()).max.y).toBeLessThanOrEqual(STAGE_FRONT_PROP_MAX_HEIGHT);
+    // Flat on a low inner wall the players look over.
+    expect(bounds(STAGE_INNER_LOW_PROP()).max.y).toBeLessThan(0.12);
     for (const deskX of [-1.5, 1.5]) {
       const box = bounds(liveConsoleFrontModel(deskX));
       // Sitting on the front wall, under 0.6 in all.

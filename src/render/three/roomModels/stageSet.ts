@@ -4,7 +4,13 @@ import { type Model, ModelBuilder, type Place, tint } from '../kit';
 import { FRONT_WALL_HEIGHT, SLAB_DEPTH, STATION_HEIGHT, WALL_HEIGHT } from '../layout';
 import { FLOOR_COLORS, WALL_COLORS } from '../look';
 import type { CounterRun } from '../rooms/counterRun';
-import { DECK_WEAR, DECK_WEAR_KINDS, STAGE_ART_HALF, type Truss } from '../rooms/stageSetRoom';
+import {
+  CABLE_PARTS,
+  DECK_WEAR,
+  DECK_WEAR_KINDS,
+  STAGE_ART_HALF,
+  type Truss,
+} from '../rooms/stageSetRoom';
 import { lettering } from '../setDressing/businessPark';
 import type { StationModel } from '../stationModels';
 
@@ -131,50 +137,41 @@ const SCREEN_DARK = 0x16142c;
 
 // ---- Walls ----
 
-/** Heights on a flat: the kick plinth, a course of the panelling, the LED channel under the cap. */
+/** Heights on a flat: the kick plinth, a course of the panelling. */
 const KICK_H = 0.09;
 const COURSE = 0.21;
-const LED_DROP = 0.075;
-/** The cap: its height and its lip past the faces; the rails along its long edges. */
+/**
+ * The cap: a dark top `CAP` thick; under it a brushed aluminium band `BAND`
+ * tall, `CAP_LIP` proud of the faces, its top `BAND_SINK` under the cap's.
+ */
 const CAP = 0.04;
-const CAP_LIP = 0.02;
-const RAIL = 0.085;
+const CAP_LIP = 0.032;
+const BAND = 0.034;
+const BAND_SINK = 0.004;
+/** The band's brushed aluminium, a touch duller than the trim's. */
+const CAP_ALU = 0x9ea4ae;
+/** Where YOTTA's violet strip runs: just under the band. */
+const LED_DROP = BAND + BAND_SINK + 0.016;
 /** Looks a flat comes in: plain, a YOTTA stencil, a taped cable, a patched panel, a power port. */
 export const STAGE_WALL_LOOKS = 5;
 
 /**
- * The brushed aluminium cap on top of a wall `h` tall, its run along x or
- * z: an extrusion, not a slab. Two light rails along the long edges with a
- * bright arris and a hairline, a mid-grey channel between them with its
- * T-slot, a connector plate across at the tile's edge, and a dark shadow
- * line under the lip.
+ * The cap on top of a wall `h` tall: one dark top over the whole tile (no
+ * panels, no rim on it), and round it a brushed aluminium band a little
+ * proud of the faces whose top sits just under the cap's. Where the next
+ * wall carries on, the band is buried in that wall's cap, so the light lip
+ * only shows along the run's open edges, never as a grid of tiles.
  */
-function cap(b: ModelBuilder, h: number, along: 'x' | 'z'): void {
+function cap(b: ModelBuilder, h: number): void {
   const { top } = WALL_COLORS.stageSet;
-  const body = h - CAP;
   const lip = 1 + CAP_LIP * 2;
-  // A box `l` along the run, `w` across it, at (u along, y, v across).
-  const run = (l: number, hh: number, w: number, color: number, u: number, y: number, v: number) =>
-    along === 'x'
-      ? b.box(l, hh, w, color, { at: [u, y, v] }, 0)
-      : b.box(w, hh, l, color, { at: [v, y, u] }, 0);
-  b.box(1.008, 0.012, 1.008, BLACK, { at: [0, body - 0.006, 0] }, 0);
-  b.box(lip, CAP * 0.7, lip, ALU_DARK, { at: [0, body + CAP * 0.35, 0] }, 0);
-  // The channel between the rails, a T-slot down its middle.
-  run(1, 0.006, lip - RAIL * 2, top, 0, body + CAP * 0.7 + 0.003, 0);
-  run(1, 0.007, 0.02, 0x2c2e33, 0, body + CAP * 0.7 + 0.0035, 0);
-  for (const s of [-1, 1]) {
-    const v = s * (lip / 2 - RAIL / 2);
-    run(1, CAP, RAIL, ALU, 0, h - CAP / 2, v);
-    run(1, 0.004, 0.02, ALU_LIGHT, 0, h + 0.002, s * (lip / 2 - 0.012));
-    run(1, 0.003, 0.006, tint(ALU, -0.12), 0, h + 0.0015, v - s * 0.02);
-  }
-  // The connector plate at the tile's edge, bolted across the channel.
-  run(0.06, 0.01, lip - RAIL * 2 + 0.02, ALU, -0.47, body + CAP * 0.7 + 0.006, 0);
-  for (const s of [-1, 1]) {
-    const [x, z] = along === 'x' ? [-0.47, s * 0.2] : [s * 0.2, -0.47];
-    b.cylinder(0.01, 0.01, 0.006, ALU_DARK, { at: [x, body + CAP * 0.7 + 0.013, z] }, 8);
-  }
+  const bandY = h - BAND_SINK - BAND / 2;
+  b.box(lip, BAND, lip, CAP_ALU, { at: [0, bandY, 0] }, 0);
+  // The band's dark underside line, where it overhangs the flat.
+  b.box(lip - 0.004, 0.006, lip - 0.004, tint(CAP_ALU, -0.45), {
+    at: [0, bandY - BAND / 2 - 0.003, 0],
+  });
+  b.box(1, CAP, 1, top, { at: [0, h - CAP / 2, 0] }, 0);
 }
 
 /**
@@ -209,7 +206,7 @@ function ledStrip(b: ModelBuilder, on: Face, y: number): void {
   const [x, yy, z] = p.at ?? [0, 0, 0];
   // Pushed out a hair past the recess, along the face.
   const turned = (p.rot?.[1] ?? 0) !== 0;
-  glowBox(b, turned ? 0.008 : 1, 0.011, turned ? 1 : 0.008, YOTTA_GLOW, {
+  glowBox(b, turned ? 0.008 : 1, 0.016, turned ? 1 : 0.008, YOTTA_GLOW, {
     at: [x + (turned ? Math.sign(x) * 0.003 : 0), yy, z + (turned ? 0 : Math.sign(z) * 0.003)],
   });
 }
@@ -229,16 +226,16 @@ export function stageWallModel(piece: WallPiece, look: number): Model {
     const body = h - CAP;
     b.box(1, body, 1, face, { at: [0, body / 2, 0] }, 0);
     b.box(1.012, 0.045, 1.012, KICK, { at: [0, 0.0225, 0] }, 0);
-    for (const on of faces(0.503).slice(0, 2)) {
-      ledStrip(b, on, body - 0.035);
-      b.box(0.008, body - 0.08, 0.005, tint(face, -0.22), on(-0.5 + 0.5 * (look % 2), 0.075), 0);
+    for (const on of faces(0.503)) {
+      ledStrip(b, on, h - LED_DROP);
+      b.box(0.008, body - 0.1, 0.005, tint(face, -0.22), on(-0.5 + 0.5 * (look % 2), 0.075), 0);
     }
-    cap(b, h, 'x');
+    cap(b, h);
     return b.build();
   }
   const h = WALL_HEIGHT;
   const body = h - CAP;
-  const stripY = body - LED_DROP;
+  const stripY = h - LED_DROP;
   b.box(1, body, 1, face, { at: [0, body / 2, 0] }, 0);
   b.box(1.016, KICK_H, 1.016, KICK, { at: [0, KICK_H / 2, 0] }, 0.004);
   b.box(1.02, 0.008, 1.02, tint(KICK, 0.25), { at: [0, KICK_H, 0] }, 0);
@@ -280,7 +277,7 @@ export function stageWallModel(piece: WallPiece, look: number): Model {
       b.led(0.006, 0x2ea05a, p);
     }
   });
-  cap(b, h, piece === 'wall-inner' ? 'z' : 'x');
+  cap(b, h);
   return b.build();
 }
 
@@ -350,12 +347,12 @@ export function deckLook(x: number, y: number, wear: number): number {
   return ((wear * DECK_VARIANTS + variant) << 1) | (deckStart(x, y) ? 1 : 0);
 }
 
-/** A tile's brightness: ±4% per deck (each a sheet painted on its own), a touch per tile. */
+/** A tile's brightness: ±5% per deck (each a sheet painted on its own), a touch per tile. */
 export function deckTone(x: number, y: number, salt: number): number {
   const dx = Math.floor((x + (y & 1)) / 2);
   const deck = ((Math.imul(dx + 41, 73856093) ^ Math.imul(y + 7, 19349663) ^ salt) >>> 0) % 1001;
   const own = (tileHash(x + 3, y + 5) ^ salt) % 101;
-  return 1 + (deck / 1000 - 0.5) * 0.08 + (own / 100 - 0.5) * 0.006;
+  return 1 + (deck / 1000 - 0.5) * 0.1 + (own / 100 - 0.5) * 0.006;
 }
 
 /**
@@ -383,19 +380,14 @@ export function deckFloorModel(look: number): Model {
   const screw = tint(base, -0.14);
   for (const u of [-0.3, 0.2]) mark(0.014, 0.014, screw, u, -0.465, 0.0018);
   if (jx) for (const u of [-0.25, 0.25]) mark(0.014, 0.014, screw, -0.465, u, 0.0018);
-  // Flecks of old tape residue and paint.
-  for (let i = 0; i < 4; i++) {
-    const k = tileHash(i + 9, variant * 7 + 3);
-    const s = 0.012 + (k % 3) * 0.008;
-    mark(
-      s * 1.6,
-      s,
-      k % 3 ? tint(base, 0.12) : tint(base, -0.12),
-      ((k >> 3) % 84) / 100 - 0.42,
-      ((k >> 9) % 84) / 100 - 0.42,
-      0.0014,
-      (k % 7) * 0.4,
-    );
+  // Now and then a fleck of old tape residue, dull (no light speckle over the play area).
+  if (variant % 4 === 0) {
+    const k = tileHash(variant + 9, 3);
+    mark(0.04, 0.022, tint(base, -0.1), ((k >> 3) % 70) / 100 - 0.35, ((k >> 9) % 70) / 100 - 0.35);
+  }
+  if (wear >= DECK_WEAR.cable) {
+    floorCable(b, wear - DECK_WEAR.cable);
+    return b.build();
   }
   switch (wear) {
     case DECK_WEAR.spikeWhite:
@@ -427,42 +419,10 @@ export function deckFloorModel(look: number): Model {
       b.add(new THREE.BoxGeometry(0.34, 0.003, 0.03), GLOW_TAPE, { at: [0, 0.0016, 0.43] }, 'glow');
       break;
     }
-    case DECK_WEAR.cableX:
-    case DECK_WEAR.cableZ:
-    case DECK_WEAR.cableEndBack:
-    case DECK_WEAR.cableEndFront:
-    case DECK_WEAR.cableEndLeft:
-    case DECK_WEAR.cableEndRight: {
-      // A black cable gaffer-taped flat; at its end a stage box with its connectors.
-      const end = wear >= DECK_WEAR.cableEndBack;
-      const across =
-        wear === DECK_WEAR.cableX ||
-        wear === DECK_WEAR.cableEndLeft ||
-        wear === DECK_WEAR.cableEndRight;
-      const from = wear === DECK_WEAR.cableEndBack || wear === DECK_WEAR.cableEndLeft ? -1 : 1;
-      const turn = across ? 0 : Math.PI / 2;
-      const off = 0.12;
-      // Along the run (u) from `u0` to `u1`, `off` across from the middle.
-      const u0 = end ? from * 0.5 : -0.5;
-      const u1 = end ? 0 : 0.5;
-      const pos = (u: number, v: number): [number, number] => (across ? [u, v] : [v, u]);
-      const [mx, mz] = pos((u0 + u1) / 2, off);
-      b.box(Math.abs(u1 - u0), 0.016, 0.022, CABLE, { at: [mx, 0.008, mz], rot: [0, turn, 0] }, 0);
-      for (const u of end ? [from * 0.3] : [-0.28, 0.22]) {
-        const [tx, tz] = pos(u, off);
-        b.box(0.055, 0.004, 0.11, GAFFER, { at: [tx, 0.017, tz], rot: [0, turn, 0] }, 0);
-      }
-      if (end) {
-        const [sx, sz] = pos(-from * 0.04, off);
-        b.box(0.24, 0.08, 0.16, CASE_BLACK, { at: [sx, 0.04, sz], rot: [0, turn, 0] }, 0.012);
-        b.box(0.244, 0.012, 0.164, ALU_DARK, { at: [sx, 0.078, sz], rot: [0, turn, 0] }, 0);
-        for (const k of [-0.06, 0, 0.06]) {
-          const [cx, cz] = pos(-from * 0.04 + k, off);
-          b.cylinder(0.016, 0.016, 0.006, 0x8a9098, { at: [cx, 0.087, cz] }, 10);
-        }
-        const [lx, lz] = pos(-from * 0.04 + 0.09, off + 0.05);
-        b.led(0.006, 0x2ea05a, { at: [lx, 0.086, lz] });
-      }
+    case DECK_WEAR.spikeX: {
+      // A spike-tape X where something gets set for the next act, white, a touch see-through.
+      const color = mix(base, SPIKE[0], 0.6);
+      for (const r of [Math.PI / 4, -Math.PI / 4]) mark(0.32, 0.03, color, 0, 0, 0.0024, r);
       break;
     }
     case DECK_WEAR.scuffs: {
@@ -479,6 +439,57 @@ export function deckFloorModel(look: number): Model {
     }
   }
   return b.build();
+}
+
+/** The floor cable's black, the grey gaffer over it, a cable ramp's yellow and black. */
+const FLOOR_CABLE = 0x2a2b30;
+const FLOOR_GAFFER = 0x8a8c94;
+const RAMP_YELLOW = 0xd8b020;
+const RAMP_BLACK = 0x1a1a1a;
+
+/**
+ * A cable taped flat along one edge of a deck tile (`kind`, see
+ * `CABLE_PARTS`): hugging the edge it runs along (a wall or a door is past
+ * that edge), a strip of grey gaffer every half tile, and by its part a
+ * stage box where it ends or a yellow and black cable ramp over it.
+ */
+function floorCable(b: ModelBuilder, kind: number): void {
+  const edge = Math.floor(kind / CABLE_PARTS) % 4;
+  const part = kind % CABLE_PARTS;
+  // Along x on the back (0) and front (1) edges, along z on the left (2) and right (3); on the
+  // front a little further in, or the low wall in front of it hides it from the camera.
+  const alongX = edge < 2;
+  const off = [-0.42, 0.24, -0.42, 0.42][edge] ?? 0.42;
+  const pos = (u: number, v: number): [number, number] => (alongX ? [u, v] : [v, u]);
+  const turn = alongX ? 0 : Math.PI / 2;
+  const box = part === 1 || part === 2;
+  const end = part === 1 || part === 3 ? 1 : -1;
+  const [u0, u1] = box ? (end > 0 ? [-0.5, 0.2] : [-0.2, 0.5]) : [-0.5, 0.5];
+  const [mx, mz] = pos((u0 + u1) / 2, off);
+  b.box(u1 - u0, 0.012, 0.05, FLOOR_CABLE, { at: [mx, 0.006, mz], rot: [0, turn, 0] }, 0);
+  for (const u of [-0.25, 0.25]) {
+    if (u < u0 || u > u1) continue;
+    const [tx, tz] = pos(u, off);
+    b.box(0.06, 0.004, 0.09, FLOOR_GAFFER, { at: [tx, 0.013, tz], rot: [0, turn, 0] }, 0);
+  }
+  if (box) {
+    // The stage box at the cable's end, tight to the edge, its connectors and LED.
+    const [sx, sz] = pos(end * 0.3, off + (off > 0 ? -0.04 : 0.04));
+    b.box(0.22, 0.08, 0.15, CASE_BLACK, { at: [sx, 0.04, sz], rot: [0, turn, 0] }, 0.012);
+    b.box(0.224, 0.012, 0.154, ALU_DARK, { at: [sx, 0.078, sz], rot: [0, turn, 0] }, 0);
+    for (const k of [-0.06, 0, 0.06]) {
+      const [cx, cz] = pos(end * 0.3 + k, off + (off > 0 ? -0.04 : 0.04));
+      b.cylinder(0.014, 0.014, 0.006, 0x8a9098, { at: [cx, 0.087, cz] }, 10);
+    }
+  } else if (part >= 3) {
+    // A cable ramp across it where feet cross: black, yellow chevrons on its slopes.
+    const [rx, rz] = pos(end * 0.3, off + (off > 0 ? -0.03 : 0.03));
+    b.box(0.26, 0.026, 0.16, RAMP_BLACK, { at: [rx, 0.013, rz], rot: [0, turn, 0] }, 0.008);
+    for (const k of [-0.08, 0, 0.08]) {
+      const [yx, yz] = pos(end * 0.3 + k, off + (off > 0 ? -0.03 : 0.03));
+      b.box(0.045, 0.004, 0.15, RAMP_YELLOW, { at: [yx, 0.027, yz], rot: [0, turn, 0] }, 0);
+    }
+  }
 }
 
 // ---- Flight cases ----
