@@ -15,6 +15,7 @@ import {
   basementRoom,
   battenFit,
   innerWalls,
+  pagerBoardTile,
 } from './basementRoom';
 
 describe('basementRoom', () => {
@@ -64,16 +65,52 @@ describe('basementRoom', () => {
     expect(basementRoom(draft).uplinks.map((u) => u.door.tiles.map((t) => t.x))).toEqual([[2, 3]]);
   });
 
-  it('builds the server room’s full walls as the cage, and only those', () => {
+  it('builds every one of the server room’s walls as the cage (the low ones too), and only those', () => {
     for (const m of maps) {
       const { swaps } = basementRoom(m);
-      const inner = new Set(innerWalls(m).flatMap((r) => r.map((p) => `${p.x},${p.y}`)));
-      expect(Object.keys(swaps).length).toBeGreaterThan(3);
-      for (const k of Object.keys(swaps)) {
+      const inner = innerWalls(m).flatMap((r) => r.map((p) => `${p.x},${p.y}`));
+      expect(Object.keys(swaps).sort()).toEqual([...inner].sort());
+      for (const [k, name] of Object.entries(swaps)) {
         const [x = 0, y = 0] = k.split(',').map(Number);
-        expect(inner.has(k)).toBe(true);
-        expect(wallPiece(m, x, y)).not.toBe('wall-front');
+        expect(name.startsWith(`cage:${wallPiece(m, x, y)}:`)).toBe(true);
       }
+      expect(
+        Object.keys(swaps).some((k) => {
+          const [x = 0, y = 0] = k.split(',').map(Number);
+          return wallPiece(m, x, y) === 'wall-front';
+        }),
+      ).toBe(true);
+    }
+  });
+
+  it('stands the pager board on the first wall tile past the inbox run, off the inbox', () => {
+    expect(pagerBoardTile(shipped)).toEqual({ x: 4, y: 0 });
+    expect(pagerBoardTile(draft)).toEqual({ x: 0, y: 4 });
+    for (const m of maps) {
+      const { pagerBoard, pagerDoor } = basementRoom(m);
+      expect(pagerBoard).toEqual(pagerBoardTile(m));
+      if (!pagerBoard) continue;
+      expect(getTile(m, pagerBoard.x, pagerBoard.y)).toBe('wall');
+      for (const t of pagerDoor?.tiles ?? []) expect(cheb(t, pagerBoard)).toBeGreaterThanOrEqual(1);
+      // Nothing else on that wall top.
+      const { capProps, wallArt } = basementRoom(m);
+      for (const p of capProps) expect(p.x === pagerBoard.x && p.y === pagerBoard.y).toBe(false);
+      for (const a of wallArt) expect(a.x === pagerBoard.x && a.y === pagerBoard.y).toBe(false);
+    }
+  });
+
+  it('lifts the one floor tile in a corner out of the way: walls on two sides at right angles', () => {
+    for (const m of maps) {
+      const lifted = Object.entries(basementRoom(m).floorWear).filter(
+        ([, w]) => w >= RAISED_WEAR.lifted && w < RAISED_WEAR.scuffs,
+      );
+      expect(lifted).toHaveLength(1);
+      const [k = '', w = 0] = lifted[0] ?? [];
+      const [x = 0, y = 0] = k.split(',').map(Number);
+      const corner = w - RAISED_WEAR.lifted;
+      const wall = (dx: number, dy: number) => getTile(m, x + dx, y + dy) === 'wall';
+      expect(wall(0, corner < 2 ? -1 : 1)).toBe(true);
+      expect(wall(corner % 2 ? 1 : -1, 0)).toBe(true);
     }
   });
 
@@ -210,6 +247,9 @@ describe('basementRoom', () => {
       const { trays } = basementRoom(m);
       expect(trays.length).toBeGreaterThan(0);
       for (const t of trays) {
+        // Never in front of a back wall with void behind it (the scene's racks stand there).
+        for (let x = Math.ceil(t.x0); x <= Math.floor(t.x1); x++)
+          expect(getTile(m, x, t.back - 1)).not.toBe('void');
         expect(t.x1 - t.x0).toBeGreaterThanOrEqual(3);
         expect(t.y).toBe(TRAY_Y);
         expect(t.y).toBeGreaterThan(WALL_HEIGHT + 0.5);

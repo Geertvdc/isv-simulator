@@ -48,7 +48,7 @@ export type BasementArt =
   'runbook' | 'authorised' | 'fireExit' | 'breaker' | 'thermostat' | 'unplug';
 /** How far each piece reaches either side of its tile's middle (`roomModels/basement` builds to it). */
 export const BASEMENT_ART_HALF: Readonly<Record<BasementArt, number>> = {
-  runbook: 0.44,
+  runbook: 0.56,
   authorised: 0.3,
   fireExit: 0.17,
   breaker: 0.22,
@@ -85,8 +85,10 @@ export interface Tray {
 }
 
 export interface BasementRoom {
-  /** The inbox framed as the propped-open fire door with the pager board over it. */
+  /** The inbox framed as the propped-open fire door. */
   pagerDoor: Doorway | null;
+  /** The wall tile the pager board stands on (see `pagerBoardTile`). */
+  pagerBoard: GridPoint | null;
   /**
    * Which way along the door model's x its leaf is propped open flat-ish
    * against the wall beside it (±1), or 0 where neither side has a wall
@@ -118,7 +120,7 @@ export interface BasementRoom {
   trays: Tray[];
 }
 
-/** The cage swaps: one per wall piece and look. */
+/** The cage swaps: one per wall piece (full, or the low `wall-front`) and look. */
 export const CAGE_LOOKS = 3;
 export const cageSwap = (piece: string, look: number) => `cage:${piece}:${look}`;
 
@@ -161,6 +163,7 @@ export function basementRoom(map: LevelMap): BasementRoom {
   const innerTops = innerPlan(map, innerRuns, doors);
   return {
     pagerDoor,
+    pagerBoard: pagerBoardTile(map),
     pagerLeaf: pagerDoor ? leafSide(map, pagerDoor) : 0,
     uplinks,
     decos: {},
@@ -175,6 +178,26 @@ export function basementRoom(map: LevelMap): BasementRoom {
     cans: caps.cans,
     trays,
   };
+}
+
+/**
+ * The wall tile the pager board stands on: the first wall tile after the
+ * inbox's run along its edge, in +x for an inbox on the back or front edge
+ * and in +y for one on the left or right edge, so the inbox's ticket card
+ * never covers it. The red beacon on it sits over that tile's middle.
+ */
+export function pagerBoardTile(map: LevelMap): GridPoint | null {
+  const door = findDoorways(map, 'inbox')[0];
+  if (!door) return null;
+  const alongX = door.side === 'back' || door.side === 'front';
+  const end = door.tiles.reduce((a, t) => (alongX ? (t.x > a.x ? t : a) : t.y > a.y ? t : a));
+  for (let k = 1; k < Math.max(map.width, map.height); k++) {
+    const p = alongX ? { x: end.x + k, y: end.y } : { x: end.x, y: end.y + k };
+    const t = getTile(map, p.x, p.y);
+    if (t === null) return null;
+    if (t === 'wall') return p;
+  }
+  return null;
 }
 
 /** The map step the door model's +x runs along once turned to face out on `side`. */
@@ -286,14 +309,17 @@ export function innerWalls(map: LevelMap): GridPoint[][] {
   return runs;
 }
 
-/** The server room's full walls (not the low ones the players look over), built as the cage. */
+/**
+ * The server room's walls built as the cage: the full ones as racks behind
+ * mesh, the low ones the players look over as a low row of rack units, so
+ * no inner wall ever reads as a counter.
+ */
 function cageSwaps(map: LevelMap, inner: ReadonlySet<string>): Record<string, string> {
   const out: Record<string, string> = {};
   const salt = levelSalt(map);
   for (const k of [...inner].sort()) {
     const [x = 0, y = 0] = k.split(',').map(Number);
     const piece = wallPiece(map, x, y);
-    if (piece === 'wall-front') continue;
     out[k] = cageSwap(piece, ((tileHash(x + 11, y + 3) ^ salt) >>> 4) % CAGE_LOOKS);
   }
   return out;
@@ -393,33 +419,35 @@ function floorWear(
   vents.sort((a, b) => a.h - b.h);
   for (const v of vents.slice(0, VENTS_MAX)) out[key(v.x, v.y)] = ventWear(v.edge);
 
-  // The lifted tile: floor along an outer wall (back, left or right), two tiles from every spawn
-  // and the doors, its corner toward the wall; cable ties beside it along the wall.
-  const lifts: { x: number; y: number; edge: Side; h: number }[] = [];
+  // The lifted tile: out of the way, in a corner where nobody walks (walls on two sides at right
+  // angles, the server cage's counting), two tiles from every spawn and the doors, its lifted
+  // half in that corner; snipped cable ties on the tile beside it along the side wall.
+  const lifts: { x: number; y: number; corner: number; side: Side; h: number }[] = [];
+  const isWall = (x: number, y: number) => getTile(map, x, y) === 'wall';
   for (let y = 0; y < map.height; y++)
     for (let x = 0; x < map.width; x++) {
       if (!free(x, y) || nearSpawn(x, y, 2) || (pagerDoor && nearDoor([pagerDoor], x, y, 2)))
         continue;
-      for (const edge of ['back', 'left', 'right'] as const) {
-        const { dx, dy } = OUT[edge];
-        const t = getTile(map, x + dx, y + dy);
-        if (t !== 'wall' || inner.has(key(x + dx, y + dy))) continue;
-        lifts.push({ x, y, edge, h: (tileHash(x + 29, y + 5) ^ salt) % 997 });
-        break;
-      }
+      const v = isWall(x, y - 1) ? 0 : isWall(x, y + 1) ? 2 : -1;
+      const s = isWall(x - 1, y) ? 0 : isWall(x + 1, y) ? 1 : -1;
+      if (v < 0 || s < 0) continue;
+      lifts.push({
+        x,
+        y,
+        corner: v + s,
+        side: s ? 'right' : 'left',
+        h: (tileHash(x + 29, y + 5) ^ salt) % 997,
+      });
     }
   lifts.sort((a, b) => a.h - b.h);
   const lift = lifts[0];
   if (lift) {
-    const corner = liftCorner(lift.edge, lift.h);
-    out[key(lift.x, lift.y)] = RAISED_WEAR.lifted + corner;
-    // Ties along the wall beside it (the first free neighbour along the wall).
-    const [ax, ay] = lift.edge === 'back' ? [1, 0] : [0, 1];
+    out[key(lift.x, lift.y)] = RAISED_WEAR.lifted + lift.corner;
+    const { dx } = OUT[lift.side];
     for (const s of [1, -1]) {
-      const q = { x: lift.x + ax * s, y: lift.y + ay * s };
-      const { dx, dy } = OUT[lift.edge];
-      if (free(q.x, q.y) && getTile(map, q.x + dx, q.y + dy) === 'wall') {
-        out[key(q.x, q.y)] = tiesWear(lift.edge);
+      const q = { x: lift.x, y: lift.y + s };
+      if (free(q.x, q.y) && isWall(q.x + dx, q.y)) {
+        out[key(q.x, q.y)] = tiesWear(lift.side);
         break;
       }
     }
@@ -457,15 +485,6 @@ function floorWear(
     }
   }
   return out;
-}
-
-/** The corner of a lifted tile beside a wall on `edge` (one of the two along it, by `h`). */
-function liftCorner(edge: Side, h: number): number {
-  const pick = h % 2;
-  // Corners: 0 back-left, 1 back-right, 2 front-left, 3 front-right.
-  if (edge === 'back') return pick;
-  if (edge === 'left') return pick ? 2 : 0;
-  return pick ? 3 : 1;
 }
 
 /**
@@ -706,15 +725,22 @@ function backRuns(map: LevelMap): { inside: number; x0: number; x1: number }[] {
 }
 
 /**
- * The cable trays: one per run of the room along a back wall, from its
- * inner face at one end to the other, just in front of the back wall,
- * high over the wall-top clusters; on uprights standing on the back wall's
- * cap: the wall tiles nearest each end, and one in the middle of a long run.
+ * The cable trays: one per run of the room along a back wall on the map's
+ * own back edge (a back wall with void behind it inside the map has the
+ * scene's racks behind it, which a tray would cut across), from its inner
+ * face at one end to the other, just in front of the back wall, over the
+ * wall-top clusters, all at one height; on uprights standing on the back
+ * wall's cap: the wall tiles nearest each end, and one in the middle of a
+ * long run.
  */
 function placeTrays(map: LevelMap): Tray[] {
   const out: Tray[] = [];
   for (const run of backRuns(map)) {
     const back = run.inside - 1;
+    let voidBehind = false;
+    for (let x = run.x0; x <= run.x1; x++)
+      if (getTile(map, x, back - 1) === 'void') voidBehind = true;
+    if (voidBehind) continue;
     const walls: number[] = [];
     for (let x = run.x0 - 1; x <= run.x1 + 1; x++)
       if (getTile(map, x, back) === 'wall' && !isOpen(map, x, back - 1)) walls.push(x);

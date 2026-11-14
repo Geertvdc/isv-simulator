@@ -5,7 +5,7 @@ import { lettering } from './businessPark';
  * On the basement's walls (On Call): what stands on top of them in stacked
  * clusters, and what lies on the low front wall. The server room's kit and
  * the night's firefight in muted colours, nothing in a station's or a
- * player's colour and nothing to eat (one small can pyramid excepted):
+ * player's colour and nothing to eat (one energy-drink can excepted):
  * cable reels, spare drives, patch cables in loops, a rack-mount UPS, a
  * hard hat on a box of zip ties, Demo Day's lanyards. Plus the one-offs on
  * the server room's walls: Segfault asleep on the warmest server and the
@@ -38,6 +38,8 @@ const PATCH = [0x7a7e84, 0xb89a3a, 0x5a6c82, 0x8a4a44, 0x4e7a56] as const;
 const LED_BLUE = 0x1f6fc8;
 const LED_GREEN = 0x2ab060;
 const LED_AMBER = 0xc07818;
+/** Segfault's towel: dark ESD blue. */
+const TOWEL = 0x2c4a7a;
 
 /** A cable reel on its side at (x, y, z): dark cheeks, cable wound on, a plug hanging off. */
 function cableReel(
@@ -171,7 +173,7 @@ export const BASEMENT_WALL_TOP_PROPS: readonly (() => Model)[] = [
   prop((b) => {
     // Cable reels: a big one on a box, a smaller one leaning on it, a coil hung over the corner.
     box(b, -0.04, 0, 0, [0.46, 0.12, 0.34], 0.04);
-    cableReel(b, -0.08, 0.12, 0, 0.15, 0x1d1e22);
+    cableReel(b, -0.08, 0.12, 0, 0.15, 0x5a6c82);
     cableReel(b, 0.2, 0, 0.14, 0.09, 0x6a4a2a);
     coil(b, 0.18, 0.12, -0.08, 0.07, PATCH[0]);
   }, 1.3),
@@ -195,12 +197,12 @@ export const BASEMENT_WALL_TOP_PROPS: readonly (() => Model)[] = [
   }, 1.3),
   prop((b) => {
     // The rack-mount UPS: a 2U black box with its green LCD, a battery pack, a power strip.
-    b.box(0.52, 0.11, 0.34, BLACK, { at: [0, 0.055, 0] }, 0.008);
+    b.box(0.52, 0.11, 0.34, 0x3a3e45, { at: [0, 0.055, 0] }, 0.008);
     b.box(0.5, 0.09, 0.006, 0x2a2d32, { at: [0, 0.055, 0.172] }, 0);
     b.screen(0.08, 0.035, 0x2a8a4a, { at: [-0.14, 0.065, 0.177] });
     for (let k = 0; k < 3; k++)
       b.led(0.007, k === 2 ? LED_AMBER : LED_GREEN, { at: [-0.04 + k * 0.03, 0.065, 0.176] });
-    b.box(0.3, 0.12, 0.26, 0x2c2f34, { at: [-0.06, 0.17, -0.02], rot: [0, -0.08, 0] }, 0.008);
+    b.box(0.3, 0.12, 0.26, 0x50555c, { at: [-0.06, 0.17, -0.02], rot: [0, -0.08, 0] }, 0.008);
     lettering(b, 'UPS', -0.06, 0.17, 0.112, 0.008, 0x9a9ea4, 0.002);
     b.box(0.28, 0.04, 0.06, 0xc8c6bc, { at: [0.14, 0.25, 0.04], rot: [0, 0.3, 0] }, 0.006);
     b.led(0.006, 0xd03020, { at: [0.03, 0.27, 0.06] });
@@ -253,8 +255,8 @@ export const BASEMENT_FRONT_PROP_MAX_HEIGHT = 0.3;
 /**
  * Low clusters lying on the low front wall, which the camera looks over
  * (each under `BASEMENT_FRONT_PROP_MAX_HEIGHT`): a coil of patch cable and
- * a crimp tool; a box of spare drives lying low; a cable reel on its side
- * with a few zip ties.
+ * a crimp tool; a box of spare drives lying low; an extension reel stood
+ * on its edge (orange cable) with a gaffer tape roll and a few zip ties.
  */
 export const BASEMENT_FRONT_WALL_PROPS: readonly (() => Model)[] = [
   prop((b) => {
@@ -267,9 +269,24 @@ export const BASEMENT_FRONT_WALL_PROPS: readonly (() => Model)[] = [
     drive(b, 0.22, 0, 0.05, 1.2);
   }, 1.3),
   prop((b) => {
-    b.cylinder(0.12, 0.12, 0.08, 0x1d1e22, { at: [-0.06, 0.04, 0] }, 18);
-    b.cylinder(0.13, 0.13, 0.012, 0x4a4c52, { at: [-0.06, 0.086, 0] }, 18);
-    b.cylinder(0.03, 0.03, 0.09, GALV, { at: [-0.06, 0.05, 0] }, 10);
+    // An extension reel stood on its edge, orange cable wound on, and a roll of yellow gaffer tape.
+    cableReel(b, -0.08, 0, 0, 0.09, 0xc8641e);
+    b.cylinder(
+      0.055,
+      0.055,
+      0.045,
+      0xd8b030,
+      { at: [0.12, 0.055, 0.1], rot: [Math.PI / 2, 0, 0.5] },
+      14,
+    );
+    b.cylinder(
+      0.03,
+      0.03,
+      0.047,
+      0x5a5040,
+      { at: [0.12, 0.055, 0.1], rot: [Math.PI / 2, 0, 0.5] },
+      10,
+    );
     for (const [x, z, r] of [
       [0.16, -0.06, 0.5],
       [0.2, 0.04, -0.4],
@@ -280,15 +297,32 @@ export const BASEMENT_FRONT_WALL_PROPS: readonly (() => Model)[] = [
 ];
 
 /**
- * A flat cluster lying on a low wall of the server room, which the players
- * look over: patch cable coils and a label printer.
+ * Flat clusters lying on the low walls of the server room, which the
+ * players look over, a different one per run: patch cable coils and a
+ * label printer; a console cable, a laptop charger brick and a torch.
  */
-export const BASEMENT_INNER_LOW_PROP: () => Model = prop((b) => {
-  coil(b, -0.18, 0, -0.04, 0.08, PATCH[1]);
-  coil(b, 0.02, 0, 0.08, 0.07, PATCH[3]);
-  b.box(0.14, 0.04, 0.1, 0x3a3e45, { at: [0.2, 0.02, -0.06], rot: [0, 0.3, 0] }, 0.008);
-  b.box(0.05, 0.004, 0.08, PAPER, { at: [0.26, 0.004, 0.05], rot: [0, 0.3, 0] }, 0);
-}, 1.2);
+export const BASEMENT_INNER_LOW_PROPS: readonly (() => Model)[] = [
+  prop((b) => {
+    coil(b, -0.18, 0, -0.04, 0.08, PATCH[2]);
+    coil(b, 0.02, 0, 0.08, 0.07, PATCH[0]);
+    b.box(0.14, 0.04, 0.1, 0x3a3e45, { at: [0.2, 0.02, -0.06], rot: [0, 0.3, 0] }, 0.008);
+    b.box(0.05, 0.004, 0.08, PAPER, { at: [0.26, 0.004, 0.05], rot: [0, 0.3, 0] }, 0);
+  }, 1.2),
+  prop((b) => {
+    coil(b, 0.16, 0, 0.02, 0.07, 0x5a7a9a);
+    b.box(0.12, 0.035, 0.07, 0x1d1f23, { at: [-0.14, 0.018, 0.02], rot: [0, -0.4, 0] }, 0.008);
+    b.led(0.006, LED_GREEN, { at: [-0.1, 0.037, 0.03] });
+    b.box(0.2, 0.006, 0.01, 0x1d1f23, { at: [0.0, 0.003, 0.0], rot: [0, 0.3, 0] }, 0);
+    b.cylinder(
+      0.022,
+      0.022,
+      0.16,
+      0x3a3e45,
+      { at: [-0.04, 0.022, -0.14], rot: [0, 0.2, Math.PI / 2] },
+      10,
+    );
+  }, 1.2),
+];
 
 /**
  * The warmest server, Segfault's bed (built from the wall top): a 4U
@@ -300,9 +334,13 @@ export const SEGFAULT_SERVER: () => Model = prop((b) => {
   server(b, 0, 0, 0, [0.56, 0.44], 4, 3);
   b.box(0.1, 0.04, 0.004, 0xd8a020, { at: [-0.16, 0.12, 0.226] }, 0);
   lettering(b, 'HOT', -0.16, 0.12, 0.228, 0.006, INK, 0.002);
-  // A towel folded on the lid, where the cat sleeps.
+  // An ESD-blue towel folded on the lid, where the cat sleeps, its fold showing.
   const top = 0.18;
-  b.box(0.36, 0.02, 0.28, 0x8a8a96, { at: [0.0, top + 0.01, 0.0] }, 0.006);
+  b.box(0.36, 0.02, 0.28, TOWEL, { at: [0.0, top + 0.01, 0.0] }, 0.006);
+  b.box(0.362, 0.004, 0.02, 0x3c5c8e, { at: [0.0, top + 0.02, 0.1] }, 0);
+  // Three status LEDs on the lid beside the cat, where they show from above.
+  for (let k = 0; k < 3; k++)
+    b.led(0.011, k === 1 ? LED_AMBER : LED_GREEN, { at: [0.23, top + 0.004, -0.08 + k * 0.05] });
 }, 1.3);
 
 /**
@@ -324,20 +362,11 @@ export const YOTTA_RACK: () => Model = prop((b) => {
   b.box(0.16, 0.003, 0.02, PAPER, { at: [0.08, 0.422, -0.06], rot: [0, -0.2, 0] }, 0);
 }, 1.2);
 
-/** The one small energy-drink can pyramid (built from the wall top): six cans, three high. */
-export const CAN_PYRAMID: () => Model = prop((b) => {
+/** The one energy-drink can left on the wall top (built from the wall top). */
+export const ENERGY_CAN: () => Model = prop((b) => {
   const r = 0.033;
   const h = 0.11;
-  const rows = [3, 2, 1];
-  rows.forEach((n, row) => {
-    for (let k = 0; k < n; k++) {
-      const x = (k - (n - 1) / 2) * (r * 2 + 0.004);
-      const y = row * h;
-      b.cylinder(r, r, h - 0.004, 0x2a5a5e, { at: [x, y + h / 2, 0] }, 12);
-      b.cylinder(r * 1.01, r * 1.01, 0.022, 0xa8b0b4, { at: [x, y + h * 0.55, 0] }, 12);
-      b.cylinder(r * 0.9, r * 0.9, 0.006, 0xa8b0b4, { at: [x, y + h - 0.003, 0] }, 12);
-    }
-  });
-  // One crushed can lying beside.
-  b.cylinder(r, r, 0.06, 0x2a5a5e, { at: [0.2, r, 0.08], rot: [Math.PI / 2, 0.4, 0] }, 10);
+  b.cylinder(r, r, h - 0.004, 0x2a5a5e, { at: [0, h / 2, 0] }, 12);
+  b.cylinder(r * 1.01, r * 1.01, 0.022, 0xa8b0b4, { at: [0, h * 0.55, 0] }, 12);
+  b.cylinder(r * 0.9, r * 0.9, 0.006, 0xa8b0b4, { at: [0, h - 0.003, 0] }, 12);
 }, 1.25);
