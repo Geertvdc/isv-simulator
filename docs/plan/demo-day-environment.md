@@ -1,6 +1,10 @@
 # Demo Day environment pass
 
-**Status:** in progress. Level 2-2 (`demo-day`, "Demo Day"), the second level of the Startup chapter, gets a hand-built world after the garage ([garage-environment.md](garage-environment.md)), [Open Plan Office](open-plan-environment.md), [Down the Hall](down-the-hall-environment.md) and [Seed Round](seed-round-environment.md).
+**Status:** two rounds done (build, critic review, fixes). Level 2-2 (`demo-day`, "Demo Day"), the second level of the Startup chapter, gets a hand-built world after the garage ([garage-environment.md](garage-environment.md)), [Open Plan Office](open-plan-environment.md), [Down the Hall](down-the-hall-environment.md) and [Seed Round](seed-round-environment.md).
+
+| Before                                       | After                                       | Before, redesign draft                             | After, redesign draft                             |
+| -------------------------------------------- | ------------------------------------------- | -------------------------------------------------- | ------------------------------------------------- |
+| ![](images/demo-day-environment/before.webp) | ![](images/demo-day-environment/after.webp) | ![](images/demo-day-environment/before-draft.webp) | ![](images/demo-day-environment/after-draft.webp) |
 
 **Goal:** the world around the level tells one story, the way Overcooked 2 levels do. Render only (`src/render/`); the sim, maps and balance don't change.
 
@@ -70,11 +74,40 @@ Three agents in one worktree at once, with strict file ownership. The shared plu
 | **World** | `scenes/demoDay.ts` (+test), `setDressing/demoDay.ts`                                                                                                                                     |
 | **Light** | `atmosphere.ts` (+test), `stage.ts` (the three.js Stage, not the room), `WorldFx.ts`, `createLights` in `look.ts`                                                                         |
 
+## Rounds
+
+Round 1 ran three agents at once (Room, World, Light). The critic scored it 6.5/10 on the shipped map and 6/10 on the draft (before: 3/10). The story read at once: the LED wall and truss, the wings full of flight cases and the next startups' roll-ups, the livestream camera, the 02:59 clock and the RESERVED investor seats. Three things held it back. The stacked near-white stage light washed the stations to pastel, so the wings out-saturated them. The bright, wide aluminium caps (two panels per tile, white rims) read as a steel kitchen pass. The 3×5 pixel letters misread ("LAUNCHFAD DENO DAY").
+
+Round 2, in three chunks:
+
+- **Room:** dark lipped caps (charcoal top, brushed aluminium lip only on open edges, a violet LED line under it). Wall tops now carry paired clusters (3 to 4 per long wall, monitor wedges at the front ends, the mirror ball on the back wall). The deck is lighter with fewer flecks. Cables hug the walls with gaffer strips and a cable ramp. The draft's middle room gets a spike-tape X.
+- **World:** the header and LIVE DEMO in the 5×5 font, so "LAUNCHPAD DEMO DAY · BATCH 26" reads. The arrow is clear of YOTTA. The screen is brighter (0x7a5ef4 to 0x8a72fc). Footlights now run the whole lip and the seat rows reach the HUD corners, with aisle step lights. The Q&A ticker sits out from under the order cards. Line arrays hang on the truss towers. The draft's front notch is dressed.
+- **Light:** a near-neutral key just under the wash-out point; the wings are lit softer and further out. The edge glows and the haze glow are smaller. Two moving-head beams sweep ±20° over 8 s, deterministic and off on `low`.
+
+Measured on the final shots:
+
+| Measure                               | Round 1     | Final       |
+| ------------------------------------- | ----------- | ----------- |
+| Yellow bench top / front saturation   | 0.16 / 0.22 | 0.30 / 0.34 |
+| Red bug queue saturation              | 0.26        | 0.34        |
+| Front wall caps, mean L / saturation  | 128 / 0.14  | 92 / 0.08   |
+| Frame mean luminance, shipped / draft | 95 / 98     | 91 / 86     |
+
+Left for later:
+
+- **Darker than the bar.** The frame is darker than the 100 target (91 shipped, 86 draft). It's a dark hall by design, and more light washes the stations out again. A neutral key at 98 dropped yellow to 0.24, so we kept the stations saturated.
+- **Weak stations.** The green keyboard (0.23) and ship hatch (0.21) tops stay a little below 0.28. Their colours are pale to begin with.
+- **The draft's spill zone.** The draft's middle room has a spike-tape X and a cable on the spill-zone tiles. Revisit it when the spills mechanic is built: its haze-machine leak, not a drink tap.
+- **Hand-copied rig numbers.** `WorldFx.ts` copies the truss rig's height and batten layout from `scenes/demoDay.ts` by hand; a test catches drift.
+- **Fixed scene id.** `stageSetRoom.ts` reads the `demo-day` lamp spots by its scene id.
+- **Small gaps.** The wall caps have no joint every 2 tiles (`MapView.ts` picks wall looks by hash). The shipped left wall has no free caps for clusters. The front wedges read as dark boxes.
+- Not checked on a real GPU.
+
 ## Done when
 
-- [ ] The shot reads as "a startup building its product live on stage at Demo Day, in front of investors" without explanation, and nothing in it reads as food or a kitchen.
-- [ ] The outside connects to the play: requests come in at the Q&A stage door, shipped features go up on the big screen.
-- [ ] No flat empty ground and no void in the 1440×810 frame.
-- [ ] Stations and players read at a glance; nothing hides them.
-- [ ] Works on the shipped map and on `?draft=demo-day`.
-- [ ] `npm run check` passes; other levels look as before.
+- [x] The shot reads as "a startup building its product live on stage at Demo Day, in front of investors" without explanation, and nothing in it reads as food or a kitchen.
+- [x] The outside connects to the play: requests come in at the Q&A stage door, shipped features go up on the big screen.
+- [x] No flat empty ground and no void in the 1440×810 frame.
+- [x] Stations and players read at a glance; nothing hides them.
+- [x] Works on the shipped map and on `?draft=demo-day`.
+- [x] `npm run check` passes; other levels look as before.
