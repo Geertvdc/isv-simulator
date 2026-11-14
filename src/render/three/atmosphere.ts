@@ -94,6 +94,12 @@ export interface Atmosphere {
     inner: number;
     glow?: { color: number; opacity: number; x: number; y: number; reach: number };
     band?: { opacity: number; depth: number };
+    /**
+     * A colour grade on the whole 3D frame: CSS `saturate()` on the canvas,
+     * 1 for none. Plain CSS like the rest of the vignette, so every quality
+     * gets the same picture. The HUD (DOM and Phaser) stays ungraded.
+     */
+    saturate?: number;
     /** More glows like `glow`, drawn over it in order: a second edge, a haze under the top. */
     glows?: { color: number; opacity: number; x: number; y: number; reach: number }[];
   };
@@ -157,7 +163,20 @@ export interface Atmosphere {
    * the top of the well, `length` long and `radius` wide at its foot, leaning
    * `lean` radians toward the camera. It lights nothing. Off on `low`.
    */
-  shafts?: { color: number; opacity: number; length: number; radius: number; lean: number };
+  shafts?: {
+    color: number;
+    opacity: number;
+    length: number;
+    radius: number;
+    lean: number;
+    /**
+     * Sunlight through the building's left curtain wall instead of down the
+     * light wells (see `sunShaftSpots`): `count` beams along the left side,
+     * their feet `out` grid units outside the outline on the floor beside the
+     * room, each running up toward the sun (`lean` unused). Never over the room.
+     */
+    side?: { count: number; out: number };
+  };
   /** Dust drifting in the room's light: `perTile` motes per floor tile, faint and below bloom. */
   motes?: { color: number; opacity: number; perTile: number };
   /**
@@ -584,37 +603,49 @@ const NIGHT_SHIFT: Atmosphere = {
 };
 
 /**
- * A bright, clean spring morning on an upper floor of a mid-rise: a crisp,
- * nearly white sun low-ish from the back left through the building's curtain
- * wall (about 42° up, so the partitions' shadows fall short toward the front
- * right and the back row stays lit), its mullions striped faintly across the
- * carpet; a soft, only slightly cool fill and sky (bluer turns the yellow
- * test benches olive), soft spring blue-grey air over the street far below,
- * small warm-white pools from the linear pendants along the back wall, and
- * cherry-blossom petals drifting past the glass outside.
+ * A bright, fresh spring morning on an upper floor of a mid-rise: a warm,
+ * creamy sun from the back left through the building's curtain wall (about
+ * 50° up, so the back wall's shadow spares the back row of stations), its
+ * mullions striped faintly across the carpet and a few faint warm beams
+ * slanting in on the floor beside the room; a soft, only slightly cool fill
+ * and sky against it (bluer turns the yellow test benches olive), light
+ * spring blue-grey air hazing the street far below, warm-white pools from
+ * the linear pendants along the back wall, cherry-blossom petals drifting
+ * past the glass outside, and a gentle saturation grade so the grey-and-glass
+ * office reads as a sunny morning rather than an overcast one.
  */
 const SPRING_MORNING: Atmosphere = {
   sun: {
-    color: 0xfff6ea,
-    intensity: 3.2,
-    from: { x: -7.5, y: -4.5, height: 8, perMapSize: false },
+    color: 0xfff0d8,
+    intensity: 2.45,
+    from: { x: -7.5, y: -4.5, height: 10.5, perMapSize: false },
     reach: 0.95,
   },
-  sky: { sky: 0xd4e0f2, ground: 0x857f78, intensity: 0.7 },
-  fill: { color: 0xe4eaf6, intensity: 0.75 },
+  sky: { sky: 0xd4e0f2, ground: 0x8c8478, intensity: 0.7 },
+  fill: { color: 0xe8ecf4, intensity: 0.68 },
   environment: 0.12,
   backdrop: { inner: 0xd2dce8, outer: 0x96a8bc },
-  fog: { color: 0xbac8d8, start: 0.5, span: 10 },
+  fog: { color: 0xc6d2e0, start: 0.35, span: 10 },
   vignette: {
     color: 0x2a3a52,
     opacity: 0.35,
     inner: 0.7,
     // The morning sun pouring in through the curtain wall on the left.
-    glow: { color: 0xfff0d8, opacity: 0.14, x: 0, y: 0.35, reach: 0.3 },
+    glow: { color: 0xfff0d8, opacity: 0.2, x: 0, y: 0.35, reach: 0.3 },
+    saturate: 1.35,
+  },
+  // Low warm sun slanting in through the left curtain wall, on the floor beside the room only.
+  shafts: {
+    color: 0xfff0d0,
+    opacity: 0.07,
+    length: 3.2,
+    radius: 0.5,
+    lean: 0,
+    side: { count: 4, out: 0.95 },
   },
   lamps: {
     color: 0xfff0dc,
-    intensity: 2.6,
+    intensity: 8,
     distance: 3.4,
     height: 2.1,
     spacing: 3.5,
@@ -1153,6 +1184,40 @@ export function petalSeeds(
     }),
   );
   return [...sides, ...over];
+}
+
+/** One sunbeam through the curtain wall: its foot on the floor and the unit direction up toward the sun. */
+export interface SunShaft {
+  foot: Vec3;
+  dir: Vec3;
+}
+
+/**
+ * The sunbeams through the left curtain wall (`Atmosphere.shafts.side`):
+ * `count` feet spread down the map's left side, `out` grid units outside the
+ * outline (never over the room), each beam running from its foot toward the sun.
+ * None when the map's left column has void (with tiles): there the building's
+ * wall hugs the room and no floor lies beside it for the light to land on.
+ */
+export function sunShaftSpots(
+  atmosphere: Atmosphere,
+  map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles'>>,
+): SunShaft[] {
+  const side = atmosphere.shafts?.side;
+  if (!side || side.count <= 0) return [];
+  if (map.tiles) {
+    for (let z = 0; z < map.height; z++) {
+      const tile = getTile(map as LevelMap, 0, z);
+      if (tile === null || tile === 'void') return [];
+    }
+  }
+  const { position: p, target: t } = sunPlacement(atmosphere, map);
+  const len = Math.hypot(p.x - t.x, p.y - t.y, p.z - t.z) || 1;
+  const dir = { x: (p.x - t.x) / len, y: (p.y - t.y) / len, z: (p.z - t.z) / len };
+  return Array.from({ length: side.count }, (_, k) => ({
+    foot: { x: -0.5 - side.out, y: 0, z: ((k + 0.5) / side.count) * map.height - 0.5 },
+    dir,
+  }));
 }
 
 /**

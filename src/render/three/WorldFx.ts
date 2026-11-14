@@ -21,6 +21,7 @@ import {
   snowSeeds,
   stutterIndex,
   stutterLevel,
+  sunShaftSpots,
 } from './atmosphere';
 import { blockHeight, facingYaw, heroPlacement, stationFacing } from './layout';
 import { ACCENT_INDEX_KEY, LAMP_INDEX_KEY, LAMP_KEY } from './look';
@@ -632,7 +633,7 @@ export class WorldFx {
     const group = new THREE.Group();
     group.userData[AMBIENT_KEY] = true;
     const wells =
-      atmosphere.snow || atmosphere.shafts || atmosphere.accents
+      atmosphere.snow || (atmosphere.shafts && !atmosphere.shafts.side) || atmosphere.accents
         ? lightWellsFor(atmosphere, this.map)
         : [];
     const spots = accentSpots(atmosphere, this.map, wells);
@@ -711,7 +712,7 @@ export class WorldFx {
       this.snow = { points, seeds: flakes, fall: snow.fall };
     }
     const shafts = atmosphere.shafts;
-    if (shafts) {
+    if (shafts && !shafts.side) {
       const geometry = shaftGeometry(shafts.length, shafts.radius);
       const material = new THREE.MeshBasicMaterial({
         color: shafts.color,
@@ -797,6 +798,7 @@ export class WorldFx {
       stripes.position.set((width - 1) / 2, 0.003, (height - 1) / 2);
       this.root.add(stripes);
     }
+    this.buildSunShafts(atmosphere);
     const spec = atmosphere.petals;
     const seeds = petalSeeds(atmosphere, this.map);
     if (!spec || seeds.length === 0) return;
@@ -824,6 +826,37 @@ export class WorldFx {
     this.root.add(group);
     this.petals = { points, seeds, fall: spec.fall, sway: spec.sway, group };
     this.driftPetals(0);
+  }
+
+  /** Faint warm beams through the left curtain wall (`Atmosphere.shafts.side`); off on `low`. */
+  private buildSunShafts(atmosphere: Atmosphere): void {
+    const shafts = atmosphere.shafts;
+    const spots = sunShaftSpots(atmosphere, this.map);
+    if (!shafts || spots.length === 0) return;
+    const group = new THREE.Group();
+    group.userData[AMBIENT_KEY] = true;
+    const geometry = shaftGeometry(shafts.length, shafts.radius);
+    // The cone's wide end at its foot: flip it so its narrow end points toward the sun.
+    geometry.rotateX(Math.PI);
+    const material = new THREE.MeshBasicMaterial({
+      color: shafts.color,
+      vertexColors: true,
+      transparent: true,
+      opacity: shafts.opacity,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      fog: false,
+    });
+    const up = new THREE.Vector3(0, 1, 0);
+    for (const { foot, dir } of spots) {
+      const d = new THREE.Vector3(dir.x, dir.y, dir.z);
+      const beam = new THREE.Mesh(geometry, material);
+      beam.quaternion.setFromUnitVectors(up, d);
+      beam.position.set(foot.x, foot.y, foot.z).addScaledVector(d, shafts.length / 2);
+      group.add(beam);
+    }
+    this.root.add(group);
   }
 
   /** Each petal falls on its own loop, swaying and blown a little toward the camera. */
