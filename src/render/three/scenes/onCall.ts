@@ -6,12 +6,18 @@ import { tint } from '../kit';
 import { CASE_SIZES, flightCase } from '../setDressing/demoDay';
 import {
   airDuct,
+  archiveBoxes,
+  archivePallet,
   bike,
   bikeStand,
   boiler,
+  boilerMains,
   boilerSign,
+  BOILER_STUB,
+  BOILER_VALVE,
   breakerPanel,
   cableReel,
+  cleanerHeadgear,
   cleaningCart,
   column,
   deflatedBalloon,
@@ -20,6 +26,7 @@ import {
   extinguisher,
   fibreDuct,
   floorDrain,
+  floorPipe,
   foundationWall,
   growLamp,
   junkShelf,
@@ -43,7 +50,6 @@ import {
 } from '../setDressing/onCall';
 import { cableTray, planterTree, raisedBanner } from '../setDressing/rooftop';
 import { cargoBike } from '../setDressing/canal';
-import { boxStack } from '../setDressing/suburb';
 import type { SetPiece } from '../setDressing/shared';
 import { scenePose } from './downTheHall';
 import { basementRoom } from '../rooms/basementRoom';
@@ -89,8 +95,8 @@ import {
 /** The basement floor out to the horizon: dark painted concrete. */
 const HORIZON = 0x4a4d50;
 /** The basement's painted floor, the boiler room's bare concrete, the apron by the walls. */
-const FLOOR = 0x737877;
-const BARE = 0x76736c;
+const FLOOR = 0x828786;
+const BARE = 0x84817a;
 const APRON_PAINT = 0x8c9190;
 /** How far behind the back wall the foundation wall's face stands (the stairs fit between). */
 const FOUNDATION_GAP = 1.0;
@@ -232,6 +238,18 @@ export function onCallScene(map: LevelMap): Scene {
     const b = projectPoint(pose, { x: 1, y: GROUND + lift, z });
     return (sx - a.x) / (b.x - a.x);
   };
+  /** The ground point under screen point (sx, sy). */
+  const groundAt = (sx: number, sy: number): Tile => {
+    let lo = B - 6;
+    let hi = F + 10;
+    for (let k = 0; k < 40; k++) {
+      const z = (lo + hi) / 2;
+      if (projectPoint(pose, { x: xAt(sx, z), y: GROUND, z }).y < sy) lo = z;
+      else hi = z;
+    }
+    const z = (lo + hi) / 2;
+    return { x: xAt(sx, z), z };
+  };
   const midZ = (B + F) / 2;
   const tileAt = (x: number, z: number) => getTile(map, x, z);
   const isVoid = (x: number, z: number) => tileAt(x, z) === 'void';
@@ -307,9 +325,9 @@ export function onCallScene(map: LevelMap): Scene {
     put(piece, x, z, yaw, variant, 'near', lift);
     return true;
   };
-  /** A stack of boxes (2 to 3 high in its looks) at (x, z), where the HUD allows. */
+  /** A stack of archive boxes (2 to 3 high in its looks) at (x, z), where the HUD allows. */
   const boxes = (x: number, z: number, look: number, yaw = 0) =>
-    putClear(boxStack, x, z, 0.4, 1.0, yaw, look);
+    putClear(archiveBoxes, x, z, 0.45, 0.85, yaw, look);
   /** A stack of flight cases at (x, z), `count` high, the biggest at the bottom. */
   const cases = (x: number, z: number, count: number, salt: number, yaw = 0) => {
     let lift = 0;
@@ -463,11 +481,17 @@ export function onCallScene(map: LevelMap): Scene {
   const roomL = stairsLeft ? L - 0.62 - STAIR_WIDTH / 2 - 0.25 : L - 0.2;
   // The boiler: as far back as the order cards allow, out from the room.
   const bx = roomL - 1.7;
-  let bz = fz + 1.7;
-  // Its pipes and flue run back to the wall at about 2 high: keep those clear of the cards too.
-  while (!clear(bx, bz - 0.55, 0.7, 2.1, 1.2) && bz < midZ) bz += 0.1;
-  put(boiler, bx, bz, 0.2);
-  put(steamWisp, bx + 0.33, bz + 0.05, 0.4, 0, 'near', 1.6);
+  let bz = fz + 1.3;
+  while (!clear(bx, bz, 0.72, BOILER_STUB.flue + 0.05) && bz < midZ) bz += 0.1;
+  const boilerYaw = 0.2;
+  put(boiler, bx, bz, boilerYaw);
+  // Its flow, return and flue run up and back into the wall's pipe run: backdrop, under the cards.
+  put(boilerMains(bz - fz, boilerYaw), bx, bz, 0, 0, 'far');
+  // Steam from the safety valve on its top.
+  const [vx, vy, vz] = BOILER_VALVE;
+  const cy = Math.cos(boilerYaw);
+  const sy = Math.sin(boilerYaw);
+  put(steamWisp, bx + vx * cy + vz * sy, bz - vx * sy + vz * cy, 0.4, 0, 'near', vy);
   // The expansion tank on its bracket against the wall, left of the boiler.
   putClear(expansionTank, bx - 1.05, fz + 0.3, 0.45, 1.45, 0);
   // The NO STORAGE sign on the wall right of the boiler, and the storage stacked under it anyway.
@@ -477,26 +501,25 @@ export function onCallScene(map: LevelMap): Scene {
   while (!clear(signX, signZ, 0.66, 1.25, 0.06) && signZ < midZ) signZ += 0.1;
   put(boilerSign, signX, signZ, -0.12, 0, 'near');
   boxes(signX - 0.25, signZ + 0.4, 1, 0.05);
-  boxes(signX + 0.3, signZ - 0.55, 2, -0.1);
-  // A junk shelf against the wall past the tank, more boxes piled against it.
-  putClear(junkShelf, bx - 2.0, fz + 0.28, 0.5, 1.6, 0, 0);
-  boxes(bx - 1.6, fz + 0.95, 0, 0.15);
+  boxes(signX + 0.2, signZ - 0.55, 0, -0.1);
+  // A shelf of archive bins against the wall past the tank.
+  putClear(junkShelf, bx - 2.0, fz + 0.28, 0.5, 1.7, 0, 0);
   const colZ = bz + 1.6;
   // The night cleaner on her break, a coffee in hand, her cart and a mop bucket beside her.
   const cz = Math.min(F - 2.2, colZ + 1.3);
   const cx = Math.min(L - 1.6, roomL - 1.1);
   person(cx, cz, 0.5, 'sipping');
+  put(cleanerHeadgear, cx, cz, 0.5);
   putClear(cleaningCart, cx - 0.95, cz + 0.15, 0.5, 0.85, Math.PI / 2 - 0.15);
   putClear(mopBucket, cx - 0.3, cz + 0.85, 0.3, 0.7, 0.4);
-  // Out toward the frame's front-left corner, low: more boxes, a reel of cable.
-  boxes(roomL - 0.5, cz + 1.6, 2, -0.1);
-  putClear(cableReel, cx - 0.9, cz + 1.7, 0.35, 0.55, 0.3, 0);
-  // Out by the frame's left edge, more junk so the floor never runs empty to the edge.
+  // Out toward the frame's front-left corner, well out from the room: a few boxes, a reel of cable.
+  boxes(roomL - 1.5, cz + 1.75, 2, -0.1);
+  putClear(cableReel, roomL - 2.45, cz + 1.55, 0.35, 0.55, 0.3, 0);
+  // Out by the frame's left edge, shelving of archive bins so the floor never runs empty to the edge.
   for (let z = fz + 1.6, k = 0; z < F; z += 1.5, k++) {
     const x = edgeL(z) + 0.75;
     if (x > bx - 0.9) continue;
-    if (k % 2) boxes(x, z, k + 1, 0.2 * k);
-    else putClear(junkShelf, x, z, 0.5, 1.6, Math.PI / 2, k);
+    putClear(junkShelf, x, z, 0.5, 1.7, Math.PI / 2, k);
   }
 
   // ---- Right: the storage cage, Prod, the bike storage ----
@@ -543,15 +566,13 @@ export function onCallScene(map: LevelMap): Scene {
     );
   const cbz = bz0 + bikes * 0.42 + 0.45;
   putClear(cargoBike, bikeX - 0.05, cbz, 0.7, 0.6, Math.PI / 2 + 0.05, 1);
-  // Toward the front-right corner, low: a reel, boxes.
+  // Toward the front-right corner, low: a reel.
   putClear(cableReel, R + 0.95, cbz + 1.0, 0.35, 0.55, -0.3, 1);
-  boxes(R + 2.0, cbz + 1.1, 0, -0.15);
-  // Out by the frame's right edge: more of the building's storage.
+  // Out by the frame's right edge: the building's archive shelving.
   for (let z = cageF + 0.8, k = 0; z < F + 0.5; z += 1.4, k++) {
     const x = edgeR(z) - 0.75;
     if (x < px + 0.9) continue;
-    if (k % 2) boxes(x, z, k, -0.2 * k);
-    else putClear(junkShelf, x, z, 0.5, 1.6, -Math.PI / 2, k);
+    putClear(junkShelf, x, z, 0.5, 1.7, -Math.PI / 2, k);
   }
 
   // ---- Front: the fibre duct from the ship hatch, Moppy's dock, the drain ----
@@ -580,6 +601,27 @@ export function onCallScene(map: LevelMap): Scene {
       put(floorDrain, x, z, 0.05, 0, 'near');
       break;
     }
+  }
+
+  // ---- The bottom corners, low (under 0.6) and clear of the HUD ----
+  // Left: a return pipe along the floor with its valve wheel, from the frame's edge in.
+  {
+    const a = groundAt(-30, 590);
+    const len = Math.min(groundAt(205, 590).x, L - 0.9) - a.x;
+    if (len > 0.8 && clear(a.x + len / 2, a.z, len / 2, 0.45, 0.15))
+      put(floorPipe(len), a.x, a.z, 0, 0, 'near');
+  }
+  // Right: a low pallet of archive bins, a second drain, Moppy's route arrows.
+  {
+    const p = groundAt(1385, 655);
+    const px0 = Math.max(p.x, R + 1.2);
+    putClear(archivePallet, px0, p.z, 0.55, 0.56, -0.12);
+    const d = groundAt(1330, 718);
+    if (d.x > R + 0.4) putClear(floorDrain, d.x, d.z, 0.16, 0.03, 0.1);
+    const ax = Math.max(groundAt(1262, 600).x, R + 0.45);
+    const az0 = cbz + 0.9;
+    const az1 = Math.min(groundAt(1262, 745).z, F + APRON + 0.6);
+    if (az1 - az0 > 1) patch('arrows', ax - 0.16, ax + 0.16, az0, az1);
   }
 
   // ---- Void tiles inside the outline: spare racks and a cable run at the back, low things in front ----
@@ -627,7 +669,17 @@ export function onCallScene(map: LevelMap): Scene {
 
   // ---- Segfault, asleep on the warmest server on the server room's wall top (the Room's server) ----
   const cat = basementRoom(map).segfault;
-  if (cat) put(segfaultCat, cat.x, cat.y, -0.15, 0, 'near', WALL_HEIGHT + SERVER_TOP - GROUND);
+  // Its tail hangs over the server's edge on the side that faces the middle of the room.
+  if (cat)
+    put(
+      segfaultCat,
+      cat.x,
+      cat.y,
+      -0.15,
+      cat.x < (width - 1) / 2 ? 0 : 1,
+      'near',
+      WALL_HEIGHT + SERVER_TOP - GROUND,
+    );
 
   return { horizon: HORIZON, ground, painters: PAINTERS, pieces, people, tufts: [] };
 }
@@ -719,4 +771,28 @@ const line: GroundPainter = (b, g, salt) => {
   }
 };
 
-const PAINTERS: Readonly<Record<string, GroundPainter>> = { floor, bare, apron, line };
+/**
+ * Moppy's route: matte yellow chevrons painted down the floor along the
+ * patch's long side, pointing toward its far end, worn here and there.
+ */
+const arrows: GroundPainter = (b, g, salt) => {
+  const w = g.x1 - g.x0;
+  const d = g.z1 - g.z0;
+  const along = d > w;
+  const len = along ? d : w;
+  const half = (along ? w : d) * 0.5;
+  for (let u = 0.3, k = 0; u < len - 0.2; u += 0.55, k++) {
+    if (shade(k, 4, salt) > 0.85) continue;
+    for (const side of [-1, 1]) {
+      const arm = half * 1.1;
+      const at: [number, number, number] = along
+        ? [(g.x0 + g.x1) / 2 + side * half * 0.4, 0.03, g.z0 + u]
+        : [g.x0 + u, 0.03, (g.z0 + g.z1) / 2 + side * half * 0.4];
+      // Each arm leans back from the tip, so the chevron points toward the patch's far end.
+      const rot: [number, number, number] = [0, along ? -side * 0.8 : Math.PI / 2 - side * 0.8, 0];
+      b.box(0.05, 0.004, arm, 0xb89a3a, { at, rot }, 0);
+    }
+  }
+};
+
+const PAINTERS: Readonly<Record<string, GroundPainter>> = { floor, bare, apron, line, arrows };
