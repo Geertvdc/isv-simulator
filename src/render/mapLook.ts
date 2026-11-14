@@ -6,7 +6,8 @@ import type { BlockTile } from '../sim/level';
  * at the inbox, pegboard and paint tins, counters as doors on sawhorses.
  * `officePark` is a business-park unit (Open Plan Office), `warehouse` an old
  * brick factory (Down the Hall), `loft` a startup's rooftop loft (Seed Round),
- * `stageSet` the demo set on the Demo Day stage. A theme's room dressing, if it has one, is
+ * `stageSet` the demo set on the Demo Day stage, `basement` the painted
+ * block basement under the loft building (On Call). A theme's room dressing, if it has one, is
  * in `src/render/three/rooms/`.
  */
 export const WALL_THEMES = [
@@ -18,6 +19,7 @@ export const WALL_THEMES = [
   'warehouse',
   'loft',
   'stageSet',
+  'basement',
 ] as const;
 export type WallTheme = (typeof WALL_THEMES)[number];
 
@@ -25,7 +27,8 @@ export type WallTheme = (typeof WALL_THEMES)[number];
  * Floor looks a level can pick. `slab` is a garage's sealed concrete, joints,
  * oil stain and all; `carpetTiles` an office's carpet tiles, `boards` old
  * timber floorboards, `polished` a loft's polished concrete, `stageDeck`
- * painted black-grey stage decks.
+ * painted black-grey stage decks, `raisedFloor` a server room's grey
+ * anti-static raised-floor tiles.
  */
 export const FLOOR_THEMES = [
   'concrete',
@@ -36,6 +39,7 @@ export const FLOOR_THEMES = [
   'boards',
   'polished',
   'stageDeck',
+  'raisedFloor',
 ] as const;
 export type FloorTheme = (typeof FLOOR_THEMES)[number];
 
@@ -63,7 +67,8 @@ export const LEVEL_LOOKS: Readonly<Record<string, MapLook>> = {
   'seed-round': { walls: 'loft', floor: 'polished', scene: 'seed-round' },
   // Demo Day: building it live on the accelerator's stage.
   'demo-day': { walls: 'stageSet', floor: 'stageDeck', scene: 'demo-day' },
-  'on-call': { walls: 'wood', floor: 'carpet' },
+  // On Call: the basement server room under the loft building, 3 AM.
+  'on-call': { walls: 'basement', floor: 'raisedFloor', scene: 'on-call' },
   // Scale-Up: glass walls go in.
   'middle-management': { walls: 'glass', floor: 'concrete' },
   hypergrowth: { walls: 'glass', floor: 'parquet' },

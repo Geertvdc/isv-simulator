@@ -85,6 +85,8 @@ export const WALL_DECOS: Readonly<Record<WallTheme, readonly string[]>> = {
   loft: ['whiteboard', 'clock', 'dashboard', 'tv', 'plants'],
   // The demo set hangs its own pieces (see `rooms/stageSetRoom.ts`); this is the fallback.
   stageSet: ['dashboard', 'tv', 'clock'],
+  // The basement hangs its own pieces (see `rooms/basementRoom.ts`); this is the fallback.
+  basement: ['clock', 'whiteboard', 'dashboard'],
 };
 /** No two decorations this close along a wall are the same. */
 export const WALL_DECO_SPREAD = 4;
