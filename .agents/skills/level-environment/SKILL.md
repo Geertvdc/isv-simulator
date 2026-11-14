@@ -9,8 +9,9 @@ The garage (1-1) was the pilot: `docs/plan/garage-environment.md` has the brief,
 
 Score history to beat: the garage went from **3/10 to 5.5/10** after round 1 and clearly higher after round 2, judged against Overcooked 2 shots.
 
-## 0. Pick one level and get references
+## 0. Pick one level, read its story, get references
 
+- **Read the level's entry in `docs/game/storyline.md` first.** The campaign is one story (YOTTA, from Mom's garage to MONOLITH's old campus) and every level is one beat of it: where and when, the joke, why the level's mechanic exists in the story, what the inbox and ship hatch are, the outside, and where the running gags (the logo, Prod the plant, Segfault the cat, Mom and her station wagon, MONOLITH, the crane tower, Derek, Moppy, the plan) are in this level. Read the levels just before and after too, so the pass sets up the next beat and doesn't repeat the last place.
 - One level per pass. Prefer the chapter's first level (x-1), so later levels in the chapter can reuse its props and atmosphere.
 - Ask the user for reference images if they didn't give any (Overcooked 2 shots work well). Copy them to the scratchpad (`sips -s format png` also converts `.avif`) so agents can read them.
 - Take a **before** shot (step 2 shows how) and keep it for the plan doc.
@@ -20,16 +21,18 @@ Score history to beat: the garage went from **3/10 to 5.5/10** after round 1 and
 
 Copy the structure of `docs/plan/garage-environment.md`:
 
-1. **Story in two sentences:** who works here, where, what time of day, and what the joke is. Every prop must belong to that place. "A mix of office-ish things" is the failure mode.
-2. **Read it from the fixed front camera.** Back (top of screen), front (bottom), left, right, inside, light. Tie the outside to the play: where tickets come from (the inbox), where shipped work goes (the ship hatch).
-3. The **six Overcooked lessons**, checked for this level:
+1. **Story in two sentences**, taken from the level's storyline entry: who works here, where, what time of day and season, and what the joke is. Every prop must belong to that place. "A mix of office-ish things" is the failure mode. You may sharpen the story (a funnier joke, a better place), but then change `docs/game/storyline.md` in the same commit, including the next level's "how it ends" hook if it no longer fits.
+2. **Where this sits on the road:** one short paragraph on the levels before and after (link the storyline, don't copy its table). Each level is bigger and more "tech" than the one before; say how this one shows that in material, light and outside.
+3. **Read it from the fixed front camera.** Back (top of screen), front (bottom), left, right, inside, light. Tie the outside to the play: build the inbox and the ship hatch as the storyline's doors (where tickets come from, where shipped work goes), and show why the level's mechanic exists (the divider because walls cost money, the spill from the leaking haze machine).
+4. **Running gags:** list where each one from the storyline's per-level table goes, with tile or screen positions. At least the logo and Segfault, plus one more. They are cameos: out of the play area, out from under the HUD, small enough to find, never readable as a player.
+5. The **six Overcooked lessons**, checked for this level:
    - The frame is full, at several heights.
    - The room's edge is made of the setting.
    - Surfaces carry material and wear.
    - One place, one story.
    - Light does the composition.
    - The outside connects to the play.
-4. The rules below, the work split, and a "Done when" list.
+6. The rules below, the work split, and a "Done when" list (including "the storyline beat reads with no explanation" and "the running gags are in place").
 
 Commit the brief before spawning agents. Only wait for the user's approval if they asked to review the plan.
 
@@ -67,7 +70,8 @@ Spawn all three in one message (`run_in_background`), as `general-purpose` agent
 
 Every agent prompt includes:
 
-- The repo path, plus "read `AGENTS.md` and the brief".
+- The repo path, plus "read `AGENTS.md`, the brief, and this level's entry in `docs/game/storyline.md`".
+- Which running gags are its job: logo and signs usually go to Room (walls) or World (backdrop), Segfault and other cameos to whoever owns the spot they sit on, people from the story (Mom, Derek, MONOLITH staff, consultants) to World.
 - The reference image paths and the before-shot path.
 - Its own files, the other two tracks' files ("don't edit; ignore their transient tsc/test errors"), and its own vite and cdp ports.
 - **"Do NOT commit."** You commit per track afterwards with `git add <its paths>`. Commits can't be split cleanly when two tracks touch `look.ts` or `ThreeRoundRenderer.ts`. When that happens, put the shared file in the last commit and make sure the final state passes `npm run check`.
@@ -108,6 +112,8 @@ These are the round-1 lessons and the critic's findings, written as rules so rou
 
 **Story and density**
 
+- **The story is the campaign's, not just the level's.** Props come from this level's beat in `docs/game/storyline.md`; nothing that belongs to an earlier or later place (no HQ glass in the garage, no garage clutter on the campus) unless the storyline calls it a callback.
+- **Software and office props, not food.** No catering, bars, kegs, crates of produce or pizza boxes: with the stations, they make the level read as a kitchen game. Coffee mugs are fine.
 - **Cluster, don't spread.** Pile props against the room's outer walls (boxes 2–3 high, overflowing bins). Leave open ground only as a deliberate breather. Wall-top props come in 3–4 stacked clusters per long wall, not one item every few tiles.
 - The best storytelling prop (the evicted car with the cat on it) must be fully in frame and read from above: windows, wheels, lights, a muted colour of its own.
 - **Background people read as extra players** unless they're smaller and quieter. Scale them by `SCENE_PERSON_SCALE` (0.88), desaturate them about 30%, give each an unmistakable action pose (mowing, watering), and keep them at least 1 tile from the room.
@@ -143,7 +149,7 @@ When round 1 is committed, spawn one `general-purpose` agent as an **exacting ar
 
 It also lists what is genuinely good and must be kept, so round 2 doesn't undo it.
 
-Points the critic must cover: frame fill (including what the HUD hides), whether the story reads with no explanation, whether the edge is made of the setting, material and wear, clustering and silhouettes, value hierarchy, light and grade (with measured luminance), life and motion, and readability risks near the play area.
+Give the critic the level's storyline entry too. Points the critic must cover: frame fill (including what the HUD hides), whether the storyline beat reads with no explanation (where we are, the joke, why the mechanic is there), whether the running gags are present and findable but not distracting, whether the edge is made of the setting, material and wear, clustering and silhouettes, value hierarchy, light and grade (with measured luminance), life and motion, and readability risks near the play area.
 
 ## 6. Round 2
 
@@ -156,6 +162,7 @@ If the result still has clear gaps and the user wants more, run another critic r
 - `npm run check` with everything in.
 - Final shots: both maps, plus one other level. Copy the shipped shot to `docs/game/images/levels/<id>.webp`, and before/after/draft to `docs/plan/images/<level>-environment/`.
 - In the brief: a before/after image table at the top, a status line, a summary of round 2, the leftovers, and ticked "Done when" boxes.
+- In `docs/game/storyline.md`: link the brief from the intro's list of levels with a brief, and update the level's entry and its row in the running-gags table to what was actually built.
 - Send the user the before and after images, then offer to ship (the `ship` skill).
 
 ## Reusable pieces from the garage

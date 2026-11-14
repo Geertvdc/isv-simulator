@@ -11,6 +11,7 @@ An Overcooked-style couch co-op game about shipping software. 2 to 4 players sha
 | [Stations](stations.md)            | Every tile you can walk up to: inbox, bug queue, keyboard, review, test bench, pipeline, ship, bin, counter |
 | [Tickets and events](mechanics.md) | Features, reviews, bugs, hotfixes, the pipeline breaking, throwing, the manager, meetings, scoring          |
 | [Levels](levels.md)                | All 16 levels in 5 chapters: layout, map, what's new, star targets                                          |
+| [Storyline](storyline.md)          | The story behind the levels: YOTTA from Mom's garage to Big Tech, level by level, and the running gags      |
 | This page                          | How a round works, controls, and every screen from title to results                                         |
 
 ## How a round works
