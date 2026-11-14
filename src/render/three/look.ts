@@ -6,6 +6,7 @@ import { gridToWorld } from '../projection';
 import {
   type Atmosphere,
   DEFAULT_ATMOSPHERE,
+  accentSpots,
   lampColor,
   lampSpots,
   sideLightSpots,
@@ -156,13 +157,15 @@ export const WALL_COLORS: Readonly<Record<WallTheme, { face: number; top: number
   // Charcoal scenery flats, capped dark with a brushed aluminium lip along the open edges.
   stageSet: { face: 0x3a3b42, top: 0x3e3f43 },
   // Painted concrete block, muted grey-green, capped with cool cast-concrete coping.
-  basement: { face: 0x8a958e, top: 0x7a7e82 },
+  basement: { face: 0x8a958e, top: 0x666b70 },
 };
 
 /** Marks the room's warm lamps, which only `medium` and `high` quality light (see `Stage`). */
 export const LAMP_KEY = 'lamp';
 /** A lamp's place in `lampSpots`, on the lamps of the row only (not the side lights). */
 export const LAMP_INDEX_KEY = 'lampIndex';
+/** An accent light's place in `Atmosphere.accents` (see `accentSpots`). */
+export const ACCENT_INDEX_KEY = 'accentIndex';
 
 /**
  * Lights for a level: sky, sun with soft shadows fitted to the map, a fill
@@ -170,7 +173,7 @@ export const LAMP_INDEX_KEY = 'lampIndex';
  * from `atmosphere` (see `atmosphere.ts`), today's studio light by default.
  */
 export function createLights(
-  map: Pick<LevelMap, 'width' | 'height'>,
+  map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles'>>,
   atmosphere: Atmosphere = DEFAULT_ATMOSPHERE,
 ): THREE.Object3D[] {
   const { width, height } = map;
@@ -237,7 +240,16 @@ export function createLights(
     light.userData[LAMP_KEY] = true;
     return light;
   });
-  return [sky, sun, sun.target, fill, fill.target, ...wash, ...lamps, ...sides];
+  // Coloured light from the world's fittings (a beacon, the boiler, the racks): hidden on `low`
+  // too. The light wells' own come with their snow (`WorldFx`), which knows the scene's wells.
+  const accents = accentSpots(atmosphere, map, []).map(({ at, accent, index }) => {
+    const light = new THREE.PointLight(accent.color, accent.intensity, accent.distance, 2);
+    put(light, at);
+    light.userData[LAMP_KEY] = true;
+    light.userData[ACCENT_INDEX_KEY] = index;
+    return light;
+  });
+  return [sky, sun, sun.target, fill, fill.target, ...wash, ...lamps, ...sides, ...accents];
 }
 
 let environment: THREE.Texture | null = null;
