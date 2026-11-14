@@ -6,6 +6,7 @@ import {
   DOWN_THE_HALL,
   GARAGE,
   LEVELS,
+  MIDDLE_MANAGEMENT,
   ON_CALL,
   OPEN_PLAN,
   SEED_ROUND,
@@ -16,6 +17,7 @@ import scaleUpDraft from '../../../maps/drafts/scale-up.txt?raw';
 import seedRoundDraft from '../../../maps/drafts/seed-round.txt?raw';
 import demoDayDraft from '../../../maps/drafts/demo-day.txt?raw';
 import onCallDraft from '../../../maps/drafts/on-call.txt?raw';
+import middleManagementDraft from '../../../maps/drafts/middle-management.txt?raw';
 import { LEVEL_LOOKS } from '../mapLook';
 import { WALL_HEIGHT } from './layout';
 import { fitCamera3d, gridToWorld, projectPoint } from '../projection';
@@ -34,6 +36,8 @@ import {
   lampSpots,
   moteSeeds,
   lightWellSpots,
+  mullionShade,
+  petalSeeds,
   sideLightSpots,
   snowSeeds,
   stutterIndex,
@@ -83,6 +87,7 @@ describe('atmosphereFor', () => {
       SEED_ROUND.id,
       DEMO_DAY.id,
       ON_CALL.id,
+      MIDDLE_MANAGEMENT.id,
     ]);
     for (const level of LEVELS) {
       if (lit.has(level.id)) continue;
@@ -492,6 +497,85 @@ describe('the night shift (on-call)', () => {
     }
     expect(snowSeeds(DEFAULT_ATMOSPHERE, SHIPPED)).toEqual([]);
     expect(accentSpots(DEFAULT_ATMOSPHERE, SHIPPED)).toEqual([]);
+  });
+});
+
+describe('the spring morning (middle-management)', () => {
+  const a = atmosphereFor('middle-management');
+  const maps = { shipped: MIDDLE_MANAGEMENT.map, draft: parseDraftMap(middleManagementDraft) };
+  const rgb = (c: number) => [(c >> 16) & 255, (c >> 8) & 255, c & 255] as const;
+
+  it('gives middle-management its own light', () => {
+    expect(atmosphereFor(LEVEL_LOOKS[MIDDLE_MANAGEMENT.id]?.scene)).toBe(
+      ATMOSPHERES['middle-management'],
+    );
+    expect(a).not.toBe(DEFAULT_ATMOSPHERE);
+  });
+
+  it('brings the sun in low-ish from the left, 40–45° up, so the back row stays lit', () => {
+    for (const [name, map] of Object.entries(maps)) {
+      const { position: s, target: t } = sunPlacement(a, map);
+      const elevation = Math.atan2(s.y - t.y, Math.hypot(s.x - t.x, s.z - t.z)) * (180 / Math.PI);
+      expect(s.x, name).toBeLessThan(t.x);
+      expect(Math.abs(s.x - t.x), name).toBeGreaterThan(Math.abs(s.z - t.z));
+      expect(elevation, name).toBeGreaterThan(40);
+      expect(elevation, name).toBeLessThan(45);
+    }
+  });
+
+  it('keeps the sun near-white and the sky and fill only slightly cool', () => {
+    for (const c of [a.sun.color, a.sky.sky, a.fill.color]) {
+      const [r, g, b] = rgb(c);
+      expect(Math.abs(b - r)).toBeLessThan(40);
+      expect(Math.min(r, g, b)).toBeGreaterThan(200);
+    }
+  });
+
+  it('hangs the pendants along the back wall only', () => {
+    for (const [name, map] of Object.entries(maps)) {
+      const spots = lampSpots(a, map);
+      expect(spots.length, name).toBeGreaterThan(0);
+      for (const p of spots) expect(p.z, name).toBeLessThan(map.height * 0.35);
+    }
+  });
+
+  it('lets the same petals fall outside the building every time, never over the room', () => {
+    for (const [name, map] of Object.entries(maps)) {
+      const seeds = petalSeeds(a, map);
+      expect(seeds.length, name).toBeGreaterThan(40);
+      expect(petalSeeds(a, map), name).toEqual(seeds);
+      for (const { at, phase } of seeds) {
+        const outside = at.x < -0.5 || at.x > map.width - 0.5;
+        const tile = getTile(map, Math.round(at.x), Math.round(at.z));
+        // Off the sides, or over the map's own voids (the air outside the building).
+        expect(outside || tile === 'void', name).toBe(true);
+        expect(phase).toBeGreaterThanOrEqual(0);
+        expect(phase).toBeLessThan(1);
+      }
+    }
+    expect(petalSeeds(DEFAULT_ATMOSPHERE, SHIPPED)).toEqual([]);
+  });
+
+  it('stripes the floor with the mullions: soft bars, stronger on the sun side, none over void', () => {
+    const map = maps.shipped;
+    const opacity = a.mullions?.opacity ?? 0;
+    const row = (z: number, x0: number, x1: number) =>
+      Array.from({ length: 200 }, (_, i) => mullionShade(a, map, x0 + ((x1 - x0) * i) / 199, z));
+    const across = row(4.5, 0.5, 12.5);
+    // Bars and gaps in turn.
+    expect(Math.max(...across)).toBeGreaterThan(0);
+    expect(across.filter((v) => v === 0).length).toBeGreaterThan(100);
+    for (const v of across) expect(v).toBeLessThanOrEqual(opacity);
+    // The sun's side (back left) carries the strongest bars.
+    const near = Math.max(...row(1.5, 0.5, 4));
+    const far = Math.max(...row(8, 9, 12.5));
+    expect(near).toBeGreaterThan(far);
+    expect(far).toBeGreaterThan(0);
+    const draft = maps.draft;
+    for (let y = 0; y < draft.height; y++)
+      for (let x = 0; x < draft.width; x++)
+        if (getTile(draft, x, y) === 'void') expect(mullionShade(a, draft, x, y)).toBe(0);
+    expect(mullionShade(DEFAULT_ATMOSPHERE, map, 3, 3)).toBe(0);
   });
 });
 
