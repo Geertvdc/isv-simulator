@@ -46,6 +46,7 @@ docs/plan/   phase specs
 - Tests sit next to code: `foo.ts` + `foo.test.ts`.
 - Every sim feature gets tests. A phase is done only when `npm run check` (typecheck, lint, test) passes and the manual checks in the phase file work.
 - Small commits per step.
+- The campaign tells one story, level by level: `docs/game/storyline.md`. Level designs and environment passes start from the level's entry there, and update it when they change the story.
 - 3D models, characters and set pieces are built in code in `src/render/three/`; billboards over the world (ticket cards, progress bars, badges) are Phaser Graphics in `src/render/billboards.ts`. Every outside asset is listed in `CREDITS.md` with its license.
 
 ## Skills
