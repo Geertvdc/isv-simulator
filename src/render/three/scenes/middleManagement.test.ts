@@ -187,16 +187,24 @@ describe('middleManagementScene', () => {
     it(`puts the running gags in (${name})`, () => {
       expect(has(mid.prodPot)).toBe(true);
       expect(has(mid.waitingVisitor)).toBe(true);
-      const tower = scene.pieces.find((p) => p.piece.size[0] === 1.7 && p.piece.size[1] === 1.2);
-      expect(tower).toBeDefined();
+      // The crane tower, right of the order cards; its crane's lights in the frame, below the
+      // curtain wall's spandrel band (so they aren't hidden behind it).
+      const tower = scene.pieces.find((p) => p.piece.size[0] === 1 && p.piece.size[1] === 0.5);
+      if (!tower) throw new Error('no crane tower');
+      expect(projectPoint(pose, tower.at).x).toBeGreaterThan(700);
+      const band = projectPoint(pose, {
+        x: tower.at.x,
+        y: GROUND + mid.CURTAIN.floor,
+        z: midRiseOutline(map).back,
+      }).y;
       const crane = scene.pieces.filter((p) => p.piece === redLight);
       expect(crane.length).toBe(2);
       for (const c of crane) {
         expect(c.alive).toBe('blink');
         expect(c.hot).toBe(true);
         const s = projectPoint(pose, c.at);
-        expect(s.y).toBeGreaterThan(0);
-        expect(s.x).toBeGreaterThan(690);
+        expect(s.y).toBeGreaterThan(Math.max(0, band));
+        expect(s.x).toBeGreaterThan(700);
       }
       expect(scene.pieces.some((p) => p.piece.size[0] === 1.4 && p.piece.size[1] === 1.4)).toBe(
         true,
@@ -298,13 +306,95 @@ describe('middleManagementScene', () => {
         for (const v of worldPoints(p)) expect(v.y - GROUND).toBeLessThan(0.6);
   });
 
-  it('puts the lifts on a side with floor, as far forward as fits', () => {
+  it('puts the lifts on a side with floor, facing the camera, wholly in the frame', () => {
     for (const map of Object.values(MAPS)) {
       const scene = middleManagementScene(map);
+      const pose = scenePose(map);
       const lifts = scene.pieces.find((p) => [mid.liftBank(1), mid.liftBank(2)].includes(p.piece));
       if (!lifts) throw new Error('no lifts');
-      expect(lifts.at.z).toBeGreaterThan(map.height - 4);
-      expect(lifts.at.z).toBeLessThan(map.height - 0.5);
+      // Beside the room (never on it), its doors toward the camera, near the front.
+      expect(lifts.yaw).toBe(0);
+      expect(lifts.at.x < -0.5 || lifts.at.x > map.width - 0.5).toBe(true);
+      expect(lifts.at.z).toBeGreaterThan(map.height - 5);
+      expect(lifts.at.z).toBeLessThan(map.height);
+      for (const v of worldPoints(lifts)) {
+        const s = projectPoint(pose, v);
+        expect(s.x).toBeGreaterThan(0);
+        expect(s.x).toBeLessThan(1420);
+        expect(s.y).toBeLessThan(810);
+      }
+    }
+  });
+
+  it('keeps the window cleaner in the frame and his ropes clear of the mute button', () => {
+    for (const map of Object.values(MAPS)) {
+      const scene = middleManagementScene(map);
+      const pose = scenePose(map);
+      const cradle = scene.pieces.find((p) => p.piece === mid.cradle);
+      const ropes = scene.pieces.filter((p) => p.piece.size[1] === mid.CRADLE.len);
+      if (!cradle) {
+        // No room for him: then neither the cradle nor the ropes.
+        expect(ropes.length).toBe(0);
+        continue;
+      }
+      expect(ropes.length).toBe(1);
+      for (const v of worldPoints(cradle)) {
+        const s = projectPoint(pose, v);
+        expect(s.x).toBeGreaterThan(1200);
+        expect(s.x).toBeLessThan(1440);
+        expect(s.y).toBeGreaterThan(60);
+        expect(s.y).toBeLessThan(740);
+      }
+      // The ropes run off the top of the frame, never across the mute button.
+      const [mx0, my0, mx1, my1] = HUD_RECTS.mute as [number, number, number, number];
+      const shown = worldPoints(ropes[0] as ScenePiece).map((v) => projectPoint(pose, v));
+      expect(Math.min(...shown.map((p) => p.y))).toBeLessThan(0);
+      const rope = ropes[0] as ScenePiece;
+      const ends = worldPoints(rope);
+      // Sample along each rope (its box's ends, top and bottom).
+      const lo = ends.filter((v) => v.y - GROUND < 2);
+      const hi = ends.filter((v) => v.y - GROUND > 2);
+      for (const a of lo)
+        for (const b of hi)
+          if (Math.abs(a.z - b.z) < 1.2)
+            for (let t = 0; t <= 1; t += 0.02) {
+              const p = projectPoint(pose, a.clone().lerp(b, t));
+              expect(p.x > mx0 && p.x < mx1 && p.y > my0 && p.y < my1).toBe(false);
+            }
+    }
+  });
+
+  it("keeps the street out from under Derek's office floor", () => {
+    const map = MAPS.shipped as LevelMap;
+    const scene = middleManagementScene(map);
+    const { office } = midRiseOutline(map);
+    if (!office) throw new Error('no office');
+    for (const g of scene.ground) {
+      if (g.kind === 'plush') continue;
+      const over =
+        Math.min(g.x1, office.x1) - Math.max(g.x0, office.x0) > 0.01 &&
+        Math.min(g.z1, office.z1) - Math.max(g.z0, office.z0) > 0.01;
+      expect(over, `${g.kind} under the office`).toBe(false);
+    }
+  });
+
+  it('draws the street far below at a smaller scale, the blossom in clumped rows', () => {
+    for (const map of Object.values(MAPS)) {
+      const scene = middleManagementScene(map);
+      for (const piece of [mid.cherryTree, mid.dayCar, mid.bus, mid.busStop])
+        for (const p of scene.pieces.filter((q) => q.piece === piece)) {
+          expect(p.row).toBe('far');
+          expect(p.scale[0]).toBeLessThan(0.7);
+        }
+      // Most trees have a neighbour whose canopy overlaps theirs.
+      const trees = scene.pieces.filter((p) => p.piece === mid.cherryTree);
+      const near = trees.filter((t) =>
+        trees.some((u) => u !== t && Math.hypot(u.at.x - t.at.x, u.at.z - t.at.z) < 0.3),
+      );
+      expect(near.length / trees.length).toBeGreaterThan(0.8);
+      expect(scene.pieces.filter((p) => p.piece === mid.dayCar).length).toBeGreaterThan(8);
+      // The building's slab edge runs round it.
+      expect(scene.ground.some((g) => g.kind.startsWith('face'))).toBe(true);
     }
   });
 
