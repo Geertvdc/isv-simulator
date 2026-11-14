@@ -6,13 +6,23 @@ import draftText from '../../../../maps/drafts/demo-day.txt?raw';
 import { wallPiece } from '../../mapShape';
 import { WALL_HEIGHT } from '../layout';
 import {
+  CABLE_PART,
   DECK_WEAR,
   STAGE_ART_HALF,
   STAGE_ART_SPAN,
   STAGE_CAP_CLUSTERS,
+  cableOf,
   findDoorways,
+  middleRoom,
   stageSetRoom,
 } from './stageSetRoom';
+
+const STEP = {
+  back: [0, -1],
+  front: [0, 1],
+  left: [-1, 0],
+  right: [1, 0],
+} as const;
 
 /** Half the box truss's size across (`roomModels/stageSet`). */
 const TRUSS_HALF = 0.065;
@@ -109,9 +119,12 @@ describe('stageSetRoom', () => {
       }
       const kinds = Object.values(floorWear);
       expect(kinds.some((w) => w >= DECK_WEAR.spikeWhite && w <= DECK_WEAR.spikePink)).toBe(true);
-      expect(kinds.some((w) => w >= DECK_WEAR.cableEndBack && w <= DECK_WEAR.cableEndRight)).toBe(
-        true,
-      );
+      expect(
+        kinds.some((w) => {
+          const c = cableOf(w);
+          return c?.part === CABLE_PART.boxPlus || c?.part === CABLE_PART.boxMinus;
+        }),
+      ).toBe(true);
     }
     // Glow tape along the shipped stage's lip, in front of the low front wall.
     const lip = Object.entries(stageSetRoom(shipped).floorWear).filter(
@@ -121,24 +134,66 @@ describe('stageSetRoom', () => {
     for (const [k] of lip) expect(k.endsWith(',8')).toBe(true);
   });
 
-  it('runs a cable in from the stage door to a stage box', () => {
+  it('runs the cable out of the stage door along the wall to a stage box', () => {
     const { floorWear } = stageSetRoom(shipped);
-    const cable = Object.entries(floorWear).filter(
-      ([k, w]) =>
-        (w === DECK_WEAR.cableZ || w === DECK_WEAR.cableEndBack) &&
-        ['2', '3'].includes(k.split(',')[0] ?? ''),
-    );
-    expect(cable.length).toBeGreaterThanOrEqual(2);
-    expect(cable.filter(([, w]) => w === DECK_WEAR.cableEndBack)).toHaveLength(1);
+    const cable = Object.entries(floorWear).filter(([k, w]) => {
+      const c = cableOf(w);
+      return c?.edge === 'back' && k.endsWith(',1');
+    });
+    expect(cable.map(([k]) => k).sort()).toEqual(['1,1', '2,1']);
+    expect(cable.filter(([, w]) => cableOf(w)?.part === CABLE_PART.boxMinus)).toHaveLength(1);
+  });
+
+  it('keeps every floor cable tight along a wall or a door, never across open floor', () => {
+    for (const m of maps) {
+      const cables = Object.entries(stageSetRoom(m).floorWear).flatMap(([k, w]) => {
+        const c = cableOf(w);
+        return c ? [{ k, c }] : [];
+      });
+      expect(cables.length).toBeGreaterThanOrEqual(4);
+      for (const { k, c } of cables) {
+        const [x = 0, y = 0] = k.split(',').map(Number);
+        const [dx, dy] = STEP[c.edge];
+        expect(getTile(m, x + dx, y + dy)).not.toBe('floor');
+      }
+    }
+    // A ramp where the players cross the console's cable on the shipped lip.
+    const parts = Object.values(stageSetRoom(shipped).floorWear).map((w) => cableOf(w)?.part);
+    expect(parts.some((p) => p === CABLE_PART.rampPlus || p === CABLE_PART.rampMinus)).toBe(true);
+  });
+
+  it("dresses the draft's middle room with a spike-tape X and a cable along its walls", () => {
+    expect(middleRoom(shipped)).toEqual([]);
+    const room = middleRoom(draft);
+    expect(room.length).toBeGreaterThanOrEqual(4);
+    for (const p of room) expect(p.x).toBeGreaterThan(6);
+    for (const p of room) expect(p.x).toBeLessThan(10);
+    const wear = stageSetRoom(draft).floorWear;
+    const x = Object.entries(wear).filter(([, w]) => w === DECK_WEAR.spikeX);
+    expect(x).toHaveLength(1);
+    expect(room.map((p) => `${p.x},${p.y}`)).toContain(x[0]?.[0]);
+    expect(Object.values(stageSetRoom(shipped).floorWear)).not.toContain(DECK_WEAR.spikeX);
   });
 
   it('puts wall-top clusters only where nothing open is behind, low clusters on the outer front wall', () => {
     for (const m of maps) {
-      const { capProps, frontProps, trusses, consoles } = stageSetRoom(m);
+      const { capProps, frontProps, frontWedges, trusses, consoles } = stageSetRoom(m);
       expect(capProps.length).toBeGreaterThan(0);
+      // Each anchor with at most one partner beside it.
       expect(capProps.length).toBeLessThanOrEqual(
-        STAGE_CAP_CLUSTERS.back + 2 * STAGE_CAP_CLUSTERS.side,
+        2 * (STAGE_CAP_CLUSTERS.back + 2 * STAGE_CAP_CLUSTERS.side),
       );
+      for (const p of capProps)
+        if (p.toward.dx || p.toward.dy)
+          expect(
+            capProps.some(
+              (q) =>
+                q.x === p.x + p.toward.dx &&
+                q.y === p.y + p.toward.dy &&
+                q.toward.dx === -p.toward.dx &&
+                q.toward.dy === -p.toward.dy,
+            ),
+          ).toBe(true);
       const towers = trusses.flatMap((t) => t.towers.map((p) => `${p.x},${p.y}`));
       for (const p of capProps) {
         expect(getTile(m, p.x, p.y)).toBe('wall');
@@ -149,7 +204,8 @@ describe('stageSetRoom', () => {
       expect(frontProps.length).toBeGreaterThan(0);
       expect(frontProps.length).toBeLessThanOrEqual(STAGE_CAP_CLUSTERS.front);
       const desks = consoles.flatMap((c) => (c.desk ? [`${c.desk.x},${c.desk.y}`] : []));
-      for (const p of frontProps) {
+      expect(frontWedges).toHaveLength(2);
+      for (const p of [...frontProps, ...frontWedges]) {
         expect(wallPiece(m, p.x, p.y)).toBe('wall-front');
         expect(isOpen(getTile(m, p.x, p.y + 1))).toBe(false);
         expect(desks).not.toContain(`${p.x},${p.y}`);
@@ -175,12 +231,31 @@ describe('stageSetRoom', () => {
           expect(x).toBeLessThan(t.x1);
         }
       }
-      // On a wall top of its own, not under a cluster.
+      // On a back wall top of its own, not under a cluster.
       expect(mirrorBall).not.toBeNull();
       if (mirrorBall) {
         expect(getTile(m, mirrorBall.x, mirrorBall.y)).toBe('wall');
+        expect(mirrorBall.y).toBe(0);
         expect(capProps.some((p) => p.x === mirrorBall.x && p.y === mirrorBall.y)).toBe(false);
       }
+    }
+  });
+
+  it("puts one cluster on each run of the draft's inner walls and the set list on one face", () => {
+    expect(stageSetRoom(shipped).innerProps).toEqual([]);
+    expect(stageSetRoom(shipped).innerSetList).toBeNull();
+    const { innerProps, innerSetList, capProps } = stageSetRoom(draft);
+    expect(innerProps.length).toBeGreaterThanOrEqual(4);
+    for (const p of innerProps) {
+      expect(getTile(draft, p.x, p.y)).toBe('wall');
+      expect(wallPiece(draft, p.x, p.y) === 'wall-front').toBe(!p.tall);
+      if (p.tall) expect(isOpen(getTile(draft, p.x, p.y - 1))).toBe(false);
+      expect(capProps.some((q) => q.x === p.x && q.y === p.y)).toBe(false);
+    }
+    expect(innerSetList).not.toBeNull();
+    if (innerSetList) {
+      expect(wallPiece(draft, innerSetList.x, innerSetList.y)).toBe('wall');
+      expect(getTile(draft, innerSetList.x, innerSetList.y + 1)).toBe('floor');
     }
   });
 

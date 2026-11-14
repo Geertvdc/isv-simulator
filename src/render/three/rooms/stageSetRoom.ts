@@ -29,22 +29,42 @@ export const DECK_WEAR = {
   spikePink: 3,
   /** Glow tape dashes along the tile's front edge (the stage lip). */
   glowFront: 4,
-  /** A gaffer-taped cable across the tile (x) or down it (z). */
-  cableX: 5,
-  cableZ: 6,
-  /**
-   * Where a cable ends in a stage box: the cable comes in from the tile's
-   * back (−z), front (+z), left (−x) or right (+x) edge.
-   */
-  cableEndBack: 7,
-  cableEndFront: 8,
-  cableEndLeft: 9,
-  cableEndRight: 10,
   /** Rubber-sole scuffs on the paint. */
-  scuffs: 11,
+  scuffs: 5,
+  /** A spike-tape X in the middle of the tile, where something gets set for the next act. */
+  spikeX: 6,
+  /**
+   * The first cable kind: a gaffer-taped cable hugging one edge of the tile
+   * (a wall or a door past it), `cable + edge * CABLE_PARTS + part` (see
+   * `cableWear`).
+   */
+  cable: 7,
 } as const;
+
+/** The edges a floor cable hugs, in the order its kind counts them. */
+export const CABLE_EDGES: readonly Side[] = ['back', 'front', 'left', 'right'];
+/**
+ * The parts of a floor cable on its tile, along its run (+ is toward +x, or
+ * +y on the map for a run down a side): the cable right across, ending in a
+ * stage box at its + or − end, or right across under a cable ramp at its +
+ * or − end.
+ */
+export const CABLE_PART = { run: 0, boxPlus: 1, boxMinus: 2, rampPlus: 3, rampMinus: 4 } as const;
+export const CABLE_PARTS = 5;
 /** How many wear kinds there are. */
-export const DECK_WEAR_KINDS = 12;
+export const DECK_WEAR_KINDS = DECK_WEAR.cable + CABLE_EDGES.length * CABLE_PARTS;
+
+/** The wear of a cable hugging `edge`, its `part` on the tile. */
+export function cableWear(edge: Side, part: number): number {
+  return DECK_WEAR.cable + CABLE_EDGES.indexOf(edge) * CABLE_PARTS + part;
+}
+
+/** Whether a wear is a floor cable, and if so the edge it hugs and its part. */
+export function cableOf(wear: number): { edge: Side; part: number } | null {
+  if (wear < DECK_WEAR.cable || wear >= DECK_WEAR_KINDS) return null;
+  const k = wear - DECK_WEAR.cable;
+  return { edge: CABLE_EDGES[Math.floor(k / CABLE_PARTS)] ?? 'back', part: k % CABLE_PARTS };
+}
 
 /**
  * What hangs on the demo set's back wall: the small LED wall panel (two
@@ -110,6 +130,15 @@ export interface StageSetRoom {
   capProps: { x: number; y: number; slot: number; toward: { dx: number; dy: number } }[];
   /** Low clusters lying on the front wall (see `RoomPlan.frontProps`). */
   frontProps: { x: number; y: number; slot: number }[];
+  /** The low front wall's two outermost free tiles: a stage monitor wedge on each, facing in. */
+  frontWedges: GridPoint[];
+  /**
+   * One cluster per run of walls inside the outline (the draft's inner
+   * walls): on a full wall's top (`tall`), else a flat one on a low wall.
+   */
+  innerProps: { x: number; y: number; tall: boolean; slot: number }[];
+  /** A gaffer-taped set list on the face of an inner wall (once, if there is one). */
+  innerSetList: GridPoint | null;
   /** The lighting trusses, one per row of lamps. */
   trusses: Truss[];
   /** The wall-top tile the mirror ball stands on (once): a side wall's cluster swapped for it. */
@@ -141,8 +170,12 @@ const CONSOLE_CABLE = 2;
 /** Spike marks at most, glow tape dashes along the lip at most, scuffs at most. */
 const SPIKES_MAX = 6;
 const SCUFFS_MAX = 2;
-/** Clusters on the wall tops at most: along the back, on each side wall, on the front wall. */
-export const STAGE_CAP_CLUSTERS = { back: 3, side: 3, front: 2 } as const;
+/**
+ * Cluster anchors on the wall tops at most: along the back, on each side
+ * wall (each anchor with a partner beside it where there is room), and on
+ * the low front wall between its two monitor wedges.
+ */
+export const STAGE_CAP_CLUSTERS = { back: 4, side: 3, front: 3 } as const;
 
 export function stageSetRoom(map: LevelMap): StageSetRoom {
   const stageDoor = findDoorways(map, 'inbox')[0] ?? null;
@@ -154,22 +187,22 @@ export function stageSetRoom(map: LevelMap): StageSetRoom {
   const trusses = placeTrusses(map);
   const towers = new Set(trusses.flatMap((t) => t.towers.map((p) => key(p.x, p.y))));
   const desks = new Set(consoles.flatMap((c) => (c.desk ? [key(c.desk.x, c.desk.y)] : [])));
-  const caps = capProps(map, doors, towers);
-  // The mirror ball (once) on the first side wall's cluster, else the last on the back.
-  const ball =
-    caps.find((p) => p.x === 0 || p.x === map.width - 1 || getTile(map, p.x, p.y - 1) === 'wall') ??
-    caps[caps.length - 1] ??
-    null;
+  const inner = innerWalls(map);
+  const { caps, ball } = capProps(map, doors, towers, inner);
+  const front = frontProps(map, doors, desks);
   return {
     stageDoor,
     consoles,
     decos: {},
     wallArt: placeWallArt(map, doors),
     floorWear: floorWear(map, stageDoor, consoles),
-    capProps: caps.filter((p) => p !== ball),
-    frontProps: frontProps(map, doors, desks),
+    capProps: caps,
+    frontProps: front.props,
+    frontWedges: front.wedges,
+    innerProps: innerProps(map, doors, towers, inner),
+    innerSetList: innerSetList(map, inner),
     trusses,
-    mirrorBall: ball ? { x: ball.x, y: ball.y } : null,
+    mirrorBall: ball,
   };
 }
 
@@ -310,8 +343,10 @@ function placeWallArt(map: LevelMap, doors: readonly (Doorway | null)[]): StageA
 }
 
 /**
- * Wear on the stage decks, placed: a gaffer-taped cable in from the stage
- * door to a stage box and a shorter one in from a console, glow tape along
+ * Wear on the stage decks, placed: gaffer-taped cables kept tight along the
+ * walls (out of the stage door to a stage box, along the lip from a
+ * console, along a middle room's walls), a spike-tape X in a middle room,
+ * glow tape along
  * the stage lip (every second tile), small spike marks on tiles along the
  * room's edges and scuffs in front of the keyboards. Never on a spawn.
  */
@@ -327,40 +362,116 @@ function floorWear(
   const free = (x: number, y: number) =>
     getTile(map, x, y) === 'floor' && out[key(x, y)] === undefined && !spawn.has(key(x, y));
 
-  /** A cable in from `door` (its best tile) up to `depth` tiles, ending in a stage box. */
-  const cable = (door: Doorway, depth: number, pick: (t: GridPoint) => number) => {
-    const { dx, dy } = OUT[door.side];
-    let best: GridPoint[] = [];
-    for (const t of [...door.tiles].sort((a, b) => pick(a) - pick(b))) {
-      const run: GridPoint[] = [];
-      for (let d = 1; d <= depth; d++) {
-        const p = { x: t.x - dx * d, y: t.y - dy * d };
-        if (!free(p.x, p.y)) break;
-        run.push(p);
-      }
-      if (run.length > best.length) best = run;
-    }
-    if (best.length === 0) return;
-    const along = dx !== 0 ? DECK_WEAR.cableX : DECK_WEAR.cableZ;
-    const end = {
-      back: DECK_WEAR.cableEndBack,
-      front: DECK_WEAR.cableEndFront,
-      left: DECK_WEAR.cableEndLeft,
-      right: DECK_WEAR.cableEndRight,
-    }[door.side];
-    best.forEach((p, i) => (out[key(p.x, p.y)] = i === best.length - 1 ? end : along));
+  /** Whether (x, y) stops a cable's side: a wall, a station, a door, the outside. */
+  const solid = (x: number, y: number) => {
+    const t = getTile(map, x, y);
+    return t !== 'floor';
   };
-  if (stageDoor) cable(stageDoor, DOOR_CABLE, (t) => (tileHash(t.x, t.y) ^ salt) % 7);
-  // One console's cable: the outer tile of the console nearest a side wall.
+  /**
+   * The free tiles from `start` along the edge `edge` (something solid past
+   * each), up to `depth`, toward `dir` (±1 along the edge).
+   */
+  const hug = (start: GridPoint, edge: Side, dir: number, depth: number): GridPoint[] => {
+    const { dx, dy } = OUT[edge];
+    const [ax, ay] = dy !== 0 ? [dir, 0] : [0, dir];
+    const run: GridPoint[] = [];
+    for (let p = start; run.length < depth; p = { x: p.x + ax, y: p.y + ay }) {
+      if (!free(p.x, p.y) || !solid(p.x + dx, p.y + dy)) break;
+      run.push(p);
+    }
+    return run;
+  };
+  /**
+   * A cable taped along `edge` through `run` (laid toward `dir`): a stage
+   * box at its far end, and a cable ramp at its start when `ramp`.
+   */
+  const lay = (run: readonly GridPoint[], edge: Side, dir: number, ramp: boolean) => {
+    run.forEach((p, i) => {
+      const last = i === run.length - 1;
+      const part = last
+        ? dir > 0
+          ? CABLE_PART.boxPlus
+          : CABLE_PART.boxMinus
+        : i === 0 && ramp
+          ? dir > 0
+            ? CABLE_PART.rampMinus
+            : CABLE_PART.rampPlus
+          : CABLE_PART.run;
+      out[key(p.x, p.y)] = cableWear(edge, part);
+    });
+  };
+  /** The longer of the two hugging runs from `start` (`prefer`'s way on a tie), and its way. */
+  const longest = (start: GridPoint, edge: Side, depth: number, prefer: number) => {
+    const a = hug(start, edge, prefer, depth);
+    const b = hug(start, edge, -prefer, depth);
+    return b.length > a.length ? { run: b, dir: -prefer } : { run: a, dir: prefer };
+  };
+
+  // From the stage door: out of the door and along the wall beside it, to a stage box.
+  if (stageDoor) {
+    const { dx, dy } = OUT[stageDoor.side];
+    const along = (p: GridPoint) => (dy !== 0 ? p.x : p.y);
+    const middle = dy !== 0 ? (map.width - 1) / 2 : (map.height - 1) / 2;
+    let best: { run: GridPoint[]; dir: number } = { run: [], dir: 1 };
+    for (const t of [...stageDoor.tiles].sort(
+      (a, b) => ((tileHash(a.x, a.y) ^ salt) % 7) - ((tileHash(b.x, b.y) ^ salt) % 7),
+    )) {
+      const start = { x: t.x - dx, y: t.y - dy };
+      const prefer = along(start) < middle ? -1 : 1;
+      const found = longest(start, stageDoor.side, DOOR_CABLE, prefer);
+      if (found.run.length > best.run.length) best = found;
+    }
+    lay(best.run, stageDoor.side, best.dir, false);
+  }
+  // From one console (the one nearest a side wall): along the lip toward its desk, a ramp
+  // where the players cross it at the hatch.
   const console = [...consoles].sort(
     (a, b) =>
       Math.min(a.door.mid.x, map.width - 1 - a.door.mid.x) -
       Math.min(b.door.mid.x, map.width - 1 - b.door.mid.x),
   )[0];
-  if (console)
-    cable(console.door, CONSOLE_CABLE, (t) =>
-      console.door.mid.x < (map.width - 1) / 2 ? t.x : -t.x,
-    );
+  if (console) {
+    const { door, desk } = console;
+    const { dx, dy } = OUT[door.side];
+    const alongX = dy !== 0;
+    const mid = alongX ? door.mid.x : door.mid.y;
+    const toward = desk
+      ? Math.sign((alongX ? desk.x : desk.y) - mid) || 1
+      : mid < (alongX ? map.width - 1 : map.height - 1) / 2
+        ? -1
+        : 1;
+    const t = [...door.tiles].sort((a, b) =>
+      alongX ? toward * (b.x - a.x) : toward * (b.y - a.y),
+    )[0];
+    if (t) {
+      const run = hug({ x: t.x - dx, y: t.y - dy }, door.side, toward, CONSOLE_CABLE);
+      lay(run, door.side, toward, run.length > 1);
+    }
+  }
+  // A middle room between inner walls (the draft's breather): a spike-tape X on its open
+  // ground and a cable taped along its walls.
+  const room = middleRoom(map);
+  if (room.length > 0) {
+    const clear = (p: GridPoint) => {
+      let d = 9;
+      for (let y = p.y - 2; y <= p.y + 2; y++)
+        for (let x = p.x - 2; x <= p.x + 2; x++)
+          if (getTile(map, x, y) !== 'floor' || spawn.has(key(x, y)))
+            d = Math.min(d, Math.max(Math.abs(x - p.x), Math.abs(y - p.y)));
+      return d;
+    };
+    let wire: { run: GridPoint[]; dir: number; edge: Side } = { run: [], dir: 1, edge: 'left' };
+    for (const p of room)
+      for (const edge of ['left', 'right', 'back'] as const) {
+        const found = longest(p, edge, DOOR_CABLE, 1);
+        if (found.run.length > wire.run.length) wire = { ...found, edge };
+      }
+    if (wire.run.length >= 2) lay(wire.run, wire.edge, wire.dir, false);
+    const spot = room
+      .filter((p) => free(p.x, p.y))
+      .sort((a, b) => clear(b) - clear(a) || a.y - b.y || a.x - b.x)[0];
+    if (spot && clear(spot) >= 1) out[key(spot.x, spot.y)] = DECK_WEAR.spikeX;
+  }
 
   // Glow tape along the lip: floor in front of a low front wall on the map's front edge.
   for (let y = 0; y < map.height; y++)
@@ -423,7 +534,7 @@ function floorWear(
 /**
  * Wall-top tiles that can carry a cluster: full walls (not the low front
  * wall) with nothing open behind them (it'd hide someone standing there),
- * clear of the door frames and the truss towers.
+ * not over a door and clear of the truss towers.
  */
 function capFree(
   map: LevelMap,
@@ -434,31 +545,124 @@ function capFree(
     getTile(map, x, y) === 'wall' &&
     wallPiece(map, x, y) !== 'wall-front' &&
     !isOpen(map, x, y - 1) &&
-    !nearDoor(doors, x, y, 1) &&
+    !nearDoor(doors, x, y, 0) &&
     !towers.has(key(x, y));
 }
 
 /**
- * Clusters on the wall tops, the rest bare as a breather: the free wall
- * tops sorted onto the back, left and right walls, and on each wall up to
- * `STAGE_CAP_CLUSTERS` single-tile clusters spread evenly along it, at
- * least `CLUSTER_GAP` apart.
+ * Walls inside the outline (nothing outside the stage among their eight
+ * neighbours), in runs of touching walls, each run in map order.
+ */
+function innerWalls(map: LevelMap): GridPoint[][] {
+  const isInner = (x: number, y: number) => {
+    if (getTile(map, x, y) !== 'wall') return false;
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) if (outside(map, x + dx, y + dy)) return false;
+    return true;
+  };
+  const seen = new Set<string>();
+  const runs: GridPoint[][] = [];
+  for (let y = 0; y < map.height; y++)
+    for (let x = 0; x < map.width; x++) {
+      if (!isInner(x, y) || seen.has(key(x, y))) continue;
+      const run: GridPoint[] = [];
+      const todo = [{ x, y }];
+      seen.add(key(x, y));
+      while (todo.length > 0) {
+        const p = todo.pop();
+        if (!p) break;
+        run.push(p);
+        for (const [dx, dy] of [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ] as const) {
+          const q = { x: p.x + dx, y: p.y + dy };
+          if (isInner(q.x, q.y) && !seen.has(key(q.x, q.y))) {
+            seen.add(key(q.x, q.y));
+            todo.push(q);
+          }
+        }
+      }
+      runs.push(run.sort((a, b) => a.y - b.y || a.x - b.x));
+    }
+  return runs;
+}
+
+/**
+ * The floor of a middle room: floor tiles with an inner wall the first thing
+ * past them both ways along their row (`innerWalls`), in the biggest group
+ * of at least four touching ones; empty on a map without one.
+ */
+export function middleRoom(map: LevelMap): GridPoint[] {
+  const inner = new Set(innerWalls(map).flatMap((r) => r.map((p) => key(p.x, p.y))));
+  const firstPast = (x: number, y: number, dx: number) => {
+    let i = x + dx;
+    while (getTile(map, i, y) === 'floor') i += dx;
+    return inner.has(key(i, y));
+  };
+  const tiles = new Set<string>();
+  for (let y = 0; y < map.height; y++)
+    for (let x = 0; x < map.width; x++)
+      if (getTile(map, x, y) === 'floor' && firstPast(x, y, -1) && firstPast(x, y, 1))
+        tiles.add(key(x, y));
+  const seen = new Set<string>();
+  let best: GridPoint[] = [];
+  for (const k of [...tiles].sort()) {
+    if (seen.has(k)) continue;
+    const [sx = 0, sy = 0] = k.split(',').map(Number);
+    const group: GridPoint[] = [];
+    const todo = [{ x: sx, y: sy }];
+    seen.add(k);
+    while (todo.length > 0) {
+      const p = todo.pop();
+      if (!p) break;
+      group.push(p);
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ] as const) {
+        const q = key(p.x + dx, p.y + dy);
+        if (tiles.has(q) && !seen.has(q)) {
+          seen.add(q);
+          todo.push({ x: p.x + dx, y: p.y + dy });
+        }
+      }
+    }
+    if (group.length > best.length) best = group;
+  }
+  return best.length >= 4 ? best.sort((a, b) => a.y - b.y || a.x - b.x) : [];
+}
+
+/**
+ * Clusters on the outline's wall tops, the rest bare as a breather: the
+ * free wall tops sorted onto the back, left and right walls; on each wall
+ * up to `STAGE_CAP_CLUSTERS` anchors spread evenly along it, each with a
+ * partner on the free tile beside it where there is one, the two leaning
+ * together into one pile. The mirror ball (once) stands on its own on the
+ * back wall's free tile nearest its right-hand corner.
  */
 function capProps(
   map: LevelMap,
   doors: readonly (Doorway | null)[],
   towers: ReadonlySet<string>,
-): StageSetRoom['capProps'] {
-  const free = capFree(map, doors, towers);
+  innerRuns: readonly GridPoint[][],
+): { caps: StageSetRoom['capProps']; ball: GridPoint | null } {
+  const inner = new Set(innerRuns.flatMap((r) => r.map((p) => key(p.x, p.y))));
+  const capOk = capFree(map, doors, towers);
+  const free = (x: number, y: number) => capOk(x, y) && !inner.has(key(x, y));
   const taken = new Set<string>();
   const runs: { tiles: GridPoint[]; across: boolean }[] = [];
   const collect = (across: boolean) => {
-    const [outer, inner] = across ? [map.height, map.width] : [map.width, map.height];
+    const [outer, len] = across ? [map.height, map.width] : [map.width, map.height];
     for (let a = 0; a < outer; a++) {
       let run: GridPoint[] = [];
-      for (let b = 0; b <= inner; b++) {
+      for (let b = 0; b <= len; b++) {
         const [x, y] = across ? [b, a] : [a, b];
-        if (b < inner && free(x, y) && !taken.has(key(x, y))) {
+        if (b < len && free(x, y) && !taken.has(key(x, y))) {
           run.push({ x, y });
           continue;
         }
@@ -479,29 +683,108 @@ function capProps(
   };
   const walls: Record<'back' | 'left' | 'right', GridPoint[]> = { back: [], left: [], right: [] };
   for (const run of runs) walls[wallOf(run)].push(...run.tiles);
+  // The mirror ball: the back wall's free tile furthest right (in its topmost row).
+  const ball =
+    [...walls.back].sort((a, b) => a.y - b.y || b.x - a.x).find((p) => p.y === walls.back[0]?.y) ??
+    null;
+  if (ball) walls.back = walls.back.filter((p) => p !== ball);
+  const used = new Set<string>(ball ? [key(ball.x, ball.y)] : []);
   const out: StageSetRoom['capProps'] = [];
   let slot = 0;
   for (const wall of ['back', 'left', 'right'] as const) {
     const along = (p: GridPoint) => (wall === 'back' ? p.x * 4 + p.y : p.y * 4 + p.x);
+    const tiles = walls[wall];
     const picked = spreadApart(
-      walls[wall],
+      tiles,
       along,
       STAGE_CAP_CLUSTERS[wall === 'back' ? 'back' : 'side'],
+      CLUSTER_GAP + 1,
     );
     const order = wall === 'right' ? [...picked].reverse() : picked;
-    for (const p of order) out.push({ x: p.x, y: p.y, slot: slot++, toward: { dx: 0, dy: 0 } });
+    for (const p of order) {
+      used.add(key(p.x, p.y));
+      const steps = wall === 'back' ? [1, -1].map((d) => [d, 0]) : [1, -1].map((d) => [0, d]);
+      const partner = steps
+        .map(([dx = 0, dy = 0]) => ({ x: p.x + dx, y: p.y + dy, dx, dy }))
+        .find(
+          (q) =>
+            tiles.some((t) => t.x === q.x && t.y === q.y) &&
+            !used.has(key(q.x, q.y)) &&
+            !picked.some((t) => t.x === q.x && t.y === q.y),
+        );
+      out.push({
+        x: p.x,
+        y: p.y,
+        slot: slot++,
+        toward: partner ? { dx: partner.dx, dy: partner.dy } : { dx: 0, dy: 0 },
+      });
+      if (partner) {
+        used.add(key(partner.x, partner.y));
+        out.push({
+          x: partner.x,
+          y: partner.y,
+          slot: slot++,
+          toward: { dx: -partner.dx, dy: -partner.dy },
+        });
+      }
+    }
   }
+  return { caps: out, ball: ball ? { x: ball.x, y: ball.y } : null };
+}
+
+/**
+ * One cluster per run of inner walls: on the top of its middle full wall
+ * with nothing open behind (a cluster as on the outline's walls), else
+ * lying flat on its middle low wall.
+ */
+function innerProps(
+  map: LevelMap,
+  doors: readonly (Doorway | null)[],
+  towers: ReadonlySet<string>,
+  runs: readonly GridPoint[][],
+): StageSetRoom['innerProps'] {
+  const capOk = capFree(map, doors, towers);
+  // How many walls stand behind (x, y) before open floor: a cluster there hides only walls.
+  const depth = (p: GridPoint) => {
+    let d = 0;
+    while (getTile(map, p.x, p.y - d - 1) === 'wall') d++;
+    return d;
+  };
+  const middle = (ps: readonly GridPoint[]) => ps[Math.floor((ps.length - 1) / 2)];
+  const out: StageSetRoom['innerProps'] = [];
+  runs.forEach((run) => {
+    const tall = run
+      .filter((p) => capOk(p.x, p.y))
+      .sort((a, b) => depth(b) - depth(a) || a.y - b.y || a.x - b.x)[0];
+    const low = run.filter(
+      (p) => wallPiece(map, p.x, p.y) === 'wall-front' && !nearDoor(doors, p.x, p.y, 0),
+    );
+    if (tall) out.push({ x: tall.x, y: tall.y, tall: true, slot: out.length });
+    // A flat one on a long low stretch too, or on the run when it has no full wall.
+    const flat = middle(low);
+    if (flat && (!tall || low.length >= 3))
+      out.push({ x: flat.x, y: flat.y, tall: false, slot: out.length });
+  });
   return out;
+}
+
+/** The inner wall whose face the set list is taped to: the first showing its face, floor in front. */
+function innerSetList(map: LevelMap, runs: readonly GridPoint[][]): GridPoint | null {
+  for (const run of runs)
+    for (const p of run)
+      if (wallPiece(map, p.x, p.y) === 'wall' && getTile(map, p.x, p.y + 1) === 'floor') return p;
+  return null;
 }
 
 /** How many tiles apart (either way) clusters stand at least. */
 const CLUSTER_GAP = 2;
 
-/** Up to `n` of `tiles`, each nearest an even mark along the wall, at least `CLUSTER_GAP` apart. */
+/** Up to `n` of `tiles`, each nearest an even mark along the wall, at least `gap` apart. */
 function spreadApart(
   tiles: readonly GridPoint[],
   along: (p: GridPoint) => number,
   n: number,
+  gap = CLUSTER_GAP,
 ): GridPoint[] {
   if (tiles.length === 0) return [];
   const sorted = [...tiles].sort((a, b) => along(a) - along(b));
@@ -510,8 +793,7 @@ function spreadApart(
     const mark = ((i + 0.5) * sorted.length) / n - 0.5;
     let best: { p: GridPoint; d: number } | null = null;
     sorted.forEach((p, k) => {
-      if (picked.some((q) => Math.max(Math.abs(q.x - p.x), Math.abs(q.y - p.y)) < CLUSTER_GAP))
-        return;
+      if (picked.some((q) => Math.max(Math.abs(q.x - p.x), Math.abs(q.y - p.y)) < gap)) return;
       const d = Math.abs(k - mark);
       if (!best || d < best.d - 1e-9) best = { p, d };
     });
@@ -522,15 +804,16 @@ function spreadApart(
 }
 
 /**
- * Low clusters on the outer front walls (low front wall pieces with the
- * outside in front of them), never beside a door or on a console's desk,
- * at most `STAGE_CAP_CLUSTERS.front`, spread along the lip.
+ * The low clusters on the outer front walls (low front wall pieces with the
+ * outside in front of them), never on a door or a console's desk: a stage
+ * monitor wedge on the outermost free tile at each end, and between them
+ * up to `STAGE_CAP_CLUSTERS.front` low clusters spread along the lip.
  */
 function frontProps(
   map: LevelMap,
   doors: readonly (Doorway | null)[],
   desks: ReadonlySet<string>,
-): StageSetRoom['frontProps'] {
+): { props: StageSetRoom['frontProps']; wedges: GridPoint[] } {
   const free: GridPoint[] = [];
   for (let y = 0; y < map.height; y++)
     for (let x = 1; x < map.width - 1; x++)
@@ -539,13 +822,19 @@ function frontProps(
         wallPiece(map, x, y) === 'wall-front' &&
         isOpen(map, x, y - 1) &&
         outside(map, x, y + 1) &&
-        !nearDoor(doors, x, y, 1) &&
+        !nearDoor(doors, x, y, 0) &&
         !desks.has(key(x, y))
       )
         free.push({ x, y });
-  return spreadApart(free, (p) => p.x * 100 + p.y, STAGE_CAP_CLUSTERS.front)
+  const sorted = [...free].sort((a, b) => a.x - b.x || a.y - b.y);
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  const wedges = first && last ? (first === last ? [first] : [first, last]) : [];
+  const rest = sorted.filter((p) => !wedges.includes(p));
+  const props = spreadApart(rest, (p) => p.x * 100 + p.y, STAGE_CAP_CLUSTERS.front, 1)
     .sort((a, b) => a.x - b.x)
     .map((p, slot) => ({ ...p, slot }));
+  return { props, wedges };
 }
 
 /**

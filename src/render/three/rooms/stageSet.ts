@@ -1,5 +1,5 @@
 import { gridToWorld } from '../../projection';
-import { WALL_HEIGHT } from '../layout';
+import { FRONT_WALL_HEIGHT, WALL_HEIGHT } from '../layout';
 import {
   STAGE_FASCIA_LOOKS,
   STAGE_WALL_ART,
@@ -17,7 +17,12 @@ import {
   stageTrussModel,
   stageWallModel,
 } from '../roomModels/stageSet';
-import { STAGE_FRONT_WALL_PROPS, STAGE_WALL_TOP_PROPS } from '../setDressing/stageSetWallTops';
+import {
+  STAGE_FRONT_WALL_PROPS,
+  STAGE_FRONT_WEDGE,
+  STAGE_INNER_LOW_PROP,
+  STAGE_WALL_TOP_PROPS,
+} from '../setDressing/stageSetWallTops';
 import { type Side, type StageSetRoom, stageLampFit, stageSetRoom } from './stageSetRoom';
 import type { RoomDressing } from './types';
 
@@ -52,7 +57,11 @@ export const STAGE_SET_ROOM: RoomDressing<StageSetRoom> = {
   foundation: { model: stageFasciaModel, looks: STAGE_FASCIA_LOOKS },
   counter: flightCaseCounter,
   lamp: { model: parCanModel, fit: stageLampFit },
-  placeStory({ stageDoor, consoles, wallArt, trusses, mirrorBall }, _map, place) {
+  placeStory(
+    { stageDoor, consoles, wallArt, trusses, mirrorBall, frontWedges, innerProps, innerSetList },
+    _map,
+    place,
+  ) {
     if (stageDoor) {
       const span = stageDoor.tiles.length;
       const low = stageDoor.side === 'front';
@@ -87,6 +96,29 @@ export const STAGE_SET_ROOM: RoomDressing<StageSetRoom> = {
         at: gridToWorld(mirrorBall.x, mirrorBall.y, WALL_HEIGHT),
         yaw: 0.3,
       });
+    frontWedges.forEach((p, i) => {
+      place('frontWedge', STAGE_FRONT_WEDGE, {
+        at: gridToWorld(p.x, p.y, FRONT_WALL_HEIGHT),
+        yaw: i % 2 ? -0.12 : 0.12,
+      });
+    });
+    for (const { x, y, tall, slot } of innerProps) {
+      if (tall) {
+        const index = (slot * 2 + 1) % STAGE_WALL_TOP_PROPS.length;
+        const model = STAGE_WALL_TOP_PROPS[index];
+        if (model)
+          place(`innerTop:${index}`, model, { at: gridToWorld(x, y, WALL_HEIGHT), yaw: 0.08 });
+      } else
+        place('innerLow', STAGE_INNER_LOW_PROP, {
+          at: gridToWorld(x, y, FRONT_WALL_HEIGHT),
+          yaw: slot % 2 ? 0.3 : -0.2,
+        });
+    }
+    if (innerSetList) {
+      const model = STAGE_WALL_ART.setList;
+      if (model)
+        place('art:setList', model, { at: gridToWorld(innerSetList.x, innerSetList.y), yaw: 0 });
+    }
   },
-  flat: new Set(['truss:0', 'truss:1', 'truss:2']),
+  flat: new Set(['truss:0', 'truss:1', 'truss:2', 'innerLow']),
 };
