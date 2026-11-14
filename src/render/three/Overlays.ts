@@ -11,6 +11,7 @@ import {
 import { type LevelMap, getTile } from '../../sim/level';
 import { orderOf, shipBlockedBy } from '../../sim/orders';
 import { pipelineWarning } from '../../sim/pipeline';
+import { tapFixShare } from '../../sim/spills';
 import type { GameState } from '../../sim/state';
 import { type QueueKind, type Ticket, isPart, isShippable, queuedTickets } from '../../sim/tickets';
 import { firstGroup } from '../mapShape';
@@ -110,6 +111,7 @@ export class Overlays {
   private readonly queueCounts = new Map<QueueKind, Phaser.GameObjects.Text>();
   private readonly invites = new Map<number, Phaser.GameObjects.Graphics>();
   private readonly pipelines = new Map<string, Phaser.GameObjects.Graphics>();
+  private readonly taps = new Map<string, Phaser.GameObjects.Graphics>();
   private readonly hints = new Map<HintId, Phaser.GameObjects.Container>();
   private readonly debugLabels: { text: Phaser.GameObjects.Text; at: Vec3 }[] = [];
   private readonly meetingLabel: { text: Phaser.GameObjects.Text; at: Vec3 } | null = null;
@@ -160,6 +162,7 @@ export class Overlays {
     this.syncQueueCounts(state, project);
     this.syncInvites(view, project);
     this.syncPipelines(state, timeMs, project);
+    this.syncTaps(state, timeMs, project);
     this.syncHints(hints, hintsVisible, timeMs, project);
   }
 
@@ -355,6 +358,29 @@ export class Overlays {
       if (seen.has(id)) continue;
       g.destroy();
       this.invites.delete(id);
+    }
+  }
+
+  /** Leaky taps (spills): a pulsing badge while one leaks, and a bar while it's being fixed. */
+  private syncTaps(state: GameState, timeMs: number, project: Project): void {
+    for (const tap of state.taps) {
+      const key = `${tap.x},${tap.y}`;
+      let g = this.taps.get(key);
+      if (!g) {
+        g = this.scene.add.graphics();
+        this.taps.set(key, g);
+      }
+      g.clear();
+      if (tap.phase !== 'leaking') continue;
+      const top = blockHeight(this.map, tap.x, tap.y);
+      const share = tapFixShare(tap);
+      if (share > 0) {
+        drawProgressBar(g, 0, 0, share);
+        place(g, project(gridToWorld(tap.x, tap.y, top + REPAIR_BAR_LIFT)), 1e6);
+      } else {
+        drawBadge(g, 0, 0, 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(timeMs / 120)));
+        place(g, project(gridToWorld(tap.x + 0.3, tap.y, top + BADGE_LIFT)), 1e6);
+      }
     }
   }
 

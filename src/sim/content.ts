@@ -241,6 +241,7 @@ export const LEVEL_NAMES: Readonly<Record<string, string>> = {
   // Lab levels: outside the campaign, for scenes and tests.
   'lab-shapes': 'Lab: shapes',
   'lab-dev': 'Lab: dev mechanics',
+  'lab-spills': 'Lab: spills',
   'open-plan': 'Open Plan Office',
   // Id from before the Scale-Up chapter; kept so saves still count.
   'scale-up': 'Down the Hall',
@@ -443,7 +444,9 @@ export type IntroPicture =
   | 'atrium'
   | 'design'
   | 'merge'
-  | 'carousel';
+  | 'carousel'
+  | 'spill'
+  | 'mop';
 
 /** On the intro card of a level that teaches something new: one line and a picture. */
 export const LEVEL_INTRO_TIPS: Readonly<Record<string, { text: string; picture: IntroPicture }>> = {
@@ -486,6 +489,23 @@ export const LEVEL_INTRO_TIPS: Readonly<Record<string, { text: string; picture: 
   'back-to-back': {
     picture: 'meeting',
     text: 'Calendar invites: the invited player sits in the meeting room for a few seconds, or you lose points.',
+  },
+};
+
+/**
+ * Intro tips for the redesigned levels (phase 23), by level id. They join
+ * `LEVEL_INTRO_TIPS` in the rollout, when these levels get their new maps.
+ */
+export const REDESIGN_INTRO_TIPS: Readonly<
+  Record<string, { text: string; picture: IntroPicture }>
+> = {
+  'demo-day': {
+    picture: 'spill',
+    text: 'Wet floor: you slide! The leaky tap floods the floor round it. Hold work at the tap to fix it, or go round.',
+  },
+  'on-call': {
+    picture: 'mop',
+    text: 'The mop robot never stops: it shoves you aside and leaves a wet trail. Pick the dry way round.',
   },
 };
 

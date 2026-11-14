@@ -145,6 +145,8 @@ export class People {
     const seenManagers = this.seenManagers;
     seenManagers.clear();
     for (const manager of state.managers) {
+      // The mop robot is a machine, drawn with the other mechanics (`Mechanics.ts`).
+      if (manager.kind === 'mopRobot') continue;
       const pos = view.renderManagerPos(manager.id);
       if (!pos) continue;
       seenManagers.add(manager.id);

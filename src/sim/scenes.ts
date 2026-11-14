@@ -205,7 +205,8 @@ export function sceneState(scene: Scene, level = levelById(scene.levelId)): Game
   state.nextOrderTick = Number.MAX_SAFE_INTEGER;
   state.nextIncidentTick = null;
   state.nextMeetingTick = null;
-  for (const m of state.managers) m.waitTicks = MAX_SCENE_TICKS;
+  // Managers hold still for the picture; the mop robot keeps driving its loop.
+  for (const m of state.managers) if (m.kind === 'manager') m.waitTicks = MAX_SCENE_TICKS;
   scene.setup(state);
   state.events = [];
   return state;

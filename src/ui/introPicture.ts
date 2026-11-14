@@ -48,7 +48,31 @@ function arrow(x1: number, x2: number, y: number): string {
   return `<line x1="${x1}" y1="${y}" x2="${x2 - 4}" y2="${y}" stroke="currentColor" stroke-width="3"/><polygon points="${x2},${y} ${x2 - 7},${y - 5} ${x2 - 7},${y + 5}" fill="currentColor"/>`;
 }
 
+/** A wet patch on the floor: a flat blue puddle. */
+function puddle(x: number, y: number, w: number): string {
+  return `<ellipse cx="${x}" cy="${y}" rx="${w / 2}" ry="7" fill="#3d8bff" fill-opacity="0.6" stroke="${OUTLINE}" stroke-width="1.5"/>`;
+}
+
 const PICTURES: Readonly<Record<IntroPicture, () => string>> = {
+  // A leaky tap on a counter floods the floor; a developer slides across it.
+  spill: () =>
+    [
+      block(40, 50, 'counter'),
+      `<rect x="36" y="22" width="8" height="16" fill="#ff4a3d" stroke="${OUTLINE}" stroke-width="1.5"/>`,
+      `<path d="M 44 26 h 10 v 6" fill="none" stroke="#ff4a3d" stroke-width="4"/>`,
+      puddle(130, 80, 150),
+      dev(150, 78, playerCssColor(1)),
+      `<path d="M 110 62 h 24" stroke="currentColor" stroke-width="2.5" stroke-dasharray="4 4"/>`,
+    ].join(''),
+  // The mop robot drives along, a wet trail behind it, and bumps a developer.
+  mop: () =>
+    [
+      puddle(70, 80, 110),
+      `<ellipse cx="140" cy="72" rx="22" ry="10" fill="#e8e8e8" stroke="${OUTLINE}" stroke-width="2"/>`,
+      `<circle cx="140" cy="62" r="4" fill="#ff8a00" stroke="${OUTLINE}" stroke-width="1"/>`,
+      arrow(165, 185, 66),
+      dev(205, 80, playerCssColor(2)),
+    ].join(''),
   // Inbox → keyboard → test bench → pipeline → ship.
   basics: () =>
     [
