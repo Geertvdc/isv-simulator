@@ -1,8 +1,9 @@
 import { gridToWorld } from '../../projection';
-import { WALL_HEIGHT } from '../layout';
+import { FRONT_WALL_HEIGHT, WALL_HEIGHT } from '../layout';
 import {
   MID_RISE_FOUNDATION_LOOKS,
   MID_RISE_WALL_ART,
+  EXEC_SEAT_TOP,
   MID_RISE_WALL_LOOKS,
   GLASS_SCREEN_MODELS,
   SOLID_MODELS,
@@ -11,11 +12,14 @@ import {
   carpetTone,
   execChairModel,
   execDeskModel,
+  headRidgeModel,
+  loneDeskThingsModel,
   midRiseDeskCounter,
   midRiseFoundationModel,
   midRiseWallModel,
   pendantModel,
   pendantWireModel,
+  puttingMatModel,
   receptionModel,
   taskChairModel,
 } from '../roomModels/midRise';
@@ -36,8 +40,20 @@ const DOOR_YAW: Readonly<Record<Side, number>> = {
   right: -Math.PI / 2,
 };
 
-/** Where Segfault lies on Derek's seat, from the desk tile's middle (the chair's seat). */
-const SEAT = { back: 0.29, y: 0.51 };
+/**
+ * Where Derek's chair stands from his desk tile's middle: pulled out from
+ * behind the desk toward the room and turned toward the camera, so Segfault
+ * asleep on its seat shows.
+ */
+const EXEC_CHAIR = { dx: 0.34, dz: -0.24, yaw: 0.5 };
+
+/** Story pieces flat on the floor or the partition tops: they cast no shadow. */
+const FLAT = new Set([
+  'puttingMat',
+  ...[false, true].flatMap((low) =>
+    Array.from({ length: 16 }, (_, arms) => `headRidge:${low}:${arms}`),
+  ),
+]);
 
 /**
  * A rented floor of a mid-rise office building (wall theme `midRise`, floor
@@ -69,7 +85,18 @@ export const MID_RISE_ROOM: RoomDressing<MidRiseRoom> = {
     wire: { hang: PENDANT_WIRE, model: pendantWireModel },
     fit: pendantFit,
   },
-  placeStory({ reception, wallArt, chairs, derekDesk, lanyards }, _map, place) {
+  flat: FLAT,
+  placeStory(
+    { reception, wallArt, chairs, derekDesk, lanyards, headTracks, puttingMat },
+    _map,
+    place,
+  ) {
+    for (const { x, y, low, arms } of headTracks)
+      place(
+        `headRidge:${low}:${arms}`,
+        () => headRidgeModel(low ? FRONT_WALL_HEIGHT : WALL_HEIGHT, arms),
+        { at: gridToWorld(x, y), yaw: 0 },
+      );
     if (reception) {
       const span = reception.tiles.length;
       const low = reception.side === 'front';
@@ -83,17 +110,28 @@ export const MID_RISE_ROOM: RoomDressing<MidRiseRoom> = {
       if (model) place(`art:${art}`, model, { at: gridToWorld(x, y), yaw });
     }
     for (const { x, y, exec } of chairs) {
+      if (exec) continue;
       const at = gridToWorld(x, y);
-      if (exec) place('execChair', execChairModel, { at, yaw: 0 });
-      else place('taskChair', taskChairModel, { at, yaw: 0 });
+      place('taskChair', taskChairModel, { at, yaw: 0 });
+      place('loneDeskThings', loneDeskThingsModel, { at, yaw: 0 });
     }
     if (derekDesk) {
+      const { dx, dz, yaw } = EXEC_CHAIR;
+      const cx = derekDesk.x + dx;
+      const cy = derekDesk.y + dz;
       place('execDesk', execDeskModel, { at: gridToWorld(derekDesk.x, derekDesk.y), yaw: 0 });
+      place('execChair', execChairModel, { at: gridToWorld(cx, cy), yaw });
+      // Segfault on the seat's middle (0.02 forward of the lift, turned with the chair).
       place('segfault', SEGFAULT_ON_CHAIR, {
-        at: gridToWorld(derekDesk.x, derekDesk.y - SEAT.back, SEAT.y),
-        yaw: 0.25,
+        at: gridToWorld(cx + Math.sin(yaw) * 0.02, cy + Math.cos(yaw) * 0.02, EXEC_SEAT_TOP),
+        yaw: yaw + 0.25,
       });
     }
+    if (puttingMat)
+      place('puttingMat', puttingMatModel, {
+        at: gridToWorld(puttingMat.x, puttingMat.y),
+        yaw: 0,
+      });
     if (lanyards)
       place('lanyards', LANYARD_BOX, {
         at: gridToWorld(lanyards.x, lanyards.y, WALL_HEIGHT),

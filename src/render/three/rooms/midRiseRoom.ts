@@ -36,9 +36,17 @@ export const CARPET_WEAR = {
   coffee: 7,
   /** One tile from a different batch: a slightly different blue. */
   odd: 11,
+  /**
+   * Derek's plush office carpet: `plush + edges`, `edges` the sides (as
+   * `PLUSH_EDGES` counts them, a bit each) where the office ends, which
+   * get its lighter border.
+   */
+  plush: 12,
 } as const;
 /** How many wear kinds there are. */
-export const CARPET_WEAR_KINDS = CARPET_WEAR.odd + 1;
+export const CARPET_WEAR_KINDS = CARPET_WEAR.plush + 16;
+/** The sides of a plush tile, as the bits of its `edges`: back 1, front 2, left 4, right 8. */
+export const PLUSH_EDGES: readonly Side[] = ['back', 'front', 'left', 'right'];
 
 /** The edges a chair mat hugs, in the order its kind counts them. */
 export const MAT_EDGES: readonly Side[] = ['back', 'front', 'left', 'right'];
@@ -50,6 +58,7 @@ export const matWear = (edge: Side) => CARPET_WEAR.mat + MAT_EDGES.indexOf(edge)
 /** What hangs on the partitions (each on one face of a wall tile). */
 export type MidRiseArt =
   | 'yotta'
+  | 'yottaSmall'
   | 'orgChart'
   | 'clock'
   | 'quietZone'
@@ -63,19 +72,20 @@ export type MidRiseArt =
 /** How far each piece reaches either side of its spot (`roomModels/midRise` builds to it). */
 export const MID_RISE_ART_HALF: Readonly<Record<MidRiseArt, number>> = {
   yotta: 0.92,
-  orgChart: 0.4,
+  yottaSmall: 0.46,
+  orgChart: 0.5,
   clock: 0.15,
   quietZone: 0.3,
   booking: 0.16,
   fireExit: 0.2,
   certificate: 0.3,
-  lanyardHook: 0.26,
+  lanyardHook: 0.3,
   statusSticky: 0.12,
   meetingTv: 0.62,
 };
 
 /** The art that hangs on a solid plasterboard panel (its tiles built as `SOLID_SWAP`). */
-const ON_SOLID: ReadonlySet<MidRiseArt> = new Set(['yotta', 'orgChart', 'booking', 'lanyardHook']);
+const ON_SOLID: ReadonlySet<MidRiseArt> = new Set(['yotta', 'yottaSmall', 'orgChart', 'booking']);
 
 /**
  * A piece of art on a wall: its spot (a tile's middle, or between two
@@ -120,6 +130,22 @@ export interface MidRiseRoom {
   derekDesk: GridPoint | null;
   /** Derek's office on this map, if it's inside the map (see `managerOffice`). */
   office: ManagerOffice | null;
+  /** His putting mat on the office floor: its middle (between two tiles), running along x; else null. */
+  puttingMat: { x: number; y: number } | null;
+  /** The aluminium head track along every partition top (see `HeadTrack`). */
+  headTracks: HeadTrack[];
+}
+
+/**
+ * The slim head track along a partition top on tile (x, y): arms from the
+ * tile's middle toward each neighbouring wall (`arms`, a bit per side as
+ * `PLUSH_EDGES` counts them), on a low wall when `low`.
+ */
+export interface HeadTrack {
+  x: number;
+  y: number;
+  low: boolean;
+  arms: number;
 }
 
 /** The swap for a solid plasterboard partition panel, in a look. */
@@ -183,24 +209,26 @@ export function midRiseRoom(map: LevelMap): MidRiseRoom {
   const salt = levelSalt(map);
   for (const a of wallArt) {
     if (!ON_SOLID.has(a.art)) continue;
-    const xs = a.art === 'yotta' ? [Math.floor(a.x), Math.ceil(a.x)] : [a.x];
+    const xs = [Math.floor(a.x), Math.ceil(a.x)];
     for (const x of new Set(xs))
       swaps[key(x, a.y)] = solidSwap(((tileHash(x + 7, a.y + 19) ^ salt) >>> 5) % SOLID_LOOKS);
   }
   Object.assign(swaps, glassScreens(map, office));
   const logoTiles = new Set(
     wallArt
-      .filter((a) => a.art === 'yotta')
+      .filter((a) => a.art === 'yotta' || a.art === 'yottaSmall')
       .flatMap((a) => [Math.floor(a.x), Math.ceil(a.x)].map((x) => key(x, a.y))),
   );
   const walkway = findWalkway(map, reception, ships);
   const derekDesk = office ? officeDesk(map, office) : null;
   const caps = capProps(map, doors, reception, logoTiles);
+  const wear = floorWear(map, walkway, officeTiles, meeting, derekDesk);
+  if (office) Object.assign(wear, plushFloor(office));
   return {
     reception,
     decos: {},
     wallArt,
-    floorWear: floorWear(map, walkway, officeTiles, meeting, derekDesk),
+    floorWear: wear,
     walkway,
     capProps: caps.props,
     frontProps: frontProps(map, doors),
@@ -209,7 +237,73 @@ export function midRiseRoom(map: LevelMap): MidRiseRoom {
     chairs: deskChairs(map, derekDesk),
     derekDesk,
     office,
+    puttingMat: office ? puttingMat(map, office, derekDesk) : null,
+    headTracks: headTracks(map, swaps),
   };
+}
+
+/** Derek's office carpet: plush on every tile of it, the lighter border where it ends. */
+function plushFloor(office: ManagerOffice): Record<string, number> {
+  const tiles = new Set(office.tiles);
+  const out: Record<string, number> = {};
+  for (const k of office.tiles) {
+    const [x = 0, y = 0] = k.split(',').map(Number);
+    let edges = 0;
+    PLUSH_EDGES.forEach((side, bit) => {
+      const { dx, dy } = OUT[side];
+      if (!tiles.has(key(x + dx, y + dy))) edges |= 1 << bit;
+    });
+    out[k] = CARPET_WEAR.plush + edges;
+  }
+  return out;
+}
+
+/**
+ * Derek's putting mat: two neighbouring floor tiles in his office's front
+ * row (never a spawn, never right in front of his desk), the pair nearest
+ * the office's middle.
+ */
+function puttingMat(
+  map: LevelMap,
+  office: ManagerOffice,
+  desk: GridPoint | null,
+): { x: number; y: number } | null {
+  const tiles = new Set(office.tiles);
+  const spawn = new Set([...map.spawns, ...map.managerSpawns].map((p) => key(p.x, p.y)));
+  const ok = (x: number, y: number) =>
+    tiles.has(key(x, y)) &&
+    getTile(map, x, y) === 'floor' &&
+    !spawn.has(key(x, y)) &&
+    !(desk && desk.x === x && desk.y + 1 === y);
+  const mid = (office.x0 + office.x1) / 2;
+  for (let y = office.y1; y >= office.y0; y--) {
+    const pairs: number[] = [];
+    for (let x = office.x0; x < office.x1; x++) if (ok(x, y) && ok(x + 1, y)) pairs.push(x + 0.5);
+    pairs.sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid) || a - b);
+    const x = pairs[0];
+    if (x !== undefined) return { x, y };
+  }
+  return null;
+}
+
+/**
+ * The head track along every partition top but the rooms' glass screens
+ * (they carry their own channel): an arm toward each neighbouring wall.
+ */
+function headTracks(map: LevelMap, swaps: Readonly<Record<string, string>>): HeadTrack[] {
+  const out: HeadTrack[] = [];
+  const isWall = (x: number, y: number) => getTile(map, x, y) === 'wall';
+  for (let y = 0; y < map.height; y++)
+    for (let x = 0; x < map.width; x++) {
+      if (!isWall(x, y) || swaps[key(x, y)]?.startsWith('glassLow')) continue;
+      let arms = 0;
+      PLUSH_EDGES.forEach((side, bit) => {
+        const { dx, dy } = OUT[side];
+        if (isWall(x + dx, y + dy)) arms |= 1 << bit;
+      });
+      out.push({ x, y, low: wallPiece(map, x, y) === 'wall-front', arms });
+    }
+  return out;
 }
 
 /** Derek's desk: the counter in his office nearest its back wall and middle. */
@@ -288,21 +382,27 @@ function placeWallArt(
     [...from].sort((a, b) => score(a) - score(b) || a.y - b.y || a.x - b.x)[0];
   // The back row counts most: a row lower costs.
   const row = (p: GridPoint) => p.y * 3;
+  const spawns = [...map.spawns, ...map.managerSpawns];
 
-  // YOTTA's logo on two faces right beside reception (only on the back or front edge).
+  // YOTTA's logo right beside reception (only on the back or front edge): on the faces left of
+  // it, else right of it, never where a spawn stands in front of it (it'd hide the logo at the
+  // start); two faces wide where there are two, else one.
   if (reception && (reception.side === 'back' || reception.side === 'front')) {
     const xs = reception.tiles.map((t) => t.x);
     const y = reception.mid.y;
-    const sides = [
-      [Math.max(...xs) + 1, Math.max(...xs) + 2],
-      [Math.min(...xs) - 2, Math.min(...xs) - 1],
-    ].sort((a, b) => Math.abs((a[0] ?? 0) - midX) - Math.abs((b[0] ?? 0) - midX));
-    for (const [a = 0, b = 0] of sides) {
-      if (!face(a, y) || !face(b, y)) continue;
-      used.add(key(a, y));
-      used.add(key(b, y));
-      out.push({ x: (a + b) / 2, y, yaw: 0, art: 'yotta' });
-      break;
+    const clear = (x: number) =>
+      face(x, y) && !spawns.some((s) => s.x === x && s.y > y && s.y - y <= 2);
+    const run = (from: number, step: number) => {
+      const got: number[] = [];
+      for (let x = from; got.length < 2 && clear(x); x += step) got.push(x);
+      return got;
+    };
+    const sides = [run(Math.min(...xs) - 1, -1), run(Math.max(...xs) + 1, 1)];
+    const got = sides.find((s) => s.length === 2) ?? sides.find((s) => s.length === 1);
+    if (got) {
+      for (const x of got) used.add(key(x, y));
+      const x = (Math.min(...got) + Math.max(...got)) / 2;
+      out.push({ x, y, yaw: 0, art: got.length === 2 ? 'yotta' : 'yottaSmall' });
     }
   }
   const art = () => out.map((a) => ({ x: a.x, y: a.y }));
@@ -310,9 +410,12 @@ function placeWallArt(
     Math.min(99, ...art().map((a) => Math.abs(a.x - p.x) + Math.abs(a.y - p.y) * 2));
   // Not right beside another piece where there is room.
   const roomy = (p: GridPoint) => (gap(p) <= 1 ? 50 : 0);
+  // Derek's org chart nearest the middle, but never behind a spawn (it'd be hidden at the start).
+  const hidden = (p: GridPoint) =>
+    spawns.some((s) => s.x === p.x && s.y > p.y && s.y - p.y <= 2) ? 20 : 0;
   take(
     'orgChart',
-    best(free(), (p) => Math.abs(p.x - midX) + row(p) + roomy(p)),
+    best(free(), (p) => Math.abs(p.x - midX) + row(p) + roomy(p) + hidden(p)),
   );
   take(
     'clock',
@@ -345,11 +448,10 @@ function placeWallArt(
       best(free(), (p) => -Math.min(gap(p), 4) + row(p)),
     );
 
-  // Derek's office: his lanyard on the side wall facing the camera, the certificate standing on
-  // his office's low back wall (facing the room, clear of his desk), the sticky by his door.
+  // Derek's office: the certificate standing on his office's low back wall (facing the room,
+  // clear of his desk), his old lanyard hung on the glass screen there (clear of both), the
+  // sticky by his door.
   if (office) {
-    const [first] = officeSideFaces(map, office.tiles, midX);
-    if (first) out.push({ ...first, art: 'lanyardHook' });
     const desk = officeDesk(map, office);
     const midO = (office.x0 + office.x1) / 2;
     const back = office.y0 - 1;
@@ -364,6 +466,15 @@ function placeWallArt(
         spots.push({ x, y: back });
     const cert = best(spots, (p) => Math.abs(p.x - (desk ? (desk.x + midO) / 2 + 1 : midO)));
     if (cert) out.push({ x: cert.x, y: cert.y, yaw: 0, art: 'certificate' });
+    const hook = best(
+      spots.filter((p) => !cert || Math.abs(p.x - cert.x) >= 2),
+      (p) => Math.abs(p.x - (cert ? cert.x + 2 : midO)),
+    );
+    if (hook) out.push({ x: hook.x, y: hook.y, yaw: 0, art: 'lanyardHook' });
+    else {
+      const [side] = officeSideFaces(map, office.tiles, midX);
+      if (side) out.push({ ...side, art: 'lanyardHook' });
+    }
     for (const d of office.doors) {
       const w = { x: d.x, y: d.y - 1 };
       if (getTile(map, w.x, w.y) === 'wall' && wallPiece(map, w.x, w.y) === 'wall') {
@@ -445,8 +556,12 @@ function officeSideFaces(
     .map(({ x, y, yaw }) => ({ x, y, yaw }));
 }
 
-/** The swap for a low glass screen on a low wall, along x, along z (map y) or both (a corner). */
-export const glassSwap = (along: 'x' | 'z' | 'xz') => `glassLow:${along}`;
+/**
+ * The swap for a low glass screen on a low wall, along x, along z (map y) or
+ * both (a corner), with a glint across it (one tile in three) or without.
+ */
+export const glassSwap = (along: 'x' | 'z' | 'xz', glint = false) =>
+  `glassLow:${along}${glint ? ':glint' : ''}`;
 
 /**
  * The low walls round Derek's office and the meeting room (beside or
@@ -471,7 +586,7 @@ function glassScreens(map: LevelMap, office: ManagerOffice | null): Record<strin
       if (!near) continue;
       const ax = isWall(x - 1, y) || isWall(x + 1, y);
       const az = isWall(x, y - 1) || isWall(x, y + 1);
-      out[key(x, y)] = glassSwap(ax && az ? 'xz' : az ? 'z' : 'x');
+      out[key(x, y)] = glassSwap(ax && az ? 'xz' : az ? 'z' : 'x', tileHash(x, y + 5) % 3 === 0);
     }
   return out;
 }
@@ -621,7 +736,7 @@ function floorWear(
   const stains: { x: number; y: number; corner: number; h: number }[] = [];
   for (let y = 0; y < map.height; y++)
     for (let x = 0; x < map.width; x++) {
-      if (!free(x, y) || nearSpawn({ x, y }, 2)) continue;
+      if (!free(x, y) || nearSpawn({ x, y }, 2) || officeTiles.has(key(x, y))) continue;
       const desk = MAT_EDGES.find((e) => isCounter(x + OUT[e].dx, y + OUT[e].dy));
       if (!desk) continue;
       const wall = MAT_EDGES.some((e) => getTile(map, x + OUT[e].dx, y + OUT[e].dy) === 'wall');

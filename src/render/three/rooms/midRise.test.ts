@@ -11,8 +11,12 @@ import {
   DESK_TOP,
   GLASS_CORE,
   MID_RISE_WALL_ART,
+  HEAD_RIDGE_W,
   WALKWAY,
   execChairModel,
+  execDeskModel,
+  headRidgeModel,
+  puttingMatModel,
   glassScreenModel,
   pendantModel,
   receptionModel,
@@ -133,10 +137,28 @@ describe('MID_RISE_ROOM', () => {
     // A lone desk leaves its back part to the chair: the chairs stay inside the tile.
     for (const chair of [execChairModel(), pendantModel()])
       expect(vertices(chair)).toBeGreaterThan(0);
+    // Derek's chair is built round its lift, small enough to stand pulled out behind his desk.
     const exec = bounds(execChairModel());
-    expect(exec.min.z).toBeGreaterThan(-0.56);
-    expect(exec.max.z).toBeLessThan(0);
+    for (const v of [exec.min.x, exec.min.z]) expect(v).toBeGreaterThan(-0.3);
+    for (const v of [exec.max.x, exec.max.z]) expect(v).toBeLessThan(0.3);
     expect(vertices(SEGFAULT_ON_CHAIR())).toBeGreaterThan(0);
+    // His desk is wider than his tile, but no more than a quarter tile over either side.
+    const desk = bounds(execDeskModel());
+    expect(desk.max.x - desk.min.x).toBeGreaterThan(1.3);
+    expect(desk.max.x).toBeLessThanOrEqual(0.75);
+    expect(desk.min.z).toBeGreaterThanOrEqual(-0.5);
+  });
+
+  it('runs a slim aluminium ridge along the partition tops, and lays flat things flat', () => {
+    for (const arms of [1 | 2, 4 | 8, 2 | 8, 0]) {
+      const box = bounds(headRidgeModel(WALL_HEIGHT, arms));
+      expect(box.max.y).toBeLessThan(WALL_HEIGHT + 0.02);
+      // Slim across its run.
+      if (arms === (1 | 2)) expect(box.max.x - box.min.x).toBeLessThanOrEqual(HEAD_RIDGE_W + 0.001);
+      if (arms === (4 | 8)) expect(box.max.z - box.min.z).toBeLessThanOrEqual(HEAD_RIDGE_W + 0.001);
+    }
+    expect(bounds(puttingMatModel()).max.y).toBeLessThanOrEqual(0.01);
+    expect(MID_RISE_ROOM.flat?.has('puttingMat')).toBe(true);
   });
 
   it('keeps everything on the low walls low: the front props and the glass screens', () => {
