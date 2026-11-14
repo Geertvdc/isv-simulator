@@ -140,7 +140,7 @@ export const FLOOR_COLORS: Readonly<Record<FloorTheme, readonly [number, number]
   // A server room's grey raised-floor tiles; the second is the joints between the tiles.
   raisedFloor: [0x868b90, 0x969a9f],
   // A rented floor's new carpet tiles, cool blue-grey; the second is the tiles laid the other way.
-  corporateCarpet: [0x8a929c, 0x848c96],
+  corporateCarpet: [0x8a939e, 0x868f9a],
 };
 
 /** Wall colors per theme: face and top. Caps stay darker than stations, so the eye goes to the stations. */
