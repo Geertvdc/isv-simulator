@@ -119,11 +119,33 @@ const FONT: Readonly<Record<string, string>> = {
 /** YOTTA's own rounder alphabet, 5 wide and 5 high (as on the loft's roof sign). */
 const WIDE: Readonly<Record<string, string>> = {
   A: '0111010001111111000110001',
+  B: '1111010001111101000111110',
+  C: '0111110000100001000001111',
+  D: '1111010001100011000111110',
+  E: '1111110000111101000011111',
+  H: '1000110001111111000110001',
+  I: '1111100100001000010011111',
+  L: '1000010000100001000011111',
+  M: '1000111011101011000110001',
+  N: '1000111001101011001110001',
   O: '0111010001100011000101110',
-  Y: '1000101010001000010000100',
+  P: '1111010001111101000010000',
+  S: '0111110000011100000111110',
   T: '1111100100001000010000100',
+  U: '1000110001100011000101110',
+  V: '1000110001100010101000100',
+  Y: '1000101010001000010000100',
+  '2': '1111000001011101000011111',
+  '6': '0111010000111101000101110',
+  '·': '0000001110011100111000000',
   ' ': '0000000000000000000000000',
 };
+
+/** Whether every glyph of `text` is in the alphabet (the wide one when `wide`). */
+export function spellable(text: string, wide = false): boolean {
+  const font = wide ? WIDE : FONT;
+  return Array.from(text).every((ch) => ch in font);
+}
 
 /** How wide `text` runs, in pixels: 3 per glyph (5 when `wide`) and 1 between. Every glyph is one UTF-16 unit. */
 export function textWidth(text: string, wide = false): number {
@@ -199,6 +221,39 @@ function stroke(
 
 /** The LED wall's picture starts this high above the ground: just over the stage-set walls' tops. */
 export const SCREEN_LIFT = 1.24;
+/** The LED wall's picture: its violet at the foot and at the top, the header band across it and its height. */
+const SCREEN_FOOT = 0x7a5ef4;
+const SCREEN_TOP = 0x8a72fc;
+const HEADER_BAND = 0x3a2c8c;
+const HEADER_H = 0.44;
+const HEADER = 'LAUNCHPAD DEMO DAY · BATCH 26';
+
+/**
+ * Where the pitch slide's parts sit on an LED wall `w` × `h` (x from the
+ * middle, y from the picture's foot): the logo on the left, LIVE DEMO and its
+ * red dot on the right, the growth chart squeezed between them so nothing
+ * overlaps, and the header's pixel size so it fits the width.
+ */
+export function slideLayout(w: number, h: number) {
+  const headPx = Math.min(0.05, (w - 1.3) / textWidth(HEADER, true));
+  const ring = 0.42;
+  const rx = -w / 2 + 0.3 + ring + 0.1;
+  const logoPx = 0.09;
+  const logoW = textWidth('YOTTA', true) * logoPx;
+  const logoX = rx + ring + 0.28 + logoW / 2;
+  const logoY = h * 0.5;
+  const livePx = 0.045;
+  const liveW = textWidth('LIVE DEMO', true) * livePx;
+  const liveX = w / 2 - 0.3 - liveW / 2;
+  const liveY = h * 0.66;
+  const dotX = liveX - liveW / 2 - 0.26;
+  // The chart's natural extent is 2.8 wide (from its origin −0.2 to +2.6) and 1.85 up to the arrow's tip.
+  const chartL = logoX + logoW / 2 + 0.4;
+  const chartR = Math.min(dotX - 0.25, liveX - 1.2 - 0.2);
+  const sx = Math.max(0.3, Math.min(1, (chartR - chartL) / 2.8));
+  const sy = Math.min(1, (h - HEADER_H - 0.3 - 0.4 - 0.24) / 1.85);
+  return { headPx, ring, rx, logoPx, logoX, logoY, livePx, liveX, liveY, dotX, chartL, sx, sy };
+}
 
 /**
  * The giant LED video wall, `w` wide and `h` tall, its picture from
@@ -221,35 +276,35 @@ export function ledWall(w: number, h: number): SetPiece {
         b.box(0.08, y0 + h, 0.08, STEEL, { at: [x, (y0 + h) / 2, -0.45] }, 0);
         b.box(0.06, 0.06, 0.7, STEEL, { at: [x, 0.03, -0.45] }, 0);
       }
-      // The picture: a violet gradient, lighter up top, a glow behind the logo's side.
+      // The picture: a bright violet gradient, lighter up top, a glow behind the logo's side.
       const bands = 7;
       for (let i = 0; i < bands; i++) {
         const t = i / (bands - 1);
-        const c = new THREE.Color(0x24125e).lerp(new THREE.Color(0x5a36c8), t).getHex();
+        const c = new THREE.Color(SCREEN_FOOT).lerp(new THREE.Color(SCREEN_TOP), t).getHex();
         glowPlane(b, w, h / bands + 0.002, c, [0, y0 + (i + 0.5) * (h / bands), 0.0]);
       }
       // A soft lighter wash behind the logo (left) and behind the arrow (middle).
       b.add(
         new THREE.CircleGeometry(1.25, 28),
-        0x6c48e0,
+        0x9680ff,
         { at: [-w / 2 + 1.8, y0 + h * 0.48, 0.004] },
         'glow',
       );
       b.add(
         new THREE.CircleGeometry(1.0, 28),
-        0x5e3ed0,
+        0x8c76ff,
         { at: [w * 0.06, y0 + h * 0.5, 0.004] },
         'glow',
       );
       // The header band across the top.
-      glowPlane(b, w, 0.42, 0x120c2c, [0, y0 + h - 0.21, 0.006]);
-      glowPlane(b, w, 0.035, VIOLET, [0, y0 + h - 0.43, 0.007]);
+      glowPlane(b, w, HEADER_H, HEADER_BAND, [0, y0 + h - HEADER_H / 2, 0.006]);
+      glowPlane(b, w, 0.035, 0xb89cff, [0, y0 + h - HEADER_H - 0.015, 0.007]);
       // LED cabinet seams: a fine dark grid over the picture.
-      const seam = 0x0b0a12;
+      const seam = 0x2a2060;
       for (let x = -w / 2 + 0.5; x < w / 2 - 0.01; x += 0.5)
-        b.box(0.012, h, 0.006, seam, { at: [x, y0 + h / 2, 0.012] }, 0);
+        b.box(0.01, h, 0.006, seam, { at: [x, y0 + h / 2, 0.012] }, 0);
       for (let y = y0 + 0.5; y < y0 + h - 0.01; y += 0.5)
-        b.box(w, 0.012, 0.006, seam, { at: [0, y, 0.012] }, 0);
+        b.box(w, 0.01, 0.006, seam, { at: [0, y, 0.012] }, 0);
     }),
   );
 }
@@ -265,26 +320,26 @@ export function pitchSlide(w: number, h: number): SetPiece {
     looks([w, 0.1], 1, (b) => {
       const y0 = SCREEN_LIFT;
       const z = 0.02;
-      // Header.
-      letters(b, 'LAUNCHPAD DEMO DAY · BATCH 26', -0.2, y0 + h - 0.21, z, 0.056, SLIDE_WHITE, true);
-      // A little rocket mark either side of the header.
-      for (const s of [-1, 1]) {
-        const x = -0.2 + s * (textWidth('LAUNCHPAD DEMO DAY · BATCH 26') * 0.028 + 0.3);
-        b.add(
-          new THREE.CircleGeometry(0.09, 3),
-          AMBER,
-          { at: [x, y0 + h - 0.2, z], rot: [0, 0, Math.PI / 2] },
-          'glow',
-        );
-      }
+      const at = slideLayout(w, h);
+      // Header, in YOTTA's wide letters so every one reads.
+      const hy = y0 + h - HEADER_H / 2;
+      letters(b, HEADER, 0, hy, z, at.headPx, SLIDE_WHITE, true, 0.01, true);
+      // A little rocket mark either side of the header, where there's room.
+      const half = (textWidth(HEADER, true) * at.headPx) / 2 + 0.22;
+      if (half + 0.1 < w / 2)
+        for (const s of [-1, 1])
+          b.add(
+            new THREE.CircleGeometry(0.08, 3),
+            AMBER,
+            { at: [s * half, hy, z], rot: [0, 0, Math.PI / 2] },
+            'glow',
+          );
       // The logo: an orbit round a planet, then YOTTA in its round letters.
-      const left = -w / 2 + 0.35;
-      const ly = y0 + h * 0.48;
-      const ring = 0.46;
-      const rx = left + ring + 0.1;
+      const { ring, rx } = at;
+      const ly = y0 + at.logoY;
       b.add(
         new THREE.TorusGeometry(ring, 0.06, 8, 32),
-        0xc8a8ff,
+        0xe0d0ff,
         { at: [rx, ly, z], rot: [0, 0, 0.5] },
         'glow',
       );
@@ -295,49 +350,52 @@ export function pitchSlide(w: number, h: number): SetPiece {
         { at: [rx + Math.cos(0.5) * ring, ly + Math.sin(0.5) * ring, z + 0.004] },
         'glow',
       );
-      const lpx = 0.1;
-      const lw = textWidth('YOTTA', true) * lpx;
-      letters(b, 'YOTTA', rx + ring + 0.3 + lw / 2, ly, z, lpx, SLIDE_WHITE, true, 0.012, true);
-      letters(b, 'SHIP IT LIVE', rx + ring + 0.3 + lw / 2, ly - 0.55, z, 0.04, 0xc8b4ff, true);
-      // The growth chart: bars rising, an arrow up and to the right over them.
-      const c0 = -0.5;
+      letters(b, 'YOTTA', at.logoX, ly, z, at.logoPx, SLIDE_WHITE, true, 0.012, true);
+      letters(b, 'SHIP IT LIVE', at.logoX, ly - 0.42, z, 0.04, 0xf0e8ff, true);
+      // The growth chart: bars rising, an arrow up and to the right over them, all between the logo and LIVE DEMO.
+      const { sx, sy } = at;
+      const c0 = at.chartL + 0.2 * sx;
       const base = y0 + 0.4;
       for (let i = 0; i < 6; i++) {
-        const bh = 0.18 + i * i * 0.05;
-        glowPlane(b, 0.26, bh, i === 5 ? 0xc8a8ff : 0x7a58e8, [c0 + i * 0.4, base + bh / 2, z]);
+        const bh = (0.18 + i * i * 0.05) * sy;
+        glowPlane(b, 0.26 * sx, bh, i === 5 ? 0xf2ecff : 0xc4b4ff, [
+          c0 + i * 0.4 * sx,
+          base + bh / 2,
+          z,
+        ]);
       }
-      const pts: [number, number][] = [
-        [c0 - 0.2, base + 0.55],
-        [c0 + 0.5, base + 0.85],
-        [c0 + 0.9, base + 0.72],
-        [c0 + 1.6, base + 1.3],
-        [c0 + 2.35, base + 1.85],
-      ];
+      const pts: [number, number][] = (
+        [
+          [-0.2, 0.55],
+          [0.5, 0.85],
+          [0.9, 0.72],
+          [1.6, 1.3],
+          [2.35, 1.85],
+        ] as const
+      ).map(([px, py]) => [c0 + px * sx, base + py * sy]);
       for (let i = 1; i < pts.length; i++) {
         const [ax, ay] = pts[i - 1] ?? [0, 0];
         const [bx, by] = pts[i] ?? [0, 0];
-        stroke(b, ax, ay, bx, by, z + 0.006, 0.11, SLIDE_WHITE);
+        stroke(b, ax, ay, bx, by, z + 0.006, 0.1, SLIDE_WHITE);
       }
       const [tx, ty] = pts[pts.length - 1] ?? [0, 0];
       b.add(
-        new THREE.CircleGeometry(0.24, 3),
+        new THREE.CircleGeometry(0.22, 3),
         SLIDE_WHITE,
-        { at: [tx, ty, z + 0.008], rot: [0, 0, Math.atan2(0.55, 0.75)] },
+        { at: [tx, ty, z + 0.008], rot: [0, 0, Math.atan2(0.55 * sy, 0.75 * sx)] },
         'glow',
       );
-      letters(b, '10X', c0 + 0.6, base + 1.7, z, 0.06, AMBER, true);
+      letters(b, '10X', c0 + 0.5 * sx, base + 1.5 * sy, z, 0.06, AMBER, true);
       // LIVE DEMO, and what's shipped live so far.
-      const rx0 = w / 2 - 1.55;
-      const lpx2 = 0.075;
-      letters(b, 'LIVE DEMO', rx0, y0 + h * 0.66, z, lpx2, SLIDE_WHITE, true);
+      letters(b, 'LIVE DEMO', at.liveX, y0 + at.liveY, z, at.livePx, SLIDE_WHITE, true, 0.01, true);
       for (let i = 0; i < 3; i++) {
         const y = y0 + h * 0.4 - i * 0.3;
-        const x = rx0 - 1.0;
+        const x = at.liveX - 1.0;
         // A tick in a green box, a line of text after it.
         glowPlane(b, 0.18, 0.18, 0x2a8a58, [x, y, z]);
         stroke(b, x - 0.05, y, x - 0.01, y - 0.05, z + 0.004, 0.035, SLIDE_WHITE);
         stroke(b, x - 0.01, y - 0.05, x + 0.07, y + 0.06, z + 0.004, 0.035, SLIDE_WHITE);
-        glowPlane(b, 1.1 - i * 0.22, 0.07, 0xd8ccff, [x + 0.2 + (1.1 - i * 0.22) / 2, y, z]);
+        glowPlane(b, 1.1 - i * 0.22, 0.07, 0xeee8ff, [x + 0.2 + (1.1 - i * 0.22) / 2, y, z]);
       }
     }),
   );
@@ -546,25 +604,25 @@ function movingHead(
 
 /** A line array of `n` cabinets hung from a bumper at y (its top), curving in at the foot. */
 function lineArray(b: ModelBuilder, x: number, y: number, z: number, n: number): void {
-  b.box(0.62, 0.05, 0.4, STEEL, { at: [x, y - 0.025, z] }, 0);
+  b.box(0.66, 0.05, 0.42, STEEL, { at: [x, y - 0.025, z] }, 0);
   let cy = y - 0.06;
   let tilt = 0;
   for (let i = 0; i < n; i++) {
-    const hh = 0.17;
-    b.box(0.58, hh, 0.38, 0x1a1b20, { at: [x, cy - hh / 2, z], rot: [tilt, 0, 0] }, 0.015);
+    const hh = 0.24;
+    b.box(0.62, hh, 0.4, 0x1e1f24, { at: [x, cy - hh / 2, z], rot: [tilt, 0, 0] }, 0.015);
     b.box(
-      0.5,
-      hh - 0.04,
+      0.54,
+      hh - 0.06,
       0.01,
-      0x30323a,
+      0x3a3c44,
       {
-        at: [x, cy - hh / 2 - Math.sin(tilt) * 0.19, z + Math.cos(tilt) * 0.19],
+        at: [x, cy - hh / 2 - Math.sin(tilt) * 0.2, z + Math.cos(tilt) * 0.2],
         rot: [tilt, 0, 0],
       },
       0,
     );
-    cy -= hh + 0.012;
-    tilt += 0.05;
+    cy -= hh + 0.014;
+    tilt += 0.06;
   }
 }
 
@@ -572,8 +630,8 @@ function lineArray(b: ModelBuilder, x: number, y: number, z: number, n: number):
  * The stage's truss rig: two box-truss towers `span` apart (centres) on
  * base plates, `h` tall, a box-truss beam across their tops reaching
  * `over` past each, par cans and moving heads hung under the beam, a moving
- * head on each tower's top, a line array hung from each end of the beam
- * outside the towers and a stack of subs at each tower's foot. The origin
+ * head on each tower's top, a line array hung off each tower on a steel
+ * arm, outside the towers, and a stack of subs at each tower's foot. The origin
  * at the middle between the towers' feet. `hot`: its lamps glow.
  */
 export function trussRig(span: number, h: number, over: number): SetPiece {
@@ -585,8 +643,19 @@ export function trussRig(span: number, h: number, over: number): SetPiece {
         b.box(0.62, 0.04, 0.62, STEEL, { at: [x, 0.02, 0] }, 0);
         trussColumn(b, x, 0, 0.04, h - 0.2);
         movingHead(b, x, h + 0.14, 0, false, 0.5);
-        // The line array off the beam's end, and the subs at the tower's foot.
-        lineArray(b, x + s * (over * 0.62), h - 0.15, 0.02, 6);
+        // The line array on a steel arm off the tower, and the subs at the tower's foot.
+        const ax = x + s * 0.62;
+        const ay = h * 0.72;
+        b.box(0.62, 0.06, 0.06, STEEL, { at: [x + s * 0.31, ay + 0.03, 0.02] }, 0);
+        b.box(
+          0.04,
+          0.3,
+          0.04,
+          STEEL,
+          { at: [x + s * 0.2, ay - 0.1, 0.02], rot: [0, 0, s * 0.8] },
+          0,
+        );
+        lineArray(b, ax, ay, 0.02, 4);
         for (let k = 0; k < 2; k++)
           b.box(0.6, 0.42, 0.5, 0x1a1b20, { at: [x + s * 0.6, 0.21 + k * 0.43, 0.05] }, 0.02);
         b.box(0.5, 0.32, 0.01, 0x2c2e36, { at: [x + s * 0.6, 0.64, 0.305] }, 0);
@@ -613,12 +682,21 @@ export function trussRig(span: number, h: number, over: number): SetPiece {
 
 // ---- Front: the stage lip and the audience ----
 
-/** Footlights: a black rail `len` long along +x, warm LEDs on it (`hot`). */
+/** The footlights' warm strip. */
+const FOOTLIGHT = 0xffb060;
+
+/**
+ * Footlights: a black rail `len` long along +x with a warm lit strip down its
+ * front and a small lamp post at its start (`hot`). Under 0.08 high.
+ */
 export function footlights(len: number): SetPiece {
   return once(`foot:${len.toFixed(2)}`, () =>
     looks([len, 0.08], 1, (b) => {
       b.box(len, 0.03, 0.06, BLACK, { at: [len / 2, 0.015, 0] }, 0);
-      for (let x = 0.12; x < len; x += 0.24) b.led(0.018, LAMP, { at: [x, 0.03, 0.025] });
+      glowBox(b, len - 0.04, 0.03, 0.01, FOOTLIGHT, [len / 2, 0.018, 0.034]);
+      glowBox(b, len - 0.04, 0.008, 0.035, FOOTLIGHT, [len / 2, 0.034, 0.012]);
+      b.box(0.07, 0.07, 0.07, BLACK, { at: [0.06, 0.035, 0] }, 0.01);
+      b.led(0.022, LAMP, { at: [0.06, 0.05, 0.036] });
     }),
   );
 }

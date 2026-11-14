@@ -163,6 +163,27 @@ describe('demoDayScene', () => {
       ).toBeGreaterThan(110);
     });
 
+    it(`keeps the Q&A ticker's top below the order cards (${name})`, () => {
+      const ticker = scene.pieces.find((p) => p.row === 'far' && p.piece.size[1] === 0.3);
+      if (!ticker) return;
+      const shown = worldPoints(ticker).map((v) => projectPoint(pose, v));
+      for (const s of shown) if (s.x < 690) expect(s.y).toBeGreaterThanOrEqual(150);
+    });
+
+    it(`runs the footlights along the whole lip and the seats out to the frame's edges (${name})`, () => {
+      const lights = scene.pieces.filter((p) => p.piece.size[1] === 0.08);
+      const xs = lights.map((p) => p.at.x);
+      // Both ends of the lip, but for a tile or two hidden under the player legend anyway.
+      expect(Math.min(...xs)).toBeLessThan(2.6);
+      expect(Math.max(...xs)).toBeGreaterThan(map.width - 1.6);
+      expect(lights.length).toBeGreaterThanOrEqual(map.width - 2);
+      const seats = scene.pieces
+        .filter((p) => p.piece === stage.seat)
+        .map((p) => projectPoint(pose, p.at).x);
+      expect(Math.min(...seats)).toBeLessThan(300);
+      expect(Math.max(...seats)).toBeGreaterThan(1240);
+    });
+
     it(`runs a cable snake to the vision mixer (${name})`, () => {
       const mixer = scene.pieces.find((p) => p.piece === stage.visionMixer);
       if (!mixer) throw new Error('no vision mixer');
@@ -206,6 +227,32 @@ describe('demoDayScene', () => {
       (p) => p.piece.size[1] === 0.16 && p.at.z > front && p.at.y > GROUND + 0.3,
     );
     expect(lip.length).toBe(1);
+  });
+
+  it('spells the LED wall in letters it has, the chart clear of the logo and LIVE DEMO', () => {
+    expect(stage.spellable('LAUNCHPAD DEMO DAY · BATCH 26', true)).toBe(true);
+    expect(stage.spellable('YOTTA', true)).toBe(true);
+    expect(stage.spellable('LIVE DEMO', true)).toBe(true);
+    expect(stage.spellable('SHIP IT LIVE')).toBe(true);
+    for (const w of [10, 11, 12]) {
+      const at = stage.slideLayout(w, 2.65);
+      expect(at.sx).toBeGreaterThan(0.6);
+      expect(at.chartL + 2.8 * at.sx).toBeLessThanOrEqual(at.dotX - 0.24);
+      expect(at.headPx).toBeGreaterThan(0.04);
+    }
+  });
+
+  it("stacks flight cases in the draft's front notch", () => {
+    const map = MAPS.draft as LevelMap;
+    const scene = demoDayScene(map);
+    const notch = scene.pieces.filter(
+      (p) =>
+        p.piece === stage.flightCase &&
+        p.at.z > map.height - 1.5 &&
+        p.at.z < map.height - 0.5 &&
+        getTile(map, Math.round(p.at.x), map.height - 1) === 'void',
+    );
+    expect(notch.length).toBeGreaterThanOrEqual(2);
   });
 
   it('dresses the void of the draft', () => {

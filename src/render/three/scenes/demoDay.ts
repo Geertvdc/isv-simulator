@@ -29,6 +29,7 @@ import {
   rollUpBanner,
   SCREEN_LIFT,
   seat,
+  slideLayout,
   spikeMark,
   streamCamera,
   swagBoxes,
@@ -77,7 +78,9 @@ const HORIZON = 0x121318;
 /** The backstage decks: black-grey painted ply. */
 const DECK = 0x363944;
 /** The hall's carpet: dark navy with a fleck. */
-const CARPET = 0x1f2230;
+const CARPET = 0x2a2838;
+/** The aisle's step lights in the carpet. */
+const AISLE_LED = 0xffc27a;
 /** The stage lip: how far it runs in front of the level, and how high (the stage's own height). */
 const APRON = 0.34;
 const APRON_H = 0.445;
@@ -100,6 +103,10 @@ const HUD: readonly (readonly [number, number, number, number])[] = [
   [1370, 0, 1440, 60],
   [600, 765, 840, 810],
 ];
+/** Where the order cards end on screen (plus a margin): the Q&A ticker shows below them. */
+const CARDS = { x: 690, y: 154 } as const;
+/** The Q&A ticker's height. */
+const TICKER_H = 0.5;
 /** The stagehand's hold: how far in front of them, how high, the case sits. */
 const CARRY = { reach: 0.34, lift: 0.55 } as const;
 /** The living props. */
@@ -180,12 +187,15 @@ export function demoDayScene(map: LevelMap): Scene {
         if (isPlay(tx, tz)) return true;
     return false;
   };
-  /** Whether a box `r` round (x, z), `high` tall, stays clear of the HUD on screen. */
-  const clear = (x: number, z: number, r: number, high: number) => {
+  /**
+   * Whether a box `r` round (x, z) (`rz` along z), from `low` up to `high`,
+   * stays clear of the HUD on screen.
+   */
+  const clear = (x: number, z: number, r: number, high: number, rz = r, low = 0) => {
     const pts = [];
     for (const dx of [-r, r])
-      for (const dz of [-r, r])
-        for (const y of [0, high])
+      for (const dz of [-rz, rz])
+        for (const y of [low, high])
           pts.push(projectPoint(pose, { x: x + dx, y: GROUND + y, z: z + dz }));
     const x0 = Math.min(...pts.map((p) => p.x)) - 2;
     const x1 = Math.max(...pts.map((p) => p.x)) + 2;
@@ -313,15 +323,8 @@ export function demoDayScene(map: LevelMap): Scene {
   hot.add(slide);
   put(slide, cx, zs, 0, 0, 'far');
   // The red dot by LIVE DEMO, on the slide.
-  put(
-    liveDot,
-    cx + sw / 2 - 1.55 - 1.55,
-    zs + 0.01,
-    0,
-    0,
-    'far',
-    SCREEN_LIFT + SCREEN_H * 0.66 - 0.1,
-  );
+  const slideAt = slideLayout(sw, SCREEN_H);
+  put(liveDot, cx + slideAt.dotX, zs + 0.01, 0, 0, 'far', SCREEN_LIFT + slideAt.liveY - 0.1);
   const span = sw + 0.7;
   const rig = trussRig(span, RIG_H, RIG_OVER);
   hot.add(rig);
@@ -333,8 +336,19 @@ export function demoDayScene(map: LevelMap): Scene {
   put(feedScreen(feedW, 1.75, 2.15), feedX, zs - 0.1, 0, 0, 'far');
   const tickR = towerL - 0.45;
   const tickL = Math.max(L - 1.5, xAt(40, zs, 1.5));
-  if (tickR - tickL > 2.5)
-    put(qaTicker(tickR - tickL, 0.5, SCREEN_LIFT), (tickL + tickR) / 2, zs + 0.02, 0, 0, 'far');
+  // Low enough that its top shows below the order cards; dropped if that would sink it behind the back wall.
+  const tickTop = (lift: number) =>
+    Math.min(
+      ...[tickL, (tickL + tickR) / 2, tickR]
+        .map((x) => projectPoint(pose, { x, y: GROUND + lift + TICKER_H + 0.06, z: zs }))
+        .filter((p) => p.x < CARDS.x)
+        .map((p) => p.y),
+      Infinity,
+    );
+  let tickLift = SCREEN_LIFT;
+  while (tickTop(tickLift) < CARDS.y && tickLift > SCREEN_LIFT - 0.35) tickLift -= 0.02;
+  if (tickR - tickL > 2.5 && tickTop(tickLift) >= CARDS.y)
+    put(qaTicker(tickR - tickL, TICKER_H, tickLift), (tickL + tickR) / 2, zs + 0.02, 0, 0, 'far');
 
   // ---- Left: the wings ----
   const wingIn = L - 0.75;
@@ -455,9 +469,15 @@ export function demoDayScene(map: LevelMap): Scene {
   if (s1 - s0 > 0.2) put(cableSnake(s1 - s0), s0, B - 0.25, 0, 0);
 
   // ---- Front: footlights and monitor wedges on the lip, the investors' front row ----
-  for (let x = 0; x < width; x++) {
-    if (clear(x, F + APRON - 0.02, 0.5, APRON_H + 0.05))
-      put(footlights(1.0), x - 0.5, F + APRON - 0.03, 0, 0, 'near', APRON_H);
+  // One warm strip along the whole lip, its side strips too, wherever the HUD allows.
+  for (let k = -1; k <= width * 2; k++) {
+    const x0 = k < 0 ? L - 0.6 : k === width * 2 ? R : L + k * 0.5;
+    const len = k < 0 || k === width * 2 ? 0.6 : 0.5;
+    if (clear(x0 + len / 2, F + APRON - 0.03, len / 2, APRON_H + 0.08, 0.05, APRON_H)) {
+      const strip = footlights(len);
+      hot.add(strip);
+      put(strip, x0, F + APRON - 0.03, 0, 0, 'near', APRON_H);
+    }
   }
   for (let x = 1; x < width - 1; x++) {
     const f = frontOf(x);
@@ -466,20 +486,94 @@ export function demoDayScene(map: LevelMap): Scene {
     putClear(monitorWedge, x, f + APRON * 0.45, 0.25, APRON_H + 0.13, 0, 0, APRON_H);
   }
   // A notch of void in the level's front is more stage: a wedge, cases, a coil of cable.
+  // A run of three or more gets a cluster: flight cases at its back end, a wedge, tape and a coil.
   const notches = [...Array(width).keys()].filter((x) => frontOf(x) < F - 0.01);
-  for (const x of notches) {
-    const z = frontOf(x) + 0.55;
-    if (unit(x, 0, 41) < 0.4) putClear(monitorWedge, x, z, 0.25, APRON_H + 0.13, 0, 0, APRON_H);
-    else if (unit(x, 0, 41) < 0.7) putClear(spikeMark, x, z, 0.2, APRON_H + 0.01, 0.2, x, APRON_H);
-    else putClear(tapeRolls, x, z, 0.2, APRON_H + 0.1, 0.3, 0, APRON_H);
+  /** A flight case on the notch's deck, if it hides no play and keeps clear of the HUD. */
+  const notchCase = (x: number, z: number, v: number, lift: number, yaw: number): number => {
+    const [w, h, d] = CASE_SIZES[v] ?? [0.6, 0.4, 0.5];
+    if (hides(x, z, lift + h, w / 2) || !clear(x, z, w / 2 + 0.06, lift + h, d / 2 + 0.06, lift))
+      return 0;
+    put(flightCase, x, z, yaw, v, 'near', lift);
+    return h;
+  };
+  for (let k = 0; k < notches.length;) {
+    let e = k;
+    while (
+      notches[e + 1] === (notches[e] ?? 0) + 1 &&
+      frontOf(notches[e + 1] ?? 0) === frontOf(notches[k] ?? 0)
+    )
+      e++;
+    const a = notches[k] ?? 0;
+    const b = notches[e] ?? 0;
+    const z = frontOf(a) + 0.55;
+    if (b - a >= 2) {
+      // Flight cases from the run's wall end in (the first spots the HUD and the play behind leave),
+      // one more on top, then tape, a coil and a wedge, all inside the run.
+      const leftEnd = a === 0 || !isVoid(a - 1, Math.round(z));
+      const dir = leftEnd ? 1 : -1;
+      const inRun = (x: number, r: number) => Math.min(b + 0.45 - r, Math.max(a - 0.45 + r, x));
+      const start = leftEnd ? a - 0.5 : b + 0.5;
+      let first = -1;
+      let h0 = 0;
+      const cases: [number, number][] = [];
+      for (let u = 0.3; cases.length < 2 && u < b - a + 0.7; u += 0.05) {
+        const x = start + dir * u;
+        for (const v of [1, 4, 2]) {
+          const [w] = CASE_SIZES[v] ?? [0.8];
+          if (x !== inRun(x, w / 2 + 0.02)) continue;
+          if (cases.some(([q, wq]) => Math.abs(q - x) < (w + wq) / 2 + 0.06)) continue;
+          const h = notchCase(x, z - 0.02, v, APRON_H, (cases.length ? -0.08 : 0.05) * dir);
+          if (h === 0) continue;
+          if (first < 0) {
+            first = x;
+            h0 = h;
+          }
+          cases.push([x, w]);
+          break;
+        }
+      }
+      if (first >= 0 && h0 > 0)
+        notchCase(first + 0.04 * dir, z - 0.04, 2, APRON_H + h0, 0.18 * dir);
+      const free = [...Array(b - a + 1).keys()]
+        .map((i) => a + i)
+        .filter((x) => !cases.some(([q, w]) => Math.abs(q - x) < w / 2 + 0.3))
+        .filter((x) => clear(x, z, 0.3, APRON_H + 0.15));
+      const [p0, p1, p2] = dir > 0 ? free : free.reverse();
+      if (p0 !== undefined)
+        putClear(monitorWedge, inRun(p0, 0.25), z, 0.25, APRON_H + 0.13, 0, 0, APRON_H);
+      if (p1 !== undefined)
+        putClear(tapeRolls, inRun(p1, 0.2), z + 0.08, 0.2, APRON_H + 0.1, 0.4, 0, APRON_H);
+      if (p2 !== undefined)
+        putClear(cableCoil, inRun(p2, 0.3), z + 0.02, 0.25, APRON_H + 0.1, 0.9, 1, APRON_H);
+    } else
+      for (let x = a; x <= b; x++) {
+        if (unit(x, 0, 41) < 0.5) putClear(monitorWedge, x, z, 0.25, APRON_H + 0.13, 0, 0, APRON_H);
+        else putClear(tapeRolls, x, z, 0.2, APRON_H + 0.1, 0.3, 0, APRON_H);
+      }
+    k = e + 1;
   }
   // The front row: black seats, every one reserved, a phone glowing here and there; an aisle where the pause hint is.
   const seatZ = lip + 0.32;
   hot.add(seat);
-  for (let x = xAt(0, seatZ) + 0.2, k = 0; x < xAt(VIEW.width, seatZ); x += 0.56, k++) {
+  // A seat that won't fit by the HUD slides up to a fifth of a seat either way, so the rows run to its edges.
+  let lastSeat = -Infinity;
+  for (let x = xAt(0, seatZ) + 0.15, k = 0; x < xAt(VIEW.width, seatZ) + 0.3; x += 0.56, k++) {
     const v = unit(k, 3, 13) < 0.22 ? 1 : unit(k, 4, 13) < 0.15 ? 2 : 0;
-    putClear(seat, x, seatZ, 0.3, 0.58, 0, v);
+    for (const dx of [0, -0.12, 0.12, -0.2]) {
+      if (x + dx - lastSeat < 0.52) continue;
+      if (putClear(seat, x + dx, seatZ, 0.25, 0.58, 0, v)) {
+        lastSeat = x + dx;
+        break;
+      }
+    }
   }
+  // Step lights in the carpet either side of the aisle under the pause hint, and out at the rows' ends.
+  const aisleZ = seatZ - 0.05;
+  for (const sx of [600, 840]) {
+    const x = xAt(sx, aisleZ);
+    patch('aisle', x - 0.05, x + 0.05, lip + 0.05, lip + 2.5);
+  }
+  patch('aisle', xAt(0, aisleZ), xAt(VIEW.width, aisleZ), lip + 0.06, lip + 0.12);
 
   // ---- Void tiles inside the outline: black stage decks with the wings' gear on them ----
   const voids: Tile[] = map.tiles.flatMap((t, i) =>
@@ -614,4 +708,22 @@ const tape: GroundPainter = (b, g) => {
   }
 };
 
-const PAINTERS: Readonly<Record<string, GroundPainter>> = { decks, apron, carpet, tape };
+/**
+ * The aisle's step lights: small warm LEDs set in the carpet, along the
+ * patch's long side every 0.4 (sparser on a long run across the hall).
+ */
+const aisle: GroundPainter = (b, g) => {
+  const w = g.x1 - g.x0;
+  const d = g.z1 - g.z0;
+  const alongZ = d > w;
+  const len = alongZ ? d : w;
+  const step = alongZ ? 0.4 : 1.6;
+  for (let u = 0.1; u < len; u += step) {
+    const at: [number, number, number] = alongZ
+      ? [(g.x0 + g.x1) / 2, 0.016, g.z0 + u]
+      : [g.x0 + u, 0.016, (g.z0 + g.z1) / 2];
+    b.box(0.06, 0.006, 0.04, AISLE_LED, { at }, 0);
+  }
+};
+
+const PAINTERS: Readonly<Record<string, GroundPainter>> = { decks, apron, carpet, tape, aisle };
