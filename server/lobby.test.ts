@@ -66,7 +66,7 @@ function everyoneReady(room: RoomState): void {
 
 describe('authoritative role setup', () => {
   it('validates role/player ids and ready booleans, and bumps incompatible protocol', () => {
-    expect(PROTOCOL_VERSION).toBe(6);
+    expect(PROTOCOL_VERSION).toBe(7);
     for (const raw of [
       { type: 'role', playerId: 1, roleId: 'wizard' },
       { type: 'role', playerId: 0, roleId: 'qa' },

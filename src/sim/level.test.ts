@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import garage from '../../maps/level-01-garage.txt?raw';
+import { FUTURE_CHARS } from './draftMap';
 import {
+  MARK_CHARS,
   type Tile,
   conveyorAt,
   getTile,
@@ -8,6 +10,8 @@ import {
   isDrop,
   isSolid,
   isWorkSurface,
+  markAt,
+  marksOf,
   parseLevelMap,
 } from './level';
 
@@ -206,5 +210,59 @@ describe('isWorkSurface', () => {
     expect(isWorkSurface('floor')).toBe(false);
     expect(isWorkSurface('wall')).toBe(false);
     expect(isWorkSurface(null)).toBe(false);
+  });
+});
+
+describe('map marks (level redesign mechanics)', () => {
+  it('parses every mark char onto its stand-in tile and lists it, row by row', () => {
+    const map = parseLevelMap('_%roLlH=Dd+QY*\n1234..........');
+    expect(map.tiles.slice(0, 14)).toEqual([
+      'floor',
+      'floor',
+      'floor',
+      'counter',
+      'floor',
+      'floor',
+      'counter',
+      'wall',
+      'counter',
+      'floor',
+      'floor',
+      'floor',
+      'floor',
+      'floor',
+    ]);
+    expect(map.marks.map((m) => m.kind)).toEqual([
+      'wet',
+      'spillZone',
+      'mopRoute',
+      'tap',
+      'lift',
+      'expressLift',
+      'chute',
+      'partition',
+      'rollingDesk',
+      'meetingDoor',
+      'turnstile',
+      'travelator',
+      'shuttleStop',
+      'revolvingDoor',
+    ]);
+    expect(markAt(map, 7, 0)).toBe('partition');
+    expect(markAt(map, 0, 1)).toBeUndefined();
+    expect(marksOf(map, 'lift')).toEqual([{ x: 4, y: 0 }]);
+  });
+
+  it('gives plain maps no marks', () => {
+    expect(parseLevelMap(garage).marks).toEqual([]);
+  });
+
+  it('stands every mark on the tile the draft tools use as its stand-in', () => {
+    for (const [char, { tile }] of Object.entries(MARK_CHARS)) {
+      const standIn = FUTURE_CHARS[char]?.standIn;
+      expect(standIn, char).toBeDefined();
+      expect(parseLevelMap(`${standIn ?? ''}1234`).tiles[0], char).toBe(tile);
+    }
+    expect(Object.keys(MARK_CHARS).sort()).toEqual(Object.keys(FUTURE_CHARS).sort());
   });
 });

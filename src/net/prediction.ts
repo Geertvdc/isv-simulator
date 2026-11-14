@@ -43,6 +43,7 @@ import {
   TICKS_PER_SECOND,
 } from '../sim/balance';
 import type { LevelMap } from '../sim/level';
+import { type LiveTiles, applyLiveTiles } from '../sim/liveTiles';
 import { pushOutOfManager } from '../sim/manager';
 import { movePlayer } from '../sim/movement';
 import type { GameEvent } from '../sim/orders';
@@ -80,6 +81,8 @@ export interface PredictionSnapshot {
   players: readonly Player[];
   managers: readonly Obstacle[];
   events: readonly GameEvent[];
+  /** The live tiles at `serverTick`: the layout players move through. */
+  liveTiles: LiveTiles;
   /**
    * The server tick the sim runs from: at or before `serverTick` while the
    * round plays, the countdown's end during the countdown, `null` while it
@@ -140,7 +143,8 @@ export function createPrediction(enabled: boolean): Prediction {
 
 /** A new round (on `level`): forgets everything but whether it's on. */
 export function resetPrediction(p: Prediction, level: LevelMap | null): void {
-  Object.assign(p, createPrediction(p.enabled), { level });
+  // A copy: reconcile puts the live tiles on it.
+  Object.assign(p, createPrediction(p.enabled), { level: level && structuredClone(level) });
 }
 
 function clonePlayer(player: Player): Player {
@@ -265,6 +269,7 @@ export function reconcile(
   const reached = p.tick;
 
   p.stats.reconciles++;
+  applyLiveTiles(p.level, snap.liveTiles);
   p.baseTick = snap.serverTick;
   p.runsFrom = snap.runsFrom;
   // Others never dash here: a shove by them is the server's call (it

@@ -7,6 +7,7 @@
 
 import { NET_SNAPSHOT_EVERY_TICKS } from '../sim/balance';
 import type { LevelMap } from '../sim/level';
+import { applyLiveTiles } from '../sim/liveTiles';
 import type { GameEvent } from '../sim/orders';
 import type { GameState } from '../sim/state';
 
@@ -40,9 +41,10 @@ export function encodeSnapshot(
   return structuredClone({ serverTick, state: rest as SnapshotState, events: [...events] });
 }
 
-/** The full game state back from a snapshot and the round's map. Deep-copies. */
+/** The full game state back from a snapshot and the round's map, with its live tiles. Deep-copies. */
 export function decodeSnapshot(snapshot: Snapshot, level: LevelMap): GameState {
-  return { ...structuredClone(snapshot.state), level: structuredClone(level) };
+  const state = structuredClone(snapshot.state);
+  return { ...state, level: applyLiveTiles(structuredClone(level), state.liveTiles) };
 }
 
 /** The server's side: the events since the last snapshot. */

@@ -46,9 +46,12 @@ export function toStandIns(text: string): string {
   );
 }
 
-/** Parses a current or draft map with the game's own parser, future chars as stand-ins. */
+/**
+ * Parses a current or draft map with the game's own parser. The future chars
+ * are marks (`LevelMap.marks`) on their stand-in tile.
+ */
 export function parseDraftMap(text: string): LevelMap {
-  return parseLevelMap(toStandIns(text));
+  return parseLevelMap(text);
 }
 
 /** File name of a draft in `maps/drafts/`: `<id>.txt`, later reorg phases `<id>.phase<N>.txt`. */

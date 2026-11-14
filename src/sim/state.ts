@@ -7,6 +7,7 @@ import { type Belt, createBelts } from './conveyor';
 import type { GridPoint, LevelMap } from './level';
 import { type Level, type LevelSettings, settingsForPlayers } from './levels';
 import { type Manager, createManagers } from './manager';
+import type { LiveTiles } from './liveTiles';
 import type { Invite } from './meetings';
 import type { GameEvent, LevelResult, Order, PendingBug } from './orders';
 import { type Pipeline, createPipelines } from './pipeline';
@@ -76,7 +77,10 @@ export interface GameState {
   rngState: RngState;
   tick: number;
   levelId: string;
+  /** The live map: mechanics change its tiles during the round (see `liveTiles.ts`). */
   level: LevelMap;
+  /** Every tile changed since the start, with its current value, by index. */
+  liveTiles: LiveTiles;
   settings: LevelSettings;
   players: Player[];
   /** Wandering managers, if the level has any. */
@@ -159,7 +163,9 @@ export function createGame(
     rngState: createRng(seed),
     tick: 0,
     levelId: level.id,
-    level: map,
+    // A copy: mechanics change the live map, never the level's own.
+    level: structuredClone(map),
+    liveTiles: {},
     settings: settingsForPlayers(level, playerIds.length),
     players,
     managers: createManagers(map),

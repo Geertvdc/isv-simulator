@@ -5,11 +5,12 @@ import { FUTURE_CHARS, countFutureChars, mapRows, parseDraftMap, toStandIns } fr
 const DRAFT = ['#I##K#', '#1_L2#', '#3=D4#', '#d+..#', '#S##T#', ''].join('\n');
 
 describe('future map chars', () => {
-  it('are not game chars yet, and stand in for game chars', () => {
+  it('are game chars that play as their stand-in tile', () => {
     for (const [char, { standIn }] of Object.entries(FUTURE_CHARS)) {
       const spawns = '1234';
-      expect(() => parseLevelMap(`#${char}${spawns}#`)).toThrow(/Unknown map char/);
-      expect(() => parseLevelMap(`#${standIn}${spawns}#`)).not.toThrow();
+      expect(parseLevelMap(`#${char}${spawns}#`).tiles[1], char).toBe(
+        parseLevelMap(`#${standIn}${spawns}#`).tiles[1],
+      );
     }
   });
 
