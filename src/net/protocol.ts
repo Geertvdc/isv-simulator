@@ -23,7 +23,7 @@ import type { RosterCommand } from '../flow/roster';
 export const GAME_ROOM = 'game';
 
 /** Bumped on every incompatible change; the server refuses other versions. */
-export const PROTOCOL_VERSION = 6;
+export const PROTOCOL_VERSION = 7;
 
 // ---------------------------------------------------------------- client → server
 

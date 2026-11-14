@@ -49,7 +49,66 @@ export interface LevelMap {
   meetingTiles: GridPoint[];
   /** Every conveyor tile and the grid direction it carries tickets, row by row. */
   conveyors: Conveyor[];
+  /**
+   * Tiles with a level-redesign mechanic on them, row by row. The tile under a
+   * mark is what it plays as until its mechanic runs: floor for the walkable
+   * ones, a counter for the tap, chute and rolling desk, a wall for a partition.
+   */
+  marks: MapMark[];
 }
+
+/** Mechanics that sit on a tile, each with its own map char. */
+export type MarkKind =
+  /** `_` wet floor: slippery (spills). */
+  | 'wet'
+  /** `%` dry floor a leaky tap floods (spills). */
+  | 'spillZone'
+  /** `r` the mop robot's loop (spills). */
+  | 'mopRoute'
+  /** `o` leaky tap: solid, fixed with work (spills). */
+  | 'tap'
+  /** `L` lift cabin (lifts). */
+  | 'lift'
+  /** `l` express lift cabin (lifts). */
+  | 'expressLift'
+  /** `H` mail chute hatch: tickets drop from the top one to the bottom one (lifts). */
+  | 'chute'
+  /** `=` partition: a wall that a reorg can open (reorgs). */
+  | 'partition'
+  /** `D` rolling desk: a counter a reorg can roll away (reorgs). */
+  | 'rollingDesk'
+  /** `d` meeting door: shut to others while a meeting is in session. */
+  | 'meetingDoor'
+  /** `+` badge turnstile: one way for people. */
+  | 'turnstile'
+  /** `Q` travelator: moving floor (campus). */
+  | 'travelator'
+  /** `Y` shuttle stop (campus). */
+  | 'shuttleStop'
+  /** `*` revolving door: one person at a time (campus). */
+  | 'revolvingDoor';
+
+export interface MapMark extends GridPoint {
+  kind: MarkKind;
+}
+
+/** Map chars for marks, and the tile each one stands on. */
+export const MARK_CHARS: Readonly<Record<string, { kind: MarkKind; tile: Tile }>> = {
+  _: { kind: 'wet', tile: 'floor' },
+  '%': { kind: 'spillZone', tile: 'floor' },
+  r: { kind: 'mopRoute', tile: 'floor' },
+  o: { kind: 'tap', tile: 'counter' },
+  L: { kind: 'lift', tile: 'floor' },
+  l: { kind: 'expressLift', tile: 'floor' },
+  H: { kind: 'chute', tile: 'counter' },
+  '=': { kind: 'partition', tile: 'wall' },
+  D: { kind: 'rollingDesk', tile: 'counter' },
+  d: { kind: 'meetingDoor', tile: 'floor' },
+  '+': { kind: 'turnstile', tile: 'floor' },
+  Q: { kind: 'travelator', tile: 'floor' },
+  Y: { kind: 'shuttleStop', tile: 'floor' },
+  '*': { kind: 'revolvingDoor', tile: 'floor' },
+};
 
 export interface Conveyor {
   x: number;
@@ -129,6 +188,7 @@ export function parseLevelMap(text: string): LevelMap {
     meetingTiles: [],
   };
   const conveyors: Conveyor[] = [];
+  const marks: MapMark[] = [];
   lines.forEach((line, y) => {
     if (line.length !== width) {
       throw new Error(`Map line ${y + 1} has length ${line.length}, expected ${width}`);
@@ -147,6 +207,12 @@ export function parseLevelMap(text: string): LevelMap {
       if (mark) {
         marked[mark].push({ x, y });
         tiles.push('floor');
+        continue;
+      }
+      const mapMark = MARK_CHARS[char];
+      if (mapMark) {
+        marks.push({ x, y, kind: mapMark.kind });
+        tiles.push(mapMark.tile);
         continue;
       }
       const dir = CONVEYOR_DIRS[char];
@@ -180,7 +246,7 @@ export function parseLevelMap(text: string): LevelMap {
     result.push(spawn);
   }
 
-  return { width, height: lines.length, tiles, spawns: result, ...marked, conveyors };
+  return { width, height: lines.length, tiles, spawns: result, ...marked, conveyors, marks };
 }
 
 /** Returns the tile at (x, y), or `null` when out of bounds or not on the grid. */
@@ -208,6 +274,16 @@ export function isBlock(tile: Tile | null): tile is BlockTile {
 /** Tiles a ticket falls into when it comes down there: the void outside and gaps. */
 export function isDrop(tile: Tile | null): boolean {
   return tile === 'void' || tile === 'gap';
+}
+
+/** The marks of `kind` on the map, row by row. */
+export function marksOf(map: LevelMap, kind: MarkKind): GridPoint[] {
+  return map.marks.filter((m) => m.kind === kind).map(({ x, y }) => ({ x, y }));
+}
+
+/** The mark on tile (x, y), if there is one. */
+export function markAt(map: LevelMap, x: number, y: number): MarkKind | undefined {
+  return map.marks.find((m) => m.x === x && m.y === y)?.kind;
 }
 
 /** The conveyor on tile (x, y), if there is one. */

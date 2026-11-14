@@ -18,6 +18,7 @@ import {
   type Vec,
   createGame,
 } from '../sim/state';
+import { setLiveTile } from '../sim/liveTiles';
 import { tick } from '../sim/tick';
 import { type InputBuffer, createInputBuffer, pushInput, takeInput } from './inputBuffer';
 import {
@@ -75,6 +76,7 @@ function snapshotOf(
     players: structuredClone(state.players),
     managers: structuredClone(state.managers),
     events,
+    liveTiles: structuredClone(state.liveTiles),
     runsFrom,
   };
 }
@@ -518,5 +520,27 @@ describe('countdownEndTick', () => {
       expect(end * (1000 / TICKS_PER_SECOND) - start).toBeGreaterThanOrEqual(total);
       expect((end - 1) * (1000 / TICKS_PER_SECOND) - start).toBeLessThan(total);
     }
+  });
+});
+
+describe('live tiles', () => {
+  it("moves through the snapshot's live layout: a tile that turned solid blocks", () => {
+    const state = newGame([1]);
+    const player = state.players[0];
+    if (!player) throw new Error('no player');
+    const x = Math.round(player.pos.x) + 1;
+    const y = Math.round(player.pos.y);
+    setLiveTile(state, x, y, 'wall');
+    const p = createPrediction(true);
+    resetPrediction(p, GARAGE.map);
+    reconcile(p, snapshotOf(state, 0), [1]);
+    const right = { playerId: 1, interact: false, work: false, dash: false, move: { x: 1, y: 0 } };
+    recordInputs(
+      p,
+      Array.from({ length: 60 }, (_, t) => ({ ...right, tick: t })),
+    );
+    advancePrediction(p, 60);
+    expect(predictedPlayer(p, 1, 1)?.pos.x).toBeLessThan(x - 0.5);
+    expect(GARAGE.map.tiles[y * GARAGE.map.width + x]).toBe('floor');
   });
 });
