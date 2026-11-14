@@ -139,6 +139,8 @@ export const FLOOR_COLORS: Readonly<Record<FloorTheme, readonly [number, number]
   stageDeck: [0x55575f, 0x666872],
   // A server room's grey raised-floor tiles; the second is the joints between the tiles.
   raisedFloor: [0x868b90, 0x969a9f],
+  // A rented floor's new carpet tiles, cool blue-grey; the second is the tiles laid the other way.
+  corporateCarpet: [0x8a929c, 0x848c96],
 };
 
 /** Wall colors per theme: face and top. Caps stay darker than stations, so the eye goes to the stations. */
@@ -158,6 +160,8 @@ export const WALL_COLORS: Readonly<Record<WallTheme, { face: number; top: number
   stageSet: { face: 0x3a3b42, top: 0x3e3f43 },
   // Painted concrete block, muted grey-green, capped with cool cast-concrete coping.
   basement: { face: 0x6f7d74, top: 0x666b70 },
+  // Light grey plasterboard under glass partitions, capped with a slim cool aluminium head track.
+  midRise: { face: 0xc9ccce, top: 0x7a8088 },
 };
 
 /** Marks the room's warm lamps, which only `medium` and `high` quality light (see `Stage`). */
