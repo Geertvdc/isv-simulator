@@ -8,13 +8,20 @@ import {
   AMBIENT_KEY,
   type Atmosphere,
   DEFAULT_ATMOSPHERE,
+  type FlakeSeed,
   type MoteSeed,
+  accentSpots,
+  blinkOn,
   glintSpots,
   moteSeeds,
   sceneOf,
+  snowSeeds,
+  stutterIndex,
+  stutterLevel,
 } from './atmosphere';
 import { blockHeight, facingYaw, heroPlacement, stationFacing } from './layout';
-import { LAMP_INDEX_KEY, LAMP_KEY } from './look';
+import { ACCENT_INDEX_KEY, LAMP_INDEX_KEY, LAMP_KEY } from './look';
+import { lightWellsFor } from './lightWells';
 import { loftRoom } from './rooms/loftRoom';
 import { SCENES } from './scenes';
 import { GROUND, type Scene, type ScenePiece } from './scenes/types';
@@ -221,6 +228,24 @@ export class WorldFx {
     seconds: number;
     group: THREE.Group;
   } | null = null;
+  /** Accent lights that blink (`Atmosphere.accents`), with their halos. */
+  private accents: {
+    light: THREE.PointLight | null;
+    base: number;
+    blink: number;
+    halo: THREE.Sprite | null;
+    haloOpacity: number;
+  }[] = [];
+  private accentGroup: THREE.Group | null = null;
+  /** The tired tube (`Atmosphere.lamps.stutter`). */
+  private stutter: {
+    light: THREE.PointLight;
+    base: number;
+    depth: number;
+    seconds: number;
+  } | null = null;
+  /** Snow falling in the light wells (`Atmosphere.snow`). */
+  private snow: { points: THREE.Points; seeds: FlakeSeed[]; fall: number } | null = null;
   private shake = { untilMs: 0, intensity: 0 };
   shakeEnabled = true;
 
@@ -259,6 +284,7 @@ export class WorldFx {
     this.buildFixtures(atmosphere);
     this.buildLampGlow(world, atmosphere);
     this.buildSweep(atmosphere);
+    this.buildNight(world, atmosphere);
     this.rug = new THREE.MeshBasicMaterial({
       color: RUG_COLOR,
       transparent: true,
@@ -312,6 +338,7 @@ export class WorldFx {
     this.turnBeacon(timeMs);
     this.runChase(timeMs);
     this.runSweep(timeMs);
+    this.runNight(timeMs);
     for (let i = this.puffs.length - 1; i >= 0; i--) {
       const puff = this.puffs[i];
       if (!puff) continue;
@@ -574,6 +601,153 @@ export class WorldFx {
     });
     this.sweep = { beams, degrees: spec.degrees, seconds: spec.seconds, group };
     this.runSweep(0);
+  }
+
+  /**
+   * A basement at night (`Atmosphere.accents`, `lamps.stutter`, `snow`,
+   * `shafts`): halos on the accent lights and their blinking, the tired
+   * tube, snow falling in the light wells and street light down them, all
+   * under one group that `Stage` hides on `low`.
+   */
+  private buildNight(world: THREE.Scene, atmosphere: Atmosphere): void {
+    const lights: THREE.PointLight[] = [];
+    world.traverse((obj) => {
+      if (obj instanceof THREE.PointLight) lights.push(obj);
+    });
+    const group = new THREE.Group();
+    group.userData[AMBIENT_KEY] = true;
+    const wells =
+      atmosphere.snow || atmosphere.shafts || atmosphere.accents
+        ? lightWellsFor(atmosphere, this.map)
+        : [];
+    const spots = accentSpots(atmosphere, this.map, wells);
+    const texture = spots.some((s) => s.accent.halo) ? haloTexture() : null;
+    // The light wells' lights: only here do the scene's wells come in (see `lightWellsFor`).
+    for (const { at, accent } of spots) {
+      if (accent.anchor !== 'wells') continue;
+      const light = new THREE.PointLight(accent.color, accent.intensity, accent.distance, 2);
+      putAt(light, at);
+      light.userData[LAMP_KEY] = true;
+      this.root.add(light);
+    }
+    spots.forEach(({ at, accent, index }, k) => {
+      if (accent.anchor === 'wells' || (!accent.halo && !accent.blink)) return;
+      // The light made for this spot: the k-th of its accent's lights, in order.
+      const mine = spots.slice(0, k).filter((s) => s.index === index).length;
+      const light = lights.filter((l) => l.userData[ACCENT_INDEX_KEY] === index)[mine] ?? null;
+      let halo: THREE.Sprite | null = null;
+      if (accent.halo && texture) {
+        halo = new THREE.Sprite(
+          new THREE.SpriteMaterial({
+            map: texture,
+            color: new THREE.Color(accent.color).multiplyScalar(2),
+            transparent: true,
+            opacity: accent.halo.opacity,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            toneMapped: false,
+            fog: false,
+          }),
+        );
+        putAt(halo, at);
+        halo.scale.setScalar(accent.halo.size);
+        group.add(halo);
+      }
+      this.accents.push({
+        light,
+        base: light?.intensity ?? 0,
+        blink: accent.blink ?? 0,
+        halo,
+        haloOpacity: accent.halo?.opacity ?? 0,
+      });
+    });
+    const stutter = atmosphere.lamps?.stutter;
+    const row = lights.filter((l) => typeof l.userData[LAMP_INDEX_KEY] === 'number');
+    const tired = stutterIndex(atmosphere, row.length);
+    const tube = row.find((l) => l.userData[LAMP_INDEX_KEY] === tired);
+    if (stutter && tube)
+      this.stutter = {
+        light: tube,
+        base: tube.intensity,
+        depth: stutter.depth,
+        seconds: stutter.seconds,
+      };
+    const snow = atmosphere.snow;
+    const flakes = snowSeeds(atmosphere, this.map, wells);
+    if (snow && flakes.length > 0) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        'position',
+        new THREE.BufferAttribute(new Float32Array(flakes.length * 3), 3),
+      );
+      const points = new THREE.Points(
+        geometry,
+        new THREE.PointsMaterial({
+          color: snow.color,
+          size: snow.size,
+          transparent: true,
+          opacity: snow.opacity,
+          depthWrite: false,
+          fog: false,
+        }),
+      );
+      points.frustumCulled = false;
+      group.add(points);
+      this.snow = { points, seeds: flakes, fall: snow.fall };
+    }
+    const shafts = atmosphere.shafts;
+    if (shafts) {
+      const geometry = shaftGeometry(shafts.length, shafts.radius);
+      const material = new THREE.MeshBasicMaterial({
+        color: shafts.color,
+        vertexColors: true,
+        transparent: true,
+        opacity: shafts.opacity,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        fog: false,
+      });
+      for (const well of wells) {
+        const beam = new THREE.Mesh(geometry, material);
+        // From the street's grating over the well down past its sill.
+        beam.position.set(well.at.x, well.at.y + shafts.length / 2 - well.h / 2, well.at.z);
+        beam.rotation.x = -shafts.lean;
+        group.add(beam);
+      }
+    }
+    if (group.children.length === 0 && this.accents.length === 0 && !this.stutter) return;
+    this.root.add(group);
+    this.accentGroup = group;
+    this.runNight(0);
+  }
+
+  /** The beacon blinks, the tired tube stutters, the snow falls. */
+  private runNight(timeMs: number): void {
+    const group = this.accentGroup;
+    if (!group?.visible) return;
+    for (const a of this.accents) {
+      const on = blinkOn(timeMs, a.blink);
+      if (a.light) a.light.intensity = on ? a.base : 0;
+      if (a.halo) a.halo.material.opacity = on ? a.haloOpacity : 0;
+    }
+    const s = this.stutter;
+    if (s) s.light.intensity = s.base * stutterLevel(timeMs, s.seconds, s.depth);
+    const snow = this.snow;
+    if (snow) {
+      const position = snow.points.geometry.getAttribute('position') as THREE.BufferAttribute;
+      const t = timeMs / 1000;
+      snow.seeds.forEach(({ at, drop, phase }, i) => {
+        const k = (phase + (t * snow.fall) / drop) % 1;
+        position.setXYZ(
+          i,
+          at.x + Math.sin(t * 0.9 + phase * 17) * 0.05,
+          at.y - k * drop,
+          at.z + Math.cos(t * 0.7 + phase * 11) * 0.03,
+        );
+      });
+      position.needsUpdate = true;
+    }
   }
 
   /** The beams swing side to side, neighbours in mirror. */
@@ -894,6 +1068,28 @@ function sweepBeamGeometry(length: number, radius: number): THREE.BufferGeometry
   const colors: number[] = [];
   for (let i = 0; i < position.count; i++) {
     const k = (1 - Math.min(1, Math.max(0, -position.getY(i) / length))) ** 1.5;
+    colors.push(k, k, k);
+  }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  return g;
+}
+
+/**
+ * A light well's shaft of street light: a flattened open column `length`
+ * tall about its middle, a little narrower at the top, faint at both ends
+ * and brightest just under the middle.
+ */
+function shaftGeometry(length: number, radius: number): THREE.BufferGeometry {
+  const g = new THREE.CylinderGeometry(radius * 0.75, radius, length, 16, 8, true).scale(
+    1,
+    1,
+    0.35,
+  );
+  const position = g.getAttribute('position');
+  const colors: number[] = [];
+  for (let i = 0; i < position.count; i++) {
+    const v = 0.5 - position.getY(i) / length;
+    const k = Math.sin(Math.PI * Math.min(1, Math.max(0, v))) ** 1.5;
     colors.push(k, k, k);
   }
   g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));

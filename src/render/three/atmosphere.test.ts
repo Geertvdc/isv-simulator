@@ -1,25 +1,41 @@
 import { describe, expect, it } from 'vitest';
 import { getTile, isSolid } from '../../sim/level';
 import { parseDraftMap } from '../../sim/draftMap';
-import { DEMO_DAY, DOWN_THE_HALL, GARAGE, LEVELS, OPEN_PLAN, SEED_ROUND } from '../../sim/levels';
+import {
+  DEMO_DAY,
+  DOWN_THE_HALL,
+  GARAGE,
+  LEVELS,
+  ON_CALL,
+  OPEN_PLAN,
+  SEED_ROUND,
+} from '../../sim/levels';
 import draftText from '../../../maps/drafts/garage.txt?raw';
 import openPlanDraft from '../../../maps/drafts/open-plan.txt?raw';
 import scaleUpDraft from '../../../maps/drafts/scale-up.txt?raw';
 import seedRoundDraft from '../../../maps/drafts/seed-round.txt?raw';
 import demoDayDraft from '../../../maps/drafts/demo-day.txt?raw';
+import onCallDraft from '../../../maps/drafts/on-call.txt?raw';
 import { LEVEL_LOOKS } from '../mapLook';
 import { fitCamera3d, gridToWorld, projectPoint } from '../projection';
 import {
   ATMOSPHERES,
   DEFAULT_ATMOSPHERE,
+  LIGHT_WELL,
+  accentSpots,
   atmosphereFor,
+  blinkOn,
   cssRgba,
   fogRange,
   glintSpots,
   lampColor,
   lampSpots,
   moteSeeds,
+  lightWellSpots,
   sideLightSpots,
+  snowSeeds,
+  stutterIndex,
+  stutterLevel,
   sunPlacement,
   washPlacement,
 } from './atmosphere';
@@ -58,7 +74,14 @@ describe('atmosphereFor', () => {
   });
 
   it('leaves every other level on the default', () => {
-    const lit = new Set([GARAGE.id, 'open-plan', 'scale-up', SEED_ROUND.id, DEMO_DAY.id]);
+    const lit = new Set([
+      GARAGE.id,
+      'open-plan',
+      'scale-up',
+      SEED_ROUND.id,
+      DEMO_DAY.id,
+      ON_CALL.id,
+    ]);
     for (const level of LEVELS) {
       if (lit.has(level.id)) continue;
       expect(atmosphereFor(LEVEL_LOOKS[level.id]?.scene)).toBe(DEFAULT_ATMOSPHERE);
@@ -251,10 +274,10 @@ describe('stage lighting', () => {
 describe('the stage wash and the side lights', () => {
   const a = atmosphereFor('demo-day');
 
-  it('leaves every other level without a wash, side lights or an occlusion override', () => {
+  it('leaves every other level without a wash (but the basement work light), side lights or an occlusion override', () => {
     for (const [id, other] of Object.entries(ATMOSPHERES)) {
       if (id === 'demo-day') continue;
-      expect(washPlacement(other, SHIPPED), id).toBeNull();
+      if (id !== 'on-call') expect(washPlacement(other, SHIPPED), id).toBeNull();
       expect(sideLightSpots(other, SHIPPED), id).toEqual([]);
       expect(other.occlusion, id).toBeUndefined();
     }
@@ -264,7 +287,7 @@ describe('the stage wash and the side lights', () => {
 
   it('gives only the stage a brighter sky on low, where its working lights are off', () => {
     for (const [id, other] of Object.entries(ATMOSPHERES))
-      expect(other.lowSky !== undefined, id).toBe(id === 'demo-day');
+      expect(other.lowSky !== undefined, id).toBe(id === 'demo-day' || id === 'on-call');
     expect(DEFAULT_ATMOSPHERE.lowSky).toBeUndefined();
     expect(a.lowSky).toBeGreaterThan(a.sky.intensity);
   });
@@ -315,6 +338,152 @@ describe('the stage wash and the side lights', () => {
         expect(color).toBe(left ? a.sides?.left : a.sides?.right);
       }
     }
+  });
+});
+
+describe('the night shift (on-call)', () => {
+  const a = atmosphereFor('on-call');
+  const maps = { shipped: ON_CALL.map, draft: parseDraftMap(onCallDraft) };
+  const rgb = (c: number) => [(c >> 16) & 255, (c >> 8) & 255, c & 255] as const;
+
+  it('gives on-call its own light', () => {
+    expect(atmosphereFor(LEVEL_LOOKS[ON_CALL.id]?.scene)).toBe(ATMOSPHERES['on-call']);
+    expect(a).not.toBe(DEFAULT_ATMOSPHERE);
+  });
+
+  it('keys the room from the front and high, at least 45° up, so the back row stays lit', () => {
+    for (const [name, map] of Object.entries(maps)) {
+      const { position, target } = sunPlacement(a, map);
+      const flat = Math.hypot(position.x - target.x, position.z - target.z);
+      expect(position.z, name).toBeGreaterThan(target.z);
+      expect(Math.atan2(position.y - target.y, flat), name).toBeGreaterThan(Math.PI / 4);
+    }
+  });
+
+  it('keeps the key near-white and the fill only slightly cool, so yellow benches stay yellow', () => {
+    for (const c of [a.sun.color, a.fill.color]) {
+      const [r, g, b] = rgb(c);
+      expect(b - r).toBeGreaterThanOrEqual(0);
+      expect(b - r).toBeLessThan(24);
+      expect(Math.min(r, g, b)).toBeGreaterThan(220);
+    }
+  });
+
+  it('keeps the basement round the room a dark grey-blue, not menu navy', () => {
+    for (const c of [a.backdrop?.inner ?? 0, a.backdrop?.outer ?? 0, a.fog?.color ?? 0]) {
+      const [r, , b] = rgb(c);
+      expect(b).toBeGreaterThanOrEqual(r);
+      // Grey-blue: blue only a little over red, never a saturated navy.
+      expect(b - r).toBeLessThan(24);
+    }
+    expect(a.vignette?.opacity).toBeCloseTo(0.35);
+    expect(a.vignette?.inner).toBeCloseTo(0.7);
+  });
+
+  it('hangs the fluorescent tubes along the back wall only, on both maps', () => {
+    for (const [name, map] of Object.entries(maps)) {
+      const spots = lampSpots(a, map);
+      expect(spots.length, name).toBeGreaterThanOrEqual(3);
+      for (const s of spots) {
+        expect(s.z, name).toBeLessThan(1.5);
+        expect(s.y, name).toBeGreaterThan(1.9);
+        expect(s.x, name).toBeGreaterThan(0);
+        expect(s.x, name).toBeLessThan(map.width - 1);
+      }
+    }
+  });
+
+  it('has one tired tube, the last, that stutters briefly and is steady in between', () => {
+    expect(stutterIndex(a, 4)).toBe(3);
+    expect(stutterIndex(DEFAULT_ATMOSPHERE, 4)).toBeNull();
+    const seconds = a.lamps?.stutter?.seconds ?? 0;
+    const depth = a.lamps?.stutter?.depth ?? 0;
+    const levels = Array.from({ length: seconds * 100 }, (_, i) =>
+      stutterLevel(i * 10, seconds, depth),
+    );
+    const out = levels.filter((l) => l < 1).length / levels.length;
+    expect(out).toBeGreaterThan(0);
+    expect(out).toBeLessThan(0.05);
+    expect(Math.min(...levels)).toBeCloseTo(1 - depth);
+    expect(stutterLevel(1234, seconds, depth)).toBe(
+      stutterLevel(1234 + seconds * 1000, seconds, depth),
+    );
+  });
+
+  it('blinks the pager beacon over the inbox, at the inbox on both maps', () => {
+    for (const [name, map] of Object.entries(maps)) {
+      const beacons = accentSpots(a, map).filter((s) => s.accent.anchor === 'inbox');
+      expect(beacons, name).toHaveLength(1);
+      const at = beacons[0]?.at ?? { x: -9, y: 0, z: -9 };
+      const inbox = map.tiles
+        .map((t, i) => ({ t, x: i % map.width, y: Math.floor(i / map.width) }))
+        .filter((c) => c.t === 'inbox');
+      const mx = inbox.reduce((s, c) => s + c.x, 0) / inbox.length;
+      const my = inbox.reduce((s, c) => s + c.y, 0) / inbox.length;
+      expect(Math.hypot(at.x - mx, at.z - my), name).toBeLessThan(1.1);
+      expect(at.y, name).toBeGreaterThan(1.15);
+      expect(beacons[0]?.accent.blink, name).toBeGreaterThan(0);
+    }
+    expect(blinkOn(100, 1)).toBe(true);
+    expect(blinkOn(600, 1)).toBe(false);
+    expect(blinkOn(600, 0)).toBe(true);
+  });
+
+  it('puts the boiler off the left edge, the racks among the inner walls, street light in the wells', () => {
+    for (const [name, map] of Object.entries(maps)) {
+      const spots = accentSpots(a, map);
+      const boiler = spots.find((s) => s.accent.anchor === 'left');
+      expect(boiler?.at.x, name).toBeLessThan(-1);
+      const racks = spots.find((s) => s.accent.anchor === 'core');
+      expect(racks, name).toBeDefined();
+      const r = racks?.at ?? { x: 0, z: 0 };
+      expect(r.x, name).toBeGreaterThan(map.width * 0.25);
+      expect(r.x, name).toBeLessThan(map.width * 0.75);
+      expect(r.z, name).toBeGreaterThan(map.height * 0.2);
+      expect(r.z, name).toBeLessThan(map.height * 0.8);
+      const wells = spots.filter((s) => s.accent.anchor === 'wells');
+      expect(wells.length, name).toBe(lightWellSpots(map).length);
+      for (const s of spots) expect(s.accent.color, name).toBeGreaterThan(0);
+    }
+  });
+
+  it('opens two or three light wells behind the back wall, over the wall tops', () => {
+    for (const [name, map] of Object.entries(maps)) {
+      const wells = lightWellSpots(map);
+      expect(wells.length, name).toBeGreaterThanOrEqual(2);
+      expect(wells.length, name).toBeLessThanOrEqual(3);
+      for (const w of wells) {
+        expect(w.at.z, name).toBeLessThan(-0.5);
+        expect(w.at.y - LIGHT_WELL.tall / 2, name).toBeGreaterThan(1.15);
+        expect(w.at.x, name).toBeGreaterThan(-0.5);
+        expect(w.at.x, name).toBeLessThan(map.width - 0.5);
+      }
+    }
+  });
+
+  it('pools the work light on the room: a wash from the front, as wide as the map', () => {
+    const wash = washPlacement(a, SHIPPED);
+    expect(wash).not.toBeNull();
+    expect(wash?.position.z).toBeGreaterThan(wash?.target.z ?? 0);
+    expect(a.wash?.intensity).toBeLessThan(a.sun.intensity);
+  });
+
+  it('lets the same snow fall in the light wells every time, never over the room', () => {
+    for (const [name, map] of Object.entries(maps)) {
+      const seeds = snowSeeds(a, map);
+      expect(seeds, name).toEqual(snowSeeds(a, map));
+      expect(seeds.length, name).toBe((a.snow?.perWell ?? 0) * lightWellSpots(map).length);
+      for (const s of seeds) {
+        expect(s.at.z, name).toBeLessThan(-0.5);
+        expect(s.at.y - s.drop, name).toBeGreaterThan(1.15);
+        expect(s.phase).toBeGreaterThanOrEqual(0);
+        expect(s.phase).toBeLessThan(1);
+      }
+      const phases = new Set(seeds.map((s) => s.phase.toFixed(3)));
+      expect(phases.size, name).toBeGreaterThan(seeds.length * 0.8);
+    }
+    expect(snowSeeds(DEFAULT_ATMOSPHERE, SHIPPED)).toEqual([]);
+    expect(accentSpots(DEFAULT_ATMOSPHERE, SHIPPED)).toEqual([]);
   });
 });
 
