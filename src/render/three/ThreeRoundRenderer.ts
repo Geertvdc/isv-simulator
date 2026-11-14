@@ -21,6 +21,7 @@ import {
 } from '../projection';
 import type { RoundFrame, RoundRenderer } from '../RoundRenderer';
 import { OVERLAY_SCALE, Overlays, POPUP_HEIGHT, type ScreenPoint, overlayScale } from './Overlays';
+import { Mechanics } from './Mechanics';
 import { People } from './People';
 import { Surroundings } from './surroundings';
 import { WorldFx } from './WorldFx';
@@ -53,6 +54,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
   private readonly overlays: Overlays;
   private readonly fx: WorldFx;
   private readonly people: People;
+  private readonly mechanics: Mechanics;
   private readonly surroundings: Surroundings;
   private readonly mapView: MapView;
   private readonly atmosphere: Atmosphere;
@@ -91,6 +93,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
     this.overlays = new Overlays(scene, map);
     this.fx = new WorldFx(this.world, map, this.atmosphere);
     this.people = new People(this.world, this.materials);
+    this.mechanics = new Mechanics(this.world, map);
     this.surroundings = new Surroundings(map, look.setting, look.scene);
     this.world.add(this.surroundings.root);
 
@@ -101,6 +104,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
   destroy(): void {
     this.scene.scale.off(Phaser.Scale.Events.RESIZE, this.onResize);
     this.people.destroy();
+    this.mechanics.destroy();
     this.surroundings.destroy();
     for (const geometry of Object.values(this.shared)) geometry.dispose();
     for (const geometry of this.ticketGeometries.values()) geometry.dispose();
@@ -145,6 +149,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
     for (const id of seenPlayers) this.updateTarget(id, targetTile(state, id));
     this.dropMissing(this.targets, seenPlayers);
     this.fx.sync(state, timeMs);
+    this.mechanics.sync(view, timeMs);
 
     for (const effect of effectsFor(state, events)) {
       switch (effect.kind) {

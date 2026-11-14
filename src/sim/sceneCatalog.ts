@@ -391,6 +391,23 @@ export const SCENES: readonly Scene[] = [
       state.tickets.some((t) => t.location.kind === 'flying' && t.location.pos.x > 12),
   },
   {
+    // Spills: the tap leaks and floods its zone, the mop robot drives its loop, a player slides.
+    id: 'spills',
+    levelId: 'lab-spills',
+    players: 2,
+    setup(state) {
+      const tap = state.taps[0];
+      if (tap) tap.nextLeakTick = 0;
+      stand(state, 1, { x: 3, y: 3 }, { x: 1, y: 0 });
+      stand(state, 2, { x: 6, y: 2 }, { x: 1, y: 0 });
+    },
+    input: (state) => [
+      command(state, 1, { move: { x: 1, y: 0 } }),
+      command(state, 2, { work: state.tick > 200 }),
+    ],
+    ticks: 260,
+  },
+  {
     // The conveyor bridge carries tickets across the atrium to the test side.
     id: 'conveyor',
     levelId: 'lab-shapes',

@@ -92,6 +92,7 @@ export const LEVEL_LOOKS: Readonly<Record<string, MapLook>> = {
   'lab-shapes': { walls: 'glass', floor: 'carpet', setting: 'scale-up' },
   'lab-dev': { walls: 'wood', floor: 'parquet', setting: 'startup' },
   'lab-roles': { walls: 'glass', floor: 'carpet', setting: 'scale-up' },
+  'lab-spills': { walls: 'plaster', floor: 'concrete', setting: 'startup' },
 };
 
 /** Signature color per block, shared by the HUD recipes, ticket step icons and intro pictures. */

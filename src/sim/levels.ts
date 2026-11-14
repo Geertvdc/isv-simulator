@@ -20,6 +20,7 @@ import monorepoMap from '../../maps/level-15-monorepo.txt?raw';
 import hackathonMap from '../../maps/level-16-hackathon.txt?raw';
 import labShapesMap from '../../maps/lab-shapes.txt?raw';
 import labDevMap from '../../maps/lab-dev.txt?raw';
+import labSpillsMap from '../../maps/lab-spills.txt?raw';
 import {
   CHAPTER_STAR_GATES,
   MAX_OPEN_ORDERS,
@@ -412,6 +413,12 @@ export function levelById(id: string): Level | undefined {
 export const LAB_LEVELS: readonly Level[] = [
   // An L-shaped office split by an atrium gap, with a conveyor bridge across it.
   level('lab-shapes', labShapesMap, GARAGE_SETTINGS),
+  // Spills: wet floor, a leaky tap with its spill zone and the mop robot's loop.
+  level('lab-spills', labSpillsMap, {
+    ...GARAGE_SETTINGS,
+    spills: { firstLeakTick: 10 * SECOND, everyTicks: 20 * SECOND },
+    mopRobot: { clockwise: true },
+  }),
   // Whiteboards, a merge station between counters, keyboards for pairing.
   level('lab-dev', labDevMap, {
     ...GARAGE_SETTINGS,
