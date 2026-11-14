@@ -13,6 +13,7 @@ import { movePlayer } from './movement';
 import { expireOrders, updateLevelTimer, updateOrders } from './orders';
 import { updatePipelines } from './pipeline';
 import { separatePlayers } from './push';
+import { updateSpills, wetCheck } from './spills';
 import { updateFlights, updateThrowCharge } from './throw';
 import type { GameState, InputCommand } from './state';
 
@@ -28,9 +29,10 @@ export function tick(state: GameState, inputs: readonly InputCommand[]): void {
   state.workFeedback = [];
   if (state.result) return;
 
+  const isWet = wetCheck(state);
   for (const player of state.players) {
     const input = inputs.find((i) => i.playerId === player.id);
-    if (movePlayer(state.level, player, input?.move, input?.dash)) {
+    if (movePlayer(state.level, player, input?.move, input?.dash, isWet)) {
       state.events.push({ type: 'dashed', playerId: player.id });
     }
   }
@@ -56,6 +58,7 @@ export function tick(state: GameState, inputs: readonly InputCommand[]): void {
   updateConveyors(state);
 
   updatePipelines(state);
+  updateSpills(state);
   updateOrders(state);
   updateMeetings(state);
   state.tick++;

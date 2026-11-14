@@ -1,6 +1,6 @@
 /** Bot navigation: where tiles are and the walk to them. */
 
-import { type GridPoint, type LevelMap, type Tile, getTile, isSolid } from './level';
+import { type GridPoint, type LevelMap, type Tile, getTile, isSolid, markAt } from './level';
 import { NEIGHBOURS, searchPath } from './path';
 import { type GameState, type PlayerId, getPlayer } from './state';
 
@@ -8,7 +8,8 @@ export function tilesOf(map: LevelMap, tile: Tile): GridPoint[] {
   const result: GridPoint[] = [];
   for (let y = 0; y < map.height; y++) {
     for (let x = 0; x < map.width; x++) {
-      if (getTile(map, x, y) === tile) result.push({ x, y });
+      // A tap stands on a counter tile but is no counter.
+      if (getTile(map, x, y) === tile && markAt(map, x, y) !== 'tap') result.push({ x, y });
     }
   }
   return result;
@@ -71,4 +72,10 @@ export function nearest(
 
 export function samePoint(a: GridPoint | null, b: GridPoint | null): boolean {
   return a !== null && b !== null && a.x === b.x && a.y === b.y;
+}
+
+/** Steps for `playerId` to stand next to `tile`, or `Infinity` when they can't get there. */
+export function walkLength(state: GameState, playerId: PlayerId, tile: GridPoint): number {
+  const path = findPath(state.level, currentTile(state, playerId), tile);
+  return path ? path.length : Infinity;
 }

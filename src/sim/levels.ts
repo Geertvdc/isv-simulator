@@ -31,6 +31,8 @@ import {
 } from './balance';
 import { CHAPTER_NAMES, LEVEL_NAMES } from './content';
 import { type LevelMap, parseLevelMap } from './level';
+import type { MopRobotSettings } from './manager';
+import type { SpillSchedule } from './spills';
 import type { TicketDomain } from './roles';
 
 /** When feature orders appear and how long they last. Bugs come from shipping instead. */
@@ -109,6 +111,10 @@ export interface LevelSettings {
   pairing?: boolean;
   /** Omit to keep classic order matching and generation unchanged. */
   domainSchedule?: DomainSchedule;
+  /** When leaky taps (`o`) leak. Needs a tap on the map. */
+  spills?: SpillSchedule;
+  /** The mop robot on the `r` loop. Needs a closed `r` loop on the map. */
+  mopRobot?: MopRobotSettings;
 }
 
 /** A bot score per team size, solo first. */
@@ -221,6 +227,7 @@ export const DEMO_DAY: Level = level('demo-day', demoDayMap, {
   ...calibrated([150, 245, 355, 440]),
   reviewShare: 0.3,
   incidents: INCIDENTS,
+  spills: { firstLeakTick: 30 * SECOND, everyTicks: 40 * SECOND },
 });
 
 /** A ring corridor around the review room: long walks while production burns. */
@@ -230,6 +237,7 @@ export const ON_CALL: Level = level('on-call', onCallMap, {
   ...calibrated([140, 210, 285, 410]),
   reviewShare: 0.4,
   incidents: INCIDENTS,
+  mopRobot: { clockwise: true },
 });
 
 // ---- Scale-Up: the wandering manager ----
@@ -476,6 +484,8 @@ export function settingsForPlayers(level: LevelSettings, playerCount: number): L
       maxDrought: level.domainSchedule.maxDrought,
     },
     incidents: level.incidents,
+    ...(level.spills ? { spills: { ...level.spills } } : {}),
+    ...(level.mopRobot ? { mopRobot: { ...level.mopRobot } } : {}),
     meetings: level.meetings && {
       ...level.meetings,
       intervalTicks: Math.round(level.meetings.intervalTicks / rate),

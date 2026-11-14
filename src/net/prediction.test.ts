@@ -77,6 +77,7 @@ function snapshotOf(
     managers: structuredClone(state.managers),
     events,
     liveTiles: structuredClone(state.liveTiles),
+    wet: { ...state.wet },
     runsFrom,
   };
 }

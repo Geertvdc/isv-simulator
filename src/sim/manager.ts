@@ -13,6 +13,7 @@ import {
   MANAGER_SHOVE_SPEED,
   MANAGER_SPEED,
   MANAGER_STUCK_TICKS,
+  MOP_ROBOT_SPEED,
   PLAYER_RADIUS,
   TICKS_PER_SECOND,
 } from './balance';
@@ -20,10 +21,24 @@ import { type GridPoint, type LevelMap, getTile } from './level';
 import { isDashing, resolveCollisions } from './movement';
 import { pathTo } from './path';
 import * as rng from './rng';
+import { mopLoop } from './spills';
 import type { GameState, Player, Vec } from './state';
+
+/** Where a mop robot drives: its loop, and which way round (level settings). */
+export interface MopRobotSettings {
+  /** Clockwise on screen, or the other way round. */
+  clockwise: boolean;
+}
 
 export interface Manager {
   id: number;
+  /**
+   * `manager`: wanders to random spots and stops for a chat. `mopRobot`
+   * (spills): drives its loop (`route`) without stopping, leaving a wet trail.
+   */
+  kind: 'manager' | 'mopRobot';
+  /** A mop robot's loop in driving order; empty for a manager. */
+  route: GridPoint[];
   /** Grid units, like players. */
   pos: Vec;
   /** Unit vector it walks or last walked along. */
@@ -45,18 +60,50 @@ const DT = 1 / TICKS_PER_SECOND;
 const PIN_SLACK = 0.02;
 const EPSILON = 1e-9;
 
-/** One manager per `M` on the map, standing still for a moment at the start. */
-export function createManagers(map: LevelMap): Manager[] {
-  return map.managerSpawns.map((spawn, i) => ({
-    id: i + 1,
-    pos: { x: spawn.x, y: spawn.y },
-    facing: { x: 0, y: 1 },
-    path: [],
-    waitTicks: MANAGER_PAUSE_MIN_TICKS,
-    stuckTicks: 0,
-    nextBumpTick: 0,
-    walking: false,
-  }));
+/**
+ * One manager per `M` on the map, standing still for a moment at the start,
+ * and a mop robot on the `r` loop when the level has one (`mopRobot`).
+ */
+export function createManagers(map: LevelMap, mopRobot?: MopRobotSettings): Manager[] {
+  const managers = map.managerSpawns.map(
+    (spawn, i): Manager => ({
+      id: i + 1,
+      kind: 'manager',
+      route: [],
+      pos: { x: spawn.x, y: spawn.y },
+      facing: { x: 0, y: 1 },
+      path: [],
+      waitTicks: MANAGER_PAUSE_MIN_TICKS,
+      stuckTicks: 0,
+      nextBumpTick: 0,
+      walking: false,
+    }),
+  );
+  const route = mopRobot ? mopLoop(map, mopRobot.clockwise) : [];
+  const start = route[0];
+  if (start) {
+    managers.push({
+      id: managers.length + 1,
+      kind: 'mopRobot',
+      route,
+      pos: { x: start.x, y: start.y },
+      facing: { x: 0, y: 1 },
+      path: [],
+      waitTicks: 0,
+      stuckTicks: 0,
+      nextBumpTick: 0,
+      walking: false,
+    });
+  }
+  return managers;
+}
+
+/** The rest of a mop robot's loop from the tile it is on, back round to that tile. */
+function nextLap(manager: Manager): GridPoint[] {
+  const here = tileOf(manager.pos);
+  const at = manager.route.findIndex((p) => p.x === here.x && p.y === here.y);
+  if (at < 0) return [...manager.route];
+  return [...manager.route.slice(at + 1), ...manager.route.slice(0, at + 1)];
 }
 
 function floorTiles(map: LevelMap): GridPoint[] {
@@ -116,7 +163,7 @@ function walk(state: GameState, manager: Manager): void {
   const dx = next.x - manager.pos.x;
   const dy = next.y - manager.pos.y;
   const dist = Math.hypot(dx, dy);
-  const step = MANAGER_SPEED * DT;
+  const step = (manager.kind === 'mopRobot' ? MOP_ROBOT_SPEED : MANAGER_SPEED) * DT;
   const facing = dist > EPSILON ? { x: dx / dist, y: dy / dist } : manager.facing;
   const to =
     dist <= step
@@ -128,7 +175,8 @@ function walk(state: GameState, manager: Manager): void {
   manager.facing = facing;
   if (pinsSomeone(state.level, state.players, to, facing)) {
     manager.stuckTicks++;
-    if (manager.stuckTicks >= MANAGER_STUCK_TICKS) {
+    // A mop robot keeps to its loop: it waits until the way is clear.
+    if (manager.kind === 'manager' && manager.stuckTicks >= MANAGER_STUCK_TICKS) {
       // Give up on this spot; a new one next tick.
       manager.path = [];
       manager.stuckTicks = 0;
@@ -140,7 +188,7 @@ function walk(state: GameState, manager: Manager): void {
   manager.walking = true;
   if (dist <= step) {
     manager.path.shift();
-    if (manager.path.length === 0) {
+    if (manager.path.length === 0 && manager.kind === 'manager') {
       const [wait, s] = rng.int(state.rngState, MANAGER_PAUSE_MIN_TICKS, MANAGER_PAUSE_MAX_TICKS);
       state.rngState = s;
       manager.waitTicks = wait;
@@ -195,7 +243,10 @@ export function updateManagers(state: GameState): void {
     if (manager.waitTicks > 0) {
       manager.waitTicks--;
     } else {
-      if (manager.path.length === 0) pickTarget(state, manager);
+      if (manager.path.length === 0) {
+        if (manager.kind === 'mopRobot') manager.path = nextLap(manager);
+        else pickTarget(state, manager);
+      }
       walk(state, manager);
     }
     pushPlayers(state, manager);

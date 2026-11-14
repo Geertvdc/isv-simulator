@@ -75,6 +75,23 @@ export const MANAGER_BUMP_COOLDOWN_TICKS = 1 * TICKS_PER_SECOND;
 /** A manager blocked (a player pinned against a wall) this long gives up and walks somewhere else. */
 export const MANAGER_STUCK_TICKS = Math.round(1.5 * TICKS_PER_SECOND);
 
+// ---- Spills (Startup): wet floor, the leaky tap, the mop robot ----
+
+/** Share of the normal acceleration and braking a player has on a wet tile: they slide and overshoot. */
+export const WET_TRACTION = 0.2;
+/** Ticks a tap drips and wobbles before it starts to leak. */
+export const TAP_WARNING_TICKS = 5 * TICKS_PER_SECOND;
+/** Ticks between two rings of the spill zone getting wet while the tap leaks. */
+export const TAP_FLOOD_RING_TICKS = 2 * TICKS_PER_SECOND;
+/** Ticks of work it takes to fix a leaking tap. */
+export const TAP_FIX_TICKS = 2 * TICKS_PER_SECOND;
+/** Ticks the whole spill zone takes to dry after a fix, outer ring first. */
+export const TAP_DRY_TICKS = 8 * TICKS_PER_SECOND;
+/** Mop robot speed in tiles per second: a bit slower than a walking player. */
+export const MOP_ROBOT_SPEED = 2;
+/** Ticks a tile stays wet after the mop robot passed over it. */
+export const MOP_TRAIL_TICKS = 6 * TICKS_PER_SECOND;
+
 /** Points lost when a calendar invite runs out before its player sat the meeting. */
 export const MEETING_MISSED_PENALTY = 15;
 
