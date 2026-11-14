@@ -4,7 +4,7 @@ The campaign tells one story: **YOTTA**, a startup founded by two people in Mom'
 
 This page is canon for level design and environment passes. A level's map, its world, its props and its light should all tell this level's beat. The players never read this page, so **the story has to show in the world**: in the backdrop, the props, the people outside and the signs on the walls.
 
-Where a level already has an environment brief, that brief is the detailed version and wins on details: [garage](../plan/garage-environment.md), [open plan](../plan/open-plan-environment.md), [down the hall](../plan/down-the-hall-environment.md), [seed round](../plan/seed-round-environment.md), [demo day](../plan/demo-day-environment.md), [on call](../plan/on-call-environment.md). Everything else here is a starting point: change it when a pass finds something funnier, and update this page when you do.
+Where a level already has an environment brief, that brief is the detailed version and wins on details: [garage](../plan/garage-environment.md), [open plan](../plan/open-plan-environment.md), [down the hall](../plan/down-the-hall-environment.md), [seed round](../plan/seed-round-environment.md), [demo day](../plan/demo-day-environment.md), [on call](../plan/on-call-environment.md), [middle management](../plan/middle-management-environment.md). Everything else here is a starting point: change it when a pass finds something funnier, and update this page when you do.
 
 ## The arc in one table
 
@@ -143,9 +143,9 @@ _New: the wandering manager._ YOTTA has money, headcount and a manager. It doesn
 - **Where and when:** a whole floor of a mid-rise office building. Spring morning, cherry blossom on the street below.
 - **The joke:** meet Derek, ex-MONOLITH, YOTTA's first manager. His corner office sticks out of the building and is bigger than the founders' desks put together. He walks into you on the way to his status update.
 - **Mechanic in the story:** the manager wanders the floor and blocks you. He's not evil, he just needs an update.
-- **Inbox and ship:** the inbox is reception (tickets arrive with a visitor badge); the ship hatch is the release board by the lifts.
-- **Outside:** the city in spring, the crane tower across the street half-clad in glass now, MONOLITH's glow further off.
-- **Running gags:** YOTTA in vinyl letters on reception, Prod in reception in a ceramic pot, Segfault on Derek's chair (he hasn't noticed), the plan as Derek's org chart.
+- **Inbox and ship:** the inbox is reception's pass-through (a badge printer, visitor badges and lanyards, "PLEASE SIGN IN"); the ship hatch is a low release board ("RELEASES ✓ v1.4.0") on the lift lobby's stone floor, with arrows to the lifts.
+- **Outside:** the rest of the floor (reception with a receptionist on the phone and a visitor waiting, breakout corners, a printer with a paper jam, the lifts) inside a glass curtain wall; past it the city in spring, small and far below: cherry trees in rows, traffic, a bus stop, a window cleaner's cradle on the glass. Across the street the crane tower, half-clad in glass, with its crane on top.
+- **Running gags:** YOTTA in violet vinyl beside reception, Prod in reception in a ceramic pot, Segfault on Derek's chair (he hasn't noticed), Derek's old MONOLITH lanyard and his "10 years of service" certificate, the plan as Derek's org chart (Derek on top of `1. Build it`, `2. ???`, `3. Profit`). On the shipped map his glass corner office sits outside the back-right corner; on the redesign draft it's the walled office in the map, with a walnut desk and a putting mat.
 - **Level design hooks:** the biggest single floor so far; one narrow aisle runs past Derek's office door.
 - **How it ends:** the next funding round arrives with a hiring plan: double the team by summer.
 
@@ -268,7 +268,7 @@ A quick lookup for set dressing. "—" means it's not in that level.
 | 2-1   | lit letters on the roof    | huge planter        | terrace bean bag     | —                           | glowing on the skyline  | crane, red light  |
 | 2-2   | LED pitch slide            | on a stage monitor  | reserved seat        | front row, RESERVED         | scout taking notes      | —                 |
 | 2-3   | sticker on a cage rack     | by the storage cage | warmest server       | —                           | —                       | —                 |
-| 3-1   | vinyl on reception         | reception           | Derek's chair        | —                           | Derek's old lanyard     | half-clad         |
+| 3-1   | vinyl beside reception     | reception           | Derek's chair        | —                           | Derek's old lanyard     | half-clad         |
 | 3-2   | welcome banner             | landing             | riding the lift      | —                           | —                       | almost done       |
 | 3-3   | on the lockers             | unbookable desk     | empty locker         | —                           | —                       | finished, TO LET  |
 | 4-1   | steel letters in the lobby | corridor planter    | boardroom table      | meeting room; visitor bay   | level with them         | they're inside it |

@@ -1,6 +1,10 @@
 # Middle Management environment pass
 
-**Status:** brief. Level 3-1 (`middle-management`, "Middle Management"), the first level of the Scale-Up chapter, gets a hand-built world after the garage ([garage-environment.md](garage-environment.md)), [Open Plan Office](open-plan-environment.md), [Down the Hall](down-the-hall-environment.md), [Seed Round](seed-round-environment.md), [Demo Day](demo-day-environment.md) and [On Call](on-call-environment.md).
+**Status:** two rounds done (build, critic review, fixes). Level 3-1 (`middle-management`, "Middle Management"), the first level of the Scale-Up chapter, gets a hand-built world after the garage ([garage-environment.md](garage-environment.md)), [Open Plan Office](open-plan-environment.md), [Down the Hall](down-the-hall-environment.md), [Seed Round](seed-round-environment.md), [Demo Day](demo-day-environment.md) and [On Call](on-call-environment.md).
+
+| Before                                                | After                                                | Before, redesign draft                                      | After, redesign draft                                      |
+| ----------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------- |
+| ![](images/middle-management-environment/before.webp) | ![](images/middle-management-environment/after.webp) | ![](images/middle-management-environment/before-draft.webp) | ![](images/middle-management-environment/after-draft.webp) |
 
 **Goal:** the world around the level tells one story, the way Overcooked 2 levels do. Render only (`src/render/`); the sim, maps and balance don't change.
 
@@ -83,13 +87,71 @@ Three agents in one worktree at once, with strict file ownership. The shared plu
 | **World** | `scenes/middleManagement.ts` (+test), `setDressing/midRise.ts`                                                                                                                             |
 | **Light** | `atmosphere.ts` (+test), `stage.ts` (the three.js Stage), `WorldFx.ts`, `createLights` in `look.ts`                                                                                        |
 
+## Rounds
+
+Round 1 ran three agents at once (Room, World, Light), with the Overcooked 2 mine level and our finished garage, Open Plan and On Call frames as the bar. The critic scored it **6/10** on the shipped map and **5.5/10** on the draft (before: 3/10 on both). It read as one clean office floor in a glass building, with reception behind the inbox, the release board at the ship, petals and mullion stripes. What held it back:
+
+- "Up on a mid-rise" didn't read: the street was painted at floor level, so it looked like a park beside the building.
+- The frame was the greyest we had shipped (saturation 0.19): overcast, not a spring morning.
+- The oak desks were as bright as the test benches.
+- The lift bank read as a beige fridge.
+- On the draft, Derek's office read as a corridor, not the joke.
+- Smaller: slab-like wall tops with a row of glints, pod chairs that read as lumps, window-cleaner ropes with no cradle in frame, a row of floor arrows by the HUD, an org chart that read as a line graph, the logo behind Derek's spawn, the street showing through the shipped office floor, and a crane tower that barely showed.
+
+Round 2, in three chunks:
+
+- **Room:**
+  - The desks went darker (0x9e8460), below every station top.
+  - The wall tops are a slim aluminium head track, with glints on one tile in three.
+  - The carpet is bluer (0x7f8ea3), with an odd-batch tile and a blue-grey walkway.
+  - Derek's draft office has a plush floor, a walnut executive desk with a DEREK nameplate and a credenza, a putting mat, the MONOLITH lanyard on the glass, and Segfault on a chair turned toward the camera.
+  - The org chart is a tree: a violet DEREK box over three white boxes.
+  - The YOTTA vinyl sits on a face with no spawn in front of it, so it shows at the start.
+- **World:**
+  - The city is small and in the far tier below a slab edge with a dark spandrel band. It has blossom in clumped rows, traffic on two streets each side, and the building's shadow.
+  - The lifts are brushed steel facing the camera, with one car open and lit.
+  - The pod chairs are open tub chairs.
+  - The window cleaner's cradle is in frame, with thin ropes clear of the mute button.
+  - At most five arrows lead to LIFTS.
+  - No street shows through the office.
+  - A new half-clad crane tower: glazed below, a bare concrete frame on top, the crane on its roof.
+- **Light:**
+  - A warmer sun raised to about 50°, so the back row stays lit.
+  - A softer fill and a haze over the city below.
+  - Brighter back pendants.
+  - Faint sun shafts at the left.
+  - A saturation grade (1.35) on this level's 3D canvas only.
+
+Measured on the final shots:
+
+| Measure                                   | Before        | Round 1       | Final         |
+| ----------------------------------------- | ------------- | ------------- | ------------- |
+| Frame mean luminance, shipped / draft     | 103.1 / 104.4 | 107.1 / 111.5 | 104.9 / 109.2 |
+| Frame mean luminance, `quality=low`       |               | 109.9         | 106.4         |
+| Frame saturation, shipped / draft         | 0.31          | 0.19 / 0.17   | 0.25 / 0.23   |
+| Sunlit desk / yellow test bench luminance |               | 150 / 147     | 118 / 147     |
+| Bug queue luminance (back row)            |               | 86            | 96            |
+
+Open Plan measured 107.7 before and after (unchanged).
+
+Left for later:
+
+- **No true drop.** The street "far below" reads from scale, the slab band and the shadow, not real parallax: `Surroundings` puts an opaque horizon plane at the slab's foot. An optional `Scene.horizonY` in `surroundings.ts` and `scenes/types.ts` would let the city sit 2.5 lower.
+- **The crane tower is small** (about 60 px) and hazed behind the back glass; from this camera you mostly see its roof. MONOLITH's tower shows only on the draft.
+- **The grade is blunt.** The saturation filter lifts everything on this level, skin and wood included. The sun shafts barely show, and the draft has none.
+- **Small text.** The DEREK nameplate, the certificate, PAPER JAM and the sticky notes are only just legible at 1440×810. Segfault reads as a small grey loaf.
+- **Bright head track.** The aluminium ridge goes near-white in the sun on the back and side walls.
+- **The draft's lifts** stand about four tiles up the right side, because the front corner is cut by the frame edge.
+- **The window-cleaner cradle** reads only moderately through the curtain wall's glass and mullions.
+- Not checked on a real GPU.
+
 ## Done when
 
-- [ ] The shot reads as "a startup's new office floor in a mid-rise on a spring morning, and its new manager" without explanation, and nothing in it reads as food or a kitchen.
-- [ ] The storyline beat reads with no explanation: we're up on a rented office floor, Derek's glass corner office sticks out, the city is in spring below.
-- [ ] The outside connects to the play: tickets come in at reception, shipped work goes up on the release board by the lifts.
-- [ ] The running gags are in place: the vinyl logo, Prod in reception, Segfault on Derek's chair, his MONOLITH lanyard, the half-clad crane tower, the org chart.
-- [ ] No flat empty ground and no void in the 1440×810 frame.
-- [ ] Stations, players and Derek read at a glance; nothing hides them.
-- [ ] Works on the shipped map and on `?draft=middle-management`.
-- [ ] `npm run check` passes; other levels look as before.
+- [x] The shot reads as "a startup's new office floor in a mid-rise on a spring morning, and its new manager" without explanation, and nothing in it reads as food or a kitchen.
+- [x] The storyline beat reads with no explanation: we're up on a rented office floor, Derek's glass corner office sticks out, the city is in spring below.
+- [x] The outside connects to the play: tickets come in at reception, shipped work goes up on the release board by the lifts.
+- [x] The running gags are in place: the vinyl logo, Prod in reception, Segfault on Derek's chair, his MONOLITH lanyard, the half-clad crane tower, the org chart.
+- [x] No flat empty ground and no void in the 1440×810 frame.
+- [x] Stations, players and Derek read at a glance; nothing hides them.
+- [x] Works on the shipped map and on `?draft=middle-management`.
+- [x] `npm run check` passes; other levels look as before.
