@@ -66,6 +66,10 @@ export interface LevelResult {
 
 export type GameEvent =
   | { type: 'orderCreated'; order: Order }
+  /** A leaky tap started to leak (spills). */
+  | { type: 'tapLeaking'; x: number; y: number }
+  /** Someone fixed a leaking tap (spills). */
+  | { type: 'tapFixed'; x: number; y: number }
   | {
       type: 'orderShipped';
       order: Order;

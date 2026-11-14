@@ -17,6 +17,7 @@
 import { type GridPoint } from './level';
 import { managerTiles } from './manager';
 import { pathTo } from './path';
+import { wetTiles } from './spills';
 import { type GameState, type InputCommand, type PlayerId, getPlayer, targetTile } from './state';
 import { chooseGoal } from './botGoals';
 import { currentTile, findPath, samePoint } from './botNav';
@@ -81,9 +82,13 @@ export function botInput(state: GameState, bot: Bot, bots: readonly Bot[]): Inpu
   const from = currentTile(state, bot.playerId);
   // Walk around managers when there is a way around; otherwise wait for them to move on.
   const blocked = managerTiles(state);
+  // Keep off wet floor (spills) when the dry way round is short enough.
+  const wet = wetTiles(state);
   if (goal.action === 'stand') {
-    const walk =
-      pathTo(state.level, from, goal.tile, blocked) ?? pathTo(state.level, from, goal.tile);
+    const walk = preferDry(
+      pathTo(state.level, from, goal.tile, [...blocked, ...wet]),
+      pathTo(state.level, from, goal.tile, blocked) ?? pathTo(state.level, from, goal.tile),
+    );
     const next = walk?.[0];
     if (next) input.move = unit(next.x - player.pos.x, next.y - player.pos.y);
     bot.interactWas = false;
@@ -94,9 +99,11 @@ export function botInput(state: GameState, bot: Bot, bots: readonly Bot[]): Inpu
         .filter((p) => p.id !== bot.playerId)
         .map((p) => ({ x: Math.round(p.pos.x), y: Math.round(p.pos.y) }))
     : [];
-  const path =
+  const path = preferDry(
+    findPath(state.level, from, goal.tile, others, [...blocked, ...wet]),
     findPath(state.level, from, goal.tile, others, blocked) ??
-    findPath(state.level, from, goal.tile, others);
+      findPath(state.level, from, goal.tile, others),
+  );
   let wantsInteract = false;
   if (path && path.length > 0) {
     const next = path[0];
@@ -117,4 +124,13 @@ export function botInput(state: GameState, bot: Bot, bots: readonly Bot[]): Inpu
   input.interact = wantsInteract && !bot.interactWas;
   bot.interactWas = input.interact;
   return input;
+}
+
+/** Steps a bot walks round wet floor (spills) rather than slide across it. */
+const DRY_DETOUR_STEPS = 6;
+
+/** The dry walk when it's at most a short detour, else the plain one. */
+function preferDry(dry: GridPoint[] | null, plain: GridPoint[] | null): GridPoint[] | null {
+  if (dry && plain && dry.length <= plain.length + DRY_DETOUR_STEPS) return dry;
+  return plain ?? dry;
 }

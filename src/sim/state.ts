@@ -12,6 +12,7 @@ import type { Invite } from './meetings';
 import type { GameEvent, LevelResult, Order, PendingBug } from './orders';
 import { type Pipeline, createPipelines } from './pipeline';
 import { type RngState, createRng } from './rng';
+import { type Tap, type WetTiles, createTaps } from './spills';
 import { isRoleId, type RoleId, type TicketDomain, type WorkTask } from './roles';
 import type { Ticket } from './tickets';
 
@@ -103,6 +104,10 @@ export interface GameState {
   /** Open calendar invites, at most one per player. */
   invites: Invite[];
   nextInviteId: number;
+  /** Leaky taps and their spill zones (spills). */
+  taps: Tap[];
+  /** Tiles wet for now (a leak, the mop's trail): tile index to the tick they dry. */
+  wet: WetTiles;
   /** Tick from which the next invite is due; `null` on levels without meetings. */
   nextMeetingTick: number | null;
   /** Bugs on their way back from shipped tickets. */
@@ -168,7 +173,7 @@ export function createGame(
     liveTiles: {},
     settings: settingsForPlayers(level, playerIds.length),
     players,
-    managers: createManagers(map),
+    managers: createManagers(map, level.mopRobot),
     tickets: [],
     pipelines: createPipelines(map),
     belts: createBelts(map),
@@ -181,6 +186,8 @@ export function createGame(
     nextIncidentTick: level.incidents?.firstTick ?? null,
     invites: [],
     nextInviteId: 1,
+    taps: createTaps(map, level.spills),
+    wet: {},
     nextMeetingTick: level.meetings?.firstTick ?? null,
     pendingBugs: [],
     score: 0,

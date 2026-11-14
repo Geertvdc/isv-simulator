@@ -11,10 +11,11 @@ import {
   REVIEW_RATE,
   WORK_RATE,
 } from './balance';
-import { type Tile, getTile } from './level';
+import { type Tile, getTile, markAt } from './level';
 import { shipTicket } from './orders';
 import { isBroken, isBuilding, pipelineAt, repairPipeline } from './pipeline';
 import { roleWorkRate } from './roles';
+import { workTap } from './spills';
 import type { RoleId } from './roles';
 import { type GameState, type PlayerId, getPlayer, targetTile } from './state';
 import {
@@ -101,6 +102,8 @@ export function canPutDown(state: GameState, ticket: Ticket, x: number, y: numbe
     return !onTile || canMerge(onTile, ticket);
   }
   if (tile === null || onTile) return false;
+  // Solid mechanics on a counter tile: a tap takes no tickets.
+  if (markAt(state.level, x, y) === 'tap') return false;
   return (
     PUT_DOWN_ON.has(tile) ||
     (tile === 'pipeline' && isAtItsStation(ticket, tile) && !isBroken(state, { x, y }))
@@ -209,6 +212,7 @@ export function work(state: GameState, playerId: PlayerId, tickWork: TickWork): 
   const player = getPlayer(state, playerId);
   if (!player) return false;
   const { reviewers } = tickWork;
+  if (markAt(state.level, x, y) === 'tap') return workTap(state, x, y);
   if (tile === 'review') {
     const ticket = ticketOnTile(state, x, y);
     if (!ticket || !stationWorkStep(ticket, tile)) return false;

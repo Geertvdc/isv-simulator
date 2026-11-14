@@ -22,8 +22,10 @@ import {
   PLAYER_RADIUS,
   TICKS_PER_SECOND,
   WALL_PROBE,
+  WET_TRACTION,
 } from './balance';
 import { type LevelMap, getTile, isSolid } from './level';
+import { DRY, type WetCheck } from './spills';
 import type { Player, Vec } from './state';
 
 const DT = 1 / TICKS_PER_SECOND;
@@ -208,7 +210,12 @@ export function startDash(player: Player, rawMove: Vec): boolean {
  * player shoots along their facing at `DASH_SPEED` and can't steer; after
  * the dash they slow back down to walking speed.
  */
-export function stepPlayer(map: LevelMap, player: Player, rawMove: Vec): void {
+export function stepPlayer(
+  map: LevelMap,
+  player: Player,
+  rawMove: Vec,
+  isWet: WetCheck = DRY,
+): void {
   const move = clampMove(rawMove);
   const moving = length(move) > EPSILON;
   if (player.dashCooldown > 0) player.dashCooldown--;
@@ -218,7 +225,13 @@ export function stepPlayer(map: LevelMap, player: Player, rawMove: Vec): void {
   } else {
     const target = { x: move.x * PLAYER_MAX_SPEED, y: move.y * PLAYER_MAX_SPEED };
     if (moving) steerAlongWalls(map, player.pos, move, target);
-    player.vel = approach(player.vel, target, (moving ? PLAYER_ACCEL : PLAYER_DECEL) * DT);
+    // On a wet tile speeding up, slowing down and turning take longer: you slide.
+    const traction = isWet(Math.round(player.pos.x), Math.round(player.pos.y)) ? WET_TRACTION : 1;
+    player.vel = approach(
+      player.vel,
+      target,
+      (moving ? PLAYER_ACCEL : PLAYER_DECEL) * traction * DT,
+    );
     if (moving) {
       const len = length(move);
       player.facing = { x: move.x / len, y: move.y / len };
@@ -255,10 +268,11 @@ export function movePlayer(
   player: Player,
   move: Vec = NO_MOVE,
   dash = false,
+  isWet: WetCheck = DRY,
 ): boolean {
   const dashPressed = dash && !player.dashHeld;
   player.dashHeld = dash;
   const dashed = dashPressed && startDash(player, move);
-  stepPlayer(map, player, move);
+  stepPlayer(map, player, move, isWet);
   return dashed;
 }

@@ -561,6 +561,7 @@ export class OnlineSession {
         managers: state.managers,
         events: snapshot.events,
         liveTiles: state.liveTiles,
+        wet: state.wet,
         runsFrom: runsFrom(flow, snapshot.serverTick, state.result !== null),
       },
       localBindings(online).map((b) => b.playerId),

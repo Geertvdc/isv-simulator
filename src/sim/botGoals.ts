@@ -16,6 +16,7 @@ import { inviteFor } from './meetings';
 import { pathTo } from './path';
 import { isBroken } from './pipeline';
 import { roleWorkRate, type RoleId } from './roles';
+import { walkLength } from './botNav';
 import { type GameState, getPlayer } from './state';
 import {
   OPTIONAL_STEPS,
@@ -103,6 +104,8 @@ export function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Go
   }
   bot.ticketId = null;
 
+  const tap = tapGoal(state, bot, bots);
+  if (tap) return tap;
   const help = reviewHelpGoal(state, bot, bots);
   if (help) return help;
   const merged =
@@ -353,4 +356,27 @@ function reviewHelpGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal 
   if (!tile) return null;
   bot.helping = tile;
   return { tile, action: 'work', besideOthers: true };
+}
+
+/**
+ * A leaking tap gets fixed by the empty-handed bot closest to it (spills):
+ * work at it until it stops.
+ */
+function tapGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal | null {
+  for (const tap of state.taps) {
+    if (tap.phase !== 'leaking') continue;
+    const tile = { x: tap.x, y: tap.y };
+    const free = bots.filter((b) => !ticketCarriedBy(state, b.playerId));
+    let best: Bot | undefined;
+    let bestLength = Infinity;
+    for (const candidate of free) {
+      const length = walkLength(state, candidate.playerId, tile);
+      if (length < bestLength) {
+        best = candidate;
+        bestLength = length;
+      }
+    }
+    if (best?.playerId === bot.playerId) return { tile, action: 'work' };
+  }
+  return null;
 }

@@ -61,6 +61,7 @@ describe('predictedView', () => {
         managers: [],
         events: [],
         liveTiles: {},
+        wet: {},
         runsFrom: 0,
       },
       [2],

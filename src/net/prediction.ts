@@ -48,6 +48,7 @@ import { pushOutOfManager } from '../sim/manager';
 import { movePlayer } from '../sim/movement';
 import type { GameEvent } from '../sim/orders';
 import { separatePlayers } from '../sim/push';
+import { type WetTiles, wetCheck } from '../sim/spills';
 import type { InputCommand, Player, PlayerId, Vec } from '../sim/state';
 
 const TICK_MS = 1000 / TICKS_PER_SECOND;
@@ -83,6 +84,8 @@ export interface PredictionSnapshot {
   events: readonly GameEvent[];
   /** The live tiles at `serverTick`: the layout players move through. */
   liveTiles: LiveTiles;
+  /** Tiles wet at `serverTick`, to the tick they dry (spills). */
+  wet: WetTiles;
   /**
    * The server tick the sim runs from: at or before `serverTick` while the
    * round plays, the countdown's end during the countdown, `null` while it
@@ -95,6 +98,8 @@ export interface Prediction {
   /** `?predict=0` turns it off: nothing is predicted. */
   enabled: boolean;
   level: LevelMap | null;
+  /** Wet tiles as the newest snapshot had them. */
+  wet: WetTiles;
   /** The newest snapshot's server tick; `null` until the first one of the round. */
   baseTick: number | null;
   /** The server tick the sim runs from; `null`: it doesn't (pause, results). */
@@ -127,6 +132,7 @@ export function createPrediction(enabled: boolean): Prediction {
   return {
     enabled,
     level: null,
+    wet: {},
     baseTick: null,
     runsFrom: null,
     others: [],
@@ -197,12 +203,13 @@ function inputFor(p: Prediction, id: PlayerId, t: number): InputCommand | null {
 function step(p: Prediction, t: number): void {
   const level = p.level;
   if (!level) return;
+  const isWet = wetCheck({ level, wet: p.wet, tick: t });
   for (const player of p.current) {
     const input = inputFor(p, player.id, t);
-    movePlayer(level, player, input?.move, input?.dash);
+    movePlayer(level, player, input?.move, input?.dash, isWet);
   }
   // Their inputs are on other machines: they let go.
-  for (const other of p.others) movePlayer(level, other);
+  for (const other of p.others) movePlayer(level, other, undefined, false, isWet);
   const everyone = [...p.current, ...p.others].sort((a, b) => a.id - b.id);
   separatePlayers(level, everyone);
   for (const player of p.current) {
@@ -270,6 +277,7 @@ export function reconcile(
 
   p.stats.reconciles++;
   applyLiveTiles(p.level, snap.liveTiles);
+  p.wet = { ...snap.wet };
   p.baseTick = snap.serverTick;
   p.runsFrom = snap.runsFrom;
   // Others never dash here: a shove by them is the server's call (it
