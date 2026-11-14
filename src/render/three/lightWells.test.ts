@@ -7,9 +7,11 @@ import {
   DEFAULT_ATMOSPHERE,
   accentSpots,
   lightWellSpots,
+  pagerTile,
   snowSeeds,
 } from './atmosphere';
 import { lightWellsFor } from './lightWells';
+import { pagerBoardTile } from './rooms/basementRoom';
 import { onCallLightWells } from './scenes/onCall';
 
 const text = (path: string) => readFileSync(new URL(`../../../${path}`, import.meta.url), 'utf8');
@@ -44,5 +46,17 @@ describe('lightWellsFor', () => {
     const size = { width: 14, height: 10 };
     expect(lightWellsFor(night, size)).toEqual(lightWellSpots(size));
     expect(lightWellsFor(DEFAULT_ATMOSPHERE, MAPS.shipped)).toEqual(lightWellSpots(MAPS.shipped));
+  });
+});
+
+describe('pagerTile', () => {
+  it("puts the beacon on the room's pager board tile, on both maps", () => {
+    for (const [name, map] of Object.entries(MAPS)) {
+      const tile = pagerTile(map);
+      expect(tile && { x: tile.x, y: tile.y }, name).toEqual(pagerBoardTile(map));
+      const beacon = accentSpots(night, map).find((s) => s.accent.anchor === 'pager');
+      expect(Math.abs((beacon?.at.x ?? -9) - (tile?.x ?? 0)), name).toBeLessThan(0.2);
+      expect(Math.abs((beacon?.at.z ?? -9) - (tile?.y ?? 0)), name).toBeLessThan(0.2);
+    }
   });
 });

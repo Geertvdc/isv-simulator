@@ -1080,11 +1080,7 @@ function sweepBeamGeometry(length: number, radius: number): THREE.BufferGeometry
  * and brightest just under the middle.
  */
 function shaftGeometry(length: number, radius: number): THREE.BufferGeometry {
-  const g = new THREE.CylinderGeometry(radius * 0.75, radius, length, 16, 8, true).scale(
-    1,
-    1,
-    0.35,
-  );
+  const g = new THREE.CylinderGeometry(radius * 0.3, radius, length, 16, 8, true).scale(1, 1, 0.35);
   const position = g.getAttribute('position');
   const colors: number[] = [];
   for (let i = 0; i < position.count; i++) {

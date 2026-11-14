@@ -204,12 +204,14 @@ export interface Atmosphere {
 
 /**
  * Where an accent light hangs: over the inbox tiles, pulled `out` toward the
- * room (negative: out of it) and `shift` along x (`inbox`); `out` grid units outside the outline's left or right edge,
+ * room (negative: out of it) and `shift` along x (`inbox`); over the middle
+ * of the pager board's wall tile (`pagerTile`), pulled `out` the same way
+ * (`pager`); `out` grid units outside the outline's left or right edge,
  * a share `along` of its depth from the back (`left`, `right`); over the
  * middle of the interior walls (`core`, none without them); or in each
  * light well (`wells`, see `lightWellSpots`).
  */
-export type AccentAnchor = 'inbox' | 'left' | 'right' | 'core' | 'wells';
+export type AccentAnchor = 'inbox' | 'pager' | 'left' | 'right' | 'core' | 'wells';
 
 export interface Accent {
   anchor: AccentAnchor;
@@ -469,7 +471,7 @@ const STAGE_LIGHTS: Atmosphere = {
  * tubes along the back wall, one of them tired. Round the room the
  * basement is dark grey-blue: the boiler glows orange off the left edge,
  * the racks glow blue-green among the server room's walls, the pager's red
- * beacon blinks over the inbox, and orange street light falls down the
+ * beacon blinks on its board past the inbox, and orange street light falls down the
  * light wells at the back with snow in it.
  */
 const NIGHT_SHIFT: Atmosphere = {
@@ -481,13 +483,13 @@ const NIGHT_SHIFT: Atmosphere = {
   },
   // The work light: a little brighter on the room than on the basement round it.
   wash: {
-    color: 0xf4f8fc,
-    intensity: 1.8,
+    color: 0xfff4e0,
+    intensity: 1.65,
     from: { x: 0, y: 6, height: 10, perMapSize: false },
     spread: 1.1,
   },
-  sky: { sky: 0xe6ecf2, ground: 0x4e565c, intensity: 0.75 },
-  lowSky: 1.0,
+  sky: { sky: 0xc4d0de, ground: 0x4e565c, intensity: 0.74 },
+  lowSky: 1.1,
   fill: { color: 0xe8eef8, intensity: 0.75 },
   environment: 0.08,
   backdrop: { inner: 0x3a434e, outer: 0x161b22 },
@@ -511,35 +513,45 @@ const NIGHT_SHIFT: Atmosphere = {
     stutter: { index: -1, depth: 0.75, seconds: 7 },
   },
   accents: [
-    // The beacon on top of the pager board over the inbox's fire door (see `pagerDoorModel`).
+    // The beacon on top of the pager board, on the wall tile past the inbox's fire door (`pagerTile`).
     {
-      anchor: 'inbox',
+      anchor: 'pager',
       color: 0xff2a1e,
       intensity: 2.2,
       distance: 2.2,
-      height: 1.52,
-      out: -0.36,
-      shift: -0.4,
+      height: 1.51,
+      out: -0.12,
       blink: 1,
       halo: { size: 0.32, opacity: 0.85 },
     },
     // The boiler's flame window, off the left edge.
     {
       anchor: 'left',
-      color: 0xff8a3a,
-      intensity: 30,
-      distance: 4.5,
+      color: 0xf09a60,
+      intensity: 22,
+      distance: 3.2,
       height: 1.0,
       out: 1.9,
       along: 0.15,
     },
+    // A sodium pool on the floor in the front right corner, under the well-side vent.
+    {
+      anchor: 'right',
+      color: 0xffa850,
+      intensity: 3,
+      distance: 1.8,
+      height: 0.7,
+      out: 1.3,
+      along: 0.82,
+    },
     // The racks, inside the server room's walls.
     { anchor: 'core', color: 0x3ad2bc, intensity: 2, distance: 4, height: 1.9 },
     // Sodium street light down the light wells.
-    { anchor: 'wells', color: 0xffa040, intensity: 5, distance: 2.6, height: -0.2 },
+    // High in the shaft, by the street, so the snow drift on the sill stays cold white.
+    { anchor: 'wells', color: 0xffb060, intensity: 2.5, distance: 2.2, height: 0.55 },
   ],
-  snow: { color: 0xfff4e6, opacity: 0.95, perWell: 30, size: 0.055, fall: 0.22, spread: 0.8 },
-  shafts: { color: 0xffa040, opacity: 0.16, length: 1.8, radius: 0.42, lean: 0.3 },
+  snow: { color: 0xe8f0ff, opacity: 0.95, perWell: 45, size: 0.12, fall: 0.22, spread: 0.8 },
+  shafts: { color: 0xffa040, opacity: 0.22, length: 1.8, radius: 0.32, lean: 0.3 },
 };
 
 /** Presets per `MapLook.scene` id. */
@@ -866,6 +878,12 @@ function accentPoints(
       const shift = accent.shift ?? 0;
       return [gridToWorld(mx + toward.dx * out + shift, my + toward.dy * out, accent.height)];
     }
+    case 'pager': {
+      if (!map.tiles) return [];
+      const tile = pagerTile(map as LevelMap);
+      if (!tile) return [];
+      return [gridToWorld(tile.x + tile.into.dx * out, tile.y + tile.into.dy * out, accent.height)];
+    }
     case 'core': {
       if (!map.tiles) return [];
       const full = map as LevelMap;
@@ -885,6 +903,43 @@ function accentPoints(
       const my = inner.reduce((a, t) => a + t.y, 0) / inner.length;
       return [gridToWorld(mx, my, accent.height)];
     }
+  }
+}
+
+/**
+ * The wall tile the pager board stands on: the first wall tile after the
+ * inbox run along the inbox's edge, +x for an inbox on the back or front
+ * edge, +y for one on the left or right edge (the same rule as the room's
+ * `pagerBoardTile`), with the step `into` the room from that edge. Null
+ * without an inbox or a wall past it.
+ */
+export function pagerTile(
+  map: LevelMap,
+): { x: number; y: number; into: { dx: number; dy: number } } | null {
+  const tiles = tilesOf(map, (t) => t === 'inbox');
+  if (tiles.length === 0) return null;
+  const mx = tiles.reduce((a, t) => a + t.x, 0) / tiles.length;
+  const my = tiles.reduce((a, t) => a + t.y, 0) / tiles.length;
+  const edges = [
+    { d: my, dx: 0, dy: 1 },
+    { d: map.height - 1 - my, dx: 0, dy: -1 },
+    { d: mx, dx: 1, dy: 0 },
+    { d: map.width - 1 - mx, dx: -1, dy: 0 },
+  ].sort((a, b) => a.d - b.d);
+  const into = edges[0] ?? { dx: 0, dy: 1 };
+  // Along the edge: +x on the back or front, +y on the left or right.
+  const ax = into.dy !== 0 ? 1 : 0;
+  const ay = 1 - ax;
+  const line = tiles.filter((t) => (ax ? t.y === Math.round(my) : t.x === Math.round(mx)));
+  const run = line.length > 0 ? line : tiles;
+  let x = ax ? Math.max(...run.map((t) => t.x)) : Math.round(mx);
+  let y = ay ? Math.max(...run.map((t) => t.y)) : Math.round(my);
+  for (;;) {
+    x += ax;
+    y += ay;
+    const tile = getTile(map, x, y);
+    if (tile === null) return null;
+    if (tile === 'wall') return { x, y, into: { dx: into.dx, dy: into.dy } };
   }
 }
 
