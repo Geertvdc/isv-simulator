@@ -17,12 +17,14 @@ import seedRoundDraft from '../../../maps/drafts/seed-round.txt?raw';
 import demoDayDraft from '../../../maps/drafts/demo-day.txt?raw';
 import onCallDraft from '../../../maps/drafts/on-call.txt?raw';
 import { LEVEL_LOOKS } from '../mapLook';
+import { WALL_HEIGHT } from './layout';
 import { fitCamera3d, gridToWorld, projectPoint } from '../projection';
 import {
   ATMOSPHERES,
   DEFAULT_ATMOSPHERE,
   LIGHT_WELL,
   accentSpots,
+  pagerTile,
   atmosphereFor,
   blinkOn,
   cssRgba,
@@ -410,19 +412,25 @@ describe('the night shift (on-call)', () => {
     );
   });
 
-  it('blinks the pager beacon over the inbox, at the inbox on both maps', () => {
+  it('blinks the pager beacon over the pager board, on the wall tile past the inbox, on both maps', () => {
+    // Shipped: inbox on the back wall at x 2-3, the board on (4, 0); draft: inbox on the left wall at y 2-3, the board on (0, 4).
+    const expected = { shipped: { x: 4, y: 0 }, draft: { x: 0, y: 4 } };
     for (const [name, map] of Object.entries(maps)) {
-      const beacons = accentSpots(a, map).filter((s) => s.accent.anchor === 'inbox');
+      const tile = pagerTile(map);
+      expect(tile && { x: tile.x, y: tile.y }, name).toEqual(
+        expected[name as keyof typeof expected],
+      );
+      const beacons = accentSpots(a, map).filter((s) => s.accent.anchor === 'pager');
       expect(beacons, name).toHaveLength(1);
       const at = beacons[0]?.at ?? { x: -9, y: 0, z: -9 };
-      const inbox = map.tiles
-        .map((t, i) => ({ t, x: i % map.width, y: Math.floor(i / map.width) }))
-        .filter((c) => c.t === 'inbox');
-      const mx = inbox.reduce((s, c) => s + c.x, 0) / inbox.length;
-      const my = inbox.reduce((s, c) => s + c.y, 0) / inbox.length;
-      expect(Math.hypot(at.x - mx, at.z - my), name).toBeLessThan(1.1);
-      expect(at.y, name).toBeGreaterThan(1.15);
+      // Over the tile's middle, just behind the wall line, on top of the board.
+      expect(Math.hypot(at.x - (tile?.x ?? 0), at.z - (tile?.y ?? 0)), name).toBeLessThan(0.2);
+      if (name === 'shipped') expect(at.z, name).toBeLessThan(0);
+      else expect(at.x, name).toBeLessThan(0);
+      expect(at.y, name).toBeCloseTo(WALL_HEIGHT + 0.36, 1);
       expect(beacons[0]?.accent.blink, name).toBeGreaterThan(0);
+      // Never over an inbox tile, where the ticket billboard hides it.
+      expect(getTile(map, Math.round(at.x), Math.round(at.z)), name).not.toBe('inbox');
     }
     expect(blinkOn(100, 1)).toBe(true);
     expect(blinkOn(600, 1)).toBe(false);
