@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import { type Model, ModelBuilder } from '../kit';
 import { lettering } from './businessPark';
 
@@ -39,8 +38,6 @@ const PATCH = [0x7a7e84, 0xb89a3a, 0x5a6c82, 0x8a4a44, 0x4e7a56] as const;
 const LED_BLUE = 0x1f6fc8;
 const LED_GREEN = 0x2ab060;
 const LED_AMBER = 0xc07818;
-/** Segfault's fur. */
-const FUR = 0xd47a30;
 
 /** A cable reel on its side at (x, y, z): dark cheeks, cable wound on, a plug hanging off. */
 function cableReel(
@@ -294,42 +291,18 @@ export const BASEMENT_INNER_LOW_PROP: () => Model = prop((b) => {
 }, 1.2);
 
 /**
- * The warmest server, with Segfault asleep on it (built from the wall
- * top): a 4U server with its amber fault LED and a HOT sticker, the cat
- * curled up on its lid, nose under tail.
+ * The warmest server, Segfault's bed (built from the wall top): a 4U
+ * server with its amber fault LED and a HOT sticker and a towel folded on
+ * its lid. The cat itself is a living scene piece (`segfaultCat` in
+ * `setDressing/onCall.ts`), so it can breathe.
  */
 export const SEGFAULT_SERVER: () => Model = prop((b) => {
   server(b, 0, 0, 0, [0.56, 0.44], 4, 3);
   b.box(0.1, 0.04, 0.004, 0xd8a020, { at: [-0.16, 0.12, 0.226] }, 0);
   lettering(b, 'HOT', -0.16, 0.12, 0.228, 0.006, INK, 0.002);
-  // A towel folded on the lid, the cat curled on it.
+  // A towel folded on the lid, where the cat sleeps.
   const top = 0.18;
   b.box(0.36, 0.02, 0.28, 0x8a8a96, { at: [0.0, top + 0.01, 0.0] }, 0.006);
-  const y = top + 0.02;
-  // The body curled in a loaf, a paler chest, the head resting on the paws, facing the room.
-  b.sphere(0.13, FUR, { at: [-0.02, y + 0.07, -0.02] }, [1.25, 0.6, 1.0]);
-  b.sphere(0.07, 0xe8c8a0, { at: [0.05, y + 0.05, 0.08] }, [1.2, 0.7, 0.8]);
-  b.sphere(0.085, FUR, { at: [0.1, y + 0.08, 0.1] }, [1.05, 0.9, 1]);
-  b.sphere(0.04, 0xe8c8a0, { at: [0.13, y + 0.06, 0.17] }, [1.1, 0.7, 0.8]);
-  for (const dx of [0.05, 0.15])
-    b.cone(0.032, 0.07, FUR, { at: [dx, y + 0.16, 0.08], rot: [-0.2, 0, (dx - 0.1) * -6] }, 4);
-  for (const dx of [0.05, 0.15])
-    b.cone(
-      0.016,
-      0.04,
-      0xc87a6a,
-      { at: [dx, y + 0.155, 0.09], rot: [-0.2, 0, (dx - 0.1) * -6] },
-      4,
-    );
-  // Stripes across its back, the tail wrapped round the front.
-  for (const x of [-0.12, -0.05, 0.02])
-    b.box(0.025, 0.01, 0.18, 0xa85a20, { at: [x, y + 0.145, -0.03], rot: [0, 0, 0.1] }, 0);
-  const tail = new THREE.TorusGeometry(0.13, 0.028, 6, 18, Math.PI * 0.8);
-  tail.scale(1.2, 1, 1);
-  b.add(tail, FUR, { at: [-0.02, y + 0.03, 0.0], rot: [Math.PI / 2, 0, 0.6] });
-  // Closed eyes: two dark slits, a pink nose.
-  for (const dx of [0.07, 0.13]) b.box(0.03, 0.006, 0.004, INK, { at: [dx, y + 0.095, 0.185] }, 0);
-  b.box(0.014, 0.01, 0.006, 0xc87a6a, { at: [0.1, y + 0.07, 0.19] }, 0);
 }, 1.3);
 
 /**
