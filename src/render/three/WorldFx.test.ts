@@ -1,10 +1,23 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { type LevelMap, parseLevelMap } from '../../sim/level';
+import { parseDraftMap } from '../../sim/draftMap';
+import { type LevelMap, type Tile, getTile, parseLevelMap } from '../../sim/level';
+import { DEMO_DAY } from '../../sim/levels';
 import { ATMOSPHERES, DEFAULT_ATMOSPHERE, sceneOf } from './atmosphere';
-import { ambientAnchors, beaconAngle, beaconFlare, beaconSpot, chaseLevel } from './WorldFx';
+import {
+  SWEEP_FLOOR,
+  ambientAnchors,
+  beaconAngle,
+  beaconFlare,
+  beaconSpot,
+  chaseLevel,
+  movingHeadLenses,
+  sweepAngle,
+  sweepEnd,
+} from './WorldFx';
 import { loftRoom } from './rooms/loftRoom';
-import { gridToWorld } from '../projection';
+import { gridToWorld, projectPoint } from '../projection';
+import { scenePose } from './scenes/downTheHall';
 import { SCENES } from './scenes';
 
 const read = (path: string) =>
@@ -118,5 +131,106 @@ describe("the lamps' chase", () => {
   it('runs along the row: the next lamp follows a step behind', () => {
     expect(chaseLevel(1200, 6, 1, 5)).toBeCloseTo(chaseLevel(0, 6, 0, 5));
     expect(chaseLevel(0, 6, 0, 5)).not.toBeCloseTo(chaseLevel(0, 6, 2, 5));
+  });
+});
+
+/** Tiles that are not stations, and how high a station reaches with its hero and monitors. */
+const NOT_STATIONS: ReadonlySet<Tile> = new Set<Tile>([
+  'wall',
+  'floor',
+  'counter',
+  'void',
+  'gap',
+  'conveyor',
+]);
+const STATION_HIGH = 1.2;
+
+describe("the moving heads' sweep", () => {
+  const a = ATMOSPHERES['demo-day'];
+  const spec = a?.sweep;
+  const maps = {
+    shipped: DEMO_DAY.map,
+    draft: parseDraftMap(
+      readFileSync(new URL('../../../maps/drafts/demo-day.txt', import.meta.url), 'utf8'),
+    ),
+  };
+
+  it('only the stage has it, faint, slow and no wider than 20° either side', () => {
+    for (const [id, other] of Object.entries(ATMOSPHERES))
+      expect(other.sweep !== undefined, id).toBe(id === 'demo-day');
+    expect(DEFAULT_ATMOSPHERE.sweep).toBeUndefined();
+    expect(spec?.opacity).toBeLessThanOrEqual(0.15);
+    expect(spec?.degrees).toBeLessThanOrEqual(20);
+    expect(spec?.seconds).toBeGreaterThanOrEqual(6);
+  });
+
+  it('swings each way once a period, neighbours in mirror, the same every time', () => {
+    const max = (20 * Math.PI) / 180;
+    expect(sweepAngle(0, 8, 20, 0)).toBeCloseTo(0);
+    expect(sweepAngle(2000, 8, 20, 0)).toBeCloseTo(max);
+    expect(sweepAngle(6000, 8, 20, 0)).toBeCloseTo(-max);
+    expect(sweepAngle(2000, 8, 20, 1)).toBeCloseTo(-max);
+    expect(sweepAngle(10000, 8, 20, 0)).toBeCloseTo(sweepAngle(2000, 8, 20, 0));
+    for (let t = 0; t < 8000; t += 250)
+      expect(Math.abs(sweepAngle(t, 8, 20, 0))).toBeLessThanOrEqual(max + 1e-9);
+  });
+
+  for (const [name, map] of Object.entries(maps)) {
+    it(`hangs from the truss rig's batten over the back wall on the ${name} map`, () => {
+      const build = SCENES['demo-day'];
+      if (!build || !spec) throw new Error('no demo-day scene or sweep');
+      const lenses = movingHeadLenses(build(map), spec.heads);
+      expect(lenses).toHaveLength(spec.heads);
+      for (const lens of lenses) {
+        // Up on the rig, behind the back wall's front face.
+        expect(lens.y).toBeGreaterThan(3.5);
+        expect(lens.z).toBeLessThan(0.5);
+      }
+      // Apart: one each side of the LED wall's middle.
+      const [l, r] = lenses;
+      expect(Math.abs((r?.x ?? 0) - (l?.x ?? 0))).toBeGreaterThan(2);
+    });
+
+    it(`never reaches down to a station on screen on the ${name} map`, () => {
+      const build = SCENES['demo-day'];
+      if (!build || !spec) throw new Error('no demo-day scene or sweep');
+      const pose = scenePose(map);
+      // The highest a station shows on screen: its top, a hero on it, a monitor (about 1.1 up).
+      let stationTop = Infinity;
+      for (let y = 0; y < map.height; y++)
+        for (let x = 0; x < map.width; x++) {
+          const tile = getTile(map, x, y);
+          if (tile === null || NOT_STATIONS.has(tile)) continue;
+          for (const dx of [-0.5, 0.5])
+            for (const dz of [-0.5, 0.5]) {
+              const p = projectPoint(pose, gridToWorld(x + dx, y + dz, STATION_HIGH));
+              stationTop = Math.min(stationTop, p.y);
+            }
+        }
+      const lenses = movingHeadLenses(build(map), spec.heads);
+      expect(lenses.length).toBeGreaterThan(0);
+      for (const lens of lenses) {
+        for (const deg of [-spec.degrees, -spec.degrees / 2, 0, spec.degrees / 2, spec.degrees]) {
+          const end = sweepEnd(lens, spec.length, spec.lean, (deg * Math.PI) / 180);
+          expect(end.y).toBeGreaterThanOrEqual(SWEEP_FLOOR);
+          // The rim of its far end stays above every station on screen, with room to spare.
+          for (const [rx, ry, rz] of [
+            [spec.radius, 0, 0],
+            [-spec.radius, 0, 0],
+            [0, 0, spec.radius],
+            [0, -spec.radius * 0.5, 0],
+          ] as const) {
+            const p = projectPoint(pose, { x: end.x + rx, y: end.y + ry, z: end.z + rz });
+            expect(p.y).toBeLessThan(stationTop - 12);
+          }
+        }
+      }
+    });
+  }
+
+  it('finds no rig in a scene without one', () => {
+    const build = SCENES['scale-up'];
+    if (!build) throw new Error('no scale-up scene');
+    expect(movingHeadLenses(build(MAPS.shipped as LevelMap), 2)).toEqual([]);
   });
 });

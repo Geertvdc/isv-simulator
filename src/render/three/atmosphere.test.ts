@@ -262,6 +262,26 @@ describe('the stage wash and the side lights', () => {
     expect(DEFAULT_ATMOSPHERE.occlusion).toBeUndefined();
   });
 
+  it('gives only the stage a brighter sky on low, where its working lights are off', () => {
+    for (const [id, other] of Object.entries(ATMOSPHERES))
+      expect(other.lowSky !== undefined, id).toBe(id === 'demo-day');
+    expect(DEFAULT_ATMOSPHERE.lowSky).toBeUndefined();
+    expect(a.lowSky).toBeGreaterThan(a.sky.intensity);
+  });
+
+  it('keeps the key and the wash near-neutral, so dark caps stay grey and stations true', () => {
+    for (const c of [a.sun.color, a.wash?.color ?? 0]) {
+      const r = (c >> 16) & 255;
+      const b = c & 255;
+      expect(r - b).toBeLessThanOrEqual(48);
+    }
+    // The wings' working light is soft blue and violet, never saturated.
+    for (const c of [a.sides?.left ?? 0, a.sides?.right ?? 0]) {
+      const ch = [(c >> 16) & 255, (c >> 8) & 255, c & 255];
+      expect((Math.max(...ch) - Math.min(...ch)) / Math.max(...ch)).toBeLessThan(0.25);
+    }
+  });
+
   it('washes the stage from the front, its cone about as wide as the map', () => {
     for (const map of [DEMO_DAY.map, parseDraftMap(demoDayDraft)]) {
       const w = washPlacement(a, map);

@@ -13,7 +13,7 @@ import type { Graphics } from '../../flow/save';
 import { type CameraPose, cameraPosition } from '../projection';
 import { AMBIENT_KEY, type Atmosphere, cssRgba } from './atmosphere';
 import { GLOW_BOOST_KEY } from './kit';
-import { LAMP_KEY, OCCLUSION_KEY, VIGNETTE_KEY } from './look';
+import { LAMP_KEY, LOW_SKY_KEY, OCCLUSION_KEY, VIGNETTE_KEY } from './look';
 import {
   type FrameWatch,
   type Quality,
@@ -190,6 +190,11 @@ export class Stage {
       // Warm room lamps are a nicety: low skips their cost.
       if (obj instanceof THREE.PointLight && obj.userData[LAMP_KEY] === true) {
         obj.visible = this.quality !== 'low';
+      }
+      // A sky that stands in for the hidden lamps on low (`Atmosphere.lowSky`).
+      if (obj instanceof THREE.HemisphereLight) {
+        const sky = obj.userData[LOW_SKY_KEY] as { high: number; low: number } | undefined;
+        if (sky) obj.intensity = this.quality === 'low' ? sky.low : sky.high;
       }
       if (obj instanceof THREE.DirectionalLight && obj.castShadow) {
         if (obj.shadow.mapSize.x !== size) {

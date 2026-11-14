@@ -19,6 +19,7 @@ import { loftRoom } from './rooms/loftRoom';
 import { SCENES } from './scenes';
 import { GROUND, type Scene, type ScenePiece } from './scenes/types';
 import { coffeeVan, narrowboat, quayLamp } from './setDressing/canal';
+import { trussRig } from './setDressing/demoDay';
 import { PIPELINE_SERVER_AT } from './stationModels';
 import { COLOR } from './palette';
 
@@ -65,6 +66,16 @@ const BEACON_LENS: Vec3 = { x: 0, y: 1, z: 0.62 };
 /** How bright the beam's core and the flare draw (over white, so they bloom), and the flare's size. */
 const BEACON_BOOST = 2.6;
 const BEACON_FLARE = 0.42;
+/**
+ * The demo-day truss rig's height and overhang, and where its hung moving
+ * heads' lenses sit from its origin (kept in step with `scenes/demoDay.ts`
+ * and `trussRig` in `setDressing/demoDay.ts`): the batten `bz` in front of
+ * the beam, a head every fourth lamp from the third, its lens 0.4 under the
+ * beam's top.
+ */
+const RIG = { h: 4.5, over: 0.95, bz: 0.55, lensDrop: 0.4, lensForward: 0.06 } as const;
+/** A sweeping beam's far end never comes lower than this (world units): high over the back wall. */
+export const SWEEP_FLOOR = 2.1;
 /** Moving things keep at least this far (grid units) from the level's outline. */
 const CLEAR_OF_PLAY = 1;
 
@@ -203,6 +214,13 @@ export class WorldFx {
     lamps: { light: THREE.PointLight; base: number; halo: THREE.Sprite | null }[];
     group: THREE.Group;
   } | null = null;
+  /** The moving heads' beams (`Atmosphere.sweep`), each turned on its own pivot. */
+  private sweep: {
+    beams: THREE.Object3D[];
+    degrees: number;
+    seconds: number;
+    group: THREE.Group;
+  } | null = null;
   private shake = { untilMs: 0, intensity: 0 };
   shakeEnabled = true;
 
@@ -240,6 +258,7 @@ export class WorldFx {
     this.buildAmbient(world, atmosphere);
     this.buildFixtures(atmosphere);
     this.buildLampGlow(world, atmosphere);
+    this.buildSweep(atmosphere);
     this.rug = new THREE.MeshBasicMaterial({
       color: RUG_COLOR,
       transparent: true,
@@ -292,6 +311,7 @@ export class WorldFx {
     this.moveAmbient(timeMs);
     this.turnBeacon(timeMs);
     this.runChase(timeMs);
+    this.runSweep(timeMs);
     for (let i = this.puffs.length - 1; i >= 0; i--) {
       const puff = this.puffs[i];
       if (!puff) continue;
@@ -516,6 +536,55 @@ export class WorldFx {
     this.runChase(0);
   }
 
+  /**
+   * The moving heads' beams (`Atmosphere.sweep`): faint additive cones from
+   * the truss rig's hung heads, under one group that `Stage` hides on `low`.
+   * No light and no shadows: they only show in the haze.
+   */
+  private buildSweep(atmosphere: Atmosphere): void {
+    const spec = atmosphere.sweep;
+    const id = sceneOf(atmosphere);
+    const build = id === undefined ? undefined : SCENES[id];
+    if (!spec || !build) return;
+    const lenses = movingHeadLenses(build(this.map), spec.heads);
+    if (lenses.length === 0) return;
+    const group = new THREE.Group();
+    group.userData[AMBIENT_KEY] = true;
+    this.root.add(group);
+    const geometry = sweepBeamGeometry(spec.length, spec.radius);
+    const material = new THREE.MeshBasicMaterial({
+      color: spec.color,
+      vertexColors: true,
+      transparent: true,
+      opacity: spec.opacity,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      fog: false,
+    });
+    const beams = lenses.map((at) => {
+      // The pivot swings side to side; the cone inside it leans toward the camera.
+      const pivot = new THREE.Group();
+      putAt(pivot, at);
+      const beam = new THREE.Mesh(geometry, material);
+      beam.rotation.x = -spec.lean;
+      pivot.add(beam);
+      group.add(pivot);
+      return pivot;
+    });
+    this.sweep = { beams, degrees: spec.degrees, seconds: spec.seconds, group };
+    this.runSweep(0);
+  }
+
+  /** The beams swing side to side, neighbours in mirror. */
+  private runSweep(timeMs: number): void {
+    const s = this.sweep;
+    if (!s?.group.visible) return;
+    s.beams.forEach((pivot, i) => {
+      pivot.rotation.z = sweepAngle(timeMs, s.seconds, s.degrees, i);
+    });
+  }
+
   /** The lamps swell and dim in a slow wave along the row, their halos with them. */
   private runChase(timeMs: number): void {
     const c = this.chase;
@@ -710,6 +779,67 @@ export function beaconSpot(map: LevelMap): Vec3 | null {
 }
 
 /**
+ * Where the truss rig's hung moving heads have their lenses (world units),
+ * `count` of them spread along the batten from the outermost in; none for a
+ * scene without the rig.
+ */
+export function movingHeadLenses(scene: Scene, count: number): Vec3[] {
+  const rig = scene.pieces.find(
+    (p) =>
+      p.piece.size[1] === 0.6 &&
+      p.piece === trussRig(p.piece.size[0] - RIG.over * 2, RIG.h, RIG.over),
+  );
+  if (!rig || count <= 0) return [];
+  const span = rig.piece.size[0] - RIG.over * 2;
+  const half = span / 2;
+  const xs: number[] = [];
+  for (let x = -half + 0.55, k = 0; x < half - 0.4; x += 0.6, k++) if (k % 4 === 2) xs.push(x);
+  if (xs.length === 0) return [];
+  const picked =
+    count === 1
+      ? [xs[Math.floor(xs.length / 2)] ?? 0]
+      : Array.from(
+          { length: Math.min(count, xs.length) },
+          (_, i) =>
+            xs[Math.round((i * (xs.length - 1)) / Math.max(1, Math.min(count, xs.length) - 1))] ??
+            0,
+        );
+  return picked.map((x) =>
+    placeOn(rig, { x, y: RIG.h - RIG.lensDrop, z: RIG.bz + RIG.lensForward }),
+  );
+}
+
+/**
+ * A moving head's swing at `timeMs` (radians, as the pivot's `rotation.z`):
+ * up to `degrees` either side, once every `seconds`, beam `index` in mirror
+ * of its neighbour.
+ */
+export function sweepAngle(
+  timeMs: number,
+  seconds: number,
+  degrees: number,
+  index: number,
+): number {
+  const phase = (timeMs / 1000 / seconds) * Math.PI * 2 + (index % 2) * Math.PI;
+  return ((degrees * Math.PI) / 180) * Math.sin(phase);
+}
+
+/**
+ * Where a sweeping beam ends (world units) from its lens at `at`, leaning
+ * `lean` toward the camera and swung by `angle`: the lowest point it lights.
+ */
+export function sweepEnd(at: Vec3, length: number, lean: number, angle: number): Vec3 {
+  // Down the cone's axis, tipped toward +z by `lean`, then swung about z by `angle`.
+  const y = -Math.cos(lean) * length;
+  const z = Math.sin(lean) * length;
+  return {
+    x: at.x - Math.sin(angle) * y,
+    y: at.y + Math.cos(angle) * y,
+    z: at.z + z,
+  };
+}
+
+/**
  * How far up its slow chase the lamp `index` of `count` is at `timeMs`, in
  * [0, 1]: one smooth wave along the row every `seconds`.
  */
@@ -746,6 +876,24 @@ function beamGeometry(reach: number): THREE.BufferGeometry {
   const colors: number[] = [];
   for (let i = 0; i < position.count; i++) {
     const k = (1 - Math.min(1, Math.max(0, position.getX(i) / reach))) ** 2;
+    colors.push(k, k, k);
+  }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  return g;
+}
+
+/**
+ * A moving head's beam: an open cone from its tip at the lens down along
+ * −y, `radius` wide at its far end, brightest at the lens and gone by its end.
+ */
+function sweepBeamGeometry(length: number, radius: number): THREE.BufferGeometry {
+  const g = new THREE.ConeGeometry(radius, length, 20, 6, true);
+  // The cone's tip is at +length/2: put it at the origin, opening downward.
+  g.translate(0, -length / 2, 0);
+  const position = g.getAttribute('position');
+  const colors: number[] = [];
+  for (let i = 0; i < position.count; i++) {
+    const k = (1 - Math.min(1, Math.max(0, -position.getY(i) / length))) ** 1.5;
     colors.push(k, k, k);
   }
   g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
