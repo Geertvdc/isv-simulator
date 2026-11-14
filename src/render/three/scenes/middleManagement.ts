@@ -5,7 +5,7 @@ import { firstGroup, tileHash } from '../../mapShape';
 import { tint } from '../kit';
 import { managerOffice } from '../rooms/managerOffice';
 import { segfaultCat } from '../setDressing/onCall';
-import { redLight, towerCrane, towerUnderConstruction } from '../setDressing/rooftop';
+import { redLight, towerCrane } from '../setDressing/rooftop';
 import {
   bigPlant,
   bus,
@@ -16,6 +16,9 @@ import {
   COLORS,
   cradle,
   CRADLE,
+  CRANE_TOWER,
+  CURTAIN,
+  craneTower,
   cradleRopes,
   credenza,
   curtainWall,
@@ -27,6 +30,7 @@ import {
   glassOffice,
   liftBank,
   LIFTS,
+  liftWidth,
   lowSofa,
   monolithTower,
   planterTrough,
@@ -97,8 +101,20 @@ const RECEPTION = 3.0;
 const SIDE = { min: 1.45, max: 2.1 } as const;
 /** How far the lobby's stone runs in front (out of the frame). */
 const LOBBY = 2.6;
-/** The street far below, out from the curtain wall: the building's face, pavement, road, the far pavement. */
-const STREET = { face: 0.3, walk: 0.26, road: 0.62, far: 0.22 } as const;
+/**
+ * The street far below, out from the curtain wall: the building's face, the pavement along the
+ * sides (wide, so the road clears the side curtain walls on screen) and behind, the road, the far
+ * pavement.
+ */
+const STREET = { face: 0.55, walk: 0.62, back: 0.17, road: 0.42, far: 0.15 } as const;
+/** The street's props (trees, cars, the bus) are this much smaller than the floor's: they're far below. */
+const CITY = 0.6;
+/** How far the building's shadow falls across the street on its right (the sun is back left). */
+const SHADOW = 1.35;
+/** How wide the park block is between the side street and the next street out. */
+const BLOCK = 2.1;
+/** How far the window cleaner's cradle hangs off the curtain wall's glass. */
+const CRADLE_OFF = 0.62;
 /** Derek's office (when the World builds it): how far it pokes past the curtain wall at the back and the side. */
 const POKE = { back: 1.4, side: 1.2 } as const;
 /** The screen the scene is composed for. */
@@ -137,6 +153,45 @@ function unit(a: number, b: number, salt: number): number {
   h = Math.imul(h, 0x45d9f3b);
   h ^= h >>> 16;
   return ((h >>> 0) % 1000) / 1000;
+}
+
+interface Rect {
+  x0: number;
+  x1: number;
+  z0: number;
+  z1: number;
+}
+
+/** The part of patch `g` inside `r`, or null. */
+function overlap<T extends Rect>(g: T, r: Rect): T | null {
+  const x0 = Math.max(g.x0, r.x0);
+  const x1 = Math.min(g.x1, r.x1);
+  const z0 = Math.max(g.z0, r.z0);
+  const z1 = Math.min(g.z1, r.z1);
+  return x1 - x0 > 0.01 && z1 - z0 > 0.01 ? { ...g, x0, x1, z0, z1 } : null;
+}
+
+/** Patch `g` with the rectangles `holes` cut out of it, as up to four strips each. */
+function cut<T extends Rect>(g: T, holes: readonly Rect[]): T[] {
+  let parts: T[] = [g];
+  for (const h of holes) {
+    const next: T[] = [];
+    for (const p of parts) {
+      if (!overlap(p, h)) {
+        next.push(p);
+        continue;
+      }
+      const strips: T[] = [
+        { ...p, z1: Math.min(p.z1, h.z0) },
+        { ...p, z0: Math.max(p.z0, h.z1) },
+        { ...p, x1: Math.min(p.x1, h.x0), z0: Math.max(p.z0, h.z0), z1: Math.min(p.z1, h.z1) },
+        { ...p, x0: Math.max(p.x0, h.x1), z0: Math.max(p.z0, h.z0), z1: Math.min(p.z1, h.z1) },
+      ];
+      next.push(...strips.filter((q) => q.x1 - q.x0 > 0.01 && q.z1 - q.z0 > 0.01));
+    }
+    parts = next;
+  }
+  return parts;
 }
 
 /** Which edge of the map a group of tiles sits on (the inbox, the ship). */
@@ -349,52 +404,113 @@ export function middleManagementScene(map: LevelMap): Scene {
   const far = 8;
 
   // ---- Ground: the city far below, then the building's face, then its floor ----
+  // The street is drawn at a smaller scale than the floor (narrow roads, fine flags, small trees
+  // and cars) so it reads as far below, and the building's slab edge runs round it as a band.
   const W = STREET;
   const near = W.face + W.walk;
   // The streets: one along each side and one behind, each pavement, road, far pavement; parks past them.
   const lRoad = leftLine - near;
   const rRoad = rightLine + near;
-  const bRoad = backZ - near;
-  patch('park', edgeL - far, lRoad - W.road - W.far, topZ - far, frontZ + far);
-  patch('park', rRoad + W.road + W.far, edgeR + far, topZ - far, frontZ + far);
-  patch('park', edgeL - far, edgeR + far, topZ - far, bRoad - W.road - W.far);
-  patch('roadZ', lRoad - W.road, lRoad, topZ - far, frontZ + far);
-  patch('roadZ', rRoad, rRoad + W.road, topZ - far, frontZ + far);
-  patch('roadX', edgeL - far, edgeR + far, bRoad - W.road, bRoad);
-  patch('walk', lRoad - W.road - W.far, lRoad - W.road, bRoad - W.road, frontZ + far);
-  patch('walk', rRoad + W.road, rRoad + W.road + W.far, bRoad - W.road, frontZ + far);
-  patch(
+  const bRoad = backZ - W.face - W.back;
+  const city: GroundPatch[] = [];
+  const street = (kind: string, x0: number, x1: number, z0: number, z1: number) => {
+    if (x1 - x0 > 0.01 && z1 - z0 > 0.01) city.push({ kind, x0, x1, z0, z1 });
+  };
+  // Past each side street a city block of park, then the next street out (pavement, road,
+  // pavement), so the view down reads as streets in a grid, not one lawn.
+  const outL = lRoad - W.road - W.far - BLOCK;
+  const outR = rRoad + W.road + W.far + BLOCK;
+  const outer = [
+    { x0: outL - W.far - W.road - W.far, x1: outL, z0: bRoad - W.road - W.far, z1: frontZ + far },
+    { x0: outR, x1: outR + W.far + W.road + W.far, z0: bRoad - W.road - W.far, z1: frontZ + far },
+  ];
+  for (const g of [
+    { x0: edgeL - far, x1: lRoad - W.road - W.far, z0: topZ - far, z1: frontZ + far },
+    { x0: rRoad + W.road + W.far, x1: edgeR + far, z0: topZ - far, z1: frontZ + far },
+    { x0: edgeL - far, x1: edgeR + far, z0: topZ - far, z1: bRoad - W.road - W.far },
+  ])
+    for (const p of cut(g, outer)) street('park', p.x0, p.x1, p.z0, p.z1);
+  for (const [x, s] of [
+    [outL, -1],
+    [outR, 1],
+  ] as const) {
+    const a = x + s * W.far;
+    const b = a + s * W.road;
+    const c = b + s * W.far;
+    const z0 = bRoad - W.road - W.far;
+    street('walk', Math.min(x, a), Math.max(x, a), z0, frontZ + far);
+    street('roadZ', Math.min(a, b), Math.max(a, b), z0, frontZ + far);
+    street('walk', Math.min(b, c), Math.max(b, c), z0, frontZ + far);
+  }
+  street('roadZ', lRoad - W.road, lRoad, topZ - far, frontZ + far);
+  street('roadZ', rRoad, rRoad + W.road, topZ - far, frontZ + far);
+  street('roadX', edgeL - far, edgeR + far, bRoad - W.road, bRoad);
+  street('walk', lRoad - W.road - W.far, lRoad - W.road, bRoad - W.road, frontZ + far);
+  street('walk', rRoad + W.road, rRoad + W.road + W.far, bRoad - W.road, frontZ + far);
+  street(
     'walk',
     lRoad - W.road - W.far,
     rRoad + W.road + W.far,
     bRoad - W.road - W.far,
     bRoad - W.road,
   );
-  patch('walk', lRoad, leftLine - W.face, bRoad, frontZ + far);
-  patch('walk', rightLine + W.face, rRoad, bRoad, frontZ + far);
-  patch('walk', lRoad, rRoad, bRoad, backZ - W.face);
-  // The building's face going down, round its outline (and round the office poking out).
-  patch('faceZ', leftLine - W.face, leftLine, backZ - W.face, frontZ + far);
-  patch('faceZ', rightLine, rightLine + W.face, backZ - W.face, frontZ + far);
-  patch('faceX', leftLine - W.face, rightLine + W.face, backZ - W.face, backZ);
+  street('walk', lRoad, leftLine - W.face, bRoad, frontZ + far);
+  street('walk', rightLine + W.face, rRoad, bRoad, frontZ + far);
+  street('walk', lRoad, rRoad, bRoad, backZ - W.face);
+  // The building's slab edge and face going down, round its outline (and round the office poking
+  // out), each named for the side the building is on (its nosing runs along that edge).
+  street('face+x', leftLine - W.face, leftLine, backZ - W.face, frontZ + far);
+  street('face-x', rightLine, rightLine + W.face, backZ - W.face, frontZ + far);
+  street('face+z', leftLine - W.face, rightLine + W.face, backZ - W.face, backZ);
   if (poke) {
     const x = poke.side === 'left' ? L : R;
     const s = poke.side === 'left' ? -1 : 1;
     const xs = [x, x + s * W.face].sort((a, b) => a - b) as [number, number];
     const line = poke.side === 'left' ? leftLine : rightLine;
     const span = [Math.min(x + s * W.face, line), Math.max(x + s * W.face, line)] as const;
-    patch('faceZ', xs[0], xs[1], poke.z0 - W.face, poke.z1 + W.face);
-    patch('faceX', span[0], span[1], poke.z0 - W.face, poke.z0);
-    patch('faceX', span[0], span[1], poke.z1, poke.z1 + W.face);
+    street(s < 0 ? 'face+x' : 'face-x', xs[0], xs[1], poke.z0 - W.face, poke.z1 + W.face);
+    street('face+z', span[0], span[1], poke.z0 - W.face, poke.z0);
+    street('face-z', span[0], span[1], poke.z1, poke.z1 + W.face);
   }
   if (office) {
-    patch('faceX', office.x0 - W.face, office.x1 + W.face, office.z0 - W.face, office.z0);
-    patch('faceZ', office.x1, office.x1 + W.face, office.z0 - W.face, office.z1 + W.face);
-    patch('faceZ', office.x0 - W.face, office.x0, office.z0 - W.face, backZ);
-    patch('faceX', rightLine, office.x1 + W.face, office.z1, office.z1 + W.face);
+    street('face+z', office.x0 - W.face, office.x1 + W.face, office.z0 - W.face, office.z0);
+    street('face-x', office.x1, office.x1 + W.face, office.z0 - W.face, office.z1 + W.face);
+    street('face+x', office.x0 - W.face, office.x0, office.z0 - W.face, backZ);
+    street('face-z', rightLine, office.x1 + W.face, office.z1, office.z1 + W.face);
   }
+  // Nothing of the street under Derek's office floor; the building's shadow (the sun is back left)
+  // across the street on its right, a soft edge at its end.
+  const holes = office ? [office] : [];
+  const shadows: [string, { x0: number; x1: number; z0: number; z1: number }][] = [
+    [':s', { x0: rightLine, x1: rightLine + SHADOW, z0: backZ - W.face, z1: frontZ + far }],
+    [':h', { x0: rightLine + SHADOW, x1: rightLine + SHADOW + 0.3, z0: backZ, z1: frontZ + far }],
+  ];
+  if (office)
+    shadows.push(
+      [':s', { x0: office.x1, x1: office.x1 + SHADOW, z0: office.z0, z1: office.z1 + 1 }],
+      [
+        ':h',
+        { x0: office.x1 + SHADOW, x1: office.x1 + SHADOW + 0.3, z0: office.z0, z1: office.z1 },
+      ],
+    );
+  for (const g of city)
+    for (const part of cut(g, holes)) {
+      // The parts in shadow, then the rest lit.
+      let rest = [part];
+      for (const [suffix, sh] of shadows) {
+        const next: GroundPatch[] = [];
+        for (const r of rest) {
+          const inside = overlap(r, sh);
+          if (inside) ground.push({ ...inside, kind: r.kind + suffix });
+          next.push(...cut(r, [sh]));
+        }
+        rest = next;
+      }
+      ground.push(...rest);
+    }
   // The floor: reception's stone behind, the carpet down the sides, the lobby's stone in front.
-  patch('stone', leftLine, rightLine, backZ, B);
+  for (const g of cut({ x0: leftLine, x1: rightLine, z0: backZ, z1: B }, holes))
+    patch('stone', g.x0, g.x1, g.z0, g.z1);
   patch('carpet', leftLine, L, B, F);
   patch('carpet', R, rightLine, B, F);
   patch('stone', leftLine, rightLine, F, frontZ + far);
@@ -462,7 +578,7 @@ export function middleManagementScene(map: LevelMap): Scene {
   if (backRight - shelf > 3) {
     const x = shelf + 1.4;
     putClear(lowSofa, x, sofaZ, 0.7, 0.75, 0, 1);
-    putClear(podChair, x + 1.5, sofaZ + 0.3, 0.4, 1.0, -0.5, 2);
+    putClear(podChair, x + 1.5, sofaZ + 0.3, 0.4, 0.85, 0.3, 2);
     putClear(bigPlant, Math.min(backRight - 0.3, x + 2.6), backZ + 0.35, 0.3, 1.5, 0, 3);
   }
   if (!office) putClear(bigPlant, rightLine - 0.35, backZ + 0.35, 0.3, 1.5, 0, 0);
@@ -491,29 +607,88 @@ export function middleManagementScene(map: LevelMap): Scene {
     put(puttingMat, ox + ow * 0.62, oz + od * 0.62, -0.25);
   }
 
+  /** The screen box (x0, y0, x1, y1) of the world box x0..x1, up y0..y1 from the ground, z0..z1. */
+  const screenBox = (
+    x0: number,
+    x1: number,
+    y0: number,
+    y1: number,
+    z0: number,
+    z1: number,
+  ): [number, number, number, number] => {
+    const pts = [];
+    for (const x of [x0, x1])
+      for (const y of [y0, y1])
+        for (const z of [z0, z1]) pts.push(projectPoint(pose, { x, y: GROUND + y, z }));
+    return [
+      Math.min(...pts.map((p) => p.x)),
+      Math.min(...pts.map((p) => p.y)),
+      Math.max(...pts.map((p) => p.x)),
+      Math.max(...pts.map((p) => p.y)),
+    ];
+  };
+  type Box = readonly [number, number, number, number];
+  const hits = (r: Box, q: Box) => !(r[2] <= q[0] || r[0] >= q[2] || r[3] <= q[1] || r[1] >= q[3]);
+  const offHud = (r: Box) => HUD.every((q) => !hits(r, q));
+
   // ---- The crane tower across the street behind, MONOLITH's tower further off ----
+  /** Where the crane tower stands along x (the trees keep out of its way). */
+  let towerAt: { x0: number; x1: number; z: number } | null = null;
   {
-    const tz = bRoad - W.road - 0.08;
-    const tw = 1.7;
-    // Right of the order cards, left of the office (or the frame's right).
-    const xMin = xAt(CARDS_RIGHT + 30, tz, 1.2) + tw / 2;
-    const xMax = (office ? Math.min(office.x0, xAt(1180, tz)) : xAt(1180, tz, 1.2)) - tw / 2;
-    const tx = Math.min(xMax, Math.max(xMin, (xMin + xMax) / 2));
-    // As tall as lets the crane's jib and its red light stay in the frame.
-    const mast = 0.32;
-    let th = 1.6;
-    while (th > 0.3 && !onScreen(tx, tz - 0.35, th + mast + 0.62, 6)) th -= 0.05;
-    th = Math.round(th * 20) / 20;
-    put(towerUnderConstruction(tw, 1.2, th), tx, tz, 0, 0, 'far');
-    // The crane on its roof, the jib out over the street away from the office.
-    const jib = 1.5;
-    const yaw = office ? Math.PI : 0;
-    put(towerCrane(mast, jib), tx, tz - 0.35, yaw, 0, 'far', th);
+    const tw = 1.0;
+    const td = 0.5;
+    const tz = bRoad - W.road - 0.05;
+    // The crane on its roof (small, as it's far), its jib out sideways away from the office.
+    const cs = 0.45;
+    const mast = 0.4;
+    const jib = 1.4;
     const dir = office ? -1 : 1;
-    put(redLight, tx + dir * (jib - 0.05), tz - 0.35, 0, 0, 'far', th + mast + 0.32);
-    put(redLight, tx, tz - 0.35, 0, 0, 'far', th + mast + 0.55);
+    const craneTop = (mast + 0.55) * cs;
+    // Right of the order cards and left of the office (or the mute button), the whole thing, crane
+    // and lights in the frame; as many storeys as fit, and the middle of where it fits.
+    const right = office
+      ? screenBox(office.x0, office.x0, 0, 2.3, office.z0, office.z0)[0] - 8
+      : 1360;
+    const fits = (x: number, floors: number) => {
+      const h = floors * CRANE_TOWER.storey;
+      const cz = tz - td / 2;
+      const a = screenBox(x - tw / 2, x + tw / 2, 0, h + 0.1, tz - td, tz);
+      const c = screenBox(
+        Math.min(x - 0.2, x + dir * jib * cs),
+        Math.max(x + 0.2, x + dir * jib * cs),
+        h,
+        h + craneTop,
+        cz - 0.1,
+        cz + 0.1,
+      );
+      // Under the curtain wall's spandrel band on screen, so the crane isn't hidden behind it.
+      const band = projectPoint(pose, { x, y: GROUND + CURTAIN.floor, z: backZ - 0.1 }).y + 3;
+      return (
+        Math.min(a[0], c[0]) > CARDS_RIGHT + 5 &&
+        Math.max(a[2], c[2]) < right &&
+        Math.min(a[1], c[1]) > Math.max(4, band)
+      );
+    };
+    for (let floors = 10; floors >= 4; floors--) {
+      const xs: number[] = [];
+      for (let x = xAt(CARDS_RIGHT, tz); x < xAt(1440, tz); x += 0.1)
+        if (fits(x, floors)) xs.push(x);
+      const first = xs[0];
+      const last = xs[xs.length - 1];
+      if (first === undefined || last === undefined) continue;
+      // Beside Derek's office when he has one (clear of Prod and the sofa), else the middle.
+      const tx = Math.round((office ? last - 0.2 : (first + last) / 2) * 20) / 20;
+      const h = floors * CRANE_TOWER.storey;
+      put(craneTower(tw, td, floors), tx, tz, 0, 0, 'far');
+      towerAt = { x0: tx - tw / 2 - 0.25, x1: tx + tw / 2 + 0.25, z: tz };
+      const cz = tz - td / 2;
+      put(towerCrane(mast, jib), tx, cz, office ? Math.PI : 0, 0, 'far', h, cs);
+      put(redLight, tx + dir * (jib - 0.05) * cs, cz, 0, 0, 'far', h + (mast + 0.32) * cs);
+      put(redLight, tx, cz, 0, 0, 'far', h + (mast + 0.55) * cs);
+      break;
+    }
     // MONOLITH, further off, toward the right.
-    const mz = tz - 1.6;
+    const mz = tz - 2.2;
     const mx = Math.min(office ? office.x0 + 1.2 : xAt(1250, mz), xAt(1300, mz));
     put(monolithTower(1.4, 3.2), mx, mz, 0, 0, 'far');
   }
@@ -537,17 +712,39 @@ export function middleManagementScene(map: LevelMap): Scene {
         : null;
   let liftZ = Infinity;
   let liftX = 0;
+  let liftW = 0;
   if (liftSide) {
-    // Against the curtain wall, its doors facing the room (the camera sees that face), its front end
-    // just behind the lobby's stone, a walkway between it and the room.
+    // At the room's front corner, its doors facing the camera across the lobby: tucked against
+    // the curtain wall, as far forward as keeps it off the HUD and wholly in the frame.
     const right = liftSide === 'right';
-    const count = 1 + (F - B > 8 ? 1 : 0);
-    const lw = count * 0.95 + 0.3;
     const line = right ? rightLine : leftLine;
-    liftX = line + (right ? -1 : 1) * (LIFTS.depth + 0.06);
-    const z = F - 0.1 - lw / 2;
-    liftZ = z - lw / 2;
-    put(liftBank(count), liftX, z, right ? -Math.PI / 2 : Math.PI / 2);
+    const inner = right ? R + 0.12 : L - 0.12;
+    const span = Math.abs(line - inner) - 0.1;
+    const count = span >= liftWidth(2) && F - B > 8 ? 2 : 1;
+    liftW = liftWidth(count);
+    const D = LIFTS.depth;
+    const s = right ? -1 : 1;
+    let best: [number, number] | null = null;
+    for (let fz = F + 0.2; fz > F - 5 && !best; fz -= 0.05)
+      for (let k = 0; k <= 12 && !best; k++) {
+        const x = line + s * (0.1 + liftW / 2 + k * 0.05);
+        if (right ? x - liftW / 2 < inner : x + liftW / 2 > inner) break;
+        const r = screenBox(
+          x - liftW / 2 - 0.03,
+          x + liftW / 2 + 0.03,
+          0,
+          LIFTS.height + 0.06,
+          fz - D - 0.03,
+          fz + 0.04,
+        );
+        if (r[0] > 20 && r[2] < 1420 && r[3] < 800 && offHud(r)) best = [x, fz];
+      }
+    if (best) {
+      [liftX, liftZ] = [best[0], best[1] - D];
+      // Its open car's light keeps its warmth (a small emitter, like the release board's).
+      hot.add(liftBank(count));
+      put(liftBank(count), liftX, best[1], 0);
+    }
   }
   /** Props against one side's curtain wall, back to front, facing the room; skipped where the HUD is. */
   const dress = (side: 'left' | 'right', z0: number, z1: number) => {
@@ -562,7 +759,7 @@ export function middleManagementScene(map: LevelMap): Scene {
         ? [
             [coatStand, 0.3, 1.8, 0.45, 0],
             [lowSofa, 0.7, 0.75, 0.9, 2],
-            [podChair, 0.42, 1.0, 0.45, 3],
+            [podChair, 0.42, 0.85, 0.45, 3],
             [bigPlant, 0.3, 1.5, 0.6, 4],
             [printer, 0.36, 0.95, 0.75, 0],
           ]
@@ -570,14 +767,15 @@ export function middleManagementScene(map: LevelMap): Scene {
             [printer, 0.36, 0.95, 0.75, 0],
             [coatStand, 0.3, 1.8, 0.45, 0],
             [bigPlant, 0.3, 1.5, 0.6, 1],
-            [podChair, 0.42, 1.0, 0.45, 0],
+            [podChair, 0.42, 0.85, 0.45, 0],
             [lowSofa, 0.7, 0.75, 0.9, 3],
           ];
     for (const [piece, r, high, gap, v] of plan) {
       const zc = z + r + 0.1;
       if (zc + r > z1) break;
       const x = wall + s * (piece === podChair ? Math.min(span - 0.55, 1.2) : r * 0.8 + 0.12);
-      const yaw = piece === podChair ? face - s * 0.6 : face;
+      // The pod chair opens toward the camera, turned a little to the room, so its seat shows.
+      const yaw = piece === podChair ? s * 0.45 : face;
       if (putClear(piece, x, zc, r, high, yaw, v)) {
         // A low coffee table in front of the breakout sofa.
         if (piece === lowSofa && span > 1.5) putClear(coffeeTable, x + s * 0.95, zc, 0.35, 0.42);
@@ -590,95 +788,172 @@ export function middleManagementScene(map: LevelMap): Scene {
     dress('right', (office ? office.z1 : B) + 0.2, (liftSide === 'right' ? liftZ : F) - 0.2);
 
   // ---- The window cleaner's cradle, outside the glass on the right ----
+  // In the frame on the right curtain wall (about x 1300–1420, y 300–450 on screen), its two thin
+  // ropes steered back along the facade and off the top of the frame left of the mute button.
   {
-    const z0 = (office ? office.z1 : backZ) + 1.0;
-    const z1 = Math.min(liftZ, F) - 0.8;
-    const x = rightLine + 0.06 + CRADLE.wide / 2;
-    let z = (z0 + z1) / 2;
-    while (z > z0 && !onScreen(x + 0.8, z, 1.2, 10)) z -= 0.25;
-    if (z1 > z0 && onScreen(x + 0.4, z, 0, 10)) {
-      put(cradle, x, z, -Math.PI / 2);
-      put(cradleRopes(6), x, z, -Math.PI / 2, 0, 'far');
-      person(x + 0.02, z + 0.25, -Math.PI / 2 - 0.2, 'idle');
+    // Hung a little off the glass, so the cradle shows past the curtain wall's top edge.
+    const x = rightLine + CRADLE_OFF + CRADLE.wide / 2;
+    const z0 = (office ? office.z1 : backZ) + 0.9;
+    const z1 = Math.min(liftZ, F) - 0.9;
+    let best: { z: number; d: number } | null = null;
+    for (let z = z0; z <= z1; z += 0.1) {
+      const r = screenBox(
+        x - CRADLE.wide / 2,
+        x + CRADLE.wide / 2 + 0.2,
+        0,
+        1.55,
+        z - CRADLE.len / 2,
+        z + CRADLE.len / 2,
+      );
+      if (r[0] < 1260 || r[2] > 1432 || r[1] < 120 || r[3] > 560 || !offHud(r)) continue;
+      const d = Math.abs((r[1] + r[3]) / 2 - 375);
+      if (!best || d < best.d) best = { z, d };
+    }
+    // The ropes' top: up and back along the facade until it's off the top of the frame.
+    let rope: [number, number, number] | null = null;
+    if (best) {
+      const z = best.z;
+      const ok = (dx: number, dy: number, dz: number) => {
+        // Both ropes, sampled along their length: clear of the mute button, ending above the frame.
+        for (const s of [-1, 1]) {
+          const a = { x, y: GROUND + 1.5, z: z + (s * CRADLE.len) / 2 };
+          const c = { x: x + dx, y: GROUND + dy, z: z + dz + s * 0.3 };
+          const top = projectPoint(pose, c);
+          if (top.y > -10 || top.x > 1355) return false;
+          for (let t = 0; t <= 1; t += 0.05) {
+            const p = projectPoint(pose, {
+              x: a.x + (c.x - a.x) * t,
+              y: a.y + (c.y - a.y) * t,
+              z: a.z + (c.z - a.z) * t,
+            });
+            if (p.x > 1360 && p.y < 70) return false;
+          }
+        }
+        return true;
+      };
+      search: for (let dz = 0; dz >= -12; dz -= 0.25)
+        for (const dy of [3, 4, 5, 6])
+          for (const dx of [0.15, 0]) {
+            if (ok(dx, dy, dz)) {
+              rope = [dx, dy, dz];
+              break search;
+            }
+          }
+    }
+    if (best && rope) {
+      put(cradle, x, best.z, -Math.PI / 2);
+      put(cradleRopes(...rope), x, best.z, 0, 0, 'far');
+      person(x + 0.02, best.z + 0.25, -Math.PI / 2 - 0.2, 'idle');
     }
   }
 
-  // ---- The street far below: cherry trees, a bus stop, cars and a bus ----
-  /** A clump of blossoming cherry trees round (x, z), along `along`. */
-  const trees = (x: number, z: number, count: number, salt: number, along: 'x' | 'z') => {
-    for (let k = 0; k < count; k++) {
-      const u = (k - (count - 1) / 2) * 0.36 + (unit(k, salt, 13) - 0.5) * 0.1;
-      const w = (unit(k, salt, 17) - 0.5) * 0.12;
-      const tx = along === 'x' ? x + u : x + w;
-      const tz = along === 'x' ? z + w : z + u;
-      if (!offSlab(tx, tz, 0.25) || !onScreen(tx, tz, 0, -40)) continue;
-      if (
-        office &&
-        tx > office.x0 - 0.3 &&
-        tx < office.x1 + 0.3 &&
-        tz > office.z0 - 0.3 &&
-        tz < office.z1
-      )
-        continue;
-      put(cherryTree, tx, tz, unit(k, salt, 19) * 6, k + salt, 'far');
+  // ---- The street far below: cherry trees in rows, a bus stop, cars and a bus ----
+  /** Whether a city prop at (x, z), `r` round, keeps out from under the building and the office. */
+  const inStreet = (x: number, z: number, r: number) => {
+    if (!offSlab(x, z, r)) return false;
+    if (towerAt && x > towerAt.x0 && x < towerAt.x1 && z > towerAt.z - 1 && z < towerAt.z + 0.6)
+      return false;
+    if (
+      office &&
+      x > office.x0 - r &&
+      x < office.x1 + W.face + r &&
+      z > office.z0 - W.face - r &&
+      z < office.z1 + r
+    )
+      return false;
+    if (x > leftLine - W.face - r && x < rightLine + W.face + r && z > backZ - W.face - r)
+      return false;
+    if (
+      poke &&
+      (poke.side === 'left' ? x > L - W.face - r : x < R + W.face + r) &&
+      z > poke.z0 - W.face - r &&
+      z < poke.z1 + W.face + r
+    )
+      return false;
+    return true;
+  };
+  /** A row of blossoming cherry trees in clumps of 3–4 overlapping canopies, from a to b along `along` at `at`. */
+  const treeRow = (along: 'x' | 'z', at: number, a: number, b: number, salt: number, phase = 0) => {
+    const step = 0.24;
+    for (let u = a + phase, k = 0; u < b; k++) {
+      const count = 3 + (unit(k, salt, 11) > 0.5 ? 1 : 0);
+      for (let j = 0; j < count; j++) {
+        const p = u + j * step + (unit(k * 7 + j, salt, 13) - 0.5) * 0.05;
+        const q = at + (unit(k * 7 + j, salt, 17) - 0.5) * 0.06;
+        const tx = along === 'x' ? p : q;
+        const tz = along === 'x' ? q : p;
+        if (p > b || !inStreet(tx, tz, 0.12) || !onScreen(tx, tz, 0, -40)) continue;
+        put(
+          cherryTree,
+          tx,
+          tz,
+          unit(k, j + salt, 19) * 6,
+          k + j + salt,
+          'far',
+          0,
+          CITY * (0.92 + unit(k, j, salt) * 0.16),
+        );
+      }
+      u += (count - 1) * step + 0.55 + unit(k, salt, 23) * 0.35;
     }
   };
-  // Along the near pavements, in clumps with gaps; in the parks past the roads, bigger clumps.
-  const walkMid = W.face + W.walk / 2;
-  for (const [side, s] of [
-    ['left', -1],
-    ['right', 1],
-  ] as const) {
-    const line = side === 'left' ? leftLine : rightLine;
-    for (let z = backZ + 0.4, k = 0; z < frontZ; z += 2.2, k++) {
-      trees(line + s * walkMid, z, 2 + (k % 2), k * 3 + (s > 0 ? 50 : 0), 'z');
-      const parkX = line + s * (near + W.road + W.far + 0.55 + unit(k, s, 23) * 0.5);
-      trees(parkX, z + 1.0, 3, k * 5 + (s > 0 ? 70 : 20), 'z');
-      trees(parkX + s * 1.4, z + 0.2, 2, k * 7 + (s > 0 ? 110 : 130), 'z');
-    }
+  // Along both pavements of each side street and the street behind, and a row into each park.
+  for (const s of [-1, 1] as const) {
+    const line = s < 0 ? leftLine : rightLine;
+    const salt = s > 0 ? 50 : 0;
+    treeRow('z', line + s * (W.face + W.walk * 0.72), topZ, frontZ + 1, salt);
+    treeRow('z', line + s * (near + W.road + W.far * 0.5), topZ, frontZ + 1, salt + 7, 0.4);
+    const block = near + W.road + W.far;
+    treeRow('z', line + s * (block + 0.5), topZ, frontZ + 1, salt + 13, 0.2);
+    treeRow('z', line + s * (block + BLOCK + W.far * 0.5), topZ, frontZ + 1, salt + 19, 0.1);
   }
-  for (let x = leftLine + 0.6, k = 0; x < rightLine; x += 2.4, k++)
-    trees(x, backZ - walkMid, 2 + (k % 2), k * 7 + 90, 'x');
-  // Cars on the roads, a bus at a stop on the side with the most street in the frame.
-  const laneL = lRoad - W.road * 0.3;
-  const laneR = rRoad + W.road * 0.3;
-  const lanes: [number, number][] = [
-    [laneL, 0],
-    [lRoad - W.road * 0.7, Math.PI],
-    [laneR, Math.PI],
-    [rRoad + W.road * 0.7, 0],
-  ];
-  lanes.forEach(([x, dir], k) => {
-    for (let j = 0; j < 3; j++) {
-      const z = backZ + 1.5 + j * 3.3 + unit(k, j, 29) * 1.6;
-      if (unit(k, j, 31) < 0.35 || !onScreen(x, z, 0, 20) || !offSlab(x, z, 0.3)) continue;
-      put(dayCar, x, z, dir + Math.PI / 2, k * 3 + j, 'far');
+  treeRow('x', backZ - W.face - W.back * 0.5, edgeL, edgeR, 90);
+  treeRow('x', bRoad - W.road - W.far * 0.5, edgeL, edgeR, 97, 0.5);
+  // Cars along both lanes of each road.
+  const carAt = (x: number, z: number, yaw: number, v: number) => {
+    if (inStreet(x, z, 0.12) && onScreen(x, z, 0, 20)) put(dayCar, x, z, yaw, v, 'far', 0, CITY);
+  };
+  (
+    [
+      [lRoad - W.road * 0.28, 0],
+      [lRoad - W.road * 0.72, Math.PI],
+      [rRoad + W.road * 0.28, Math.PI],
+      [rRoad + W.road * 0.72, 0],
+      [outL - W.far - W.road * 0.3, 0],
+      [outR + W.far + W.road * 0.3, Math.PI],
+    ] as const
+  ).forEach(([x, dir], k) => {
+    for (let j = 0; j < 7; j++) {
+      const z = backZ + 0.6 + j * 1.7 + unit(k, j, 29) * 0.9 + (k > 3 ? 0.8 : 0);
+      if (unit(k, j, 31) < 0.3) continue;
+      carAt(x, z, dir + Math.PI / 2, k * 3 + j);
     }
   });
-  for (let k = 0; k < 4; k++) {
-    const x = leftLine + 1.5 + k * 3.1 + unit(k, 1, 37) * 1.2;
-    if (x > rightLine) break;
-    put(dayCar, x, bRoad - W.road * (k % 2 ? 0.7 : 0.3), k % 2 ? Math.PI : 0, k + 2, 'far');
+  for (let k = 0; k < 8; k++) {
+    const x = leftLine + 0.5 + k * 1.9 + unit(k, 1, 37) * 0.8;
+    if (x > rightLine + 3) break;
+    carAt(x, bRoad - W.road * (k % 2 ? 0.72 : 0.28), k % 2 ? Math.PI : 0, k + 2);
   }
   {
+    // The bus at a stop on the side with the most street in the frame.
     const seenL = L - xAt(0, (B + F) / 2);
     const seenR = xAt(VIEW.width, (B + F) / 2) - R;
     const left = seenL - (L - leftLine) >= seenR - (rightLine - R);
     const s = left ? -1 : 1;
     const road = left ? lRoad : rRoad;
-    const bx = road + s * W.road * 0.7;
+    const bx = road + s * W.road * 0.72;
     const sx = road + s * (W.road + W.far * 0.5);
     // Mid-side, or the nearest stretch the building doesn't overhang (the office poking out).
     let bz = (B + F) / 2 - 0.5;
     for (let k = 0; k < 40; k++) {
       const z = (B + F) / 2 - 0.5 + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.25;
-      if (offSlab(bx, z, 0.65) && offSlab(sx, z, 0.3)) {
+      if (inStreet(bx, z, 0.4) && inStreet(sx, z, 0.2)) {
         bz = z;
         break;
       }
     }
-    put(bus, bx, bz, Math.PI / 2 + (left ? Math.PI : 0), 0, 'far');
-    put(busStop, sx, bz + 0.1, left ? Math.PI / 2 : -Math.PI / 2, 0, 'far');
+    put(bus, bx, bz, Math.PI / 2 + (left ? Math.PI : 0), 0, 'far', 0, CITY);
+    put(busStop, sx, bz + 0.1, left ? Math.PI / 2 : -Math.PI / 2, 0, 'far', 0, CITY);
   }
 
   // ---- Front: the lift lobby, thin and low ----
@@ -691,8 +966,10 @@ export function middleManagementScene(map: LevelMap): Scene {
   if (liftSide) {
     // The arrows from the board to the lifts, LIFTS painted at the lift end.
     const az = F + 0.62;
-    const a0 = liftSide === 'right' ? boardX + 1.0 : Math.max(liftX + 0.6, xAt(240, az));
-    const a1 = liftSide === 'right' ? Math.min(liftX - 0.6, xAt(1290, az)) : boardX - 1.0;
+    const a0 =
+      liftSide === 'right' ? boardX + 1.0 : Math.max(liftX + liftW / 2 - 0.1, xAt(240, az));
+    const a1 =
+      liftSide === 'right' ? Math.min(liftX - liftW / 2 + 0.1, xAt(1290, az)) : boardX - 1.0;
     patch(liftSide === 'right' ? 'arrowsR' : 'arrowsL', a0, a1, az - 0.14, az + 0.14);
   }
   // A planter trough and the recycling bins on the other side of the board, clear of the legend.
@@ -790,138 +1067,163 @@ const stone: GroundPainter = (b, g, salt) => {
 
 /** Derek's plush carpet: one deep blue-grey, a faint border. */
 const plush: GroundPainter = (b, g) => {
-  fill(b, g, 0.042, tint(PLUSH, -0.1));
+  fill(b, g, 0.056, tint(PLUSH, -0.1));
   b.box(
     g.x1 - g.x0 - 0.3,
     0.004,
     g.z1 - g.z0 - 0.3,
     PLUSH,
-    { at: [(g.x0 + g.x1) / 2, 0.046, (g.z0 + g.z1) / 2] },
+    { at: [(g.x0 + g.x1) / 2, 0.06, (g.z0 + g.z1) / 2] },
     0,
   );
 };
 
+/** The slab edge's nosing, the dark spandrel band under it, the glass of the floors below. */
+const FACE = { nosing: 0x9aa2aa, band: 0x4a525c, glass: 0x5e6c7a } as const;
+
 /**
- * The building's face going down past the curtain wall, seen from above:
- * rows of glass and pale spandrel bands narrowing and darkening toward the
- * street (`dir` the way the face runs along).
+ * The building's slab edge and face going down past the curtain wall, seen
+ * from above: the pale nosing along the building's edge, the dark slab band,
+ * then the floors below foreshortened, glass and spandrel bands narrowing
+ * and darkening toward the street, mullions across the glass. `side` is the
+ * way the building lies from the patch ('+x': toward x1), `dim` the shade.
  */
-function face(dir: 'x' | 'z'): GroundPainter {
+function face(side: '+x' | '-x' | '+z' | '-z', dim: number): GroundPainter {
   return (b, g) => {
     const top = 0.02;
-    fill(b, g, top - 0.004, 0x3c4450);
-    const depth = dir === 'x' ? g.z1 - g.z0 : g.x1 - g.x0;
-    const bands = 5;
-    for (let k = 0; k < bands; k++) {
-      const t = (k + 0.5) / bands;
-      const c = tint(COLORS.SPANDREL, 0.25 - t * 0.6);
-      const o = t * depth;
-      if (dir === 'x')
-        b.box(
-          g.x1 - g.x0,
-          0.003,
-          depth / (bands * 2.2),
-          c,
-          { at: [(g.x0 + g.x1) / 2, top, g.z0 + o] },
-          0,
-        );
-      else
-        b.box(
-          depth / (bands * 2.2),
-          0.003,
-          g.z1 - g.z0,
-          c,
-          { at: [g.x0 + o, top, (g.z0 + g.z1) / 2] },
-          0,
-        );
+    const alongX = side === '+z' || side === '-z';
+    const depth = alongX ? g.z1 - g.z0 : g.x1 - g.x0;
+    const len = alongX ? g.x1 - g.x0 : g.z1 - g.z0;
+    const k = depth / 0.55;
+    /** A band from u0 to u1 out from the building's edge. */
+    const band = (u0: number, u1: number, color: number, y = top) => {
+      const c = tint(color, dim);
+      const w = (u1 - u0) * k;
+      const o = ((u0 + u1) / 2) * k;
+      const at = (pos: number): [number, number, number] =>
+        side === '+x'
+          ? [g.x1 - pos, y, (g.z0 + g.z1) / 2]
+          : side === '-x'
+            ? [g.x0 + pos, y, (g.z0 + g.z1) / 2]
+            : side === '+z'
+              ? [(g.x0 + g.x1) / 2, y, g.z1 - pos]
+              : [(g.x0 + g.x1) / 2, y, g.z0 + pos];
+      if (alongX) b.box(len, 0.003, w, c, { at: at(o) }, 0);
+      else b.box(w, 0.003, len, c, { at: at(o) }, 0);
+    };
+    fill(b, g, top - 0.004, tint(0x3a424c, dim));
+    band(0, 0.05, FACE.nosing);
+    band(0.05, 0.16, FACE.band);
+    band(0.16, 0.3, FACE.glass);
+    band(0.3, 0.355, tint(FACE.band, -0.06));
+    band(0.355, 0.45, tint(FACE.glass, -0.14));
+    band(0.45, 0.49, tint(FACE.band, -0.12));
+    band(0.49, 0.55, tint(FACE.glass, -0.26));
+    // Mullions across the glass, every 0.4 along the face.
+    const m = tint(0x3a424c, dim - 0.04);
+    const o0 = alongX ? g.x0 : g.z0;
+    for (let u = 0.2; u < len; u += 0.4) {
+      const p = o0 + u;
+      const mid = side === '+x' ? g.x1 - 0.35 * k : side === '-x' ? g.x0 + 0.35 * k : 0;
+      const midZ = side === '+z' ? g.z1 - 0.35 * k : side === '-z' ? g.z0 + 0.35 * k : 0;
+      if (alongX) b.box(0.014, 0.003, 0.38 * k, m, { at: [p, top + 0.001, midZ] }, 0);
+      else b.box(0.38 * k, 0.003, 0.014, m, { at: [mid, top + 0.001, p] }, 0);
     }
   };
 }
 
-/** The road far below: asphalt, a kerb line each side, a dashed centre line (`along` the way it runs). */
-function road(along: 'x' | 'z'): GroundPainter {
+/** The road far below: asphalt, a dashed centre line (`along` the way it runs), patches. */
+function road(along: 'x' | 'z', dim: number): GroundPainter {
   return (b, g, salt) => {
     const top = 0.012;
-    fill(b, g, top - 0.004, COLORS.ASPHALT);
+    fill(b, g, top - 0.004, tint(COLORS.ASPHALT, dim));
     const len = along === 'x' ? g.x1 - g.x0 : g.z1 - g.z0;
     const cx = (g.x0 + g.x1) / 2;
     const cz = (g.z0 + g.z1) / 2;
-    for (let u = 0, k = 0; u < len; u += 0.4, k++) {
+    const lane = tint(COLORS.LANE, dim);
+    for (let u = 0, k = 0; u < len; u += 0.26, k++) {
       const p = (along === 'x' ? g.x0 : g.z0) + u;
-      if (along === 'x') b.box(0.2, 0.003, 0.025, COLORS.LANE, { at: [p, top + 0.002, cz] }, 0);
-      else b.box(0.025, 0.003, 0.2, COLORS.LANE, { at: [cx, top + 0.002, p] }, 0);
+      if (along === 'x') b.box(0.12, 0.003, 0.016, lane, { at: [p, top + 0.002, cz] }, 0);
+      else b.box(0.016, 0.003, 0.12, lane, { at: [cx, top + 0.002, p] }, 0);
       // Patched asphalt now and then.
-      if (shade(k, 3, salt) > 0.85) {
-        const q = (shade(k, 5, salt) - 0.5) * 0.4;
-        if (along === 'x')
-          b.box(0.3, 0.003, 0.18, tint(COLORS.ASPHALT, -0.08), { at: [p, top + 0.001, cz + q] }, 0);
-        else
-          b.box(0.18, 0.003, 0.3, tint(COLORS.ASPHALT, -0.08), { at: [cx + q, top + 0.001, p] }, 0);
+      if (shade(k, 3, salt) > 0.88) {
+        const q = (shade(k, 5, salt) - 0.5) * 0.25;
+        const c = tint(COLORS.ASPHALT, dim - 0.08);
+        if (along === 'x') b.box(0.2, 0.003, 0.11, c, { at: [p, top + 0.001, cz + q] }, 0);
+        else b.box(0.11, 0.003, 0.2, c, { at: [cx + q, top + 0.001, p] }, 0);
       }
     }
   };
 }
 
-/** Pavement far below: pale flags with joints, a kerb round its edge. */
-const walk: GroundPainter = (b, g, salt) => {
-  const top = 0.016;
-  fill(b, g, top - 0.004, COLORS.KERB);
-  const s = 0.16;
-  for (let j = 0, z = g.z0 + 0.02; z < g.z1 - 0.03; j++, z += s)
-    for (let i = 0, x = g.x0 + 0.02; x < g.x1 - 0.03; i++, x += s) {
-      const xb = Math.min(g.x1 - 0.02, x + s);
-      const zb = Math.min(g.z1 - 0.02, z + s);
-      const c = tint(COLORS.PAVEMENT, (shade(i, j, salt) - 0.5) * 0.06);
+/** Pavement far below: pale small flags with joints, a kerb round its edge. */
+function walk(dim: number): GroundPainter {
+  return (b, g, salt) => {
+    const top = 0.016;
+    fill(b, g, top - 0.004, tint(COLORS.KERB, dim));
+    const s = 0.1;
+    for (let j = 0, z = g.z0 + 0.015; z < g.z1 - 0.02; j++, z += s)
+      for (let i = 0, x = g.x0 + 0.015; x < g.x1 - 0.02; i++, x += s) {
+        const xb = Math.min(g.x1 - 0.015, x + s);
+        const zb = Math.min(g.z1 - 0.015, z + s);
+        const c = tint(COLORS.PAVEMENT, dim + (shade(i, j, salt) - 0.5) * 0.05);
+        b.box(
+          xb - x - 0.006,
+          0.003,
+          zb - z - 0.006,
+          c,
+          { at: [(x + xb) / 2, top + 0.001, (z + zb) / 2] },
+          0,
+        );
+      }
+  };
+}
+
+/** A city park far below: spring grass in mown patches, faint paths crossing it. */
+function park(dim: number): GroundPainter {
+  return (b, g, salt) => {
+    const top = 0.008;
+    fill(b, g, top - 0.004, tint(COLORS.GRASS, dim));
+    const w = g.x1 - g.x0;
+    const d = g.z1 - g.z0;
+    const path = tint(COLORS.PATH, dim);
+    for (let k = 0, x = g.x0 + 0.9; x < g.x1; k++, x += 2.2 + shade(k, 1, salt) * 0.6)
+      b.box(0.08, 0.003, d, path, { at: [x, top + 0.001, (g.z0 + g.z1) / 2] }, 0);
+    for (let k = 0, z = g.z0 + 0.7; z < g.z1; k++, z += 2.0 + shade(k, 2, salt) * 0.6)
+      b.box(w, 0.003, 0.08, path, { at: [(g.x0 + g.x1) / 2, top + 0.001, z] }, 0);
+    for (let k = 0; k < Math.floor(w * d * 0.2); k++) {
+      const x = g.x0 + shade(k, 3, salt) * w;
+      const z = g.z0 + shade(k, 4, salt) * d;
       b.box(
-        xb - x - 0.008,
-        0.003,
-        zb - z - 0.008,
-        c,
-        { at: [(x + xb) / 2, top + 0.001, (z + zb) / 2] },
+        Math.min(0.4, w),
+        0.002,
+        Math.min(0.32, d),
+        tint(COLORS.GRASS, dim + (shade(k, 5, salt) - 0.5) * 0.08),
+        { at: [x, top + 0.0005, z] },
         0,
       );
     }
-};
+  };
+}
 
-/** A city park far below: spring grass, gravel paths crossing it. */
-const park: GroundPainter = (b, g, salt) => {
-  const top = 0.008;
-  fill(b, g, top - 0.004, COLORS.GRASS);
-  const w = g.x1 - g.x0;
-  const d = g.z1 - g.z0;
-  // Paths every few tiles, along and across, and mown patches a shade apart.
-  for (let k = 0, x = g.x0 + 1.4; x < g.x1; k++, x += 3.2 + shade(k, 1, salt))
-    b.box(0.14, 0.003, d, COLORS.PATH, { at: [x, top + 0.001, (g.z0 + g.z1) / 2] }, 0);
-  for (let k = 0, z = g.z0 + 1.1; z < g.z1; k++, z += 2.8 + shade(k, 2, salt))
-    b.box(w, 0.003, 0.14, COLORS.PATH, { at: [(g.x0 + g.x1) / 2, top + 0.001, z] }, 0);
-  for (let k = 0; k < Math.floor(w * d * 0.15); k++) {
-    const x = g.x0 + shade(k, 3, salt) * w;
-    const z = g.z0 + shade(k, 4, salt) * d;
-    b.box(
-      0.6,
-      0.002,
-      0.5,
-      tint(COLORS.GRASS, (shade(k, 5, salt) - 0.5) * 0.12),
-      { at: [x, top + 0.0005, z] },
-      0,
-    );
-  }
-};
+/** The most chevrons the lobby's arrows get, and how far apart they are. */
+const CHEVRONS = { most: 5, every: 0.9 } as const;
 
-/** Floor arrows on the lobby's stone, chevrons pointing along x (`dir`), LIFTS painted at the far end. */
+/** Floor arrows on the lobby's stone, a few chevrons pointing along x (`dir`) into LIFTS painted at the far end. */
 function arrows(dir: 1 | -1): GroundPainter {
   return (b, g) => {
     const y = 0.036;
     const cz = (g.z0 + g.z1) / 2;
     const half = (g.z1 - g.z0) / 2;
-    const ink = 0x5a6068;
+    const ink = 0x8a9098;
     const len = g.x1 - g.x0;
     const textW = 19 * 0.05 + 0.3;
-    for (let u = 0.2; u < len - textW; u += 0.45)
+    // Back from the letters, so the last chevron leads into them.
+    for (let c = 0, u = len - textW - 0.25; c < CHEVRONS.most && u > 0.1; c++, u -= CHEVRONS.every)
       for (const s of [-1, 1]) {
         const x = dir > 0 ? g.x0 + u : g.x1 - u;
         b.box(
-          0.04,
+          0.05,
           0.003,
           half * 1.25,
           ink,
@@ -934,16 +1236,29 @@ function arrows(dir: 1 | -1): GroundPainter {
   };
 }
 
+/** The street's kinds, lit, in the building's shadow (':s') and at its soft edge (':h'). */
+const SHADES: readonly [string, number][] = [
+  ['', 0],
+  [':s', -0.2],
+  [':h', -0.1],
+];
+
 const PAINTERS: Readonly<Record<string, GroundPainter>> = {
   carpet,
   stone,
   plush,
-  faceX: face('x'),
-  faceZ: face('z'),
-  roadX: road('x'),
-  roadZ: road('z'),
-  walk,
-  park,
   arrowsR: arrows(1),
   arrowsL: arrows(-1),
+  ...Object.fromEntries(
+    SHADES.flatMap(([suffix, dim]) => [
+      ['face+x' + suffix, face('+x', dim)],
+      ['face-x' + suffix, face('-x', dim)],
+      ['face+z' + suffix, face('+z', dim)],
+      ['face-z' + suffix, face('-z', dim)],
+      ['roadX' + suffix, road('x', dim)],
+      ['roadZ' + suffix, road('z', dim)],
+      ['walk' + suffix, walk(dim)],
+      ['park' + suffix, park(dim)],
+    ]),
+  ),
 };

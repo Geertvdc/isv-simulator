@@ -54,17 +54,18 @@ const INK = 0x2a2c30;
 /** Muted upholstery: slate teal, warm grey, sage, dusty plum. Never a player's colour. */
 const FABRIC = [0x5e7480, 0x8a8278, 0x7c8c74, 0x7a6a78] as const;
 /** Cherry blossom, about 25% greyed, in three tones; spring leaves; bark. */
-const BLOSSOM = [0xd8afbe, 0xcca0b2, 0xe2c0cc] as const;
-const LEAF = 0x7e9468;
+const BLOSSOM = [0xeea6c0, 0xe89cb8, 0xf2b4ca] as const;
+/** The blossom's shaded underside. */
+const BLOSSOM_UNDER = 0xc07f98;
 const BARK = 0x4a3c34;
 /** The street: asphalt, pavement, kerb, lane paint. */
-const ASPHALT = 0x52565c;
+const ASPHALT = 0x60646a;
 const PAVEMENT = 0x8c8a83;
 const KERB = 0xa09d96;
 const LANE = 0xd6d2c6;
 /** A park's spring grass, its gravel path. */
-const GRASS = 0x657652;
-const PATH = 0x948b7d;
+const GRASS = 0x7e8a70;
+const PATH = tint(GRASS, 0.06);
 /** MONOLITH: black glass, faint. */
 const MONOLITH_GLASS = 0x3a4250;
 
@@ -631,27 +632,41 @@ export const prodPot = looks([0.8, 0.8], 1, (b) => {
 
 // ---- The rest of the floor ----
 
-/** An egg-shaped pod chair in a muted fabric (look), its hood open toward +z. */
-export const podChair = looks([0.8, 0.8], FABRIC.length, (b, v) => {
-  const c = nth(FABRIC, v + 1);
-  b.cylinder(0.26, 0.3, 0.04, ALU_DARK, { at: [0, 0.02, 0] }, 20);
-  b.cylinder(0.03, 0.03, 0.18, ALU_DARK, { at: [0, 0.12, 0] }, 8);
-  // The shell: a deep half-sphere hood behind, a seat bowl.
-  // The shell: a deep hood open toward +z (its gap round φ = π/2), the fabric lining inside it.
-  const shell = new THREE.SphereGeometry(
-    0.4,
-    18,
-    12,
-    Math.PI * 0.8,
-    Math.PI * 1.4,
-    0,
-    Math.PI * 0.62,
-  );
-  shell.scale(1, 1.35, 1);
-  b.add(shell, 0xe8e6e0, { at: [0, 0.5, 0] });
-  b.sphere(0.36, tint(c, -0.15), { at: [0, 0.55, -0.05] }, [1, 1.2, 0.85]);
-  b.sphere(0.3, c, { at: [0, 0.38, 0.02] }, [1, 0.35, 1]);
-  b.box(0.46, 0.4, 0.12, c, { at: [0, 0.62, -0.2], rot: [-0.2, 0, 0] }, 0.06);
+/** The pod chairs' shells: a soft white and, by look, a muted sage, a pale stone and a warm white. */
+const SHELLS = [0xe2e0da, 0x6f8f7a, 0xcac6bc, 0xdcd6ca] as const;
+
+/**
+ * A tub-shaped lounge chair (the floor's "pod" chair), open toward +z so its
+ * seat shows from above: a pale steel base disc and stem, a curved shell in
+ * slats round the back (high at the back, low at the arms), a shaded lining
+ * inside it and a fat slate-blue seat cushion. Under 0.8 tall.
+ */
+export const podChair = looks([0.8, 0.8], SHELLS.length, (b, v) => {
+  const shell = nth(SHELLS, v);
+  const lining = tint(shell, -0.12);
+  b.cylinder(0.3, 0.32, 0.03, 0x8a9097, { at: [0, 0.015, 0] }, 24);
+  b.cylinder(0.035, 0.035, 0.2, ALU_DARK, { at: [0, 0.13, 0] }, 8);
+  // The shell: slats round from one arm, past the back (−z), to the other.
+  const r = 0.34;
+  const n = 11;
+  const reach = Math.PI * 0.62;
+  for (let k = 0; k < n; k++) {
+    // φ = 0 is the back (−z), ±reach a little past the sides, toward the open front.
+    const phi = (k / (n - 1) - 0.5) * 2 * reach;
+    const h = 0.2 + 0.4 * Math.cos((phi / reach) * (Math.PI / 2)) ** 0.7;
+    const x = Math.sin(phi) * r;
+    const z = -Math.cos(phi) * r;
+    const w = ((2 * reach * r) / (n - 1)) * 1.12;
+    b.box(w, h, 0.06, shell, { at: [x, 0.26 + h / 2, z], rot: [0, -phi, 0] }, 0.02);
+    b.box(w * 0.9, h - 0.05, 0.02, lining, {
+      at: [x * 0.86, 0.26 + (h - 0.05) / 2 + 0.03, z * 0.86],
+      rot: [0, -phi, 0],
+    });
+  }
+  // The seat bowl and its cushion.
+  b.cylinder(0.32, 0.26, 0.08, shell, { at: [0, 0.26, 0] }, 24);
+  b.cylinder(0.27, 0.27, 0.07, 0x5a6a8a, { at: [0, 0.33, 0.02] }, 24);
+  b.box(0.36, 0.2, 0.07, tint(0x5a6a8a, -0.08), { at: [0, 0.46, -0.2], rot: [-0.25, 0, 0] }, 0.03);
 });
 
 /**
@@ -684,61 +699,85 @@ export const printer = looks([0.7, 0.6], 1, (b) => {
 
 // ---- The lifts ----
 
-/** The lift bank: its height and depth. */
-export const LIFTS = { height: 1.62, depth: 0.9 } as const;
+/** The lift bank: its height and depth, and the width one lift takes (plus `LIFTS.ends` for the two ends). */
+export const LIFTS = { height: 1.3, depth: 0.55, bay: 0.9, ends: 0.24 } as const;
+/** Brushed steel cladding round the lifts, and the dark shadow-gap reveal round each door. */
+const LIFT_STEEL = 0x9ea6ae;
+const REVEAL = 0x2e3238;
+
+/** How wide a bank of `n` lifts is. */
+export function liftWidth(n: number): number {
+  return n * LIFTS.bay + LIFTS.ends;
+}
 
 /**
- * The lift core's end, `n` lifts wide along x, its face at z = 0 facing +z:
- * pale stone cladding in big joints, brushed-steel doors in steel frames,
- * an amber floor indicator over each ("7"), the call buttons between them.
- * The first lift stands open, its lit car inside (a mirror, a handrail).
+ * The lift core's end, `n` lifts wide along x, its face at z = 0 facing +z
+ * (the camera): brushed-steel cladding with a dark cap, each door in a dark
+ * shadow-gap reveal, a big amber floor number over each ("7") in a black
+ * strip, the call buttons beside. The first lift stands open, its lit car
+ * inside (a mirror, a handrail) and its door leaves slid aside.
  */
 export function liftBank(n: number): SetPiece {
   return once(`lifts:${n}`, () =>
-    looks([n * 0.95 + 0.3, LIFTS.depth], 1, (b) => {
-      const W = n * 0.95 + 0.3;
+    looks([liftWidth(n), LIFTS.depth], 1, (b) => {
+      const W = liftWidth(n);
       const H = LIFTS.height;
       const D = LIFTS.depth;
-      flat(b, W, H, D, STONE, [0, H / 2, -D / 2]);
-      for (let y = 0.4; y < H; y += 0.4)
-        flat(b, W + 0.004, 0.012, 0.006, tint(STONE, -0.14), [0, y, 0.002]);
-      flat(b, W + 0.03, 0.06, D + 0.03, tint(STONE, -0.2), [0, H + 0.03, -D / 2]);
-      flat(b, W + 0.01, 0.08, 0.02, 0x6a6e72, [0, 0.04, 0.008]);
-      const dw = 0.62;
-      const dh = 1.12;
+      const dw = 0.58;
+      const dh = 0.98;
+      const doorX = (k: number) => -W / 2 + LIFTS.ends / 2 + (k + 0.5) * LIFTS.bay;
+      // The core: solid over the doors, solid round them, hollow where the first lift stands open.
+      const top = dh + 0.05;
+      flat(b, W, H - top, D, LIFT_STEEL, [0, (H + top) / 2, -D / 2]);
+      const hole = [doorX(0) - dw / 2 - 0.01, doorX(0) + dw / 2 + 0.01] as const;
+      flat(b, hole[0] + W / 2, top, D, LIFT_STEEL, [(-W / 2 + hole[0]) / 2, top / 2, -D / 2]);
+      flat(b, W / 2 - hole[1], top, D, LIFT_STEEL, [(W / 2 + hole[1]) / 2, top / 2, -D / 2]);
+      // Panel joints on the cladding, a darker cap with a lighter nosing, a kick plate.
+      for (const x of [-W / 2 + 0.06, W / 2 - 0.06])
+        flat(b, 0.008, H, 0.006, tint(LIFT_STEEL, -0.18), [x, H / 2, 0.002]);
+      flat(b, W + 0.03, 0.04, D + 0.03, 0xb8c0c6, [0, H + 0.02, -D / 2]);
+      flat(b, W + 0.034, 0.03, 0.03, 0x4a525c, [0, H + 0.015, 0.0]);
+      flat(b, W - 0.1, 0.006, D - 0.1, tint(LIFT_STEEL, -0.08), [0, H + 0.043, -D / 2]);
+      flat(b, W + 0.01, 0.07, 0.02, 0x5a6068, [0, 0.035, 0.008]);
       for (let k = 0; k < n; k++) {
-        const x = -W / 2 + 0.15 + (k + 0.5) * 0.95;
-        flat(b, dw + 0.1, dh + 0.06, 0.03, 0x7a8086, [x, (dh + 0.06) / 2, 0.012]);
+        const x = doorX(k);
         if (k === 0) {
-          // Open: the lit car, its back mirror, a handrail; the doors slid aside.
-          glowBox(b, dw - 0.02, dh - 0.02, 0.01, 0xf2e8d4, [x, dh / 2, -0.3]);
-          flat(b, dw - 0.2, dh * 0.5, 0.008, 0xa8b4bc, [x, dh * 0.6, -0.29]);
-          flat(b, dw - 0.1, 0.03, 0.04, ALU, [x, 0.42, -0.27]);
+          // Open: the reveal as jambs and a head round the opening, the lit car inside (its back
+          // wall and walls warm-lit, a mirror, a handrail, a pale floor), the leaves slid aside.
           for (const s of [-1, 1])
-            flat(b, 0.012, dh - 0.02, 0.3, 0xd8d4c8, [x + s * (dw / 2 - 0.01), dh / 2, -0.15]);
-          flat(b, dw - 0.02, 0.012, 0.3, 0x8a8478, [x, 0.006, -0.15]);
+            flat(b, 0.04, top, 0.02, REVEAL, [x + s * (dw / 2 + 0.02), top / 2, 0.006]);
+          flat(b, dw + 0.08, 0.04, 0.02, REVEAL, [x, dh + 0.03, 0.006]);
+          glowBox(b, dw, dh, 0.01, 0xf2e8d4, [x, dh / 2, -D + 0.01]);
+          flat(b, dw - 0.22, dh * 0.42, 0.008, 0xbcc6cc, [x, dh * 0.62, -D + 0.02]);
+          flat(b, dw - 0.1, 0.03, 0.03, ALU, [x, 0.4, -D + 0.04]);
           for (const s of [-1, 1])
-            flat(b, 0.06, dh - 0.02, 0.02, STEEL, [x + s * (dw / 2 - 0.02), dh / 2, 0.03]);
+            glowBox(b, 0.01, dh, D - 0.02, 0xe2d6bc, [x + s * (dw / 2), dh / 2, -D / 2]);
+          glowBox(b, dw, 0.01, D - 0.02, 0xcabca0, [x, 0.005, -D / 2]);
+          glowBox(b, dw, 0.01, D - 0.02, 0xfff4dc, [x, dh - 0.005, -D / 2]);
+          for (const s of [-1, 1])
+            flat(b, 0.06, dh - 0.02, 0.02, STEEL_HI, [x + s * (dw / 2 + 0.07), dh / 2, 0.02]);
         } else {
+          // The reveal round the door, then the closed leaves.
+          flat(b, dw + 0.08, dh + 0.05, 0.02, REVEAL, [x, (dh + 0.05) / 2, 0.006]);
           for (const s of [-1, 1]) {
-            flat(b, dw / 2 - 0.008, dh - 0.02, 0.02, STEEL, [x + (s * dw) / 4, dh / 2, 0.03]);
+            flat(b, dw / 2 - 0.006, dh - 0.02, 0.02, STEEL, [x + (s * dw) / 4, dh / 2, 0.02]);
             for (const f of [0.3, 0.7])
               flat(b, 0.006, dh - 0.08, 0.004, STEEL_HI, [
                 x + (s * dw) / 4 + (f - 0.5) * (dw / 2),
                 dh / 2,
-                0.042,
+                0.032,
               ]);
           }
-          flat(b, 0.012, dh - 0.02, 0.006, 0x2a2d32, [x, dh / 2, 0.043]);
+          flat(b, 0.012, dh - 0.02, 0.006, REVEAL, [x, dh / 2, 0.033]);
         }
-        // The indicator: a black strip, an arrow and the floor in amber.
-        flat(b, 0.34, 0.12, 0.02, SCREEN_OFF, [x, dh + 0.17, 0.012]);
-        letters(b, k === 0 ? '7' : '3', x + 0.06, dh + 0.17, 0.024, 0.018, AMBER, true);
-        glowBox(b, 0.05, 0.05, 0.004, AMBER, [x - 0.06, dh + 0.17, 0.024], [0, 0, Math.PI / 4]);
+        // The indicator: a black strip, an arrow and the floor in big amber.
+        const iy = dh + 0.15;
+        flat(b, 0.42, 0.22, 0.02, SCREEN_OFF, [x, iy, 0.012]);
+        letters(b, '7', x + 0.08, iy, 0.024, 0.036, AMBER, true);
+        glowBox(b, 0.08, 0.08, 0.004, AMBER, [x - 0.1, iy, 0.024], [0, 0, Math.PI / 4]);
         // The call buttons right of each door.
-        flat(b, 0.06, 0.16, 0.012, STEEL_HI, [x + dw / 2 + 0.1, 0.95, 0.008]);
-        b.led(0.016, AMBER, { at: [x + dw / 2 + 0.1, 0.98, 0.016] });
-        b.led(0.016, 0x8a9096, { at: [x + dw / 2 + 0.1, 0.92, 0.016] });
+        flat(b, 0.06, 0.16, 0.012, STEEL_HI, [x + dw / 2 + 0.08, 0.95 * 0.85, 0.008]);
+        b.led(0.018, AMBER, { at: [x + dw / 2 + 0.08, 0.84, 0.016] });
       }
     }),
   );
@@ -835,7 +874,7 @@ export const CRADLE = { len: 1.3, wide: 0.42 } as const;
 export const cradle = looks([CRADLE.len, CRADLE.wide], 1, (b) => {
   const L = CRADLE.len;
   const W = CRADLE.wide;
-  const yel = 0xd8b040;
+  const yel = 0xe6b834;
   flat(b, L, 0.05, W, 0x6a6e72, [0, 0.025, 0]);
   for (const s of [-1, 1]) {
     flat(b, L, 0.14, 0.02, yel, [0, 0.09, (s * W) / 2]);
@@ -856,12 +895,18 @@ export const cradle = looks([CRADLE.len, CRADLE.wide], 1, (b) => {
   flat(b, 0.24, 0.03, 0.03, INK, [-0.4, 0.07, 0.1], [0, 0.4, 0]);
 });
 
-/** The cradle's ropes: two dark lines from its stirrups straight up `high`, out of the frame. */
-export function cradleRopes(high: number): SetPiece {
-  return once(`ropes:${high.toFixed(2)}`, () =>
-    looks([CRADLE.len, 0.1], 1, (b) => {
+/**
+ * The cradle's ropes, for a cradle turned to run along z (yaw −π/2): two thin
+ * grey lines from its stirrups (at z = ±`CRADLE.len` / 2, 1.5 up) to the
+ * roof davit at (`dx`, `dy`, `dz`) from its middle, so they can be steered off
+ * the top of the frame clear of the HUD. Placed with yaw 0.
+ */
+export function cradleRopes(dx: number, dy: number, dz: number): SetPiece {
+  const key = [dx, dy, dz].map((v) => v.toFixed(2)).join(':');
+  return once(`ropes:${key}`, () =>
+    looks([0.1, CRADLE.len], 1, (b) => {
       for (const s of [-1, 1])
-        flat(b, 0.016, high, 0.016, 0x2a2c30, [(s * CRADLE.len) / 2, 1.5 + high / 2, 0]);
+        bar(b, [0, 1.5, (s * CRADLE.len) / 2], [dx, dy, dz + s * 0.3], 0.012, 0x6a7078);
     }),
   );
 }
@@ -869,25 +914,38 @@ export function cradleRopes(high: number): SetPiece {
 // ---- Outside: the street far below ----
 
 /**
- * A cherry tree in blossom far below, seen from above: a dark trunk, a
- * clumped canopy of greyed pink puffs with a few spring leaves. `look` turns
- * and sizes the clumps; the canopy is about 0.3 tall.
+ * A cherry tree in blossom far below, seen from above: a dark trunk, a broad
+ * canopy about 0.5 across, its shaded underside in a deeper rose showing at
+ * the edges under a top of pink puffs and a few pale highlights. `look` turns
+ * and sizes the puffs. Planted in rows, the canopies overlap.
  */
 export const cherryTree = looks([0.5, 0.5], 4, (b, v) => {
-  b.cylinder(0.022, 0.03, 0.18, BARK, { at: [0, 0.09, 0] }, 6);
+  b.cylinder(0.026, 0.036, 0.22, BARK, { at: [0, 0.11, 0] }, 6);
+  for (let k = 0; k < 4; k++) {
+    const a = (k / 4) * Math.PI * 2 + v * 0.7;
+    b.sphere(
+      0.13,
+      tint(BLOSSOM_UNDER, (hash01(k, v, 2) - 0.5) * 0.08),
+      { at: [Math.cos(a) * 0.1, 0.25, Math.sin(a) * 0.1] },
+      [1, 0.6, 1],
+    );
+  }
   const puffs = 5 + (v % 2);
   for (let k = 0; k < puffs; k++) {
     const a = (k / puffs) * Math.PI * 2 + v * 0.9;
-    const r = k === 0 ? 0 : 0.1 + hash01(k, v, 3) * 0.05;
-    const s = 0.08 + hash01(k, v, 5) * 0.04;
+    const r = k === 0 ? 0 : 0.08 + hash01(k, v, 3) * 0.06;
+    const s = 0.1 + hash01(k, v, 5) * 0.04;
     b.sphere(
       s,
       nth(BLOSSOM, k + v),
-      { at: [Math.cos(a) * r, 0.22 + hash01(k, v, 7) * 0.06, Math.sin(a) * r] },
-      [1, 0.8, 1],
+      { at: [Math.cos(a) * r, 0.31 + hash01(k, v, 7) * 0.05, Math.sin(a) * r] },
+      [1, 0.75, 1],
     );
   }
-  b.sphere(0.05, LEAF, { at: [0.08, 0.2, -0.1] });
+  for (let k = 0; k < 2; k++) {
+    const a = k * 2.4 + v;
+    b.sphere(0.05, 0xf8d0de, { at: [Math.cos(a) * 0.06, 0.39, Math.sin(a) * 0.06] }, [1, 0.6, 1]);
+  }
 });
 
 /** A car far below in daylight: tiny, a muted paint by look, dark glass, along x. */
@@ -914,6 +972,69 @@ export const busStop = looks([0.5, 0.16], 1, (b) => {
   flat(b, 0.012, 0.16, 0.14, 0xe0d4b0, [0.24, 0.1, 0]);
   flat(b, 0.3, 0.02, 0.04, 0x6a5a4a, [0, 0.05, -0.03]);
 });
+
+/** The crane tower's storey height, and how many top storeys are still a bare frame. */
+export const CRANE_TOWER = { storey: 0.12, bare: 3 } as const;
+
+/**
+ * The tower across the street, half-clad: `floors` storeys, `w` × `d`, its
+ * front at z = 0 facing +z. The lower storeys are glazed (pale sky-blue glass
+ * in dark mullions, a white slab edge at each floor, a reflection stripe
+ * slanting across them); the top `CRANE_TOWER.bare` are the bare concrete
+ * frame, open slabs on columns with the dark inside showing, orange netting
+ * along one edge, the concrete core rising through and rebar on top. The
+ * crane stands on it separately (`towerCrane` in `rooftop.ts`).
+ */
+export function craneTower(w: number, d: number, floors: number): SetPiece {
+  return once(`craneTower:${w}:${d}:${floors}`, () =>
+    looks([w, d], 1, (b) => {
+      const f = CRANE_TOWER.storey;
+      const h = floors * f;
+      const glazed = Math.max(2, floors - CRANE_TOWER.bare);
+      const concrete = 0x9a9890;
+      const glass = 0x4a76a0;
+      // The core, up through it all and a storey over the top.
+      flat(b, w * 0.34, h + f, d * 0.4, tint(concrete, -0.06), [0, (h + f) / 2, -d / 2]);
+      for (let k = 0; k <= floors; k++) {
+        const y = k * f;
+        if (k === floors) {
+          // The top slab is only half poured: the back half, the columns standing up out of the front.
+          flat(b, w + 0.02, 0.035, d * 0.5, concrete, [0, y + 0.018, -d * 0.75]);
+          for (let x = -w / 2 + 0.04; x <= w / 2; x += (w - 0.08) / 4)
+            flat(b, 0.05, 0.1, 0.05, concrete, [x, y + 0.05, -0.04]);
+          continue;
+        }
+        flat(b, w + 0.02, 0.035, d + 0.02, k <= glazed ? 0xeef0ee : concrete, [
+          0,
+          y + 0.018,
+          -d / 2,
+        ]);
+        if (k < glazed) {
+          flat(b, w - 0.02, f - 0.035, d - 0.02, glass, [0, y + 0.035 + (f - 0.035) / 2, -d / 2]);
+          for (let x = -w / 2 + 0.2; x < w / 2 - 0.05; x += 0.2)
+            flat(b, 0.02, f - 0.035, 0.012, 0x2a3440, [x, y + 0.035 + (f - 0.035) / 2, 0.0]);
+          for (let z = -0.2; z > -d + 0.05; z -= 0.2)
+            flat(b, 0.012, f - 0.035, 0.016, 0x3a4652, [w / 2, y + 0.035 + (f - 0.035) / 2, z]);
+        } else {
+          // Bare: columns at the corners and along the front, the dark floor inside.
+          flat(b, w - 0.12, f - 0.04, d - 0.12, 0x2e3032, [0, y + 0.035 + (f - 0.04) / 2, -d / 2]);
+          for (let x = -w / 2 + 0.04; x <= w / 2; x += (w - 0.08) / 4)
+            for (const z of [-0.04, -d + 0.04])
+              flat(b, 0.05, f - 0.035, 0.05, concrete, [x, y + 0.035 + (f - 0.035) / 2, z]);
+          if (k === floors - 2)
+            flat(b, w * 0.6, f * 0.5, 0.01, 0xd8823a, [-w * 0.18, y + 0.035 + f * 0.25, 0.005]);
+        }
+      }
+      // The reflection stripe, slanting across the glazed front.
+      const gh = glazed * f;
+      flat(b, 0.18, gh * 1.15, 0.006, 0xd8e8f2, [w * 0.1, gh / 2 + 0.02, 0.008], [0, 0, -0.5]);
+      flat(b, 0.07, gh * 1.1, 0.006, 0xc8dcea, [w * 0.1 + 0.2, gh / 2 + 0.02, 0.008], [0, 0, -0.5]);
+      // Rebar up from the top slab.
+      for (let x = -w / 2 + 0.1; x < w / 2; x += 0.22)
+        flat(b, 0.012, 0.14, 0.012, 0x6a4a3a, [x, h + 0.1, -0.08]);
+    }),
+  );
+}
 
 /**
  * MONOLITH's tower, far off: a tall black-glass slab, fins, a pale crown band
