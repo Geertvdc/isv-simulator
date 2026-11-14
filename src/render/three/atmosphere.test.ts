@@ -43,6 +43,7 @@ import {
   stutterIndex,
   stutterLevel,
   sunPlacement,
+  sunShaftSpots,
   washPlacement,
 } from './atmosphere';
 
@@ -512,14 +513,14 @@ describe('the spring morning (middle-management)', () => {
     expect(a).not.toBe(DEFAULT_ATMOSPHERE);
   });
 
-  it('brings the sun in low-ish from the left, 40–45° up, so the back row stays lit', () => {
+  it('brings the sun in from the left, 46–52° up, so the back wall shadow spares the back row', () => {
     for (const [name, map] of Object.entries(maps)) {
       const { position: s, target: t } = sunPlacement(a, map);
       const elevation = Math.atan2(s.y - t.y, Math.hypot(s.x - t.x, s.z - t.z)) * (180 / Math.PI);
       expect(s.x, name).toBeLessThan(t.x);
       expect(Math.abs(s.x - t.x), name).toBeGreaterThan(Math.abs(s.z - t.z));
-      expect(elevation, name).toBeGreaterThan(40);
-      expect(elevation, name).toBeLessThan(45);
+      expect(elevation, name).toBeGreaterThan(46);
+      expect(elevation, name).toBeLessThan(52);
     }
   });
 
@@ -529,6 +530,41 @@ describe('the spring morning (middle-management)', () => {
       expect(Math.abs(b - r)).toBeLessThan(40);
       expect(Math.min(r, g, b)).toBeGreaterThan(200);
     }
+  });
+
+  it('warms the sun against a cooler fill, and grades the frame a little richer', () => {
+    const [sr, , sb] = rgb(a.sun.color);
+    const [fr, , fb] = rgb(a.fill.color);
+    expect(sr - sb).toBeGreaterThan(30);
+    expect(fb).toBeGreaterThan(fr);
+    expect(a.fill.intensity).toBeLessThan(a.sky.intensity);
+    expect(a.vignette?.saturate).toBeGreaterThan(1);
+    expect(a.vignette?.saturate).toBeLessThan(1.6);
+    // No other preset is graded: their pictures stay exactly as they were.
+    for (const [id, other] of Object.entries(ATMOSPHERES))
+      if (other !== a) expect(other.vignette?.saturate, id).toBeUndefined();
+  });
+
+  it('slants faint sunbeams in on the floor beside the room, never over it', () => {
+    const shipped = sunShaftSpots(a, maps.shipped);
+    expect(shipped.length).toBe(a.shafts?.side?.count);
+    expect(a.shafts?.opacity).toBeLessThan(0.1);
+    const { position: s, target: t } = sunPlacement(a, maps.shipped);
+    for (const { foot, dir } of shipped) {
+      expect(foot.x).toBeLessThan(-0.5);
+      expect(foot.z).toBeGreaterThan(-0.5);
+      expect(foot.z).toBeLessThan(maps.shipped.height - 0.5);
+      // Each beam runs from its foot up toward the sun, away from the room.
+      expect(Math.hypot(dir.x, dir.y, dir.z)).toBeCloseTo(1);
+      expect(dir.y).toBeGreaterThan(0);
+      expect(dir.x).toBeLessThan(0);
+      expect(Math.sign(dir.z)).toBe(Math.sign(s.z - t.z));
+    }
+    expect(sunShaftSpots(a, maps.shipped)).toEqual(shipped);
+    // The draft's building hugs the room on the left: no floor there to light.
+    expect(sunShaftSpots(a, maps.draft)).toEqual([]);
+    expect(sunShaftSpots(DEFAULT_ATMOSPHERE, SHIPPED)).toEqual([]);
+    expect(sunShaftSpots(atmosphereFor('on-call'), SHIPPED)).toEqual([]);
   });
 
   it('hangs the pendants along the back wall only', () => {

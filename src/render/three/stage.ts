@@ -220,6 +220,7 @@ export class Stage {
     const style = this.vignette.style;
     style.display = vignette ? 'block' : 'none';
     if (vignette) style.background = vignetteCss(vignette);
+    this.renderer.domElement.style.filter = gradeFilter(vignette);
   }
 
   private applyPixelRatio(): void {
@@ -327,6 +328,15 @@ export function vignetteCss(vignette: NonNullable<Atmosphere['vignette']>): stri
   if (glows.length === 0) return edges;
   // The glows over the edges, the last on top: wide soft ellipses, strongest at their centres.
   return [...glows.reverse().map(glowCss), edges].join(', ');
+}
+
+/**
+ * The CSS filter that grades the 3D canvas (`vignette.saturate`): empty for
+ * a preset without one, so the other levels keep their exact picture.
+ */
+export function gradeFilter(vignette: Atmosphere['vignette']): string {
+  const saturate = vignette?.saturate;
+  return saturate !== undefined && saturate !== 1 ? `saturate(${saturate})` : '';
 }
 
 /** One glow: a wide soft ellipse, strongest at its centre. */

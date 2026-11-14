@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { type Box3, type Vec3, fitCamera3d, projectPoint } from '../projection';
 import { ATMOSPHERES } from './atmosphere';
-import { applyPose, vignetteCss } from './stage';
+import { applyPose, gradeFilter, vignetteCss } from './stage';
 
 describe('applyPose', () => {
   const box: Box3 = { min: { x: -0.5, y: -0.45, z: -0.5 }, max: { x: 13.5, y: 1.4, z: 9.5 } };
@@ -90,5 +90,18 @@ describe('vignetteCss', () => {
     expect(top).toBeLessThan(right);
     expect(right).toBeLessThan(left);
     expect(left).toBeLessThan(css.indexOf('farthest-corner'));
+  });
+});
+
+describe('gradeFilter', () => {
+  it('grades only a preset that asks for it', () => {
+    expect(gradeFilter(undefined)).toBe('');
+    expect(gradeFilter({ color: 0, opacity: 0.3, inner: 0.7 })).toBe('');
+    expect(gradeFilter({ color: 0, opacity: 0.3, inner: 0.7, saturate: 1 })).toBe('');
+    expect(gradeFilter({ color: 0, opacity: 0.3, inner: 0.7, saturate: 1.4 })).toBe(
+      'saturate(1.4)',
+    );
+    for (const id of ['garage', 'open-plan', 'scale-up', 'seed-round', 'demo-day', 'on-call'])
+      expect(gradeFilter(ATMOSPHERES[id]?.vignette), id).toBe('');
   });
 });
