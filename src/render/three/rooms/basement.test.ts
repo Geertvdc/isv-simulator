@@ -5,28 +5,38 @@ import { ON_CALL } from '../../../sim/levels';
 import draftText from '../../../../maps/drafts/on-call.txt?raw';
 import { LEVEL_LOOKS } from '../../mapLook';
 import { type Model, tint } from '../kit';
-import { FRONT_WALL_HEIGHT } from '../layout';
+import { FRONT_WALL_HEIGHT, WALL_HEIGHT } from '../layout';
 import { FLOOR_COLORS, PALETTE, WALL_COLORS } from '../look';
 import {
   BASEMENT_WALL_ART,
   CAGE_MODELS,
+  CAGE_TOP,
+  LOW_CAGE_TOP,
   SHELF_TOP,
   battenModel,
+  cageModel,
+  pagerBoardModel,
   trayModel,
   uplinkFrontModel,
 } from '../roomModels/basement';
 import {
   BASEMENT_FRONT_PROP_MAX_HEIGHT,
   BASEMENT_FRONT_WALL_PROPS,
-  BASEMENT_INNER_LOW_PROP,
+  BASEMENT_INNER_LOW_PROPS,
   BASEMENT_WALL_TOP_PROPS,
-  CAN_PYRAMID,
+  ENERGY_CAN,
   SEGFAULT_SERVER,
   YOTTA_RACK,
 } from '../setDressing/basementWallTops';
 import { ROOMS, floorDressing } from '.';
 import { BASEMENT_ROOM } from './basement';
-import { BASEMENT_ART_HALF, RAISED_WEAR_KINDS, basementRoom } from './basementRoom';
+import {
+  BASEMENT_ART_HALF,
+  CORNERS,
+  RAISED_WEAR,
+  RAISED_WEAR_KINDS,
+  basementRoom,
+} from './basementRoom';
 
 const vertices = (m: Model) => m.body.getAttribute('position').count;
 const luminance = (c: number) => {
@@ -113,7 +123,10 @@ describe('BASEMENT_ROOM', () => {
       const m = floor.model(floor.look(2, 3, wear));
       expect(m.glass).toBeNull();
       expect(m.glow).toBeNull();
+      // The lifted tile's pit shows its blue cable bundles, down in the floor, not on it.
+      const pit = wear >= RAISED_WEAR.lifted && wear < RAISED_WEAR.lifted + CORNERS;
       for (const c of bodyColors(m)) {
+        if (pit) continue;
         const { r, b } = new THREE.Color(c);
         // No blue that could pass for a wet trail.
         expect(b - r).toBeLessThan(0.05);
@@ -148,7 +161,8 @@ describe('BASEMENT_ROOM', () => {
   it('keeps everything on the low front wall low: the props and the uplink', () => {
     for (const p of BASEMENT_FRONT_WALL_PROPS)
       expect(bounds(p()).max.y).toBeLessThanOrEqual(BASEMENT_FRONT_PROP_MAX_HEIGHT);
-    expect(bounds(BASEMENT_INNER_LOW_PROP()).max.y).toBeLessThan(0.12);
+    expect(BASEMENT_INNER_LOW_PROPS.length).toBeGreaterThan(1);
+    for (const p of BASEMENT_INNER_LOW_PROPS) expect(bounds(p()).max.y).toBeLessThan(0.12);
     for (const frameX of [-1.5, 1.5]) {
       const box = bounds(uplinkFrontModel(frameX));
       // Standing on the low front wall, under 0.6 in all.
@@ -159,7 +173,7 @@ describe('BASEMENT_ROOM', () => {
   });
 
   it('builds every wall-top cluster and one-off inside its tile, and every piece of wall art on the face', () => {
-    for (const p of [...BASEMENT_WALL_TOP_PROPS, SEGFAULT_SERVER, YOTTA_RACK, CAN_PYRAMID]) {
+    for (const p of [...BASEMENT_WALL_TOP_PROPS, SEGFAULT_SERVER, YOTTA_RACK, ENERGY_CAN]) {
       const box = bounds(p());
       expect(box.max.x - box.min.x).toBeLessThan(1);
       expect(box.max.z - box.min.z).toBeLessThan(1);
@@ -174,6 +188,28 @@ describe('BASEMENT_ROOM', () => {
       expect(box.max.x).toBeLessThanOrEqual(half + 0.01);
       expect(box.min.x).toBeGreaterThanOrEqual(-half - 0.01);
     }
+  });
+
+  it('builds every inner wall as the cage, dark tops that never take the counters’ value', () => {
+    for (const piece of ['wall', 'wall-front', 'wall-inner'] as const)
+      for (let l = 0; l < 3; l++) expect(vertices(cageModel(piece, l))).toBeGreaterThan(0);
+    // The low cage stays a low wall.
+    expect(bounds(cageModel('wall-front', 0)).max.y).toBeLessThan(FRONT_WALL_HEIGHT + 0.03);
+    for (const top of [CAGE_TOP, LOW_CAGE_TOP]) {
+      expect(top).not.toBe(SHELF_TOP);
+      expect(Math.abs(luminance(top) - luminance(SHELF_TOP))).toBeGreaterThan(0.002);
+      expect(luminance(top)).toBeLessThan(luminance(WALL_COLORS.basement.top));
+    }
+  });
+
+  it('builds the pager board on its wall tile, its beacon over the tile’s middle just behind the wall line', () => {
+    const box = bounds(pagerBoardModel(false, 0));
+    expect(box.max.x - box.min.x).toBeLessThan(1);
+    expect((box.max.x + box.min.x) / 2).toBeCloseTo(0, 1);
+    expect(box.max.y).toBeGreaterThan(WALL_HEIGHT + 0.3);
+    expect(box.max.y).toBeLessThan(WALL_HEIGHT + 0.42);
+    expect(box.max.z).toBeLessThan(0);
+    expect(bounds(pagerBoardModel(true, 0)).max.y).toBeLessThan(0.6);
   });
 
   it('builds the tray over its whole run and its battens hanging under it', () => {

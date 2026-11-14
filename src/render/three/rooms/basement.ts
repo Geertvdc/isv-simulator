@@ -8,6 +8,7 @@ import {
   basementFoundationModel,
   basementWallModel,
   battenModel,
+  pagerBoardModel,
   pagerDoorModel,
   rackShelfCounter,
   raisedFloorModel,
@@ -19,9 +20,9 @@ import {
 } from '../roomModels/basement';
 import {
   BASEMENT_FRONT_WALL_PROPS,
-  BASEMENT_INNER_LOW_PROP,
+  BASEMENT_INNER_LOW_PROPS,
   BASEMENT_WALL_TOP_PROPS,
-  CAN_PYRAMID,
+  ENERGY_CAN,
   SEGFAULT_SERVER,
   YOTTA_RACK,
 } from '../setDressing/basementWallTops';
@@ -46,7 +47,7 @@ const DOOR_YAW: Readonly<Record<Side, number>> = {
  * dark rack shelves and crash carts for counters, the night's kit in
  * clusters on the wall tops, fluorescent battens on a cable tray along the
  * back, and the story pieces: the propped fire door with the pager board at
- * the inbox, the uplink's patch frame at the ship hatches, and on the walls
+ * the inbox and the pager board on the wall past it, the uplink's patch frame at the ship hatches, and on the walls
  * the incident runbook, the server room sign, the fire exit, the breaker
  * box, the thermostat at 31°C and the do-not-unplug note. Segfault sleeps
  * on the warmest server; YOTTA's sticker is on a rack.
@@ -62,7 +63,18 @@ export const BASEMENT_ROOM: RoomDressing<BasementRoom> = {
   swapModels: CAGE_MODELS,
   lamp: { model: battenModel, fit: battenFit },
   placeStory(
-    { pagerDoor, pagerLeaf, uplinks, wallArt, innerProps, segfault, yotta, cans, trays },
+    {
+      pagerDoor,
+      pagerBoard,
+      pagerLeaf,
+      uplinks,
+      wallArt,
+      innerProps,
+      segfault,
+      yotta,
+      cans,
+      trays,
+    },
     _map,
     place,
   ) {
@@ -70,14 +82,15 @@ export const BASEMENT_ROOM: RoomDressing<BasementRoom> = {
       const span = pagerDoor.tiles.length;
       const low = pagerDoor.side === 'front';
       const yaw = DOOR_YAW[pagerDoor.side];
-      place(
-        `pagerDoor:${span}:${low}:${yaw}:${pagerLeaf}`,
-        () => pagerDoorModel(span, low, yaw, pagerLeaf),
-        {
-          at: gridToWorld(pagerDoor.mid.x, pagerDoor.mid.y),
+      place(`pagerDoor:${span}:${low}:${pagerLeaf}`, () => pagerDoorModel(span, low, pagerLeaf), {
+        at: gridToWorld(pagerDoor.mid.x, pagerDoor.mid.y),
+        yaw,
+      });
+      if (pagerBoard)
+        place(`pagerBoard:${low}:${yaw}`, () => pagerBoardModel(low, yaw), {
+          at: gridToWorld(pagerBoard.x, pagerBoard.y),
           yaw,
-        },
-      );
+        });
     }
     for (const { door, frame } of uplinks) {
       const at = gridToWorld(door.mid.x, door.mid.y);
@@ -102,11 +115,15 @@ export const BASEMENT_ROOM: RoomDressing<BasementRoom> = {
         const model = BASEMENT_WALL_TOP_PROPS[index];
         if (model)
           place(`innerTop:${index}`, model, { at: gridToWorld(x, y, WALL_HEIGHT), yaw: 0.08 });
-      } else
-        place('innerLow', BASEMENT_INNER_LOW_PROP, {
-          at: gridToWorld(x, y, FRONT_WALL_HEIGHT),
-          yaw: slot % 2 ? 0.3 : -0.2,
-        });
+      } else {
+        const index = slot % BASEMENT_INNER_LOW_PROPS.length;
+        const model = BASEMENT_INNER_LOW_PROPS[index];
+        if (model)
+          place(`innerLow:${index}`, model, {
+            at: gridToWorld(x, y, FRONT_WALL_HEIGHT),
+            yaw: slot % 2 ? 0.3 : -0.2,
+          });
+      }
     }
     if (segfault)
       place('segfault', SEGFAULT_SERVER, {
@@ -115,8 +132,7 @@ export const BASEMENT_ROOM: RoomDressing<BasementRoom> = {
       });
     if (yotta)
       place('yotta', YOTTA_RACK, { at: gridToWorld(yotta.x, yotta.y, WALL_HEIGHT), yaw: 0.1 });
-    if (cans)
-      place('cans', CAN_PYRAMID, { at: gridToWorld(cans.x, cans.y, WALL_HEIGHT), yaw: 0.2 });
+    if (cans) place('cans', ENERGY_CAN, { at: gridToWorld(cans.x, cans.y, WALL_HEIGHT), yaw: 0.2 });
   },
-  flat: new Set(['tray:0', 'tray:1', 'tray:2', 'tray:3', 'innerLow']),
+  flat: new Set(['tray:0', 'tray:1', 'tray:2', 'tray:3', 'innerLow:0', 'innerLow:1']),
 };

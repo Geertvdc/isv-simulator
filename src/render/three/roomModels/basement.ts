@@ -156,16 +156,22 @@ export function text(
 
 /** The block's paint: pale above the dado, the muted grey-green under it, its dark band and plinth. */
 const UPPER = 0xaeb1a9;
-const DADO_BAND = 0x5f6c64;
-const KICK = 0x4c5052;
+const DADO_BAND = 0x4f5a53;
+const KICK = 0x3a423e;
 /** Cast-concrete coping: the cap's top is `WALL_COLORS.basement.top`. */
 const COPING_EDGE = 0x959a9e;
 /** Galvanised steel (the tray, the struts, the conduit) and a darker steel. */
 export const GALV = 0x8c9399;
 const STEEL_DARK = 0x4a4f55;
+/** The cable tray and its battens: dark steel, so the rail doesn't cut across the back. */
+const TRAY_STEEL = 0x5a6068;
 /** The racks' black, their steel mesh, a server's face. */
 export const RACK = 0x25282d;
-const MESH = 0x5d636b;
+const MESH = 0x5a6068;
+/** The cage's charcoal top, darker than the counters' shelf top. */
+export const CAGE_TOP = 0x2a3038;
+/** The low cage's top: a lighter charcoal (the players look down on it), still under the counters' value. */
+export const LOW_CAGE_TOP = 0x3e4650;
 const SERVER = 0x33373e;
 /** Rack LEDs (glow, boosted on screen: small and dim). */
 export const LED_BLUE = 0x1f6fc8;
@@ -182,6 +188,11 @@ const FIBRE = 0xd8b42a;
 const PAPER = 0xd8d6cc;
 const INK = 0x2a2c30;
 const MARKER_RED = 0xc0302a;
+/** The runbook's whiteboard marker: dark blue, and the red circle. */
+const RUNBOOK_INK = 0x1a2a5a;
+const RUNBOOK_RED = 0xd02020;
+/** How far the runbook's foot is kicked out from the wall, tipping it toward the camera. */
+const RUNBOOK_TIP = 0.5;
 
 // ---- Walls ----
 
@@ -363,7 +374,8 @@ const CAGE_BLOCK = 0.42;
  * top. `look`: servers behind mesh, solid perforated rack doors with a
  * handle, or a patch panel with its cables.
  */
-export function cageModel(_piece: WallPiece, look: number): Model {
+export function cageModel(piece: WallPiece, look: number): Model {
+  if (piece === 'wall-front') return lowCageModel(look);
   const { face } = WALL_COLORS.basement;
   const b = new ModelBuilder();
   const h = WALL_HEIGHT;
@@ -374,11 +386,11 @@ export function cageModel(_piece: WallPiece, look: number): Model {
   const rackY = CAGE_BLOCK + rackH / 2;
   b.box(0.94, rackH, 0.94, RACK, { at: [0, rackY, 0] }, 0);
   // The dark steel top, a little proud, and the frame's corner posts.
-  b.box(1.0, 0.04, 1.0, 0x34383e, { at: [0, h - 0.02, 0] }, 0);
+  b.box(1.0, 0.04, 1.0, CAGE_TOP, { at: [0, h - 0.02, 0] }, 0);
   // The top's rim, catching the light, and a vent grille in it.
   for (const s of [-1, 1]) {
-    b.box(1.004, 0.008, 0.02, tint(MESH, 0.1), { at: [0, h - 0.003, s * 0.492] }, 0);
-    b.box(0.02, 0.008, 1.004, tint(MESH, 0.1), { at: [s * 0.492, h - 0.003, 0] }, 0);
+    b.box(1.004, 0.008, 0.02, MESH, { at: [0, h - 0.003, s * 0.492] }, 0);
+    b.box(0.02, 0.008, 1.004, MESH, { at: [s * 0.492, h - 0.003, 0] }, 0);
   }
   for (let k = 0; k < 5; k++)
     b.box(0.5, 0.004, 0.02, 0x1d2024, { at: [0, h + 0.001, -0.2 + k * 0.1] }, 0);
@@ -453,9 +465,47 @@ export function cageModel(_piece: WallPiece, look: number): Model {
   return b.build();
 }
 
+/**
+ * A low wall of the server room (the players look over it) as a low row of
+ * rack units: a black chassis on a dark kick, its charcoal top inside a
+ * steel-mesh rail, a row of LEDs and a vent slot on every face. Never a
+ * counter's grey: it reads as part of the cage.
+ */
+function lowCageModel(look: number): Model {
+  const b = new ModelBuilder();
+  const h = FRONT_WALL_HEIGHT;
+  b.box(1.0, 0.035, 1.0, KICK, { at: [0, 0.0175, 0] }, 0);
+  b.box(0.98, h - 0.05, 0.98, RACK, { at: [0, 0.035 + (h - 0.05) / 2, 0] }, 0);
+  b.box(1.0, 0.016, 1.0, LOW_CAGE_TOP, { at: [0, h - 0.008, 0] }, 0);
+  // The steel-mesh rail round the top: a rim and its uprights' stubs at the corners.
+  for (const s of [-1, 1]) {
+    b.box(1.004, 0.014, 0.026, MESH, { at: [0, h + 0.002, s * 0.489] }, 0);
+    b.box(0.026, 0.014, 1.004, MESH, { at: [s * 0.489, h + 0.002, 0] }, 0);
+  }
+  // A mesh panel in the top: a few darker slats.
+  for (let k = 0; k < 6; k++)
+    b.box(0.7, 0.003, 0.018, 0x1d2024, { at: [0, h + 0.0005, -0.3 + k * 0.12] }, 0);
+  faces(0.492).forEach((on, f) => {
+    const seed = tileHash(look + 5, f + 11);
+    b.box(0.9, 0.05, 0.006, SERVER, on(0, 0.105), 0);
+    b.box(0.3, 0.012, 0.004, 0x15171a, on(0.22, 0.105), 0);
+    for (let k = 0; k < 4; k++) {
+      const hk = tileHash(seed + k, 3);
+      const color = hk % 7 === 0 ? LED_AMBER : hk % 2 ? LED_BLUE : LED_GREEN;
+      const p = on(-0.36 + k * 0.06, 0.105);
+      const [x, y, z] = p.at ?? [0, 0, 0];
+      const turned = f >= 2;
+      glowBox(b, turned ? 0.004 : 0.024, 0.014, turned ? 0.024 : 0.004, color, {
+        at: [x + (turned ? Math.sign(x) * 0.006 : 0), y, z + (turned ? 0 : Math.sign(z) * 0.006)],
+      });
+    }
+  });
+  return b.build();
+}
+
 /** Every cage swap model, by its name in the plan's `swaps`. */
 export const CAGE_MODELS: Readonly<Record<string, () => Model>> = Object.fromEntries(
-  (['wall', 'wall-inner'] as const).flatMap((piece) =>
+  (['wall', 'wall-inner', 'wall-front'] as const).flatMap((piece) =>
     Array.from({ length: CAGE_LOOKS }, (_, look) => [
       cageSwap(piece, look),
       () => cageModel(piece, look),
@@ -632,8 +682,13 @@ export function raisedFloorModel(look: number): Model {
   return b.build();
 }
 
+/** The void under a lifted panel: steel grey, not a black hole; its cable bundles. */
+const PIT = 0x3a4048;
+const PIT_BLUE = 0x2f5f9a;
+const PIT_YELLOW = 0xc8a030;
+
 /**
- * A lifted floor panel in half tile `corner`: the dark void under it with
+ * A lifted floor panel in half tile `corner`: the void under it with
  * its pedestal and cables, the panel leaning beside on its edge, a suction
  * lifter left by it.
  */
@@ -641,15 +696,15 @@ function liftedPanel(b: ModelBuilder, corner: number, base: number): void {
   const [cx, cz] = HALVES[corner] ?? [0, 0];
   const sx = Math.sign(cx);
   const sz = Math.sign(cz);
-  b.box(0.47, 0.004, 0.47, VOID, { at: [cx, 0.001, cz] }, 0);
+  b.box(0.47, 0.004, 0.47, PIT, { at: [cx, 0.001, cz] }, 0);
   b.box(0.012, 0.006, 0.47, tint(base, -0.3), { at: [cx - sx * 0.235, 0.002, cz] }, 0);
   b.box(0.47, 0.006, 0.012, tint(base, -0.3), { at: [cx, 0.002, cz - sz * 0.235] }, 0);
   // The pedestal's head at the inner corner, cables across the void and one out over the floor.
   b.cylinder(0.03, 0.03, 0.01, 0x8a8e92, { at: [cx - sx * 0.22, 0.005, cz - sz * 0.22] }, 10);
   for (const [k, col] of [
-    [0, 0x1d1f22],
-    [1, 0x3a3d42],
-    [2, 0x5a4a44],
+    [0, PIT_BLUE],
+    [1, PIT_YELLOW],
+    [2, PIT_BLUE],
   ] as const)
     b.cylinder(
       0.014,
@@ -670,21 +725,23 @@ function liftedPanel(b: ModelBuilder, corner: number, base: number): void {
     { at: [cx - sx * 0.3, 0.008, cz - sz * 0.05], rot: [0, 0, Math.PI / 2] },
     8,
   );
-  // The panel itself, leaning on its edge against the wall side, tilted up.
+  // The panel itself, propped on the next half tile toward the room, its far edge raised 15°.
   b.box(
     0.46,
     0.03,
     0.46,
-    tint(base, 0.02),
+    tint(base, 0.04),
     {
-      at: [cx - sx * 0.02, 0.07, cz + sz * 0.05],
-      rot: [sz * 0.32, 0, -sx * 0.1],
+      at: [cx - sx * 0.47, 0.065, cz - sz * 0.08],
+      rot: [0, 0, -sx * 0.26],
     },
     0.006,
   );
+  // A wooden wedge under its raised edge.
+  b.box(0.06, 0.05, 0.08, 0x9a7a4a, { at: [cx - sx * 0.68, 0.025, cz - sz * 0.08] }, 0.006);
   // The suction lifter: two cups and a handle, lying on the next panel.
-  const lx = cx - sx * 0.44;
-  const lz = cz - sz * 0.12;
+  const lx = cx - sx * 0.1;
+  const lz = cz - sz * 0.36;
   for (const d of [-0.06, 0.06])
     b.cylinder(0.035, 0.035, 0.02, 0x2a2c30, { at: [lx + d, 0.01, lz] }, 12);
   b.box(0.16, 0.02, 0.025, 0x8a2a24, { at: [lx, 0.035, lz] }, 0.006);
@@ -839,73 +896,85 @@ function doorLeaf(b: ModelBuilder, hx: number, s: number, z: number): void {
   });
 }
 
+/** The alert lamps' red, the pager board's screen. */
+const ALERT_LAMP = 0xff3b30;
+const BOARD_SCREEN = 0x101418;
+
 /**
- * The pager board, built facing +z round its middle: a wall-mounted alert
- * panel with a row of red alert lamps (one lit bright), a small screen
- * reading ALERTS · 37, a red beacon on top and a pager hung on a hook.
+ * The pager board, built facing +z round its middle (about 0.9 of a tile
+ * wide): a wall-mounted alert panel with a row of six red alert lamps (the
+ * third burning hot), a dark screen reading ALERTS 37, an ON CALL strip, the
+ * red beacon dome on top over its middle and a pager hung on a hook.
  */
 function pagerBoard(b: ModelBuilder): void {
-  b.box(0.92, 0.3, 0.07, 0x30343a, { at: [0, 0, 0] }, 0.014);
-  b.box(0.94, 0.02, 0.08, GALV, { at: [0, 0.15, 0] }, 0);
-  // The lamps: red domes in bezels, the second one lit bright.
-  for (let k = 0; k < 5; k++) {
-    const x = -0.36 + k * 0.09;
-    b.cylinder(
-      0.034,
-      0.034,
-      0.02,
-      0x1a1c1f,
-      { at: [x, 0.065, 0.04], rot: [Math.PI / 2, 0, 0] },
-      14,
-    );
+  const w = 0.88;
+  b.box(w, 0.36, 0.07, 0x262a30, { at: [0, 0, 0] }, 0.014);
+  b.box(w + 0.02, 0.02, 0.08, GALV, { at: [0, 0.18, 0] }, 0);
+  b.box(w + 0.02, 0.016, 0.08, GALV, { at: [0, -0.18, 0] }, 0);
+  // The lamps: red domes in black bezels, all lit, one hotter (the one that's blinking).
+  for (let k = 0; k < 6; k++) {
+    const x = -0.325 + k * 0.13;
+    b.cylinder(0.045, 0.045, 0.02, 0x15171a, { at: [x, 0.09, 0.04], rot: [Math.PI / 2, 0, 0] }, 14);
     b.add(
-      new THREE.SphereGeometry(0.026, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
-      k === 1 ? 0xff3a2a : k === 3 ? ALERT_RED : 0x6a1010,
-      {
-        at: [x, 0.065, 0.048],
-        rot: [Math.PI / 2, 0, 0],
-      },
+      new THREE.SphereGeometry(0.036, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+      k === 2 ? 0xffb0a0 : ALERT_LAMP,
+      { at: [x, 0.09, 0.05], rot: [Math.PI / 2, 0, 0] },
       'glow',
     );
   }
-  // The screen: ALERTS · 37.
-  b.box(0.36, 0.13, 0.01, 0x101214, { at: [0.22, -0.06, 0.04] }, 0);
-  b.screen(0.34, 0.11, 0x1a0808, { at: [0.22, -0.06, 0.0455] });
-  text(b, 'ALERTS', 0.16, -0.035, 0.046, 0.009, 0xff6a4a);
-  text(b, '37', 0.33, -0.07, 0.046, 0.016, 0xff3a2a);
-  // A label strip, ON CALL, under the lamps.
-  b.box(0.38, 0.05, 0.004, PAPER, { at: [-0.18, -0.07, 0.037] }, 0);
-  text(b, 'ON CALL', -0.18, -0.07, 0.039, 0.008, INK);
-  // The beacon on top.
-  b.cylinder(0.05, 0.055, 0.03, 0x1a1c1f, { at: [-0.36, 0.17, 0] }, 14);
+  // The screen: ALERTS 37, big.
+  b.box(0.68, 0.14, 0.01, BOARD_SCREEN, { at: [-0.08, -0.08, 0.04] }, 0);
+  b.screen(0.66, 0.12, 0x1a0606, { at: [-0.08, -0.08, 0.0455] });
+  text(b, 'ALERTS 37', -0.08, -0.08, 0.046, 0.0185, 0xff5a44);
+  // The pager on its hook at the right end.
+  b.box(0.014, 0.05, 0.03, GALV, { at: [0.36, 0.0, 0.05] }, 0);
+  b.box(0.1, 0.14, 0.035, 0x1d1f22, { at: [0.37, -0.08, 0.06], rot: [0, 0, 0.1] }, 0.012);
+  glowBox(b, 0.07, 0.04, 0.004, 0x2a7a3a, { at: [0.375, -0.055, 0.079] });
+  b.led(0.01, ALERT_LAMP, { at: [0.36, -0.125, 0.079] });
+  // The beacon on top, over the middle.
+  b.cylinder(0.06, 0.065, 0.035, 0x15171a, { at: [0, 0.205, 0] }, 14);
   b.add(
-    new THREE.SphereGeometry(0.045, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.SphereGeometry(0.055, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
     ALERT_RED,
-    { at: [-0.36, 0.185, 0] },
+    { at: [0, 0.222, 0] },
     'glow',
   );
-  // The pager on its hook, hung off the board's right end.
-  b.box(0.012, 0.05, 0.03, GALV, { at: [0.5, 0.06, 0.03] }, 0);
-  b.box(0.1, 0.13, 0.035, 0x1d1f22, { at: [0.52, -0.04, 0.05], rot: [0, 0, 0.12] }, 0.012);
-  glowBox(b, 0.07, 0.035, 0.004, 0x2a6a3a, { at: [0.525, -0.015, 0.069] });
-  b.led(0.008, 0xff3a2a, { at: [0.5, -0.09, 0.069] });
+}
+
+/** How high the pager board's middle stands over the wall top (its beacon then sits at about +0.36). */
+const BOARD_RISE = 0.14;
+/** How far behind the wall tile's middle the board stands (toward the outside). */
+const BOARD_BACK = 0.36;
+
+/**
+ * The pager board on its wall tile (see `pagerBoardTile`), built for a
+ * tile turned by `yaw` to face out (−z outside), the board turned back to
+ * face the camera, standing on the wall top just behind the wall line.
+ * On a low front wall it lies tilted low instead.
+ */
+export function pagerBoardModel(low: boolean, yaw = 0): Model {
+  const b = new ModelBuilder();
+  if (low) {
+    pagerBoard(framed(b, [0, FRONT_WALL_HEIGHT + 0.1, 0.1], [-0.9, -yaw, 0], 0.5));
+    return b.build();
+  }
+  pagerBoard(framed(b, [0, WALL_HEIGHT + BOARD_RISE, -BOARD_BACK], [0, -yaw, 0]));
+  return b.build();
 }
 
 /**
  * The fire door round the inbox (`span` tiles wide), its opening toward −z:
- * a steel frame and head in the block wall, the pager board standing on the
- * head (turned back by `yaw` to face the camera whatever wall it is on),
- * and the door leaf propped open against the wall face on side `leaf`
- * (±1 along x, 0 for none) with its wedge. On the front edge, which the
- * camera looks over, only low posts and the board lying low.
+ * a steel frame and head in the block wall, and the door leaf propped open
+ * against the wall face on side `leaf` (±1 along x, 0 for none) with its
+ * wedge. On the front edge, which the camera looks over, only low posts.
+ * The pager board stands on the next wall tile (`pagerBoardModel`).
  */
-export function pagerDoorModel(span: number, low: boolean, yaw = 0, leaf = 0): Model {
+export function pagerDoorModel(span: number, low: boolean, leaf = 0): Model {
   const b = new ModelBuilder();
   const half = span / 2;
   if (low) {
     for (const s of [-1, 1])
       b.box(0.08, 0.3, 0.1, DOOR_FRAME, { at: [s * (half + 0.04), 0.15, 0.45] }, 0.01);
-    pagerBoard(framed(b, [-half - 0.4, 0.42, 0.42], [-0.9, 0, 0], 0.5));
     return b.build();
   }
   const top = WALL_HEIGHT;
@@ -925,12 +994,7 @@ export function pagerDoorModel(span: number, low: boolean, yaw = 0, leaf = 0): M
   b.box(span, top - headY, 0.2, UPPER, { at: [0, (top + headY) / 2, -0.4] }, 0);
   b.box(span + 0.02, 0.07, 0.2, DOOR_FRAME, { at: [0, headY - 0.035, -0.4] }, 0.008);
   b.box(span + 0.04, 0.04, 0.24, COPING_EDGE, { at: [0, top - 0.02, -0.4] }, 0);
-  // Green emergency light strip over the head on the stair side, a glimpse of the dark stairwell.
   b.box(span - 0.2, 0.02, 0.02, 0x1a1c1f, { at: [0, STATION_HEIGHT + 0.1, -0.49] }, 0);
-  // The pager board on the wall over the door, turned square to the camera.
-  const board = framed(b, [0, top + 0.17, -0.36], [0, -yaw, 0]);
-  for (const s of [-1, 1]) board.box(0.025, 0.08, 0.025, GALV, { at: [s * 0.3, -0.17, -0.02] }, 0);
-  pagerBoard(board);
   if (leaf !== 0) doorLeaf(b, leaf * (half + 0.02), leaf, 0.5);
   return b.build();
 }
@@ -1086,39 +1150,61 @@ function fireExitSign(b: ModelBuilder, cy: number, z: number): void {
  */
 export const BASEMENT_WALL_ART: Readonly<Record<string, () => Model>> = {
   runbook: () => {
-    // The incident runbook: a whiteboard with the plan, "2. ???" circled in red.
+    // The incident runbook: a big whiteboard hung from the coping on two chains, its foot kicked
+    // out so it tips up toward the camera; the plan on it, "2. ???" circled hard in red.
     const b = new ModelBuilder();
     const w = BASEMENT_ART_HALF.runbook * 2;
-    const [h, cy, z] = [0.56, 0.76, 0.515];
-    b.box(w, h, 0.03, 0x9aa0a6, { at: [0, cy, z] }, 0.008);
-    b.box(w - 0.04, h - 0.04, 0.006, 0xcfd1cc, { at: [0, cy, z + 0.016] }, 0);
-    const f = z + 0.019;
-    text(b, 'RUNBOOK', -0.14, cy + 0.2, f, 0.008, 0x2a4a8a);
-    b.box(0.26, 0.004, 0.002, 0x2a4a8a, { at: [-0.14, cy + 0.17, f + 0.001] }, 0);
-    text(b, 'P1 · 03:12', 0.2, cy + 0.2, f, 0.006, MARKER_RED);
-    text(b, '1. BUILD IT', -0.06, cy + 0.1, f, 0.011, INK);
-    text(b, '2. ???', -0.12, cy - 0.01, f, 0.011, INK);
-    text(b, '3. PROFIT', -0.08, cy - 0.12, f, 0.011, INK);
-    // The red circle round step 2, drawn in a hurry.
-    const ring = new THREE.TorusGeometry(0.1, 0.006, 5, 28);
-    ring.scale(1.45, 0.62, 1);
-    b.add(ring, MARKER_RED, { at: [-0.12, cy - 0.01, f + 0.002], rot: [0, 0, 0.08] });
-    b.box(
-      0.08,
-      0.008,
+    const h = 0.62;
+    const hang = WALL_HEIGHT - 0.08;
+    for (const s of [-1, 1])
+      b.box(0.012, 0.06, 0.012, GALV, { at: [s * (w / 2 - 0.08), hang + 0.02, 0.51] }, 0);
+    const g = framed(b, [0, hang, 0.51], [-RUNBOOK_TIP, 0, 0]);
+    const cy = -h / 2;
+    g.box(w, h, 0.03, 0x8a9096, { at: [0, cy, 0.015] }, 0.008);
+    g.box(w - 0.04, h - 0.04, 0.006, 0xe6e7e2, { at: [0, cy, 0.031] }, 0);
+    const f = 0.034;
+    text(g, 'RUNBOOK', -0.3, cy + 0.24, f, 0.011, RUNBOOK_INK);
+    text(g, 'P1 03:12', 0.3, cy + 0.24, f, 0.01, RUNBOOK_RED);
+    g.box(w - 0.12, 0.008, 0.002, RUNBOOK_INK, { at: [0, cy + 0.195, f + 0.001] }, 0);
+    text(g, '1. BUILD', -0.16, cy + 0.12, f, 0.02, RUNBOOK_INK);
+    text(g, '2. ???', -0.16, cy - 0.025, f, 0.03, RUNBOOK_INK);
+    text(g, '3. PROFIT', -0.12, cy - 0.17, f, 0.02, RUNBOOK_INK);
+    // The red circle round step 2, drawn hard and in a hurry, an arrow pointing at it.
+    const ring = new THREE.TorusGeometry(0.1, 0.014, 5, 32);
+    ring.scale(2.9, 0.9, 1);
+    g.add(ring, RUNBOOK_RED, { at: [-0.16, cy - 0.025, f + 0.003], rot: [0, 0, 0.05] });
+    g.box(
+      0.18,
+      0.018,
       0.002,
-      MARKER_RED,
-      { at: [0.08, cy + 0.02, f + 0.002], rot: [0, 0, 0.4] },
+      RUNBOOK_RED,
+      { at: [0.33, cy + 0.04, f + 0.002], rot: [0, 0, 0.4] },
+      0,
+    );
+    g.box(
+      0.07,
+      0.018,
+      0.002,
+      RUNBOOK_RED,
+      { at: [0.24, cy + 0.035, f + 0.002], rot: [0, 0, 1.2] },
+      0,
+    );
+    g.box(
+      0.07,
+      0.018,
+      0.002,
+      RUNBOOK_RED,
+      { at: [0.25, cy - 0.005, f + 0.002], rot: [0, 0, -0.1] },
       0,
     );
     // The marker tray with a red marker in it.
-    b.box(w - 0.1, 0.02, 0.05, 0x9aa0a6, { at: [0, cy - h / 2 - 0.005, z + 0.03] }, 0.004);
-    b.box(
+    g.box(w - 0.1, 0.02, 0.05, 0x8a9096, { at: [0, cy - h / 2 - 0.005, 0.045] }, 0.004);
+    g.box(
       0.12,
       0.018,
       0.018,
-      MARKER_RED,
-      { at: [0.2, cy - h / 2 + 0.012, z + 0.035], rot: [0, 0, Math.PI / 2 - 0.05] },
+      RUNBOOK_RED,
+      { at: [0.3, cy - h / 2 + 0.012, 0.05], rot: [0, 0, Math.PI / 2 - 0.05] },
       0.005,
     );
     return b.build();
@@ -1219,21 +1305,23 @@ export function battenModel(): Model {
   const b = new ModelBuilder();
   const len = 0.7;
   for (const s of [-1, 1])
-    b.box(0.012, BATTEN_DROP, 0.012, GALV, { at: [s * 0.26, BATTEN_DROP / 2, 0] }, 0);
-  b.box(len, 0.04, 0.1, 0xa4a8aa, { at: [0, -0.02, 0] }, 0.008);
-  b.box(len + 0.01, 0.012, 0.11, 0x8c9092, { at: [0, -0.002, 0] }, 0);
-  for (const z of [-0.026, 0.026])
-    b.add(
-      new THREE.CylinderGeometry(0.016, 0.016, len - 0.06, 10),
-      0xc8d6e0,
-      {
-        at: [0, -0.052, z],
-        rot: [0, 0, Math.PI / 2],
-      },
-      'glow',
-    );
+    b.box(0.01, BATTEN_DROP, 0.01, TRAY_STEEL, { at: [s * 0.26, BATTEN_DROP / 2, 0] }, 0);
+  b.box(len, 0.024, 0.06, TRAY_STEEL, { at: [0, -0.012, 0] }, 0.005);
+  b.add(
+    new THREE.CylinderGeometry(0.011, 0.011, len - 0.05, 8),
+    0xc8d6e0,
+    { at: [0, -0.03, 0], rot: [0, 0, Math.PI / 2] },
+    'glow',
+  );
   for (const s of [-1, 1])
-    b.box(0.03, 0.04, 0.1, 0x8c9092, { at: [s * (len / 2 - 0.02), -0.05, 0] }, 0.006);
+    b.box(
+      0.02,
+      0.026,
+      0.06,
+      tint(TRAY_STEEL, -0.2),
+      { at: [s * (len / 2 - 0.015), -0.026, 0] },
+      0.004,
+    );
   return b.build();
 }
 
@@ -1248,39 +1336,29 @@ export function trayModel(tray: Tray): Model {
   const { y, x0, x1 } = tray;
   const len = x1 - x0;
   const mid = (x0 + x1) / 2;
-  const w = 0.2;
+  const w = 0.12;
   for (const s of [-1, 1]) {
-    b.box(len, 0.045, 0.012, GALV, { at: [mid, y + 0.02, s * (w / 2)] }, 0);
-    b.box(len, 0.008, 0.024, tint(GALV, -0.15), { at: [mid, y, s * (w / 2 - 0.006)] }, 0);
+    b.box(len, 0.027, 0.008, TRAY_STEEL, { at: [mid, y + 0.012, s * (w / 2)] }, 0);
+    b.box(len, 0.005, 0.014, tint(TRAY_STEEL, -0.2), { at: [mid, y, s * (w / 2 - 0.004)] }, 0);
   }
   for (let x = x0 + 0.15; x < x1 - 0.05; x += 0.3)
-    b.box(0.02, 0.008, w, tint(GALV, -0.1), { at: [x, y + 0.002, 0] }, 0);
+    b.box(0.012, 0.005, w, tint(TRAY_STEEL, -0.15), { at: [x, y + 0.001, 0] }, 0);
   // The cables in it: a black bundle, a grey one and the yellow fibre.
   for (const [z, r, col] of [
-    [-0.05, 0.022, 0x1d1f22],
-    [-0.01, 0.018, 0x2c2f33],
-    [0.03, 0.018, 0x4a4e55],
-    [0.065, 0.012, FIBRE],
+    [-0.03, 0.013, 0x1d1f22],
+    [0.0, 0.011, 0x2c2f33],
+    [0.03, 0.008, FIBRE],
   ] as const)
-    b.cylinder(r, r, len - 0.04, col, { at: [mid, y + 0.008 + r, z], rot: [0, 0, Math.PI / 2] }, 8);
+    b.cylinder(r, r, len - 0.04, col, { at: [mid, y + 0.004 + r, z], rot: [0, 0, Math.PI / 2] }, 6);
   // The uprights on the back wall's coping, each with an arm out to the tray and a base plate.
   const back = tray.back - tray.z;
   for (const p of tray.posts) {
-    const h = y + 0.08 - WALL_HEIGHT;
-    b.box(0.2, 0.012, 0.2, STEEL_DARK, { at: [p.x, WALL_HEIGHT + 0.006, back] }, 0.004);
-    b.box(0.045, h, 0.045, GALV, { at: [p.x, WALL_HEIGHT + h / 2, back] }, 0.006);
-    for (let k = 1; k < 5; k++)
-      b.box(
-        0.012,
-        0.02,
-        0.004,
-        STEEL_DARK,
-        { at: [p.x, WALL_HEIGHT + k * (h / 5), back + 0.024] },
-        0,
-      );
-    const arm = -back + w / 2 + 0.02;
-    b.box(0.04, 0.04, arm, GALV, { at: [p.x, y - 0.02, back + arm / 2] }, 0.006);
-    b.box(0.03, 0.08, 0.03, GALV, { at: [p.x, y + 0.02, w / 2 + 0.02] }, 0);
+    const h = y + 0.04 - WALL_HEIGHT;
+    b.box(0.14, 0.01, 0.14, STEEL_DARK, { at: [p.x, WALL_HEIGHT + 0.005, back] }, 0.003);
+    b.box(0.03, h, 0.03, TRAY_STEEL, { at: [p.x, WALL_HEIGHT + h / 2, back] }, 0.004);
+    const arm = -back + w / 2 + 0.01;
+    b.box(0.026, 0.022, arm, TRAY_STEEL, { at: [p.x, y - 0.01, back + arm / 2] }, 0.004);
+    b.box(0.02, 0.05, 0.02, TRAY_STEEL, { at: [p.x, y + 0.012, w / 2 + 0.01] }, 0);
   }
   return b.build();
 }
