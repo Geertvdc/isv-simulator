@@ -197,6 +197,23 @@ describe('onCallScene', () => {
       expect(wells.some((w) => guard && Math.abs(guard.at.x - w.at.x) < w.w / 2)).toBe(true);
     });
 
+    it(`runs the boiler's pipes back into the foundation wall (${name})`, () => {
+      const b = scene.pieces.find((p) => p.piece === basement.boiler);
+      if (!b) throw new Error('no boiler');
+      const mains = scene.pieces.find((p) => p !== b && p.at.x === b.at.x && p.at.z === b.at.z);
+      if (!mains) throw new Error('no boiler mains');
+      // The foundation wall's face is a tile behind the back wall (z = −1.5).
+      const back = Math.min(...worldPoints(mains).map((v) => v.z));
+      expect(back).toBeLessThan(-1.45);
+      expect(back).toBeGreaterThan(-1.65);
+    });
+
+    it(`keeps the archive boxes few (${name})`, () => {
+      const piles = scene.pieces.filter((p) => p.piece === basement.archiveBoxes);
+      expect(piles.length).toBeGreaterThanOrEqual(2);
+      expect(piles.length).toBeLessThanOrEqual(5);
+    });
+
     it(`brings no food or drink (${name})`, () => {
       for (const p of scene.pieces) expect(FOOD.has(p.piece)).toBe(false);
     });
