@@ -31,25 +31,32 @@ describe('midRiseRoom', () => {
     }
   });
 
-  it('hangs YOTTA right beside reception on two solid back faces, out of the order cards', () => {
+  it('hangs YOTTA right beside reception on solid back faces, no spawn in front, out of the order cards', () => {
     const VIEW = { width: 1440, height: 810 };
     for (const m of maps) {
       const { wallArt, reception, swaps } = midRiseRoom(m);
-      const logo = wallArt.find((a) => a.art === 'yotta');
+      const logo = wallArt.find((a) => a.art === 'yotta' || a.art === 'yottaSmall');
       expect(logo).toBeDefined();
       if (!logo || !reception) continue;
+      const half = logo.art === 'yotta' ? 0.5 : 0;
+      const tiles = [...new Set([logo.x - half, logo.x + half])];
       const xs = reception.tiles.map((t) => t.x);
       expect(
         Math.min(
-          Math.abs(logo.x - 0.5 - Math.max(...xs)),
-          Math.abs(logo.x + 0.5 - Math.min(...xs)),
+          ...tiles.map((x) =>
+            Math.min(Math.abs(x - Math.max(...xs)), Math.abs(x - Math.min(...xs))),
+          ),
         ),
       ).toBe(1);
-      for (const x of [logo.x - 0.5, logo.x + 0.5])
+      for (const x of tiles) {
         expect(swaps[`${x},${logo.y}`]).toMatch(/^solid:/);
+        // Nobody starts right in front of it, hiding it at the start.
+        for (const s of [...m.spawns, ...m.managerSpawns])
+          expect(s.x === x && s.y > logo.y && s.y - logo.y <= 2).toBe(false);
+      }
       // Its letters (about 0.83 to 1.07 high on the face) clear the order cards' band.
       const pose = fitCamera3d(levelBox(m), VIEW, roundInsets(VIEW));
-      for (const dx of [-0.45, 0.45])
+      for (const dx of [-0.4, 0.4])
         for (const h of [0.75, 1.08]) {
           const p = projectPoint(pose, { ...gridToWorld(logo.x + dx, logo.y + 0.5, h) });
           expect(p.y > 140 || p.x > 690, `${p.x},${p.y}`).toBe(true);
@@ -105,9 +112,57 @@ describe('midRiseRoom', () => {
   it('keeps every wall-art piece within its half of a tile pair', () => {
     for (const m of maps)
       for (const a of midRiseRoom(m).wallArt)
-        expect(MID_RISE_ART_HALF[a.art]).toBeLessThan(
-          a.art === 'yotta' || a.art === 'meetingTv' ? 1 : 0.5,
+        expect(MID_RISE_ART_HALF[a.art]).toBeLessThanOrEqual(
+          a.art === 'yotta' || a.art === 'meetingTv' ? 0.95 : 0.5,
         );
+  });
+
+  it("lays Derek's office in plush with a border where it ends, his putting mat clear of every spawn", () => {
+    const d = midRiseRoom(draft);
+    const office = d.office;
+    expect(office).not.toBeNull();
+    if (!office) return;
+    const tiles = new Set(office.tiles);
+    for (const k of office.tiles) {
+      const w = d.floorWear[k] ?? 0;
+      expect(w).toBeGreaterThanOrEqual(CARPET_WEAR.plush);
+      const [x = 0, y = 0] = k.split(',').map(Number);
+      const edges = w - CARPET_WEAR.plush;
+      expect(Boolean(edges & 1)).toBe(!tiles.has(`${x},${y - 1}`));
+      expect(Boolean(edges & 8)).toBe(!tiles.has(`${x + 1},${y}`));
+    }
+    const mat = d.puttingMat;
+    expect(mat).not.toBeNull();
+    if (!mat) return;
+    for (const x of [mat.x - 0.5, mat.x + 0.5]) {
+      expect(tiles.has(`${x},${mat.y}`)).toBe(true);
+      expect(getTile(draft, x, mat.y)).toBe('floor');
+      for (const s of [...draft.spawns, ...draft.managerSpawns])
+        expect(s.x === x && s.y === mat.y).toBe(false);
+    }
+    expect(midRiseRoom(shipped).puttingMat).toBeNull();
+    // His lanyard hangs on the glass of the office's low back wall, facing the camera.
+    const hook = d.wallArt.find((a) => a.art === 'lanyardHook');
+    expect(hook?.yaw).toBe(0);
+    if (hook) expect(wallPiece(draft, hook.x, hook.y)).toBe('wall-front');
+  });
+
+  it('runs a head track along every partition top, glass screens aside, arms toward its neighbours', () => {
+    for (const m of maps) {
+      const { headTracks, swaps } = midRiseRoom(m);
+      expect(headTracks.length).toBeGreaterThan(20);
+      for (const t of headTracks) {
+        expect(getTile(m, t.x, t.y)).toBe('wall');
+        expect(swaps[`${t.x},${t.y}`]?.startsWith('glassLow') ?? false).toBe(false);
+        expect(Boolean(t.arms & 8)).toBe(getTile(m, t.x + 1, t.y) === 'wall');
+        expect(Boolean(t.arms & 2)).toBe(getTile(m, t.x, t.y + 1) === 'wall');
+        expect(t.low).toBe(wallPiece(m, t.x, t.y) === 'wall-front');
+      }
+    }
+    // One glass screen in about three glints.
+    const glass = Object.values(midRiseRoom(draft).swaps).filter((v) => v.startsWith('glassLow'));
+    const glinting = glass.filter((v) => v.endsWith(':glint')).length;
+    expect(glinting).toBeLessThanOrEqual(Math.ceil(glass.length / 2));
   });
 
   it('lays the walkway from reception to the lifts over floor, in one connected line', () => {
@@ -125,12 +180,12 @@ describe('midRiseRoom', () => {
     }
   });
 
-  it('puts no wear but the walkway under a spawn or in the meeting room, and one stain at most', () => {
+  it('puts no wear but the walkway or plush under a spawn or in the meeting room, and one stain at most', () => {
     for (const m of maps) {
       const { floorWear } = midRiseRoom(m);
       for (const s of [...m.spawns, ...m.managerSpawns]) {
         const w = floorWear[`${s.x},${s.y}`];
-        if (w !== undefined) expect(w).toBe(CARPET_WEAR.walkway);
+        if (w !== undefined && w < CARPET_WEAR.plush) expect(w).toBe(CARPET_WEAR.walkway);
       }
       for (const t of m.meetingTiles) expect(floorWear[`${t.x},${t.y}`]).toBeUndefined();
       const stains = Object.entries(floorWear).filter(

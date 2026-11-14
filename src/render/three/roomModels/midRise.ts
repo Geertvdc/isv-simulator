@@ -59,23 +59,26 @@ function faces(half: number): Face[] {
 export const ALU = 0xb3b9bf;
 const ALU_DARK = 0x8d949b;
 /** What's seen through the glass band: a cool mid grey-blue, never a bright slab. */
-export const GLASS_CORE = 0x93a1ab;
+export const GLASS_CORE = 0x7e8a94;
 const GLASS_PANE = 0xdbe7ee;
-const GLASS_GLINT = 0xb9c6ce;
+/** A glint on the glass: one tile in three, at half contrast. */
+const GLASS_GLINT = 0xa3b0b9;
+/** The head track's ridge along a partition's top. */
+export const HEAD_RIDGE = 0xb6bcc2;
+export const HEAD_RIDGE_W = 0.14;
 const FROST = 0xc3cbd1;
 /** YOTTA violet: the vinyl logo, and the manifestation dots muted. */
 export const YOTTA_VIOLET = 0x6a4cc0;
 const MANIFEST = 0x8676b8;
 /** The desks: light oak veneer (darker than every station top), the grey cable spine, aluminium legs. */
-export const DESK_TOP = 0xbb9f78;
-const DESK_EDGE = 0x9a7f5a;
+export const DESK_TOP = 0x9e8460;
+const DESK_EDGE = 0x7a6346;
 const SPINE = 0x6a7078;
 const LEG = 0xa7adb3;
 /** Paper, ink, a marker. */
 const PAPER = 0xe2e2dc;
 const INK = 0x2a2d33;
 const SCREEN = 0x1d3550;
-const PLASTIC = 0x34373d;
 
 // ---- Walls ----
 
@@ -88,32 +91,68 @@ const GLASS0 = PB_H + TRANSOM_H;
 const GLASS1 = WALL_HEIGHT - HEAD_H;
 /** Where the frosted manifestation stripe runs. */
 const MANIFEST_Y = GLASS0 + (GLASS1 - GLASS0) * 0.45;
-/** Looks a partition comes in: a socket, trolley scuffs, a patched dent, plain. */
-export const MID_RISE_WALL_LOOKS = 4;
+/** Wear a partition comes in: a socket, trolley scuffs, a patched dent, plain. */
+const WALL_WEARS = 4;
+/** Looks a partition comes in: each wear, with a glint on its glass (one in three) or without. */
+export const MID_RISE_WALL_LOOKS = WALL_WEARS * 3;
+const wearOf = (look: number) => look % WALL_WEARS;
+const glints = (look: number) => look >= WALL_WEARS * 2;
 
 /**
- * The head track on top of a partition `h` tall: a slim aluminium lip band
- * round it a little proud of the faces, and on top a slim aluminium frame
- * round the cool glass-grey infill (the double glazing seen from above),
- * a faint glint across it. A run reads as framed glass modules, never as a
- * row of flat slabs.
+ * The top of a partition `h` tall: a slim aluminium lip band round it a
+ * little proud of the faces, the cool glass-grey infill (the double glazing
+ * seen from above) flush with it, a faint glint across it when `glint`.
+ * The head track's ridge along the run's middle is its own piece
+ * (`headRidgeModel`), so a run reads as one continuous partition, never as a
+ * row of framed slabs.
  */
-function headTrack(b: ModelBuilder, h: number, lip = 0.035): void {
+function headTrack(b: ModelBuilder, h: number, glint: boolean, lip = 0.035): void {
   const { top } = WALL_COLORS.midRise;
-  const rim = 0.04;
   b.box(1.02, lip, 1.02, ALU, { at: [0, h - 0.004 - lip / 2, 0] }, 0);
   b.box(1.016, 0.006, 1.016, tint(ALU_DARK, -0.4), { at: [0, h - 0.004 - lip - 0.003, 0] }, 0);
   b.box(1, 0.02, 1, top, { at: [0, h - 0.01, 0] }, 0);
-  for (const s of [-1, 1]) {
-    b.box(1.02, 0.004, rim, ALU, { at: [0, h + 0.001, s * (0.51 - rim / 2)] }, 0);
-    b.box(rim, 0.004, 1.02, ALU, { at: [s * (0.51 - rim / 2), h + 0.001, 0] }, 0);
-    // The brushed sheen along the lip's top edge.
-    b.box(1.02, 0.002, 0.006, tint(ALU, 0.25), { at: [0, h + 0.004, s * 0.507] }, 0);
-    b.box(0.006, 0.002, 1.02, tint(ALU, 0.25), { at: [s * 0.507, h + 0.004, 0] }, 0);
+  if (glint)
+    b.box(0.05, 0.002, 0.6, tint(top, 0.05), { at: [0.26, h + 0.0012, 0.1], rot: [0, 0.75, 0] }, 0);
+}
+
+/**
+ * The head track's ridge along a partition top (`h` high), as `HeadTrack`
+ * lays it: a slim aluminium extrusion along the run's middle, an arm from
+ * the tile's middle to each side in `arms` (back 1, front 2, left 4, right
+ * 8), a brushed sheen line on it. An end with no arm gets a cap.
+ */
+export function headRidgeModel(h: number, arms: number): Model {
+  const b = new ModelBuilder();
+  const w = HEAD_RIDGE_W;
+  const y = h + 0.006;
+  // The channel down its middle, so it reads as a track (two slim rails), never a painted line.
+  const channel = tint(HEAD_RIDGE, -0.32);
+  const cw = 0.05;
+  b.box(w, 0.012, w, HEAD_RIDGE, { at: [0, y, 0] }, 0);
+  b.box(cw, 0.002, cw, channel, { at: [0, y + 0.006, 0] }, 0);
+  // A lone wall (no neighbour) runs its ridge along x.
+  const all = arms === 0 ? 4 | 8 : arms;
+  for (const [bit, dx, dz] of [
+    [1, 0, -1],
+    [2, 0, 1],
+    [4, -1, 0],
+    [8, 1, 0],
+  ] as const) {
+    if (!(all & bit)) continue;
+    const len = 0.5 - w / 2 + 0.002;
+    const c = w / 2 + len / 2;
+    const along = dx !== 0;
+    b.box(along ? len : w, 0.012, along ? w : len, HEAD_RIDGE, { at: [dx * c, y, dz * c] }, 0);
+    b.box(
+      along ? len : cw,
+      0.002,
+      along ? cw : len,
+      channel,
+      { at: [dx * c, y + 0.006, dz * c] },
+      0,
+    );
   }
-  // A glint across the glass-grey infill.
-  b.box(0.08, 0.002, 0.7, tint(top, 0.1), { at: [0.05, h + 0.0012, 0], rot: [0, 0.75, 0] }, 0);
-  b.box(0.03, 0.002, 0.5, tint(top, 0.1), { at: [0.2, h + 0.0012, 0.08], rot: [0, 0.75, 0] }, 0);
+  return b.build();
 }
 
 /** Plasterboard joints and the look's wear on a face from the skirting up to `y1`. */
@@ -155,7 +194,7 @@ function plasterboard(b: ModelBuilder, on: Face, f: number, look: number, y1: nu
  * dashes, a diagonal glint, the mullion at the face's −u end (so every
  * corner of a tile gets one, and the run reads framed every tile).
  */
-function glassBand(b: ModelBuilder, on: Face, inset: Face, f: number): void {
+function glassBand(b: ModelBuilder, on: Face, inset: Face, f: number, glint: boolean): void {
   const h = GLASS1 - GLASS0;
   const cy = GLASS0 + h / 2;
   b.box(0.028, h, 0.012, ALU, on(-0.486, cy), 0);
@@ -163,11 +202,10 @@ function glassBand(b: ModelBuilder, on: Face, inset: Face, f: number): void {
   b.box(0.97, 0.07, 0.004, FROST, inset(0, MANIFEST_Y), 0);
   for (let k = 0; k < 9; k++)
     b.box(0.045, 0.02, 0.004, MANIFEST, on(-0.4 + k * 0.1, MANIFEST_Y), 0);
+  if (!glint) return;
   // A glint across the glass, low on one face, higher on the next.
   const g = inset(0.12 * (f % 2 ? -1 : 1), cy + 0.05);
-  b.box(0.05, h * 0.9, 0.003, GLASS_GLINT, { at: g.at, rot: [0, g.rot?.[1] ?? 0, 0.6] }, 0);
-  const g2 = inset(0.24 * (f % 2 ? -1 : 1), cy + 0.06);
-  b.box(0.018, h * 0.7, 0.003, GLASS_GLINT, { at: g2.at, rot: [0, g2.rot?.[1] ?? 0, 0.6] }, 0);
+  b.box(0.04, h * 0.9, 0.003, GLASS_GLINT, { at: g.at, rot: [0, g.rot?.[1] ?? 0, 0.6] }, 0);
 }
 
 /** The low front wall: plasterboard on its skirting under a slim track, a joint per `look`. */
@@ -185,7 +223,7 @@ function lowWall(b: ModelBuilder, look: number): void {
       on(-0.3 + 0.4 * (look % 2), (h + SKIRT_H) / 2 - 0.02),
       0,
     );
-  headTrack(b, h, 0.026);
+  headTrack(b, h, glints(look), 0.026);
 }
 
 /**
@@ -213,14 +251,14 @@ export function midRiseWallModel(piece: WallPiece, look: number): Model {
   const outer = faces(0.506);
   const inner = faces(0.482);
   outer.forEach((on, f) => {
-    plasterboard(b, on, f, look, PB_H);
-    glassBand(b, on, inner[f] ?? on, f);
+    plasterboard(b, on, f, wearOf(look), PB_H);
+    glassBand(b, on, inner[f] ?? on, f, glints(look));
   });
   for (const on of faces(0.5)) {
     const p = on(0, (GLASS0 + GLASS1) / 2);
     b.pane(1, GLASS1 - GLASS0, 0.006, GLASS_PANE, p);
   }
-  headTrack(b, h);
+  headTrack(b, h, glints(look));
   return b.build();
 }
 
@@ -248,7 +286,7 @@ export function solidPanelModel(look: number): Model {
       0,
     );
   });
-  headTrack(b, h);
+  headTrack(b, h, false);
   return b.build();
 }
 
@@ -263,9 +301,9 @@ export const SOLID_MODELS: Readonly<Record<string, () => Model>> = Object.fromEn
  * partition, a slim aluminium shoe and top channel, the glass with its
  * frosted dots, so the rooms read as glass boxes without hiding anyone.
  */
-export function glassScreenModel(along: 'x' | 'z' | 'xz', look: number): Model {
+export function glassScreenModel(along: 'x' | 'z' | 'xz', look: number, glint = false): Model {
   const b = new ModelBuilder();
-  lowWall(b, look);
+  lowWall(b, look % WALL_WEARS);
   const y0 = FRONT_WALL_HEIGHT;
   const hh = GLASS_SCREEN_H;
   for (const turn of along === 'xz' ? [0, Math.PI / 2] : along === 'z' ? [Math.PI / 2] : [0]) {
@@ -273,16 +311,19 @@ export function glassScreenModel(along: 'x' | 'z' | 'xz', look: number): Model {
     g.box(1.0, 0.03, 0.05, ALU, { at: [0, y0 + 0.015, 0] }, 0.006);
     g.pane(1.0, hh, 0.012, GLASS_PANE, { at: [0, y0 + 0.03 + hh / 2, 0] });
     g.box(1.0, 0.018, 0.026, ALU, { at: [0, y0 + 0.03 + hh + 0.009, 0] }, 0.004);
-    for (let k = 0; k < 9; k++)
-      g.box(0.045, 0.018, 0.016, MANIFEST, { at: [-0.4 + k * 0.1, y0 + 0.03 + hh * 0.55, 0] }, 0);
-    g.box(
-      0.05,
-      hh * 0.85,
-      0.014,
-      GLASS_GLINT,
-      { at: [0.15, y0 + 0.03 + hh / 2, 0], rot: [0, 0, 0.6] },
-      0,
-    );
+    // The frosted manifestation band, its violet dashes muted and few.
+    g.box(1.0, 0.04, 0.014, FROST, { at: [0, y0 + 0.03 + hh * 0.55, 0] }, 0);
+    for (let k = 0; k < 3; k++)
+      g.box(0.05, 0.014, 0.016, MANIFEST, { at: [-0.3 + k * 0.3, y0 + 0.03 + hh * 0.55, 0] }, 0);
+    if (glint)
+      g.box(
+        0.04,
+        hh * 0.8,
+        0.014,
+        GLASS_GLINT,
+        { at: [0.15, y0 + 0.03 + hh / 2, 0], rot: [0, 0, 0.6] },
+        0,
+      );
   }
   return b.build();
 }
@@ -292,7 +333,12 @@ export const GLASS_SCREEN_H = 0.42;
 
 /** Every glass-screen swap model, by its name in the plan's `swaps`. */
 export const GLASS_SCREEN_MODELS: Readonly<Record<string, () => Model>> = Object.fromEntries(
-  (['x', 'z', 'xz'] as const).map((along) => [glassSwap(along), () => glassScreenModel(along, 1)]),
+  (['x', 'z', 'xz'] as const).flatMap((along) =>
+    [false, true].map((glint) => [
+      glassSwap(along, glint),
+      () => glassScreenModel(along, 1, glint),
+    ]),
+  ),
 );
 
 // ---- The foundation: the floor slab over the ceiling void of the floor below ----
@@ -369,8 +415,8 @@ export function midRiseFoundationModel(look: number): Model {
     const voidY = (slabBottom - 0.03 + ceilTop) / 2;
     if (look === 1) b.box(1.004, 0.11, 0.006, 0xc0c6cc, on(0, voidY), 0);
     else if (look === 2) {
-      b.box(1.004, 0.03, 0.008, 0xb03a30, on(0, voidY + 0.03), 0);
-      b.box(0.02, 0.05, 0.01, 0xb03a30, on(0.1, voidY - 0.01), 0);
+      b.box(1.004, 0.03, 0.008, 0x9aa0a6, on(0, voidY + 0.03), 0);
+      b.box(0.02, 0.05, 0.01, 0x9aa0a6, on(0.1, voidY - 0.01), 0);
     } else b.box(0.5, 0.02, 0.006, 0x24272c, on(-0.1, voidY - 0.03), 0);
   });
   return b.build();
@@ -400,9 +446,13 @@ export function carpetTone(x: number, y: number, salt: number): number {
   return 1 + (own / 1000 - 0.5) * 0.08;
 }
 
-/** The walkway's lighter grey carpet, and the odd batch's bluer one. */
-export const WALKWAY = 0x9fa5ab;
-const ODD_BATCH = 0x7f8ea2;
+/** The walkway's lighter blue-grey carpet. */
+export const WALKWAY = 0x97a3b3;
+/** The odd batch: a bluer tile, about 5% brighter (base, alt). */
+export const ODD_BATCH = [0x8494b2, 0x8090ad] as const;
+/** Derek's plush office carpet, and its border a little lighter. */
+export const PLUSH = 0x5c6474;
+const PLUSH_BORDER = tint(PLUSH, 0.06);
 
 /**
  * A tile of new carpet (`look` from `carpetLook`): four quarter tiles laid
@@ -414,17 +464,14 @@ export function carpetFloorModel(look: number): Model {
   const variant = look % CARPET_VARIANTS;
   const wear = Math.floor(look / CARPET_VARIANTS) % CARPET_WEAR_KINDS;
   const [floorBase, floorAlt] = FLOOR_COLORS.corporateCarpet;
+  if (wear >= CARPET_WEAR.plush) return plushModel(wear - CARPET_WEAR.plush);
   const base =
-    wear === CARPET_WEAR.walkway
-      ? WALKWAY
-      : wear === CARPET_WEAR.odd
-        ? mix(floorBase, ODD_BATCH, 0.55)
-        : floorBase;
+    wear === CARPET_WEAR.walkway ? WALKWAY : wear === CARPET_WEAR.odd ? ODD_BATCH[0] : floorBase;
   const alt =
     wear === CARPET_WEAR.walkway
       ? tint(WALKWAY, -0.035)
       : wear === CARPET_WEAR.odd
-        ? mix(floorAlt, ODD_BATCH, 0.55)
+        ? ODD_BATCH[1]
         : floorAlt;
   const b = new ModelBuilder();
   b.box(1, 0.012, 1, base, { at: [0, -0.006, 0] }, 0);
@@ -440,7 +487,7 @@ export function carpetFloorModel(look: number): Model {
       else mark(0.46, 0.04, stripe, x, z + k, 0.0016);
   });
   // Seams: the tile's back and left edges (the next tile draws the rest) and its middle cross.
-  const seam = tint(base, -0.07);
+  const seam = tint(base, -0.05);
   for (const z of [-0.494, 0]) mark(1, 0.012, seam, 0, z, 0.0019);
   for (const x of [-0.494, 0]) mark(0.012, 1, seam, x, 0, 0.0019);
   // Flecks in the yarn.
@@ -460,6 +507,37 @@ export function carpetFloorModel(look: number): Model {
   else if (wear === CARPET_WEAR.castor) castorMarks(b, base, 0, 0);
   else if (wear >= CARPET_WEAR.coffee && wear < CARPET_WEAR.coffee + STAIN_CORNERS)
     coffeeStain(b, wear - CARPET_WEAR.coffee, base);
+  return b.build();
+}
+
+/**
+ * Derek's plush office carpet: one deep blue-grey broadloom, its pile's
+ * faint sheen, the lighter border along `edges` (back 1, front 2, left 4,
+ * right 8) where the office ends.
+ */
+function plushModel(edges: number): Model {
+  const b = new ModelBuilder();
+  b.box(1, 0.014, 1, PLUSH, { at: [0, -0.005, 0] }, 0);
+  for (const k of [-0.3, 0.05, 0.32])
+    b.box(0.9, 0.002, 0.08, tint(PLUSH, 0.025), { at: [0, 0.0028, k], rot: [0, 0.05, 0] }, 0);
+  const bw = 0.09;
+  for (const [bit, dx, dz] of [
+    [1, 0, -1],
+    [2, 0, 1],
+    [4, -1, 0],
+    [8, 1, 0],
+  ] as const) {
+    if (!(edges & bit)) continue;
+    const along = dz !== 0;
+    b.box(
+      along ? 1 : bw,
+      0.003,
+      along ? bw : 1,
+      PLUSH_BORDER,
+      { at: [dx * (0.5 - bw / 2), 0.0034, dz * (0.5 - bw / 2)] },
+      0,
+    );
+  }
   return b.build();
 }
 
@@ -529,8 +607,9 @@ function coffeeStain(b: ModelBuilder, corner: number, base: number): void {
  * A counter as a light-oak bench desk, built from where it sits in its run
  * (x along the run): two oak tops either side of a grey cable spine, slim
  * aluminium frame legs at the run's ends and its `legs` tiles, a grey
- * modesty panel under; a laptop on the run's first tile, a monitor on an arm
- * clamped to the spine on its last, papers and a mug between. A lone desk
+ * modesty panel under; a laptop on the run's first tile and on its last
+ * (no monitors: their tall screens cast smudges on the oak), papers and a
+ * mug between. A lone desk
  * (a run of one) is a single workstation: its top on the front part of the
  * tile, its back part left free for the chair (`deskChair`). The tops are
  * darker than every station top.
@@ -577,7 +656,8 @@ export function midRiseDeskCounter(run: CounterRun): StationModel {
   // What's on it.
   if (minusEnd) laptop(b, mid + 0.18, top, -0.27, 0.1);
   else if (plusEnd) {
-    monitorArm(b, mid + 0.26, top);
+    // A second laptop, not a monitor: a monitor's tall screen cast a dark smudge on the oak.
+    laptop(b, mid + 0.2, top, 0.27, -0.1);
     mug(b, mid - 0.3, top, 0.3, 0x2f6f9a);
   } else if (run.legs) {
     papers(b, mid - 0.2, top, 0.28, 0.2);
@@ -616,9 +696,18 @@ function loneDesk(): StationModel {
     b.box(0.045, 0.03, d - 0.04, LEG, { at: [x, top - t - 0.015, cz] }, 0);
   }
   b.box(0.8, 0.24, 0.016, 0x8a9097, { at: [0, top - 0.17, z1 - 0.04] }, 0);
-  laptop(b, -0.24, top, -0.02, Math.PI - 0.15);
-  mug(b, 0.32, top, 0.06, 0xd8d4c8);
   return { base: b.build(), hero: null, heroAt: [0, 0] };
+}
+
+/**
+ * What's on a lone desk, placed with its chair (Derek's desk is built over
+ * it bare): a laptop facing the chair and a mug.
+ */
+export function loneDeskThingsModel(): Model {
+  const b = new ModelBuilder();
+  laptop(b, -0.24, STATION_HEIGHT, -0.02, Math.PI - 0.15);
+  mug(b, 0.32, STATION_HEIGHT, 0.06, 0xd8d4c8);
+  return b.build();
 }
 
 /** An open laptop on a top at `y`, its screen facing +z turned by `yaw`. */
@@ -629,15 +718,6 @@ function laptop(b: ModelBuilder, x: number, y: number, z: number, yaw: number): 
   const lid = framed(g, [0, 0.014, -0.07], [-0.3, 0, 0]);
   lid.box(0.26, 0.16, 0.012, 0x9aa0a6, { at: [0, 0.08, 0] }, 0.005);
   lid.screen(0.23, 0.13, SCREEN, { at: [0, 0.08, 0.0065] });
-}
-
-/** A monitor on an arm clamped to the spine at x, its screen facing +z. */
-function monitorArm(b: ModelBuilder, x: number, y: number): void {
-  b.box(0.05, 0.03, 0.05, PLASTIC, { at: [x, y + 0.015, 0] }, 0.006);
-  b.box(0.02, 0.16, 0.02, ALU_DARK, { at: [x, y + 0.1, 0] }, 0);
-  b.box(0.02, 0.02, 0.12, ALU_DARK, { at: [x, y + 0.18, 0.05] }, 0);
-  b.box(0.3, 0.19, 0.03, PLASTIC, { at: [x, y + 0.23, 0.12] }, 0.008);
-  b.screen(0.28, 0.17, SCREEN, { at: [x, y + 0.23, 0.136] });
 }
 
 /** A mug at (x, z) on a top at `y`. */
@@ -702,82 +782,159 @@ function chairBase(b: ModelBuilder, z: number, color: number): void {
   b.cylinder(0.02, 0.02, 0.32, ALU_DARK, { at: [0, 0.22, z] }, 10);
 }
 
-/** Derek's leather executive chair: high-backed, buttoned, oxblood-brown, chrome base. */
-const LEATHER = 0x5a3428;
+/** Derek's executive chair: high-backed, buttoned, charcoal leather, chrome base. */
+const LEATHER = 0x2a2a2e;
+/** How high its seat's top is (Segfault lies on it). */
+export const EXEC_SEAT_TOP = 0.505;
+/** Built round its own middle (where its gas lift stands), facing +z. */
 export function execChairModel(): Model {
   const b = new ModelBuilder();
-  const z = -0.3;
-  chairBase(b, z, 0x8d949b);
+  chairBase(b, 0, 0x8d949b);
   // Pumped up high: Derek likes to look down on the room.
-  b.cylinder(0.024, 0.024, 0.08, 0x8d949b, { at: [0, 0.4, z] }, 10);
-  b.box(0.42, 0.09, 0.34, LEATHER, { at: [0, 0.46, z + 0.02] }, 0.035);
+  b.cylinder(0.024, 0.024, 0.08, 0x8d949b, { at: [0, 0.4, 0] }, 10);
+  b.box(0.42, 0.09, 0.36, LEATHER, { at: [0, 0.46, 0.02] }, 0.035);
   // The high back, rolled at the top, its buttons.
-  b.box(0.42, 0.56, 0.08, LEATHER, { at: [0, 0.8, z - 0.17], rot: [-0.1, 0, 0] }, 0.04);
-  b.box(0.44, 0.09, 0.11, tint(LEATHER, 0.08), { at: [0, 1.09, z - 0.2], rot: [-0.1, 0, 0] }, 0.04);
+  b.box(0.42, 0.56, 0.08, LEATHER, { at: [0, 0.8, -0.17], rot: [-0.1, 0, 0] }, 0.04);
+  b.box(0.44, 0.09, 0.11, tint(LEATHER, 0.1), { at: [0, 1.09, -0.2], rot: [-0.1, 0, 0] }, 0.04);
   for (let r = 0; r < 3; r++)
     for (let c = 0; c < 3; c++)
-      b.sphere(0.012, tint(LEATHER, -0.35), {
-        at: [-0.12 + c * 0.12, 0.66 + r * 0.13, z - 0.12 + r * 0.013],
+      b.sphere(0.012, tint(LEATHER, 0.18), {
+        at: [-0.12 + c * 0.12, 0.66 + r * 0.13, -0.12 + r * 0.013],
       });
   // Arms.
   for (const s of [-1, 1]) {
-    b.box(0.07, 0.06, 0.3, LEATHER, { at: [s * 0.23, 0.6, z + 0.01] }, 0.025);
-    b.box(0.03, 0.12, 0.03, 0x8d949b, { at: [s * 0.23, 0.52, z + 0.08] }, 0.008);
+    b.box(0.07, 0.06, 0.3, LEATHER, { at: [s * 0.23, 0.6, 0.01] }, 0.025);
+    b.box(0.03, 0.12, 0.03, 0x8d949b, { at: [s * 0.23, 0.52, 0.08] }, 0.008);
   }
   return b.build();
 }
 
 // ---- Derek's executive desk ----
 
+/** Dark walnut, its darker grain, brass. */
+const WALNUT = 0x5e4632;
+const BRASS = 0xc8a050;
+/** How wide Derek's desk is (wider than his tile: it's an executive desk). */
+export const EXEC_DESK_W = 1.44;
+/** Where its top's back edge is (the chair's space behind it, the credenza at the wall). */
+const EXEC_DESK_BACK = -0.08;
+
 /**
- * Over the lone desk at Derek's tile: a dark walnut top with a leather
- * desk pad, the brass DEREK nameplate facing his visitors, a green banker's
- * lamp, a closed laptop and a framed photo of himself shaking a hand.
+ * Over the bare lone desk at Derek's tile: a wide dark-walnut executive
+ * desk on two drawer pedestals with a modesty panel, a leather blotter, the
+ * brass DEREK nameplate facing his visitors (and the camera), a green
+ * banker's lamp, a closed laptop and a framed photo of himself shaking a
+ * hand; behind it, against the office's back wall, his low walnut credenza
+ * with a decanter tray and a row of business books.
  */
 export function execDeskModel(): Model {
   const b = new ModelBuilder();
-  const top = STATION_HEIGHT;
-  const z0 = LONE_DESK_BACK - 0.01;
+  const top = STATION_HEIGHT + 0.04;
+  const z0 = EXEC_DESK_BACK;
   const z1 = 0.48;
+  const d = z1 - z0;
   const cz = (z0 + z1) / 2;
-  const walnut = 0x5e4030;
-  b.box(1.0, 0.024, z1 - z0, walnut, { at: [0, top + 0.012, cz] }, 0.006);
-  b.box(1.0, 0.26, 0.03, tint(walnut, -0.15), { at: [0, top - 0.13, z1 - 0.015] }, 0.006);
-  b.box(0.5, 0.004, 0.3, 0x2f3a2c, { at: [0, top + 0.026, cz - 0.03] }, 0);
-  // The nameplate at the front edge, facing out.
+  const w = EXEC_DESK_W;
+  const grain = tint(WALNUT, -0.2);
+  b.box(w, 0.04, d, WALNUT, { at: [0, top - 0.02, cz] }, 0.008);
+  b.box(w - 0.02, 0.002, 0.006, tint(WALNUT, 0.12), { at: [0, top + 0.001, z1 - 0.01] }, 0);
+  for (const k of [-0.12, 0.05, 0.18])
+    b.box(w * 0.8, 0.002, 0.006, grain, { at: [0.05, top + 0.001, cz + k] }, 0);
+  // The pedestals, their drawers and brass pulls, the modesty panel between.
+  for (const s of [-1, 1]) {
+    const px = s * (w / 2 - 0.2);
+    b.box(
+      0.38,
+      top - 0.04,
+      d - 0.04,
+      tint(WALNUT, -0.08),
+      { at: [px, (top - 0.04) / 2, cz] },
+      0.006,
+    );
+    for (let k = 0; k < 3; k++) {
+      const y = 0.1 + k * 0.16;
+      b.box(0.34, 0.004, 0.004, grain, { at: [px, y + 0.075, z1 - 0.018] }, 0);
+      b.box(0.1, 0.014, 0.012, BRASS, { at: [px, y, z1 - 0.014] }, 0.004);
+    }
+  }
   b.box(
-    0.24,
-    0.05,
-    0.035,
-    0x2a1e18,
-    { at: [0.05, top + 0.05, z1 - 0.06], rot: [-0.3, 0, 0] },
-    0.006,
+    w - 0.76,
+    top - 0.2,
+    0.03,
+    tint(WALNUT, -0.12),
+    { at: [0, top - 0.04 - (top - 0.2) / 2, z1 - 0.04] },
+    0.004,
   );
-  b.box(0.22, 0.034, 0.004, 0xc8a050, { at: [0.05, top + 0.052, z1 - 0.04], rot: [-0.3, 0, 0] }, 0);
-  const plate = framed(b, [0.05, top + 0.052, z1 - 0.037], [-0.3, 0, 0]);
-  text(plate, 'DEREK', 0, 0, 0, 0.0045, 0x2a1e18);
+  // The leather blotter, a pen on it (the desk's right half left bare, so his chair shows).
+  b.box(0.56, 0.006, 0.34, 0x2f3a2c, { at: [-0.1, top + 0.003, cz - 0.02] }, 0.002);
+  b.box(0.5, 0.002, 0.3, tint(0x2f3a2c, 0.12), { at: [-0.1, top + 0.0065, cz - 0.02] }, 0);
+  b.box(
+    0.14,
+    0.012,
+    0.012,
+    0x1d1f23,
+    { at: [0.08, top + 0.013, cz + 0.02], rot: [0, 0.4, 0] },
+    0.004,
+  );
+  // The nameplate at the front edge, tilted back toward the camera: DEREK in black on brass.
+  const plate = framed(b, [0.0, top + 0.05, z1 - 0.07], [-0.75, 0, 0]);
+  plate.box(0.46, 0.11, 0.03, 0x2a1e18, { at: [0, 0, -0.016] }, 0.006);
+  plate.box(0.44, 0.094, 0.004, BRASS, { at: [0, 0, 0.001] }, 0);
+  text(plate, 'DEREK', 0, 0, 0.004, 0.015, 0x1d1510);
   // The banker's lamp.
-  b.cylinder(0.05, 0.06, 0.02, 0xb08a40, { at: [-0.36, top + 0.034, cz] }, 14);
-  b.box(0.012, 0.12, 0.012, 0xb08a40, { at: [-0.36, top + 0.1, cz] }, 0);
-  b.box(0.2, 0.05, 0.08, 0x1f5a3a, { at: [-0.36, top + 0.17, cz + 0.02], rot: [0.3, 0, 0] }, 0.02);
-  b.box(0.17, 0.006, 0.05, 0xfff0c8, { at: [-0.36, top + 0.145, cz + 0.03] }, 0);
-  // A closed laptop, the framed photo.
-  b.box(
-    0.28,
-    0.02,
-    0.2,
-    0x9aa0a6,
-    { at: [0.28, top + 0.034, cz - 0.04], rot: [0, -0.2, 0] },
-    0.006,
-  );
+  b.cylinder(0.05, 0.06, 0.02, 0xb08a40, { at: [-0.5, top + 0.01, cz + 0.06] }, 14);
+  b.box(0.012, 0.12, 0.012, 0xb08a40, { at: [-0.5, top + 0.07, cz + 0.06] }, 0);
+  b.box(0.2, 0.05, 0.08, 0x1f5a3a, { at: [-0.5, top + 0.14, cz + 0.08], rot: [0.3, 0, 0] }, 0.02);
+  b.box(0.17, 0.006, 0.05, 0xfff0c8, { at: [-0.5, top + 0.115, cz + 0.09] }, 0);
+  // The framed photo of himself shaking a hand, on the lamp's side.
   b.box(
     0.12,
     0.15,
     0.015,
-    0xb08a40,
-    { at: [0.36, top + 0.1, z0 + 0.1], rot: [-0.2, 2.8, 0] },
+    BRASS,
+    { at: [-0.62, top + 0.075, z0 + 0.1], rot: [-0.2, 0.3, 0] },
     0.004,
   );
+  // The credenza against the back wall, behind his chair.
+  const cw = 1.2;
+  const ch = 0.4;
+  const cz0 = -0.5 + 0.08;
+  b.box(cw, ch, 0.15, WALNUT, { at: [0.08, ch / 2, cz0] }, 0.006);
+  b.box(cw - 0.02, 0.012, 0.16, tint(WALNUT, 0.1), { at: [0.08, ch + 0.006, cz0] }, 0.004);
+  for (const x of [-0.22, 0.08, 0.38])
+    b.box(0.004, ch - 0.06, 0.004, grain, { at: [x, ch / 2, cz0 + 0.076] }, 0);
+  // Business books standing on it, and the decanter on its tray.
+  const books = [0x7a2a2a, 0x2a3a5a, 0xc8b070, 0x2a2d32, 0x7a2a2a];
+  books.forEach((c, k) => {
+    const bh = 0.2 - (k % 2) * 0.03;
+    b.box(0.045, bh, 0.12, c, { at: [-0.48 + k * 0.05, ch + 0.012 + bh / 2, cz0] }, 0.004);
+  });
+  b.box(0.2, 0.01, 0.12, BRASS, { at: [0.5, ch + 0.017, cz0] }, 0.003);
+  b.cylinder(0.04, 0.045, 0.11, 0xc89a5a, { at: [0.47, ch + 0.077, cz0] }, 12);
+  b.cylinder(0.012, 0.02, 0.05, 0xc89a5a, { at: [0.47, ch + 0.157, cz0] }, 8);
+  b.cylinder(0.025, 0.022, 0.05, 0xdfe6ea, { at: [0.56, ch + 0.047, cz0 + 0.02] }, 10);
+  return b.build();
+}
+
+/**
+ * Derek's putting mat, flat on his office carpet (built round its middle,
+ * along x): green turf with a white edge, the cup at its far end and a
+ * ball by it. Never more than a hair high.
+ */
+export const PUTTING_MAT_L = 1.7;
+export function puttingMatModel(): Model {
+  const b = new ModelBuilder();
+  const l = PUTTING_MAT_L;
+  const w = 0.42;
+  b.box(l, 0.004, w, 0xf0f0ea, { at: [0, 0.002, 0] }, 0);
+  b.box(l - 0.04, 0.003, w - 0.04, 0x4f7a4a, { at: [0, 0.0045, 0] }, 0);
+  // The mown stripes.
+  for (let k = 0; k < 4; k++)
+    b.box(0.2, 0.001, w - 0.05, tint(0x4f7a4a, 0.07), { at: [-0.6 + k * 0.4, 0.0062, 0] }, 0);
+  // The cup with its white rim, a ball short of it.
+  b.cylinder(0.05, 0.05, 0.002, 0xf0f0ea, { at: [l / 2 - 0.18, 0.0068, 0] }, 18);
+  b.cylinder(0.038, 0.038, 0.002, 0x1d1f1c, { at: [l / 2 - 0.18, 0.0078, 0] }, 18);
+  b.cylinder(0.026, 0.026, 0.002, 0xf8f8f4, { at: [l / 2 - 0.42, 0.0068, 0.06] }, 12);
   return b.build();
 }
 
@@ -917,7 +1074,12 @@ function frame(
   b.box(w - 0.03, h - 0.03, 0.004, mount, { at: [0, cy, z + 0.026] }, 0);
 }
 
-/** A box in the org chart: a white card with an ink border, its number over its label. */
+/** The org chart's connector ink. */
+const CHART_INK = 0x2a2d32;
+/** Derek's box on his org chart. */
+const CHART_VIOLET = 0x6b4fd8;
+
+/** A box in the org chart: a white card in an ink border, its number over its label. */
 function chartBox(
   b: ModelBuilder,
   num: string,
@@ -926,16 +1088,14 @@ function chartBox(
   y: number,
   z: number,
   w: number,
-  color: number,
+  labelColor = CHART_INK,
 ): void {
-  const h = num ? 0.11 : 0.085;
-  b.box(w, h, 0.003, color, { at: [x, y, z] }, 0);
-  b.box(w - 0.016, h - 0.016, 0.003, 0xfbfbf8, { at: [x, y, z + 0.0015] }, 0);
-  const px = Math.min(0.0095, (w - 0.04) / (label.length * 4 - 1));
-  if (num) {
-    text(b, num, x, y + 0.025, z + 0.003, 0.007, color === INK ? 0x7a8088 : color);
-    text(b, label, x, y - 0.018, z + 0.003, px, color === INK ? INK : color);
-  } else text(b, label, x, y, z + 0.003, px, INK);
+  const h = 0.15;
+  b.box(w, h, 0.003, CHART_INK, { at: [x, y, z] }, 0);
+  b.box(w - 0.02, h - 0.02, 0.003, 0xfbfbf8, { at: [x, y, z + 0.0015] }, 0);
+  const px = Math.min(0.011, (w - 0.05) / (label.length * 4 - 1));
+  text(b, num, x, y + 0.035, z + 0.003, 0.009, 0x7a8088);
+  text(b, label, x, y - 0.025, z + 0.003, px, labelColor);
 }
 
 /**
@@ -945,7 +1105,7 @@ function chartBox(
  */
 export const MID_RISE_WALL_ART: Readonly<Record<string, () => Model>> = {
   yotta: () => {
-    // YOTTA in cut vinyl letters, violet, big, on the solid panels beside reception, a thin
+    // YOTTA in cut vinyl letters, violet, big, on the two solid panels beside reception, a thin
     // violet rule under it and the tagline in grey.
     const b = new ModelBuilder();
     const z = 0.506;
@@ -954,25 +1114,43 @@ export const MID_RISE_WALL_ART: Readonly<Record<string, () => Model>> = {
     text(b, 'SHIP IT', 0, 0.72, z, 0.014, 0x7a8088, 0.004);
     return b.build();
   },
+  yottaSmall: () => {
+    // The same vinyl on one solid panel: YOTTA as wide as the panel lets it, the rule, the tagline.
+    const b = new ModelBuilder();
+    const z = 0.506;
+    text(b, 'YOTTA', 0, 0.93, z, 0.04, YOTTA_VIOLET, 0.006);
+    b.box(0.78, 0.012, 0.004, YOTTA_VIOLET, { at: [0, 0.8, z + 0.002] }, 0);
+    text(b, 'SHIP IT', 0, 0.73, z, 0.013, 0x7a8088, 0.004);
+    return b.build();
+  },
   orgChart: () => {
-    // Derek's org chart, framed: DEREK on top, under him the plan in three boxes.
+    // Derek's org chart, framed: DEREK in violet on top, under him the plan in three white boxes,
+    // joined by thick ink lines, so it reads as a tree from across the room.
     const b = new ModelBuilder();
     const z = 0.506;
     const cy = 0.74;
-    frame(b, 0.78, 0.56, cy, z);
+    frame(b, 0.98, 0.72, cy, z);
     const f = z + 0.03;
-    text(b, 'ORG CHART', 0, cy + 0.225, f, 0.0065, 0x7a8088);
-    chartBox(b, '', 'DEREK', 0, cy + 0.13, f, 0.3, INK);
+    text(b, 'ORG CHART', 0, cy + 0.3, f, 0.008, 0x7a8088);
+    // DEREK.
+    const dy = cy + 0.17;
+    b.box(0.42, 0.13, 0.003, tint(CHART_VIOLET, -0.25), { at: [0, dy, f] }, 0);
+    b.box(0.4, 0.11, 0.003, CHART_VIOLET, { at: [0, dy, f + 0.0015] }, 0);
+    text(b, 'DEREK', 0, dy, f + 0.003, 0.016, 0xffffff);
     // The lines down to his three reports.
-    b.box(0.006, 0.05, 0.003, INK, { at: [0, cy + 0.065, f] }, 0);
-    b.box(0.54, 0.006, 0.003, INK, { at: [0, cy + 0.04, f] }, 0);
-    for (const x of [-0.24, 0, 0.24]) b.box(0.006, 0.04, 0.003, INK, { at: [x, cy + 0.02, f] }, 0);
-    chartBox(b, '1.', 'BUILD IT', -0.245, cy - 0.05, f, 0.235, INK);
-    chartBox(b, '2.', '???', 0, cy - 0.05, f, 0.235, 0xc0302a);
-    chartBox(b, '3.', 'PROFIT', 0.245, cy - 0.05, f, 0.235, INK);
-    // A note pinned under: Q3 STATUS?
-    b.box(0.2, 0.08, 0.003, 0xe8d860, { at: [0.2, cy - 0.17, f], rot: [0, 0, 0.06] }, 0);
-    text(b, 'STATUS?', 0.2, cy - 0.17, f + 0.002, 0.0055, INK);
+    const t = 0.012;
+    const by = cy + 0.06;
+    const ky = cy - 0.08;
+    b.box(t, dy - 0.065 - by, 0.003, CHART_INK, { at: [0, (dy - 0.065 + by) / 2, f] }, 0);
+    b.box(0.64 + t, t, 0.003, CHART_INK, { at: [0, by, f] }, 0);
+    for (const x of [-0.32, 0, 0.32])
+      b.box(t, by - (ky + 0.075), 0.003, CHART_INK, { at: [x, (by + ky + 0.075) / 2, f] }, 0);
+    chartBox(b, '1.', 'BUILD IT', -0.32, ky, f, 0.29);
+    chartBox(b, '2.', '???', 0, ky, f, 0.29, 0xc0302a);
+    chartBox(b, '3.', 'PROFIT', 0.32, ky, f, 0.29);
+    // A note stuck under: STATUS?
+    b.box(0.2, 0.08, 0.003, 0xe8d860, { at: [0.3, cy - 0.255, f], rot: [0, 0, 0.06] }, 0);
+    text(b, 'STATUS?', 0.3, cy - 0.255, f + 0.002, 0.0055, INK);
     return b.build();
   },
   clock: () => {
@@ -1081,30 +1259,35 @@ export const MID_RISE_WALL_ART: Readonly<Record<string, () => Model>> = {
     return b.build();
   },
   lanyardHook: () => {
-    // A brass coat hook, Derek's old MONOLITH lanyard on it (charcoal strap, white badge), his coat.
+    // On the glass screen of Derek's office (the glass in the tile's middle, its top channel at
+    // about 0.67): a brass hook clipped over the channel, his old MONOLITH lanyard on it
+    // (charcoal strap, a white badge facing the room), his camel coat on the second hook.
     const b = new ModelBuilder();
-    const z = 0.51;
-    const hy = 0.92;
-    b.box(0.08, 0.03, 0.02, 0xb08a40, { at: [-0.1, hy, z + 0.01] }, 0.006);
-    b.box(0.014, 0.014, 0.05, 0xb08a40, { at: [-0.1, hy - 0.01, z + 0.04], rot: [0.5, 0, 0] }, 0);
+    const z = 0.03;
+    const hy = FRONT_WALL_HEIGHT + 0.03 + GLASS_SCREEN_H + 0.018;
+    const lx = -0.12;
+    b.box(0.07, 0.04, 0.05, 0xb08a40, { at: [lx, hy, 0] }, 0.006);
+    b.box(0.016, 0.016, 0.06, 0xb08a40, { at: [lx, hy - 0.03, z + 0.01], rot: [0.5, 0, 0] }, 0);
     // The lanyard: two straps down to the badge.
+    const by = hy - 0.24;
     for (const s of [-1, 1])
       b.box(
-        0.018,
-        0.26,
+        0.02,
+        0.18,
         0.004,
         0x2a2f3a,
-        { at: [-0.1 + s * 0.04, hy - 0.14, z + 0.05], rot: [0, 0, s * -0.15] },
+        { at: [lx + s * 0.025, hy - 0.11, z + 0.03], rot: [0, 0, s * -0.14] },
         0,
       );
-    b.box(0.1, 0.13, 0.006, 0xf2f2ee, { at: [-0.1, hy - 0.32, z + 0.052] }, 0.004);
-    b.box(0.09, 0.03, 0.004, 0x1d2430, { at: [-0.1, hy - 0.27, z + 0.056] }, 0);
-    text(b, 'MONOLITH', -0.1, hy - 0.27, z + 0.058, 0.0024, 0xf2f2ee);
-    b.box(0.04, 0.05, 0.003, 0x9a9ea4, { at: [-0.1, hy - 0.335, z + 0.056] }, 0);
+    b.box(0.08, 0.11, 0.006, 0xf6f6f2, { at: [lx, by, z + 0.034] }, 0.004);
+    b.box(0.08, 0.026, 0.004, 0x1d2430, { at: [lx, by + 0.035, z + 0.038] }, 0);
+    text(b, 'MONOLITH', lx, by + 0.035, z + 0.04, 0.002, 0xf2f2ee);
+    b.box(0.034, 0.04, 0.003, 0x9a9ea4, { at: [lx, by - 0.012, z + 0.038] }, 0);
     // His coat on the second hook: a camel overcoat.
-    b.box(0.08, 0.03, 0.02, 0xb08a40, { at: [0.14, hy, z + 0.01] }, 0.006);
-    b.box(0.2, 0.46, 0.06, 0x9a7a52, { at: [0.14, hy - 0.25, z + 0.05] }, 0.03);
-    b.box(0.08, 0.1, 0.064, tint(0x9a7a52, -0.15), { at: [0.14, hy - 0.04, z + 0.05] }, 0.02);
+    const cx = 0.16;
+    b.box(0.07, 0.04, 0.05, 0xb08a40, { at: [cx, hy, 0] }, 0.006);
+    b.box(0.2, 0.38, 0.06, 0x9a7a52, { at: [cx, hy - 0.22, z + 0.04] }, 0.03);
+    b.box(0.08, 0.08, 0.064, tint(0x9a7a52, -0.15), { at: [cx, hy - 0.05, z + 0.04] }, 0.02);
     return b.build();
   },
   statusSticky: () => {

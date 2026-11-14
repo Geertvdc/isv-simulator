@@ -259,10 +259,29 @@ export const LANYARD_BOX: () => Model = prop((b) => {
   lettering(b, 'LANYARDS', 0, 0.07, 0.111, 0.0055, INK, 0.002);
 }, 1.15);
 
-/** Segfault asleep on Derek's leather chair: the On Call cat, a little smaller, curled on the seat. */
+/** The On Call cat's grey fur, and the lighter grey it shows on Derek's dark chair. */
+const CAT_FUR = 0x8a8580;
+export const SEGFAULT_FUR = 0x9a9590;
+
+/**
+ * Segfault asleep on Derek's leather chair: the On Call cat, a little
+ * smaller, curled on the seat, its fur a shade lighter so it reads against
+ * the charcoal leather.
+ */
 export const SEGFAULT_ON_CHAIR: () => Model = () => {
   const m = segfaultCat.model(1);
-  const s = 0.82;
+  const s = 0.95;
   for (const g of [m.body, m.glow, m.glass]) g?.scale(s, s, s);
+  const from = new THREE.Color(CAT_FUR);
+  const to = new THREE.Color(SEGFAULT_FUR);
+  const colors = m.body.getAttribute('color');
+  for (let i = 0; i < colors.count; i++)
+    if (
+      Math.abs(colors.getX(i) - from.r) < 1e-3 &&
+      Math.abs(colors.getY(i) - from.g) < 1e-3 &&
+      Math.abs(colors.getZ(i) - from.b) < 1e-3
+    )
+      colors.setXYZ(i, to.r, to.g, to.b);
+  colors.needsUpdate = true;
   return m;
 };
