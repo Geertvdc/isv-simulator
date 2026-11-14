@@ -10,10 +10,13 @@ import {
   DEFAULT_ATMOSPHERE,
   type FlakeSeed,
   type MoteSeed,
+  type PetalSeed,
   accentSpots,
   blinkOn,
   glintSpots,
   moteSeeds,
+  mullionShade,
+  petalSeeds,
   sceneOf,
   snowSeeds,
   stutterIndex,
@@ -50,6 +53,8 @@ const MOTE_DRIFT = 0.18;
 const MOTE_PERIOD_MS = 9000;
 /** Mote size on screen, in world units (they shrink with distance). */
 const MOTE_SIZE = 0.045;
+/** Texels per grid unit of the mullions' floor stripes (`Atmosphere.mullions`). */
+const MULLION_TEXELS = 24;
 /** Steam over the coffee van's hatch: puffs, how long one rises and how high. */
 const STEAM = { color: 0xf4f0e8, count: 7, ms: 3200, rise: 0.6, opacity: 0.75 };
 /** Smoke from the narrowboat's chimney: kept low (nothing tall in front of the level), drifting downwind. */
@@ -246,6 +251,14 @@ export class WorldFx {
   } | null = null;
   /** Snow falling in the light wells (`Atmosphere.snow`). */
   private snow: { points: THREE.Points; seeds: FlakeSeed[]; fall: number } | null = null;
+  /** Blossom petals drifting down outside the building (`Atmosphere.petals`), off on `low`. */
+  private petals: {
+    points: THREE.Points;
+    seeds: PetalSeed[];
+    fall: number;
+    sway: number;
+    group: THREE.Group;
+  } | null = null;
   private shake = { untilMs: 0, intensity: 0 };
   shakeEnabled = true;
 
@@ -285,6 +298,7 @@ export class WorldFx {
     this.buildLampGlow(world, atmosphere);
     this.buildSweep(atmosphere);
     this.buildNight(world, atmosphere);
+    this.buildSpring(atmosphere);
     this.rug = new THREE.MeshBasicMaterial({
       color: RUG_COLOR,
       transparent: true,
@@ -339,6 +353,7 @@ export class WorldFx {
     this.runChase(timeMs);
     this.runSweep(timeMs);
     this.runNight(timeMs);
+    this.driftPetals(timeMs);
     for (let i = this.puffs.length - 1; i >= 0; i--) {
       const puff = this.puffs[i];
       if (!puff) continue;
@@ -750,6 +765,85 @@ export class WorldFx {
     }
   }
 
+  /** The mullions' stripes on the floor and the blossom petals outside (`Atmosphere.mullions`, `petals`). */
+  private buildSpring(atmosphere: Atmosphere): void {
+    if (atmosphere.mullions) {
+      const { width, height } = this.map;
+      const cols = width * MULLION_TEXELS;
+      const rows = height * MULLION_TEXELS;
+      const data = new Uint8Array(cols * rows * 4).fill(255);
+      for (let j = 0; j < rows; j++) {
+        // Row 0 is the plane's bottom edge: the front of the map once it lies flat.
+        const z = height - 0.5 - (j + 0.5) / MULLION_TEXELS;
+        for (let i = 0; i < cols; i++) {
+          const x = -0.5 + (i + 0.5) / MULLION_TEXELS;
+          data[(j * cols + i) * 4 + 3] = Math.round(255 * mullionShade(atmosphere, this.map, x, z));
+        }
+      }
+      const texture = new THREE.DataTexture(data, cols, rows);
+      texture.magFilter = THREE.LinearFilter;
+      texture.minFilter = THREE.LinearFilter;
+      texture.needsUpdate = true;
+      const stripes = new THREE.Mesh(
+        new THREE.PlaneGeometry(width, height).rotateX(-Math.PI / 2),
+        new THREE.MeshBasicMaterial({
+          color: atmosphere.mullions.color,
+          map: texture,
+          transparent: true,
+          depthWrite: false,
+          fog: false,
+        }),
+      );
+      stripes.position.set((width - 1) / 2, 0.003, (height - 1) / 2);
+      this.root.add(stripes);
+    }
+    const spec = atmosphere.petals;
+    const seeds = petalSeeds(atmosphere, this.map);
+    if (!spec || seeds.length === 0) return;
+    const group = new THREE.Group();
+    group.userData[AMBIENT_KEY] = true;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute(
+      'position',
+      new THREE.BufferAttribute(new Float32Array(seeds.length * 3), 3),
+    );
+    const points = new THREE.Points(
+      geometry,
+      new THREE.PointsMaterial({
+        color: spec.color,
+        size: spec.size,
+        map: petalTexture(),
+        transparent: true,
+        alphaTest: 0.05,
+        opacity: spec.opacity,
+        depthWrite: false,
+      }),
+    );
+    points.frustumCulled = false;
+    group.add(points);
+    this.root.add(group);
+    this.petals = { points, seeds, fall: spec.fall, sway: spec.sway, group };
+    this.driftPetals(0);
+  }
+
+  /** Each petal falls on its own loop, swaying and blown a little toward the camera. */
+  private driftPetals(timeMs: number): void {
+    const p = this.petals;
+    if (!p?.group.visible) return;
+    const position = p.points.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const t = timeMs / 1000;
+    p.seeds.forEach(({ at, drop, phase }, i) => {
+      const k = (phase + (t * p.fall) / drop) % 1;
+      position.setXYZ(
+        i,
+        at.x + Math.sin(t * 0.8 + phase * 17) * p.sway,
+        at.y - k * drop,
+        at.z + Math.cos(t * 0.55 + phase * 11) * p.sway * 0.6 + k * 0.5,
+      );
+    });
+    position.needsUpdate = true;
+  }
+
   /** The beams swing side to side, neighbours in mirror. */
   private runSweep(timeMs: number): void {
     const s = this.sweep;
@@ -1096,6 +1190,27 @@ function shaftGeometry(length: number, radius: number): THREE.BufferGeometry {
 function unitOf(i: number, salt: number): number {
   const hash = Math.imul(i + 1, 0x9e3779b1) ^ Math.imul(salt, 0x85ebca6b);
   return ((Math.imul(hash ^ (hash >>> 15), 0x2c1b3c6d) >>> 0) % 10007) / 10007;
+}
+
+/** A small petal: a white oval, soft at its rim and notched at one end, as alpha. */
+function petalTexture(): THREE.Texture {
+  const size = 16;
+  const data = new Uint8Array(size * size * 4).fill(255);
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      const u = (x + 0.5) / size - 0.5;
+      const v = (y + 0.5) / size - 0.5;
+      // Wider than tall, tipped a little, with a notch in its top.
+      const a = (u * 0.94 + v * 0.34) / 0.46;
+      const b = (v * 0.94 - u * 0.34) / 0.3;
+      const inside = 1 - Math.hypot(a, b);
+      const notch = Math.hypot(u - 0.3, v - 0.22) < 0.09 ? 0 : 1;
+      data[(y * size + x) * 4 + 3] = Math.round(255 * Math.min(1, Math.max(0, inside * 4)) * notch);
+    }
+  const texture = new THREE.DataTexture(data, size, size);
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
 }
 
 /** A soft round glow, white in the middle and gone at the edge, for halo sprites. */

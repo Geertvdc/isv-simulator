@@ -161,6 +161,35 @@ export interface Atmosphere {
   /** Dust drifting in the room's light: `perTile` motes per floor tile, faint and below bloom. */
   motes?: { color: number; opacity: number; perTile: number };
   /**
+   * Blossom petals drifting down in the air outside the building, never over
+   * the room (see `petalSeeds`): `perSide` petals down each side of the
+   * outline, `near` to `far` grid units out, and `perVoid` over each of the
+   * map's void tiles; each falls from `top` to `bottom` (world units) at
+   * `fall` units a second, swaying `sway` units. Not additive, `size` world
+   * units across. Off on `low`.
+   */
+  petals?: {
+    color: number;
+    opacity: number;
+    perSide: number;
+    perVoid: number;
+    near: number;
+    far: number;
+    top: number;
+    bottom: number;
+    fall: number;
+    sway: number;
+    size: number;
+  };
+  /**
+   * The curtain wall's mullions striped across the floor in the sun (see
+   * `mullionShade`): soft `color` bars `width` grid units wide every `every`
+   * units, running along the sun's direction, `opacity` on the sun's side of
+   * the room and `fade` × that on the far side. A decal on the floor (never
+   * over void), no light and no shadow map. On every quality.
+   */
+  mullions?: { color: number; opacity: number; width: number; every: number; fade: number };
+  /**
    * Small motion in the scene round the level (see `WorldFx`), all of it off
    * on `low` and none of it moving within a tile of the play area: steam over
    * the coffee van's hatch, smoke from the narrowboat's chimney, light
@@ -554,6 +583,61 @@ const NIGHT_SHIFT: Atmosphere = {
   shafts: { color: 0xffa040, opacity: 0.22, length: 1.8, radius: 0.32, lean: 0.3 },
 };
 
+/**
+ * A bright, clean spring morning on an upper floor of a mid-rise: a crisp,
+ * nearly white sun low-ish from the back left through the building's curtain
+ * wall (about 42° up, so the partitions' shadows fall short toward the front
+ * right and the back row stays lit), its mullions striped faintly across the
+ * carpet; a soft, only slightly cool fill and sky (bluer turns the yellow
+ * test benches olive), soft spring blue-grey air over the street far below,
+ * small warm-white pools from the linear pendants along the back wall, and
+ * cherry-blossom petals drifting past the glass outside.
+ */
+const SPRING_MORNING: Atmosphere = {
+  sun: {
+    color: 0xfff6ea,
+    intensity: 3.2,
+    from: { x: -7.5, y: -4.5, height: 8, perMapSize: false },
+    reach: 0.95,
+  },
+  sky: { sky: 0xd4e0f2, ground: 0x857f78, intensity: 0.7 },
+  fill: { color: 0xe4eaf6, intensity: 0.75 },
+  environment: 0.12,
+  backdrop: { inner: 0xd2dce8, outer: 0x96a8bc },
+  fog: { color: 0xbac8d8, start: 0.5, span: 10 },
+  vignette: {
+    color: 0x2a3a52,
+    opacity: 0.35,
+    inner: 0.7,
+    // The morning sun pouring in through the curtain wall on the left.
+    glow: { color: 0xfff0d8, opacity: 0.14, x: 0, y: 0.35, reach: 0.3 },
+  },
+  lamps: {
+    color: 0xfff0dc,
+    intensity: 2.6,
+    distance: 3.4,
+    height: 2.1,
+    spacing: 3.5,
+    inset: 0.45,
+    // Back wall only: a pendant by the front wall would hang over the players' heads on screen.
+    frontFrom: 99,
+  },
+  petals: {
+    color: 0xf4a6c0,
+    opacity: 0.95,
+    perSide: 36,
+    perVoid: 2,
+    near: 0.9,
+    far: 4.2,
+    top: 3.2,
+    bottom: -0.4,
+    fall: 0.16,
+    sway: 0.22,
+    size: 0.5,
+  },
+  mullions: { color: 0x3c4a62, opacity: 0.22, width: 0.28, every: 1.5, fade: 0.3 },
+};
+
 /** Presets per `MapLook.scene` id. */
 export const ATMOSPHERES: Readonly<Record<string, Atmosphere>> = {
   garage: GOLDEN_HOUR,
@@ -562,6 +646,7 @@ export const ATMOSPHERES: Readonly<Record<string, Atmosphere>> = {
   'seed-round': BLUE_HOUR,
   'demo-day': STAGE_LIGHTS,
   'on-call': NIGHT_SHIFT,
+  'middle-management': SPRING_MORNING,
 };
 
 /** The light and air for a scene id; the default for none or an unknown one. */
@@ -1020,4 +1105,88 @@ export function snowSeeds(
       };
     });
   });
+}
+
+/** A blossom petal: where its fall starts (world units), how far it falls, and its phase in [0, 1). */
+export interface PetalSeed {
+  at: Vec3;
+  drop: number;
+  phase: number;
+}
+
+/**
+ * The blossom petals outside the building, the same every time for a map:
+ * `perSide` down each side of the outline from a tile behind it to its front,
+ * `near` to `far` grid units out, and `perVoid` over each void tile (the air
+ * outside the building on a map with notches), never over the room.
+ */
+export function petalSeeds(
+  atmosphere: Atmosphere,
+  map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles'>>,
+): PetalSeed[] {
+  const petals = atmosphere.petals;
+  if (!petals) return [];
+  const drop = petals.top - petals.bottom;
+  const sides = [-1, 1].flatMap((side, s) =>
+    Array.from({ length: petals.perSide }, (_, k) => {
+      const i = s * 1000 + k;
+      const out = petals.near + unit(i, 21) * (petals.far - petals.near);
+      const x = side < 0 ? -0.5 - out : map.width - 0.5 + out;
+      const z = -1.5 + unit(i, 22) * (map.height + 1);
+      return { at: { x, y: petals.top, z }, drop, phase: unit(i, 23) };
+    }),
+  );
+  if (!map.tiles || petals.perVoid <= 0) return sides;
+  const voids = tilesOf(map as LevelMap, (t) => t === 'void');
+  const over = voids.flatMap((t, v) =>
+    Array.from({ length: petals.perVoid }, (_, k) => {
+      const i = 5000 + v * 16 + k;
+      return {
+        at: {
+          x: t.x + (unit(i, 24) - 0.5) * 0.8,
+          y: petals.top,
+          z: t.y + (unit(i, 25) - 0.5) * 0.8,
+        },
+        drop,
+        phase: unit(i, 26),
+      };
+    }),
+  );
+  return [...sides, ...over];
+}
+
+/**
+ * How strongly the mullions' stripes (`Atmosphere.mullions`) darken the floor
+ * at world `x`, `z`, in [0, opacity]: bars along the sun's direction across
+ * the floor, soft at their edges, strongest on the sun's side and fading
+ * away from it; 0 over void and off the map.
+ */
+export function mullionShade(
+  atmosphere: Atmosphere,
+  map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles'>>,
+  x: number,
+  z: number,
+): number {
+  const m = atmosphere.mullions;
+  if (!m) return 0;
+  if (map.tiles) {
+    const tile = getTile(map as LevelMap, Math.round(x), Math.round(z));
+    if (tile === null || tile === 'void') return 0;
+  } else if (x < -0.5 || z < -0.5 || x > map.width - 0.5 || z > map.height - 0.5) return 0;
+  const { position: p, target: t } = sunPlacement(atmosphere, map);
+  const len = Math.hypot(p.x - t.x, p.z - t.z) || 1;
+  const dx = (p.x - t.x) / len;
+  const dz = (p.z - t.z) / len;
+  // Across the bars: which bar, and how far from its middle.
+  const across = x * -dz + z * dx;
+  const frac = (((across / m.every) % 1) + 1) % 1;
+  const off = Math.abs(frac - 0.5) * m.every;
+  const edge = 0.05;
+  const bar = Math.min(1, Math.max(0, (m.width / 2 + edge - off) / (2 * edge)));
+  if (bar === 0) return 0;
+  // Along the sun: 1 on its side of the room, `fade` on the far side.
+  const along = (x - t.x) * dx + (z - t.z) * dz;
+  const half = (Math.abs(dx) * map.width + Math.abs(dz) * map.height) / 2;
+  const s = Math.min(1, Math.max(-1, along / half));
+  return m.opacity * bar * (m.fade + ((1 - m.fade) * (s + 1)) / 2);
 }
