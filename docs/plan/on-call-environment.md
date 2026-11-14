@@ -1,6 +1,10 @@
 # On Call environment pass
 
-**Status:** brief and plumbing. Level 2-3 (`on-call`, "On Call"), the last level of the Startup chapter, gets a hand-built world after the garage ([garage-environment.md](garage-environment.md)), [Open Plan Office](open-plan-environment.md), [Down the Hall](down-the-hall-environment.md), [Seed Round](seed-round-environment.md) and [Demo Day](demo-day-environment.md).
+**Status:** two rounds done (build, critic review, fixes). Level 2-3 (`on-call`, "On Call"), the last level of the Startup chapter, gets a hand-built world after the garage ([garage-environment.md](garage-environment.md)), [Open Plan Office](open-plan-environment.md), [Down the Hall](down-the-hall-environment.md), [Seed Round](seed-round-environment.md) and [Demo Day](demo-day-environment.md).
+
+| Before                                      | After                                      | Before, redesign draft                            | After, redesign draft                            |
+| ------------------------------------------- | ------------------------------------------ | ------------------------------------------------- | ------------------------------------------------ |
+| ![](images/on-call-environment/before.webp) | ![](images/on-call-environment/after.webp) | ![](images/on-call-environment/before-draft.webp) | ![](images/on-call-environment/after-draft.webp) |
 
 **Goal:** the world around the level tells one story, the way Overcooked 2 levels do. Render only (`src/render/`); the sim, maps and balance don't change.
 
@@ -37,26 +41,26 @@ Top of screen = back of the level.
 
 ## Running gags
 
-| Gag                       | Where                                                                                                            | Track |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------- | ----- |
-| YOTTA's logo              | a violet YOTTA sticker on a server rack (a rack on the server-room wall tops or in the top void), findable       | Room  |
-| Segfault                  | asleep on top of the warmest server (a rack on a wall top, away from spawns), `purr`, out of the play area       | Room  |
-| Prod                      | brought down from the loft "for the oxygen": the seed round's far-too-big planter, squeezed in a corner outside  | World |
-| The plan                  | the incident runbook on a wall face: `1. Build it  2. ???  3. Profit`, with "2. ???" circled in red              | Room  |
+| Gag                       | Where                                                                                                           | Track |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------- | ----- |
+| YOTTA's logo              | a violet YOTTA sticker on a server rack (a rack on the server-room wall tops or in the top void), findable      | Room  |
+| Segfault                  | asleep on top of the warmest server (a rack on a wall top, away from spawns), `purr`, out of the play area      | Room  |
+| Prod                      | brought down from the loft "for the oxygen": the seed round's far-too-big planter, squeezed in a corner outside | World |
+| The plan                  | the incident runbook on a wall face: `1. Build it  2. ???  3. Profit`, with "2. ???" circled in red             | Room  |
 | Demo Day / Seed callbacks | the storage cage: flight cases, the LAUNCHPAD roll-up, the deflated "WE RAISED!" balloon                        | World |
-| The guard                 | asleep at the lobby desk, seen through a light well                                                              | World |
+| The guard                 | asleep at the lobby desk, seen through a light well                                                             | World |
 
 All cameos out of the play area, out from under the HUD, small enough to find and never readable as a player.
 
 ## The six Overcooked lessons, for this level
 
-| Lesson                                 | Here                                                                                                                                 |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| The frame is full, at several heights  | Foundation wall with light wells and ducts at the back, the boiler and its pipes left, bikes and the storage cage right, racks       |
+| Lesson                                 | Here                                                                                                                                |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| The frame is full, at several heights  | Foundation wall with light wells and ducts at the back, the boiler and its pipes left, bikes and the storage cage right, racks      |
 | The room's edge is made of the setting | Painted block walls with concrete coping, cable trays and pipes on brackets, the server cage, the raised floor's edge as foundation |
-| Surfaces carry material and wear       | Block coursing, formwork lines, damp stains, raised-floor tiles with vents and a lifted tile, the worn safety line                   |
-| One place, one story                   | A building's basement at 3 AM: boiler, bikes, storage, servers. Nothing of the loft or the stage, except what got dumped down here   |
-| Light does the composition             | Bright cold work light on the play area, blue-green rack glow, warm boiler at the left, orange snow light falling down the wells      |
+| Surfaces carry material and wear       | Block coursing, formwork lines, damp stains, raised-floor tiles with vents and a lifted tile, the worn safety line                  |
+| One place, one story                   | A building's basement at 3 AM: boiler, bikes, storage, servers. Nothing of the loft or the stage, except what got dumped down here  |
+| Light does the composition             | Bright cold work light on the play area, blue-green rack glow, warm boiler at the left, orange snow light falling down the wells    |
 | The outside connects to the play       | Alerts come down the stairs to the pager board (inbox); shipped work goes up the fibre uplink (ship)                                |
 
 ## Rules
@@ -79,13 +83,69 @@ Three agents in one worktree at once, with strict file ownership. The shared plu
 | **World** | `scenes/onCall.ts` (+test), `setDressing/onCall.ts`                                                                                                                                         |
 | **Light** | `atmosphere.ts` (+test), `stage.ts` (the three.js Stage), `WorldFx.ts`, `createLights` in `look.ts`                                                                                         |
 
+## Rounds
+
+Round 1 ran three agents at once (Room, World, Light), with the Overcooked 2 mine level as the reference. The critic scored it **6/10** on the shipped map and **5.5/10** on the draft (before: 3/10 on both). The basement read at once: the stairs from the lobby, the boiler room, the bikes and the storage cage, the black racks of the server cage, the raised floor, and the uplink with its yellow fibre duct. What held it back:
+
+- It didn't read as night: the light wells looked like warm house windows.
+- The pager board sat under the inbox's ticket billboard.
+- Segfault (orange, striped, on a grey towel) read as a roast chicken on a plate.
+- The cardboard boxes were the most saturated thing on screen.
+- Half of the server room's inner walls read as counters.
+- A lifted floor tile read as a hole in the play area.
+
+Round 2, in three chunks:
+
+- **Room:**
+  - The pager board moved to the wall tile after the inbox run (`pagerBoardTile`), so "ALERTS 37" shows beside the fire door.
+  - Every inner wall is a dark rack cage, darker than the counters but distinct from them.
+  - The lifted tile moved into a corner and shows cables in a grey pit.
+  - The runbook is twice the size, hung on chains and tipped toward the camera.
+  - The wall face and floor are darker; the cable tray and battens are thin and grey at one height on both maps.
+  - The drink-can pyramid became a single can.
+- **World:**
+  - Segfault is a grey tabby with its tail over the server's edge, on an ESD-blue towel, and it breathes.
+  - The light wells are night blue with a sodium wedge at the top and cold snow; the foundation wall is about 25% darker.
+  - The guard is a silhouette asleep under a lit lobby window; the night cleaner has a bun and yellow headphones.
+  - The boiler is silver-lagged and piped back into the wall.
+  - There are half the box piles, in muted colours; the shelving holds grey archive bins.
+  - The bottom corners have low dressing (a floor pipe, an archive pallet, a drain, Moppy's yellow route chevrons).
+- **Light:**
+  - The beacon follows the pager board.
+  - Snow is white flakes and the sodium light is a narrow cone.
+  - The well light sits high in the shaft and the boiler glow is shorter and softer.
+  - A sodium pool lights the bottom-right corner.
+
+Measured on the final shots:
+
+| Measure                                   | Before      | Round 1     | Final       |
+| ----------------------------------------- | ----------- | ----------- | ----------- |
+| Frame mean luminance, shipped / draft     | 72.6 / 70.7 | 97.8 / 99.7 | 91.4 / 93.4 |
+| Frame mean luminance, `quality=low`       |             | 102.6       | 96.6        |
+| Play floor L                              |             | 162         | 151         |
+| Inner walls L (counters about 51)         |             | 113–119     | 39–63       |
+| Cardboard box saturation                  |             | 0.72        | 0.23–0.35   |
+| Ship / red bug queue front saturation     |             | 0.56 / 0.51 | 0.56 / 0.51 |
+| Yellow bench top / green keyboard front S |             | 0.26 / 0.18 | 0.27 / 0.18 |
+
+Left for later:
+
+- **Pale station tops.** The yellow bench top (S 0.27) and the green keyboard front (S 0.18) stay below the critic's 0.30 / 0.25. Light can't fix it: `stationModels.ts` draws station tops as `tint(color, 0.4)`, which is already that pale as a material. A smaller tint (about 0.3) would fix it, but touches every level.
+- **"Dim" more than "3 AM".** The basement round the room reads dim rather than deep night. A darker hall would take a frame mean nearer 88, below the floor we keep for readability.
+- **Small text.** The "???" inside the runbook's red circle, MOPPY on the dock and the NO STORAGE sign's letters are faint at 1440×810. The shapes read.
+- **Static blinkers.** The LEDs beside Segfault and the pager board's lamps don't blink (room pieces can't move; a World `blink` piece at the same spot would do it). The battens' tubes don't flicker; only the point light stutters.
+- **Draft details.** The draft's lobby door is under the order cards (only the flight shows); its runbook reaches 0.06 into the next station's tile; Moppy's route chevrons are squeezed against the right wall.
+- **The cleaner's headgear** is a separate static piece, so it can drift a little off the head during a sip.
+- **Moppy itself** isn't built: the mop-robot mechanic comes later, and the world has only its empty dock and route chevrons.
+- Not checked on a real GPU.
+
 ## Done when
 
-- [ ] The shot reads as "a startup firefighting its servers in a basement at 3 AM on a snowy night" without explanation, and nothing in it reads as food or a kitchen.
-- [ ] The storyline beat reads with no explanation: we're under the loft building, it's the night after Demo Day, the pager is going off.
-- [ ] The outside connects to the play: alerts come down the stairs to the pager board, shipped work goes up the uplink.
-- [ ] The running gags are in place: the logo sticker, Segfault on the warm server, Prod, the runbook, the storage-cage callbacks.
-- [ ] No flat empty ground and no void in the 1440×810 frame.
-- [ ] Stations and players read at a glance; nothing hides them.
-- [ ] Works on the shipped map and on `?draft=on-call`.
-- [ ] `npm run check` passes; other levels look as before.
+- [x] The shot reads as "a startup firefighting its servers in a basement at 3 AM on a snowy night" without explanation, and nothing in it reads as food or a kitchen.
+- [x] The storyline beat reads with no explanation: we're under the loft building, it's the night after Demo Day, the pager is going off.
+- [x] The outside connects to the play: alerts come down the stairs to the pager board, shipped work goes up the uplink.
+- [x] The running gags are in place: the logo sticker, Segfault on the warm server, Prod, the runbook, the storage-cage callbacks.
+- [x] No flat empty ground and no void in the 1440×810 frame.
+- [x] Stations and players read at a glance; nothing hides them.
+- [x] Works on the shipped map and on `?draft=on-call`.
+- [x] `npm run check` passes; other levels look as before.

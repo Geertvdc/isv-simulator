@@ -4,7 +4,7 @@ The campaign tells one story: **YOTTA**, a startup founded by two people in Mom'
 
 This page is canon for level design and environment passes. A level's map, its world, its props and its light should all tell this level's beat. The players never read this page, so **the story has to show in the world**: in the backdrop, the props, the people outside and the signs on the walls.
 
-Where a level already has an environment brief, that brief is the detailed version and wins on details: [garage](../plan/garage-environment.md), [open plan](../plan/open-plan-environment.md), [down the hall](../plan/down-the-hall-environment.md), [seed round](../plan/seed-round-environment.md), [demo day](../plan/demo-day-environment.md). Everything else here is a starting point: change it when a pass finds something funnier, and update this page when you do.
+Where a level already has an environment brief, that brief is the detailed version and wins on details: [garage](../plan/garage-environment.md), [open plan](../plan/open-plan-environment.md), [down the hall](../plan/down-the-hall-environment.md), [seed round](../plan/seed-round-environment.md), [demo day](../plan/demo-day-environment.md), [on call](../plan/on-call-environment.md). Everything else here is a starting point: change it when a pass finds something funnier, and update this page when you do.
 
 ## The arc in one table
 
@@ -129,8 +129,8 @@ _New: production incidents._ The money is real, the customers are real, and so i
 - **The joke:** the founders, still in their Demo Day outfits, firefight the traffic spike in a basement while the night cleaner's mop robot calmly mops the corridor it always mops at 3 AM, wet floor and all.
 - **Mechanic in the story:** Moppy the mop robot drives its ring and leaves wet floor behind it; the pager is on.
 - **Inbox and ship:** the inbox is the pager board by the stairs (alerts come in); the ship hatch is the uplink to the racks: "deployed".
-- **Outside:** light wells with snow and streetlight above, the building's boiler room, bike storage, a security guard asleep at the desk upstairs (visible through a light well).
-- **Running gags:** a YOTTA sticker on the server rack, Prod brought down from the loft "for the oxygen", Segfault asleep on the warmest server, the plan as an incident runbook with "2. ???" circled.
+- **Outside:** the rest of the basement: the foundation wall with light wells full of snow and sodium streetlight, a security guard asleep at the lobby desk upstairs (seen through a light well), the stairs down from the lobby, the boiler room with the night cleaner on a coffee break, bike storage and a storage cage full of Demo Day's leftovers, and Moppy's empty charging dock.
+- **Running gags:** a YOTTA sticker on a server rack, Prod brought down from the loft "for the oxygen" in its far-too-big planter, Segfault asleep on the warmest server, the plan as an incident runbook with "2. ???" circled, and in the storage cage the LAUNCHPAD roll-up, Demo Day's flight cases and the deflated "WE RAISED!" balloon.
 - **Level design hooks:** the ring round the server room gives two ways round; Moppy decides which one is dry.
 - **How it ends:** by morning it's up, the Series A has landed, and the investors want "adult supervision".
 
@@ -267,7 +267,7 @@ A quick lookup for set dressing. "—" means it's not in that level.
 | 1-3   | A4 printout on each door   | filing cabinet      | radiator in the hall | —                           | —                       | —                 |
 | 2-1   | lit letters on the roof    | huge planter        | terrace bean bag     | —                           | glowing on the skyline  | crane, red light  |
 | 2-2   | LED pitch slide            | on a stage monitor  | reserved seat        | front row, RESERVED         | scout taking notes      | —                 |
-| 2-3   | sticker on the rack        | brought downstairs  | warmest server       | —                           | —                       | —                 |
+| 2-3   | sticker on a cage rack     | by the storage cage | warmest server       | —                           | —                       | —                 |
 | 3-1   | vinyl on reception         | reception           | Derek's chair        | —                           | Derek's old lanyard     | half-clad         |
 | 3-2   | welcome banner             | landing             | riding the lift      | —                           | —                       | almost done       |
 | 3-3   | on the lockers             | unbookable desk     | empty locker         | —                           | —                       | finished, TO LET  |
