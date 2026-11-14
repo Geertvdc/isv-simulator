@@ -135,7 +135,7 @@ export const FLOOR_COLORS: Readonly<Record<FloorTheme, readonly [number, number]
   // A loft's polished concrete, light warm grey; the second is the saw cuts, thin and darker.
   polished: [0xaaa69e, 0x86827a],
   // Painted stage decks, a dark grey; the second is the joints between the decks.
-  stageDeck: [0x4a4c55, 0x5c5e68],
+  stageDeck: [0x55575f, 0x666872],
 };
 
 /** Wall colors per theme: face and top. Caps stay darker than stations, so the eye goes to the stations. */
@@ -151,8 +151,8 @@ export const WALL_COLORS: Readonly<Record<WallTheme, { face: number; top: number
   warehouse: { face: 0x805a4e, top: 0x6e706d },
   // White-painted brick over birch ply, capped with cool light coping.
   loft: { face: 0xd3d5d2, top: 0x72777c },
-  // Charcoal scenery flats, capped with brushed aluminium rails round a mid-grey channel.
-  stageSet: { face: 0x3a3b42, top: 0x5c6068 },
+  // Charcoal scenery flats, capped dark with a brushed aluminium lip along the open edges.
+  stageSet: { face: 0x3a3b42, top: 0x3e3f43 },
 };
 
 /** Marks the room's warm lamps, which only `medium` and `high` quality light (see `Stage`). */
@@ -174,6 +174,8 @@ export function createLights(
   const cy = (height - 1) / 2;
   const { sky: SKY, sun: SUN, fill: FILL } = atmosphere;
   const sky = new THREE.HemisphereLight(SKY.sky, SKY.ground, SKY.intensity);
+  if (atmosphere.lowSky !== undefined)
+    sky.userData[LOW_SKY_KEY] = { high: SKY.intensity, low: atmosphere.lowSky };
 
   const sun = new THREE.DirectionalLight(SUN.color, SUN.intensity);
   // From behind and left: shadows fall forward and right, toward the camera,
@@ -245,6 +247,12 @@ export function roomEnvironment(renderer: THREE.WebGLRenderer): THREE.Texture {
   return environment;
 }
 
+/**
+ * Marks the sky light whose intensity `Stage` swaps on `low`
+ * (`Atmosphere.lowSky`): `{ high, low }`, the intensities for post-processed
+ * quality and for `low`.
+ */
+export const LOW_SKY_KEY = 'lowSky';
 /** Where a scene keeps its vignette for `Stage` (an `Atmosphere['vignette']`). */
 export const VIGNETTE_KEY = 'vignette';
 /** Where a scene keeps its ambient occlusion strength for `Stage` (`Atmosphere.occlusion`). */

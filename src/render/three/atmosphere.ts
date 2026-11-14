@@ -51,6 +51,13 @@ export interface Atmosphere {
     out: number;
     perSide: number;
   };
+  /**
+   * The sky light's intensity on `low` quality instead of `sky.intensity`:
+   * low hides the point lights (`sides`, `lamps`), so a set lit mostly by
+   * them gets its light back from the sky there. Every quality uses
+   * `sky.intensity` when left out.
+   */
+  lowSky?: number;
   /** A weak light from the camera side that lifts the shadow sides. */
   fill: { color: number; intensity: number };
   /**
@@ -141,6 +148,24 @@ export interface Atmosphere {
    * open floor. Under the bloom threshold, off on `low` with the lamps.
    */
   glints?: { color: number; opacity: number; size: number; forward: number };
+  /**
+   * Moving heads sweeping through the haze (see `WorldFx`): `heads` faint
+   * additive cones hung from the scene's truss rig, `length` world units
+   * long and `radius` wide at their far end, leaning `lean` radians toward
+   * the camera and swung side to side by up to `degrees` once every
+   * `seconds`, neighbours in mirror. They light nothing (no light, no
+   * shadows) and end high over the back wall, never over a station. Off on `low`.
+   */
+  sweep?: {
+    color: number;
+    opacity: number;
+    heads: number;
+    length: number;
+    radius: number;
+    lean: number;
+    degrees: number;
+    seconds: number;
+  };
 }
 
 /** Marks what `Stage` hides on `low`: the ambient motion of `Atmosphere.ambient`. */
@@ -298,38 +323,43 @@ const BLUE_HOUR: Atmosphere = {
 };
 
 /**
- * Stage lighting at the accelerator's Demo Day: a strong warm-white front
- * wash (the front-of-house key light, from the front and high, about 47° up,
- * so shadows fall upstage behind people and props and the back row stays
- * lit), a near-white fill so stations stay true, a dark hall all round with
- * blue working light in the wings, YOTTA-violet back light at the right edge
- * and a faint haze glowing under the truss at the top. Par cans on the truss
- * along the back wall, warm white and violet, swell in a slow chase.
+ * Stage lighting at the accelerator's Demo Day: a near-neutral front-of-house
+ * key and wash (from the front and high, about 47° up, so shadows fall
+ * upstage behind people and props and the back row stays lit), kept just
+ * under the point where the station tops wash out to pastel, and only a
+ * touch warm, so the dark wall caps stay grey. The hall round the stage is
+ * dark, with soft blue-grey working light in the wings (it carries the
+ * frame's brightness, not the stage key), faint blue and violet at the
+ * edges and a haze glowing under the truss over the LED wall. Par cans on
+ * the truss along the back wall swell in a slow chase, and two moving heads
+ * sweep through the haze.
  */
 const STAGE_LIGHTS: Atmosphere = {
   sun: {
-    color: 0xfff0da,
-    intensity: 5.6,
+    color: 0xffecd6,
+    intensity: 4.2,
     from: { x: -2.5, y: 7.5, height: 8.5, perMapSize: false },
     reach: 0.95,
   },
   wash: {
-    color: 0xfff4e4,
-    intensity: 3.2,
+    color: 0xfff2e4,
+    intensity: 2.2,
     from: { x: 0, y: 9, height: 10, perMapSize: false },
     spread: 1.05,
   },
   sides: {
-    left: 0x5a86ff,
-    right: 0x8e64ff,
-    intensity: 60,
-    distance: 5,
+    left: 0xbcc6e2,
+    right: 0xc6bce4,
+    intensity: 180,
+    distance: 4.6,
     height: 2.2,
-    out: 2.8,
-    perSide: 2,
+    out: 3.6,
+    perSide: 3,
   },
-  sky: { sky: 0xf6f2f0, ground: 0x5a5670, intensity: 1.4 },
-  fill: { color: 0xeef0ff, intensity: 1.2 },
+  sky: { sky: 0xeceef4, ground: 0x5c5a64, intensity: 1.3 },
+  // Low hides the wings' working lights: the sky makes up for them there.
+  lowSky: 2.6,
+  fill: { color: 0xeef0ff, intensity: 1.0 },
   occlusion: 2.2,
   environment: 0.14,
   backdrop: { inner: 0x2c2658, outer: 0x0e0c20 },
@@ -339,12 +369,12 @@ const STAGE_LIGHTS: Atmosphere = {
     opacity: 0.38,
     inner: 0.7,
     // Blue working light in the wings (left)...
-    glow: { color: 0x4a7cff, opacity: 0.32, x: 0, y: 0.55, reach: 0.3 },
+    glow: { color: 0x6f8ee6, opacity: 0.16, x: 0, y: 0.55, reach: 0.3 },
     glows: [
       // ...YOTTA-violet back light on the tech side (right)...
-      { color: 0x8a5cff, opacity: 0.3, x: 1, y: 0.55, reach: 0.3 },
+      { color: 0x9a80ec, opacity: 0.16, x: 1, y: 0.55, reach: 0.3 },
       // ...and haze glowing under the truss, in front of the LED wall.
-      { color: 0xc8b8ff, opacity: 0.3, x: 0.62, y: 0.04, reach: 0.5 },
+      { color: 0xc8b8ff, opacity: 0.26, x: 0.62, y: 0, reach: 0.3 },
     ],
   },
   lamps: {
@@ -359,7 +389,18 @@ const STAGE_LIGHTS: Atmosphere = {
     halo: { size: 0.6, opacity: 0.5 },
     chase: { depth: 0.18, seconds: 6 },
   },
-  glints: { color: 0xfff0dc, opacity: 0.12, size: 1.5, forward: 1.2 },
+  glints: { color: 0xfff0dc, opacity: 0.22, size: 1.8, forward: 1.2 },
+  // Two moving heads on the batten over the LED wall, sweeping through the haze.
+  sweep: {
+    color: 0xd8ccff,
+    opacity: 0.12,
+    heads: 2,
+    length: 1.45,
+    radius: 0.32,
+    lean: 0.25,
+    degrees: 20,
+    seconds: 8,
+  },
 };
 
 /** Presets per `MapLook.scene` id. */
