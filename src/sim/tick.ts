@@ -14,6 +14,7 @@ import { movePlayer } from './movement';
 import { expireOrders, updateLevelTimer, updateOrders } from './orders';
 import { updatePipelines } from './pipeline';
 import { separatePlayers } from './push';
+import { gateBlocks, updateReorgs } from './reorgs';
 import { updateSpills, wetCheck } from './spills';
 import { updateFlights, updateThrowCharge } from './throw';
 import type { GameState, InputCommand } from './state';
@@ -35,7 +36,8 @@ export function tick(state: GameState, inputs: readonly InputCommand[]): void {
     // Between floors in a lift: nowhere to go.
     if (isRiding(state, player.id)) continue;
     const input = inputs.find((i) => i.playerId === player.id);
-    if (movePlayer(state.level, player, input?.move, input?.dash, isWet)) {
+    const blocks = gateBlocks(state.gates, player.pos);
+    if (movePlayer(state.level, player, input?.move, input?.dash, isWet, blocks)) {
       state.events.push({ type: 'dashed', playerId: player.id });
     }
   }
@@ -63,6 +65,7 @@ export function tick(state: GameState, inputs: readonly InputCommand[]): void {
 
   updatePipelines(state);
   updateSpills(state);
+  updateReorgs(state);
   updateOrders(state);
   updateMeetings(state);
   state.tick++;

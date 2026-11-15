@@ -55,6 +55,41 @@ export interface LevelMap {
    * ones, a counter for the tap, chute and rolling desk, a wall for a partition.
    */
   marks: MapMark[];
+  /**
+   * Reorg levels (Enterprise): the layout of every phase, phase 1 (this
+   * map's own) first. A reorg puts a phase's tiles on the live map.
+   */
+  phases?: Layout[];
+}
+
+/** One reorg phase's layout: its tiles and marks (partitions, rolling desks, doors move). */
+export interface Layout {
+  tiles: Tile[];
+  marks: MapMark[];
+}
+
+/**
+ * `map` with the later reorg phases parsed from `phaseTexts` (phase 2 on).
+ * Every phase must have the map's size; they may only differ in partitions,
+ * rolling desks, meeting doors and floor.
+ */
+export function withPhases(map: LevelMap, phaseTexts: readonly string[]): LevelMap {
+  if (phaseTexts.length === 0) return map;
+  const later = phaseTexts.map((text, i) => {
+    const phase = parseLevelMap(text);
+    if (phase.width !== map.width || phase.height !== map.height) {
+      throw new Error(`Reorg phase ${i + 2} is ${phase.width}×${phase.height}, not ${map.width}×${map.height}`);
+    }
+    phase.tiles.forEach((tile, index) => {
+      const base = map.tiles[index];
+      const moves = (t: Tile | undefined): boolean => t === 'floor' || t === 'wall' || t === 'counter';
+      if (tile !== base && !(moves(tile) && moves(base))) {
+        throw new Error(`Reorg phase ${i + 2} changes a ${base ?? '?'} into a ${tile} at index ${index}`);
+      }
+    });
+    return { tiles: phase.tiles, marks: phase.marks };
+  });
+  return { ...map, phases: [{ tiles: [...map.tiles], marks: map.marks }, ...later] };
 }
 
 /** Mechanics that sit on a tile, each with its own map char. */

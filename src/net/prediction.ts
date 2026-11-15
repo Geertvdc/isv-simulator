@@ -48,6 +48,7 @@ import { pushOutOfManager } from '../sim/manager';
 import { movePlayer } from '../sim/movement';
 import type { GameEvent } from '../sim/orders';
 import { separatePlayers } from '../sim/push';
+import { type Gate, gateBlocks } from '../sim/reorgs';
 import { type WetTiles, wetCheck } from '../sim/spills';
 import type { InputCommand, Player, PlayerId, Vec } from '../sim/state';
 
@@ -86,6 +87,8 @@ export interface PredictionSnapshot {
   liveTiles: LiveTiles;
   /** Tiles wet at `serverTick`, to the tick they dry (spills). */
   wet: WetTiles;
+  /** One-way gates and the way they go at `serverTick` (turnstiles). */
+  gates: Gate[];
   /**
    * The server tick the sim runs from: at or before `serverTick` while the
    * round plays, the countdown's end during the countdown, `null` while it
@@ -100,6 +103,8 @@ export interface Prediction {
   level: LevelMap | null;
   /** Wet tiles as the newest snapshot had them. */
   wet: WetTiles;
+  /** Gates as the newest snapshot had them. */
+  gates: Gate[];
   /** The newest snapshot's server tick; `null` until the first one of the round. */
   baseTick: number | null;
   /** The server tick the sim runs from; `null`: it doesn't (pause, results). */
@@ -133,6 +138,7 @@ export function createPrediction(enabled: boolean): Prediction {
     enabled,
     level: null,
     wet: {},
+    gates: [],
     baseTick: null,
     runsFrom: null,
     others: [],
@@ -206,10 +212,12 @@ function step(p: Prediction, t: number): void {
   const isWet = wetCheck({ level, wet: p.wet, tick: t });
   for (const player of p.current) {
     const input = inputFor(p, player.id, t);
-    movePlayer(level, player, input?.move, input?.dash, isWet);
+    movePlayer(level, player, input?.move, input?.dash, isWet, gateBlocks(p.gates, player.pos));
   }
   // Their inputs are on other machines: they let go.
-  for (const other of p.others) movePlayer(level, other, undefined, false, isWet);
+  for (const other of p.others) {
+    movePlayer(level, other, undefined, false, isWet, gateBlocks(p.gates, other.pos));
+  }
   const everyone = [...p.current, ...p.others].sort((a, b) => a.id - b.id);
   separatePlayers(level, everyone);
   for (const player of p.current) {
@@ -278,6 +286,7 @@ export function reconcile(
   p.stats.reconciles++;
   applyLiveTiles(p.level, snap.liveTiles);
   p.wet = { ...snap.wet };
+  p.gates = snap.gates.map((g) => ({ ...g, dir: { ...g.dir } }));
   p.baseTick = snap.serverTick;
   p.runsFrom = snap.runsFrom;
   // Others never dash here: a shove by them is the server's call (it

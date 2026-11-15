@@ -422,6 +422,20 @@ export const SCENES: readonly Scene[] = [
     ticks: 150,
   },
   {
+    // Reorgs: the Silos layout, a ticket on a rolling desk, the reorg warning about to go off.
+    id: 'reorg',
+    levelId: 'lab-reorg',
+    players: 2,
+    setup(state) {
+      putOn(workOn(openOrder(state, 'feature', 'Dark mode, again'), 1), { x: 3, y: 5 });
+      stand(state, 1, { x: 7, y: 7 }, { x: 0, y: 1 });
+      stand(state, 2, { x: 14, y: 9 }, { x: 0, y: -1 });
+      state.tick = 20 * 60 - 100;
+    },
+    input: () => [],
+    ticks: 40,
+  },
+  {
     // The conveyor bridge carries tickets across the atrium to the test side.
     id: 'conveyor',
     levelId: 'lab-shapes',

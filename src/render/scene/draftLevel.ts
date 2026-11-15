@@ -31,5 +31,13 @@ export async function loadDraftLevel(params: URLSearchParams): Promise<Level | n
     console.warn(`?draft: no maps/drafts/${file}`);
     return null;
   }
-  return draftLevel(level, await load());
+  if (request.phase > 1) return draftLevel(level, await load());
+  // Phase 1 plays the whole round: the later reorg phases come along when there are any.
+  const phases: string[] = [];
+  for (let n = 2; ; n++) {
+    const next = DRAFTS[`../../../maps/drafts/${draftFileName(request.id, n)}`];
+    if (!next) break;
+    phases.push(await next());
+  }
+  return draftLevel(level, await load(), phases);
 }

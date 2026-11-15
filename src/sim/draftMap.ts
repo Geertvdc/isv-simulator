@@ -5,7 +5,7 @@
  * they do, those read as a stand-in the game knows.
  */
 
-import { type LevelMap, parseLevelMap } from './level';
+import { type LevelMap, parseLevelMap, withPhases } from './level';
 import type { Level } from './levels';
 
 export interface FutureChar {
@@ -59,9 +59,12 @@ export function draftFileName(id: string, phase = 1): string {
   return phase > 1 ? `${id}.phase${phase}.txt` : `${id}.txt`;
 }
 
-/** The campaign level with the draft's layout: same id, name and settings, stand-ins for future chars. */
-export function draftLevel(level: Level, draftText: string): Level {
-  return { ...level, map: parseDraftMap(draftText) };
+/**
+ * The campaign level with the draft's layout: same id, name and settings.
+ * `phaseTexts` are a reorg draft's later phases (phase 2 on).
+ */
+export function draftLevel(level: Level, draftText: string, phaseTexts: readonly string[] = []): Level {
+  return { ...level, map: withPhases(parseDraftMap(draftText), phaseTexts) };
 }
 
 export type DraftRequest = { id: string; phase: number } | { error: string };

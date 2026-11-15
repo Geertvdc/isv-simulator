@@ -78,6 +78,7 @@ function snapshotOf(
     events,
     liveTiles: structuredClone(state.liveTiles),
     wet: { ...state.wet },
+    gates: structuredClone(state.gates),
     runsFrom,
   };
 }

@@ -243,6 +243,7 @@ export const LEVEL_NAMES: Readonly<Record<string, string>> = {
   'lab-dev': 'Lab: dev mechanics',
   'lab-spills': 'Lab: spills',
   'lab-lifts': 'Lab: lifts',
+  'lab-reorg': 'Lab: reorgs',
   'open-plan': 'Open Plan Office',
   // Id from before the Scale-Up chapter; kept so saves still count.
   'scale-up': 'Down the Hall',
@@ -448,7 +449,8 @@ export type IntroPicture =
   | 'carousel'
   | 'spill'
   | 'mop'
-  | 'lift';
+  | 'lift'
+  | 'reorg';
 
 /** On the intro card of a level that teaches something new: one line and a picture. */
 export const LEVEL_INTRO_TIPS: Readonly<Record<string, { text: string; picture: IntroPicture }>> = {
@@ -512,6 +514,14 @@ export const REDESIGN_INTRO_TIPS: Readonly<
   'hot-desking': {
     picture: 'lift',
     text: 'Three floors. The express skips the middle one but breaks down now and then: then it is the local lift or the stairs.',
+  },
+  synergy: {
+    picture: 'reorg',
+    text: 'Reorg! Walls and desks move on a schedule. Stripes and a countdown warn you; a ticket on a rolling desk rolls with it.',
+  },
+  'the-reorg': {
+    picture: 'reorg',
+    text: 'Three floor plans in one round. Badge turnstiles only let you through one way (follow the arrow) and flip in a reorg; the staff door always works.',
   },
   'on-call': {
     picture: 'mop',

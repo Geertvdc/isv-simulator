@@ -75,6 +75,15 @@ const PICTURES: Readonly<Record<IntroPicture, () => string>> = {
       dev(152, 56, playerCssColor(1)),
       ticket(170, 28),
     ].join(''),
+  // A partition slides away between two developers, warning stripes on it.
+  reorg: () =>
+    [
+      dev(50, 80, playerCssColor(1)),
+      `<rect x="110" y="20" width="20" height="60" fill="#b8c0cc" stroke="${OUTLINE}" stroke-width="2"/>`,
+      `<path d="M 112 30 l 16 10 M 112 45 l 16 10 M 112 60 l 16 10" stroke="#ffa53d" stroke-width="3"/>`,
+      arrow(135, 165, 50),
+      dev(200, 80, playerCssColor(2)),
+    ].join(''),
   // The mop robot drives along, a wet trail behind it, and bumps a developer.
   mop: () =>
     [

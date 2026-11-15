@@ -3,6 +3,7 @@
 import { type GridPoint, type LevelMap, getTile, isSolid } from './level';
 import { LIFT_PATH_STEPS } from './balance';
 import { liftLinks } from './lifts';
+import { type Gate, gateRefuses } from './reorgs';
 
 export const NEIGHBOURS: readonly GridPoint[] = [
   { x: 1, y: 0 },
@@ -26,6 +27,7 @@ export function searchPath(
   from: GridPoint,
   isGoal: (p: GridPoint) => boolean,
   blocked: readonly GridPoint[] = [],
+  gates: readonly Gate[] = [],
 ): GridPoint[] | null {
   const key = (p: GridPoint): number => p.y * map.width + p.x;
   if (isGoal(from)) return [];
@@ -63,6 +65,7 @@ export function searchPath(
           continue;
         }
         if (blockedKeys.has(key(next))) continue;
+        if (stepCost === 1 && gateRefuses(gates, at, next)) continue;
         cameFrom.set(key(next), at);
         cost.set(key(next), nextCost);
         if (isGoal(next)) {
@@ -82,6 +85,7 @@ export function pathTo(
   from: GridPoint,
   to: GridPoint,
   blocked: readonly GridPoint[] = [],
+  gates: readonly Gate[] = [],
 ): GridPoint[] | null {
-  return searchPath(map, from, (p) => p.x === to.x && p.y === to.y, blocked);
+  return searchPath(map, from, (p) => p.x === to.x && p.y === to.y, blocked, gates);
 }

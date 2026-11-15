@@ -123,7 +123,7 @@ function tileOf(pos: Vec): GridPoint {
 function pickTarget(state: GameState, manager: Manager): void {
   const [target, s] = rng.pick(state.rngState, floorTiles(state.level));
   state.rngState = s;
-  const path = pathTo(state.level, tileOf(manager.pos), target);
+  const path = pathTo(state.level, tileOf(manager.pos), target, [], state.gates);
   if (path && path.length > 0) manager.path = path;
   else manager.waitTicks = MANAGER_PAUSE_MIN_TICKS;
 }

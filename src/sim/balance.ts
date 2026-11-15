@@ -431,3 +431,8 @@ export const NET_PREDICT_SNAP_DISTANCE = 1.5;
 export const NET_PREDICT_SMOOTH_MS = 100;
 /** Prediction never runs more than this many ticks ahead in one go (a stalled tab, a clock jump). */
 export const NET_PREDICT_MAX_TICKS = 60;
+
+// ---- Reorgs (Enterprise): layouts that change during the round ----
+
+/** Ticks a reorg is telegraphed before the walls and desks move (stripes and a countdown). */
+export const REORG_WARNING_TICKS = 3 * TICKS_PER_SECOND;

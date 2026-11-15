@@ -2,6 +2,7 @@
 
 import { type GridPoint, type LevelMap, type Tile, getTile, isSolid, markAt } from './level';
 import { NEIGHBOURS, searchPath } from './path';
+import type { Gate } from './reorgs';
 import { type GameState, type PlayerId, getPlayer } from './state';
 
 export function tilesOf(map: LevelMap, tile: Tile): GridPoint[] {
@@ -34,6 +35,7 @@ export function findPath(
   target: GridPoint,
   taken: readonly GridPoint[] = [],
   blocked: readonly GridPoint[] = [],
+  gates: readonly Gate[] = [],
 ): GridPoint[] | null {
   const key = (p: GridPoint): number => p.y * map.width + p.x;
   const takenKeys = new Set([...taken, ...blocked].map(key));
@@ -42,7 +44,7 @@ export function findPath(
       .map(key)
       .filter((k) => !takenKeys.has(k)),
   );
-  return searchPath(map, from, (p) => goals.has(key(p)), blocked);
+  return searchPath(map, from, (p) => goals.has(key(p)), blocked, gates);
 }
 
 export function currentTile(state: GameState, playerId: PlayerId): GridPoint {
@@ -61,7 +63,7 @@ export function nearest(
   let best: GridPoint | undefined;
   let bestLength = Infinity;
   for (const tile of tiles) {
-    const path = findPath(state.level, from, tile);
+    const path = findPath(state.level, from, tile, [], [], state.gates);
     if (path && path.length < bestLength) {
       best = tile;
       bestLength = path.length;
@@ -76,6 +78,6 @@ export function samePoint(a: GridPoint | null, b: GridPoint | null): boolean {
 
 /** Steps for `playerId` to stand next to `tile`, or `Infinity` when they can't get there. */
 export function walkLength(state: GameState, playerId: PlayerId, tile: GridPoint): number {
-  const path = findPath(state.level, currentTile(state, playerId), tile);
+  const path = findPath(state.level, currentTile(state, playerId), tile, [], [], state.gates);
   return path ? path.length : Infinity;
 }

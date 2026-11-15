@@ -17,11 +17,12 @@
 import * as THREE from 'three';
 import type { LevelMap } from '../../sim/level';
 import { breakdownWarns, chuteShare, liftBroken, liftChimes } from '../../sim/lifts';
+import { reorgTiles, reorgWarning } from '../../sim/reorgs';
 import { isWet, tapWarns } from '../../sim/spills';
 import type { GameState } from '../../sim/state';
 import { gridToWorld } from '../projection';
 import type { RoundView } from '../roundView';
-import { blockHeight } from './layout';
+import { STATION_HEIGHT, blockHeight } from './layout';
 import { disposeTree } from './stage';
 
 const WET_COLOR = 0x3d8bff;
@@ -37,6 +38,11 @@ const LIFT_COLOR = 0x5bc0eb;
 /** An express cabin with its doors open here. */
 const EXPRESS_COLOR = 0xf2b134;
 const CHUTE_COLOR = 0x8e7dbe;
+const PARTITION_COLOR = 0xb8c0cc;
+const DESK_COLOR = 0x9b6b43;
+const GATE_COLOR = 0x4cd964;
+const PARTITION_HEIGHT = 1.1;
+const DESK_HEIGHT = STATION_HEIGHT;
 const ROBOT_LIGHT = 0xff8a00;
 /** Just over the floor, so puddles don't flicker with it. */
 const PUDDLE_LIFT = 0.012;
@@ -96,6 +102,8 @@ export class Mechanics {
     this.syncRobots(view, timeMs);
     this.syncLifts(state, timeMs);
     this.syncChutes(state, timeMs);
+    this.syncReorg(state, timeMs);
+    this.syncGates(state);
   }
 
   private syncPuddles(state: GameState): void {
@@ -234,6 +242,77 @@ export class Mechanics {
         const travelling = chuteShare(state, chute) > 0 && Math.floor(timeMs / 150) % 2 === 0;
         material.color.setHex(travelling ? TAP_WARN : end === 'from' ? CHUTE_COLOR : LIFT_COLOR);
       }
+    }
+  }
+
+  /** Moving tiles (reorgs): a block per tile, shown as a partition, a desk or nothing. */
+  private readonly moving = new Map<
+    number,
+    { wall: THREE.Mesh; desk: THREE.Mesh; warn: THREE.Mesh }
+  >();
+  private readonly partitionMaterial = flat(PARTITION_COLOR);
+  private readonly deskMaterial = flat(DESK_COLOR);
+  private readonly warnMaterial = flat(TAP_WARN, 0.55);
+  private readonly gateArrows = new Map<string, THREE.Mesh>();
+
+  private syncReorg(state: GameState, timeMs: number): void {
+    if (this.moving.size === 0) {
+      for (const i of reorgTiles(this.map)) {
+        const x = i % this.map.width;
+        const y = Math.floor(i / this.map.width);
+        const at = gridToWorld(x, y);
+        const wall = new THREE.Mesh(
+          new THREE.BoxGeometry(0.96, PARTITION_HEIGHT, 0.96),
+          this.partitionMaterial,
+        );
+        wall.position.set(at.x, PARTITION_HEIGHT / 2, at.z);
+        const desk = new THREE.Mesh(
+          new THREE.BoxGeometry(0.9, DESK_HEIGHT, 0.9),
+          this.deskMaterial,
+        );
+        desk.position.set(at.x, DESK_HEIGHT / 2, at.z);
+        const warn = new THREE.Mesh(this.puddle, this.warnMaterial);
+        warn.position.set(at.x, PUDDLE_LIFT * 3, at.z);
+        this.root.add(wall, desk, warn);
+        this.moving.set(i, { wall, desk, warn });
+      }
+    }
+    const warning = reorgWarning(state);
+    const warned = new Set(warning?.tiles ?? []);
+    // Blinks faster as the reorg comes closer.
+    const period = warning ? 120 + warning.inTicks * 2 : 1;
+    const on = Math.floor(timeMs / period) % 2 === 0;
+    for (const [i, look] of this.moving) {
+      const tile = state.level.tiles[i];
+      look.wall.visible = tile === 'wall';
+      look.desk.visible = tile === 'counter';
+      look.warn.visible = warned.has(i) && on;
+      if (look.warn.visible)
+        look.warn.position.y =
+          tile === 'wall'
+            ? PARTITION_HEIGHT + 0.02
+            : tile === 'counter'
+              ? DESK_HEIGHT + 0.02
+              : PUDDLE_LIFT * 3;
+    }
+  }
+
+  private syncGates(state: GameState): void {
+    for (const gate of state.gates) {
+      const key = `${gate.x},${gate.y}`;
+      let arrow = this.gateArrows.get(key);
+      if (!arrow) {
+        // A flat green arrow on the floor pointing the way through.
+        arrow = new THREE.Mesh(
+          new THREE.ConeGeometry(0.28, 0.6, 3).rotateX(Math.PI / 2),
+          flat(GATE_COLOR),
+        );
+        this.root.add(arrow);
+        this.gateArrows.set(key, arrow);
+      }
+      const at = gridToWorld(gate.x, gate.y, 0.05);
+      arrow.position.set(at.x, at.y, at.z);
+      arrow.rotation.y = Math.atan2(gate.dir.x, gate.dir.y);
     }
   }
 

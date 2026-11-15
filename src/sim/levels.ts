@@ -22,6 +22,9 @@ import labShapesMap from '../../maps/lab-shapes.txt?raw';
 import labDevMap from '../../maps/lab-dev.txt?raw';
 import labSpillsMap from '../../maps/lab-spills.txt?raw';
 import labLiftsMap from '../../maps/lab-lifts.txt?raw';
+import labReorgMap from '../../maps/lab-reorg.txt?raw';
+import labReorgPhase2 from '../../maps/lab-reorg.phase2.txt?raw';
+import labReorgPhase3 from '../../maps/lab-reorg.phase3.txt?raw';
 import {
   CHAPTER_STAR_GATES,
   MAX_OPEN_ORDERS,
@@ -32,8 +35,9 @@ import {
   TICKS_PER_SECOND,
 } from './balance';
 import { CHAPTER_NAMES, LEVEL_NAMES } from './content';
-import { type LevelMap, parseLevelMap } from './level';
+import { type GridPoint, type LevelMap, parseLevelMap, withPhases } from './level';
 import type { LiftBreakdown } from './lifts';
+import type { ReorgStep } from './reorgs';
 import type { MopRobotSettings } from './manager';
 import type { SpillSchedule } from './spills';
 import type { TicketDomain } from './roles';
@@ -120,6 +124,13 @@ export interface LevelSettings {
   mopRobot?: MopRobotSettings;
   /** When a lift is out of order (Scale-Up). Needs that lift on the map. */
   liftBreakdowns?: readonly LiftBreakdown[];
+  /** When the layout changes to another reorg phase (Enterprise). Needs `LevelMap.phases`. */
+  reorgs?: readonly ReorgStep[];
+  /**
+   * Per reorg phase (phase 1 first): the way each badge turnstile (`+`, in
+   * reading order) lets people through. Phases without a list keep phase 1's.
+   */
+  turnstiles?: readonly (readonly GridPoint[])[];
 }
 
 /** A bot score per team size, solo first. */
@@ -163,8 +174,14 @@ function calibrated(botScores: BotScores): Pick<LevelSettings, 'botScores' | 'st
 }
 
 /** A level from its id, map text and settings; the name comes from `content.ts`. */
-function level(id: string, mapText: string, settings: LevelSettings): Level {
-  return { id, name: LEVEL_NAMES[id] ?? id, map: parseLevelMap(mapText), ...settings };
+function level(
+  id: string,
+  mapText: string,
+  settings: LevelSettings,
+  phaseTexts: readonly string[] = [],
+): Level {
+  const map = withPhases(parseLevelMap(mapText), phaseTexts);
+  return { id, name: LEVEL_NAMES[id] ?? id, map, ...settings };
 }
 
 // ---- Garage ----
@@ -305,6 +322,12 @@ export const SYNERGY: Level = level('synergy', synergyMap, {
   ...calibrated([100, 285, 390, 415]),
   incidents: INCIDENTS,
   meetings: MEETINGS,
+  // The boardroom folds open and closes again (on maps with reorg phases).
+  reorgs: [
+    { atTick: 45 * SECOND, phase: 2 },
+    { atTick: 90 * SECOND, phase: 1 },
+    { atTick: 135 * SECOND, phase: 2 },
+  ],
 });
 
 /** Everything at once: reviews, incidents, a manager and meetings. */
@@ -315,6 +338,26 @@ export const THE_REORG: Level = level('the-reorg', theReorgMap, {
   reviewShare: 0.3,
   incidents: INCIDENTS,
   meetings: MEETINGS,
+  // Silos, Open Plan, Matrix (on maps with reorg phases).
+  reorgs: [
+    { atTick: 60 * SECOND, phase: 2 },
+    { atTick: 120 * SECOND, phase: 3 },
+  ],
+  // Into the lobby on the left and out on the right; flipped in Open Plan.
+  turnstiles: [
+    [
+      { x: 0, y: 1 },
+      { x: 0, y: -1 },
+    ],
+    [
+      { x: 0, y: -1 },
+      { x: 0, y: 1 },
+    ],
+    [
+      { x: 0, y: 1 },
+      { x: 0, y: -1 },
+    ],
+  ],
 });
 
 /** A stage of the company: three levels, open from a total number of stars. */
@@ -369,6 +412,11 @@ export const HACKATHON: Level = level('hackathon', hackathonMap, {
   fullstackShare: 0.4,
   pairing: true,
   incidents: CALM_INCIDENTS,
+  // The partition closes the east lane, then the west, then the east again (on maps with reorg phases).
+  reorgs: [
+    { atTick: 60 * SECOND, phase: 2 },
+    { atTick: 120 * SECOND, phase: 1 },
+  ],
 });
 
 /** The campaign, in order. */
@@ -428,6 +476,30 @@ export const LAB_LEVELS: readonly Level[] = [
     ...GARAGE_SETTINGS,
     liftBreakdowns: [{ lift: 'express', atTick: 20 * SECOND, ticks: 20 * SECOND }],
   }),
+  // Reorgs: three layouts round a boardroom, rolling desks, badge turnstiles that flip.
+  level(
+    'lab-reorg',
+    labReorgMap,
+    {
+      ...GARAGE_SETTINGS,
+      reorgs: [
+        { atTick: 20 * SECOND, phase: 2 },
+        { atTick: 40 * SECOND, phase: 3 },
+        { atTick: 60 * SECOND, phase: 1 },
+      ],
+      turnstiles: [
+        [
+          { x: 0, y: 1 },
+          { x: 0, y: -1 },
+        ],
+        [
+          { x: 0, y: -1 },
+          { x: 0, y: 1 },
+        ],
+      ],
+    },
+    [labReorgPhase2, labReorgPhase3],
+  ),
   // Whiteboards, a merge station between counters, keyboards for pairing.
   level('lab-dev', labDevMap, {
     ...GARAGE_SETTINGS,
@@ -504,6 +576,10 @@ export function settingsForPlayers(level: LevelSettings, playerCount: number): L
     ...(level.mopRobot ? { mopRobot: { ...level.mopRobot } } : {}),
     ...(level.liftBreakdowns
       ? { liftBreakdowns: level.liftBreakdowns.map((b) => ({ ...b })) }
+      : {}),
+    ...(level.reorgs ? { reorgs: level.reorgs.map((r) => ({ ...r })) } : {}),
+    ...(level.turnstiles
+      ? { turnstiles: level.turnstiles.map((p) => p.map((d) => ({ ...d }))) }
       : {}),
     meetings: level.meetings && {
       ...level.meetings,

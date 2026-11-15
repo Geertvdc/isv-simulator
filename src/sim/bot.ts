@@ -87,8 +87,9 @@ export function botInput(state: GameState, bot: Bot, bots: readonly Bot[]): Inpu
   const wet = wetTiles(state);
   if (goal.action === 'stand') {
     const walk = preferDry(
-      pathTo(state.level, from, goal.tile, [...blocked, ...wet]),
-      pathTo(state.level, from, goal.tile, blocked) ?? pathTo(state.level, from, goal.tile),
+      pathTo(state.level, from, goal.tile, [...blocked, ...wet], state.gates),
+      pathTo(state.level, from, goal.tile, blocked, state.gates) ??
+        pathTo(state.level, from, goal.tile, [], state.gates),
     );
     const next = walk?.[0];
     if (next) input.move = stepToward(state.level, player.pos, next);
@@ -101,9 +102,9 @@ export function botInput(state: GameState, bot: Bot, bots: readonly Bot[]): Inpu
         .map((p) => ({ x: Math.round(p.pos.x), y: Math.round(p.pos.y) }))
     : [];
   const path = preferDry(
-    findPath(state.level, from, goal.tile, others, [...blocked, ...wet]),
-    findPath(state.level, from, goal.tile, others, blocked) ??
-      findPath(state.level, from, goal.tile, others),
+    findPath(state.level, from, goal.tile, others, [...blocked, ...wet], state.gates),
+    findPath(state.level, from, goal.tile, others, blocked, state.gates) ??
+      findPath(state.level, from, goal.tile, others, [], state.gates),
   );
   let wantsInteract = false;
   if (path && path.length > 0) {

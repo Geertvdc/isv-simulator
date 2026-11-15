@@ -21,6 +21,7 @@ import {
 } from '../projection';
 import type { RoundFrame, RoundRenderer } from '../RoundRenderer';
 import { OVERLAY_SCALE, Overlays, POPUP_HEIGHT, type ScreenPoint, overlayScale } from './Overlays';
+import { withoutReorgTiles } from '../../sim/reorgs';
 import { Mechanics } from './Mechanics';
 import { People } from './People';
 import { Surroundings } from './surroundings';
@@ -77,7 +78,8 @@ export class ThreeRoundRenderer implements RoundRenderer {
     this.stage = getStage(parent);
     this.atmosphere = atmosphereFor(look.scene);
     dressScene(this.world, this.stage.renderer, this.atmosphere);
-    this.mapView = buildMap(map, look);
+    // Partitions and rolling desks move in a reorg: `Mechanics` draws them from the live map.
+    this.mapView = buildMap(withoutReorgTiles(map), look);
     this.world.add(...createLights(map, this.atmosphere), this.mapView.root);
     this.hover = new THREE.LineLoop(
       new THREE.BufferGeometry().setFromPoints([
