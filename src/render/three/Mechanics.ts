@@ -7,10 +7,16 @@
  * leaky tap is a pipe on its counter that shows dry, about to leak or leaking
  * (its fix bar is an overlay, like a pipeline repair), and the mop robot is a squat disc with a
  * blinking light.
+ *
+ * Lifts: cabin floors are plates, lit (blue local, amber express) while the
+ * lift stands open at that floor, orange a second before it leaves, red while
+ * broken down (blinking before). Pips over a cabin count its floor. Mail
+ * chute hatches carry a down arrow that blinks while a ticket slides down.
  */
 
 import * as THREE from 'three';
 import type { LevelMap } from '../../sim/level';
+import { breakdownWarns, chuteShare, liftBroken, liftChimes } from '../../sim/lifts';
 import { isWet, tapWarns } from '../../sim/spills';
 import type { GameState } from '../../sim/state';
 import { gridToWorld } from '../projection';
@@ -24,6 +30,13 @@ const TAP_DRY = 0x8a9bb0;
 const TAP_WARN = 0xffa53d;
 const TAP_LEAK = 0xff4a3d;
 const ROBOT_COLOR = 0xe8e8e8;
+/** A lift cabin's floor while the lift is elsewhere or riding. */
+const LIFT_IDLE = 0x4a5568;
+/** A local lift cabin with its doors open here. */
+const LIFT_COLOR = 0x5bc0eb;
+/** An express cabin with its doors open here. */
+const EXPRESS_COLOR = 0xf2b134;
+const CHUTE_COLOR = 0x8e7dbe;
 const ROBOT_LIGHT = 0xff8a00;
 /** Just over the floor, so puddles don't flicker with it. */
 const PUDDLE_LIFT = 0.012;
@@ -81,6 +94,8 @@ export class Mechanics {
     this.syncPuddles(state);
     this.syncTaps(state, timeMs);
     this.syncRobots(view, timeMs);
+    this.syncLifts(state, timeMs);
+    this.syncChutes(state, timeMs);
   }
 
   private syncPuddles(state: GameState): void {
@@ -149,6 +164,76 @@ export class Mechanics {
       if (seen.has(id)) continue;
       this.root.remove(look.group);
       this.robots.delete(id);
+    }
+  }
+
+  /** One floor plate per lift cabin tile, by lift index and floor; its colour is the lift's state there. */
+  private readonly cabinPlates = new Map<string, THREE.MeshBasicMaterial>();
+  private readonly hatches = new Map<string, THREE.MeshBasicMaterial>();
+
+  private syncLifts(state: GameState, timeMs: number): void {
+    state.lifts.forEach((lift, li) => {
+      const blink = Math.floor(timeMs / 200) % 2 === 0;
+      lift.stops.forEach((cabin, floor) => {
+        const key = `${li}:${floor}`;
+        let material = this.cabinPlates.get(key);
+        if (!material) {
+          material = flat(LIFT_IDLE, 0.85);
+          this.cabinPlates.set(key, material);
+          for (const tile of cabin) {
+            const plate = new THREE.Mesh(this.puddle, material);
+            const at = gridToWorld(tile.x, tile.y, PUDDLE_LIFT * 2);
+            plate.position.set(at.x, at.y, at.z);
+            this.root.add(plate);
+          }
+          // The floor number over the cabin: one small block per floor (top floor first).
+          const first = cabin[0];
+          if (first) {
+            for (let i = 0; i < lift.stops.length - floor; i++) {
+              const pip = new THREE.Mesh(
+                new THREE.BoxGeometry(0.1, 0.1, 0.1),
+                flat(lift.kind === 'express' ? EXPRESS_COLOR : LIFT_COLOR),
+              );
+              const at = gridToWorld(first.x - 0.3 + i * 0.15, first.y - 0.45, 1.2);
+              pip.position.set(at.x, at.y, at.z);
+              this.root.add(pip);
+            }
+          }
+        }
+        const here = lift.at === floor;
+        const base = lift.kind === 'express' ? EXPRESS_COLOR : LIFT_COLOR;
+        let color = LIFT_IDLE;
+        if (liftBroken(state, lift) || (breakdownWarns(state, lift) && blink)) color = TAP_LEAK;
+        else if (here && lift.phase === 'open') color = liftChimes(state, lift) ? TAP_WARN : base;
+        material.color.setHex(color);
+      });
+    });
+  }
+
+  private syncChutes(state: GameState, timeMs: number): void {
+    for (const chute of state.chutes) {
+      for (const [end, hatch] of [
+        ['from', chute.from],
+        ['to', chute.to],
+      ] as const) {
+        const key = `${hatch.x},${hatch.y}`;
+        let material = this.hatches.get(key);
+        if (!material) {
+          material = flat(CHUTE_COLOR);
+          this.hatches.set(key, material);
+          // A down arrow on the hatch: the way tickets go.
+          const arrow = new THREE.Mesh(
+            new THREE.ConeGeometry(0.16, 0.3, 12).rotateX(Math.PI),
+            material,
+          );
+          const at = gridToWorld(hatch.x, hatch.y, blockHeight(this.map, hatch.x, hatch.y) + 0.35);
+          arrow.position.set(at.x, at.y, at.z);
+          this.root.add(arrow);
+        }
+        // A ticket on its way down: both hatches blink.
+        const travelling = chuteShare(state, chute) > 0 && Math.floor(timeMs / 150) % 2 === 0;
+        material.color.setHex(travelling ? TAP_WARN : end === 'from' ? CHUTE_COLOR : LIFT_COLOR);
+      }
     }
   }
 

@@ -64,6 +64,17 @@ const PICTURES: Readonly<Record<IntroPicture, () => string>> = {
       dev(150, 78, playerCssColor(1)),
       `<path d="M 110 62 h 24" stroke="currentColor" stroke-width="2.5" stroke-dasharray="4 4"/>`,
     ].join(''),
+  // Two floors side by side; a developer with a ticket rides the lift across, a ticket slides down the chute.
+  lift: () =>
+    [
+      `<rect x="20" y="40" width="80" height="50" fill="none" stroke="${OUTLINE}" stroke-width="2"/>`,
+      `<rect x="140" y="10" width="80" height="50" fill="none" stroke="${OUTLINE}" stroke-width="2"/>`,
+      `<rect x="78" y="58" width="20" height="30" fill="#5bc0eb" stroke="${OUTLINE}" stroke-width="1.5"/>`,
+      `<rect x="142" y="28" width="20" height="30" fill="#5bc0eb" stroke="${OUTLINE}" stroke-width="1.5"/>`,
+      `<path d="M 100 60 Q 120 30 138 40" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="5 4"/>`,
+      dev(152, 56, playerCssColor(1)),
+      ticket(170, 28),
+    ].join(''),
   // The mop robot drives along, a wet trail behind it, and bumps a developer.
   mop: () =>
     [

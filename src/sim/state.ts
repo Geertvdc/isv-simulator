@@ -7,6 +7,7 @@ import { type Belt, createBelts } from './conveyor';
 import type { GridPoint, LevelMap } from './level';
 import { type Level, type LevelSettings, settingsForPlayers } from './levels';
 import { type Manager, createManagers } from './manager';
+import { type Chute, type Lift, createChutes, createLifts } from './lifts';
 import type { LiveTiles } from './liveTiles';
 import type { Invite } from './meetings';
 import type { GameEvent, LevelResult, Order, PendingBug } from './orders';
@@ -108,6 +109,10 @@ export interface GameState {
   taps: Tap[];
   /** Tiles wet for now (a leak, the mop's trail): tile index to the tick they dry. */
   wet: WetTiles;
+  /** Lifts between floors (Scale-Up). */
+  lifts: Lift[];
+  /** Mail chutes: top hatch to bottom hatch (Scale-Up). */
+  chutes: Chute[];
   /** Tick from which the next invite is due; `null` on levels without meetings. */
   nextMeetingTick: number | null;
   /** Bugs on their way back from shipped tickets. */
@@ -188,6 +193,8 @@ export function createGame(
     nextInviteId: 1,
     taps: createTaps(map, level.spills),
     wet: {},
+    lifts: createLifts(map),
+    chutes: createChutes(map),
     nextMeetingTick: level.meetings?.firstTick ?? null,
     pendingBugs: [],
     score: 0,

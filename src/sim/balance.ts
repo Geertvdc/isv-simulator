@@ -92,6 +92,25 @@ export const MOP_ROBOT_SPEED = 2;
 /** Ticks a tile stays wet after the mop robot passed over it. */
 export const MOP_TRAIL_TICKS = 6 * TICKS_PER_SECOND;
 
+// ---- Lifts (Scale-Up): local and express lifts, breakdowns, the mail chute ----
+
+/** Ticks a lift stands with its doors open at a floor before it leaves. */
+export const LIFT_OPEN_TICKS = 3 * TICKS_PER_SECOND;
+/** Ticks a local lift rides from one floor to the next. */
+export const LIFT_RIDE_TICKS = 2 * TICKS_PER_SECOND;
+/** Ticks the express stands open (it takes a whole team). */
+export const EXPRESS_OPEN_TICKS = 4 * TICKS_PER_SECOND;
+/** Ticks the express rides, skipping floors. */
+export const EXPRESS_RIDE_TICKS = 3 * TICKS_PER_SECOND;
+/** Ticks before leaving that the chime sounds and the light over the doors turns amber. */
+export const LIFT_CHIME_TICKS = 1 * TICKS_PER_SECOND;
+/** Ticks a breakdown is telegraphed before the lift stops (lights flicker, a sign drops). */
+export const LIFT_BREAKDOWN_WARNING_TICKS = 5 * TICKS_PER_SECOND;
+/** What a lift ride to the next floor counts as on a bot's or manager's route, in steps: the wait and the ride. */
+export const LIFT_PATH_STEPS = 20;
+/** Ticks a ticket takes down the mail chute. */
+export const CHUTE_TICKS = 2 * TICKS_PER_SECOND;
+
 /** Points lost when a calendar invite runs out before its player sat the meeting. */
 export const MEETING_MISSED_PENALTY = 15;
 

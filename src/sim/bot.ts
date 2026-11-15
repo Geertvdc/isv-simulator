@@ -14,7 +14,8 @@
  * everything (but keeps carrying) and stands in the meeting room.
  */
 
-import { type GridPoint } from './level';
+import { type GridPoint, type LevelMap } from './level';
+import { isLiftHop } from './lifts';
 import { managerTiles } from './manager';
 import { pathTo } from './path';
 import { wetTiles } from './spills';
@@ -90,7 +91,7 @@ export function botInput(state: GameState, bot: Bot, bots: readonly Bot[]): Inpu
       pathTo(state.level, from, goal.tile, blocked) ?? pathTo(state.level, from, goal.tile),
     );
     const next = walk?.[0];
-    if (next) input.move = unit(next.x - player.pos.x, next.y - player.pos.y);
+    if (next) input.move = stepToward(state.level, player.pos, next);
     bot.interactWas = false;
     return input;
   }
@@ -107,7 +108,7 @@ export function botInput(state: GameState, bot: Bot, bots: readonly Bot[]): Inpu
   let wantsInteract = false;
   if (path && path.length > 0) {
     const next = path[0];
-    if (next) input.move = unit(next.x - player.pos.x, next.y - player.pos.y);
+    if (next) input.move = stepToward(state.level, player.pos, next);
   } else if (path) {
     const here = currentTile(state, bot.playerId);
     const dir = { x: goal.tile.x - here.x, y: goal.tile.y - here.y };
@@ -133,4 +134,21 @@ const DRY_DETOUR_STEPS = 6;
 function preferDry(dry: GridPoint[] | null, plain: GridPoint[] | null): GridPoint[] | null {
   if (dry && plain && dry.length <= plain.length + DRY_DETOUR_STEPS) return dry;
   return plain ?? dry;
+}
+
+/**
+ * The move toward the next tile of a path. A tile further than next door is a
+ * lift ride: stand in the middle of the cabin tile and let the lift take you.
+ */
+function stepToward(
+  map: LevelMap,
+  pos: { x: number; y: number },
+  next: GridPoint,
+): { x: number; y: number } {
+  if (isLiftHop(map, pos, next)) {
+    const here = { x: Math.round(pos.x), y: Math.round(pos.y) };
+    const off = Math.hypot(here.x - pos.x, here.y - pos.y);
+    return off > 0.1 ? unit(here.x - pos.x, here.y - pos.y) : { x: 0, y: 0 };
+  }
+  return unit(next.x - pos.x, next.y - pos.y);
 }

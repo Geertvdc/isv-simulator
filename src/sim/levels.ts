@@ -21,6 +21,7 @@ import hackathonMap from '../../maps/level-16-hackathon.txt?raw';
 import labShapesMap from '../../maps/lab-shapes.txt?raw';
 import labDevMap from '../../maps/lab-dev.txt?raw';
 import labSpillsMap from '../../maps/lab-spills.txt?raw';
+import labLiftsMap from '../../maps/lab-lifts.txt?raw';
 import {
   CHAPTER_STAR_GATES,
   MAX_OPEN_ORDERS,
@@ -32,6 +33,7 @@ import {
 } from './balance';
 import { CHAPTER_NAMES, LEVEL_NAMES } from './content';
 import { type LevelMap, parseLevelMap } from './level';
+import type { LiftBreakdown } from './lifts';
 import type { MopRobotSettings } from './manager';
 import type { SpillSchedule } from './spills';
 import type { TicketDomain } from './roles';
@@ -116,6 +118,8 @@ export interface LevelSettings {
   spills?: SpillSchedule;
   /** The mop robot on the `r` loop. Needs a closed `r` loop on the map. */
   mopRobot?: MopRobotSettings;
+  /** When a lift is out of order (Scale-Up). Needs that lift on the map. */
+  liftBreakdowns?: readonly LiftBreakdown[];
 }
 
 /** A bot score per team size, solo first. */
@@ -419,6 +423,11 @@ export const LAB_LEVELS: readonly Level[] = [
     spills: { firstLeakTick: 10 * SECOND, everyTicks: 20 * SECOND },
     mopRobot: { clockwise: true },
   }),
+  // Lifts: three floors, a local lift, an express that breaks down, a mail chute.
+  level('lab-lifts', labLiftsMap, {
+    ...GARAGE_SETTINGS,
+    liftBreakdowns: [{ lift: 'express', atTick: 20 * SECOND, ticks: 20 * SECOND }],
+  }),
   // Whiteboards, a merge station between counters, keyboards for pairing.
   level('lab-dev', labDevMap, {
     ...GARAGE_SETTINGS,
@@ -493,6 +502,9 @@ export function settingsForPlayers(level: LevelSettings, playerCount: number): L
     incidents: level.incidents,
     ...(level.spills ? { spills: { ...level.spills } } : {}),
     ...(level.mopRobot ? { mopRobot: { ...level.mopRobot } } : {}),
+    ...(level.liftBreakdowns
+      ? { liftBreakdowns: level.liftBreakdowns.map((b) => ({ ...b })) }
+      : {}),
     meetings: level.meetings && {
       ...level.meetings,
       intervalTicks: Math.round(level.meetings.intervalTicks / rate),

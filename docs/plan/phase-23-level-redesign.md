@@ -912,7 +912,7 @@ Gate 2b (mechanics, see [the plan](#gate-2b-and-rollout-plan)):
 
 - [x] A. Live tiles: every future char is a real tile with a live accessor; no behaviour change
 - [x] B. Spills: wet floor, leaky tap, mop robot
-- [ ] C. Lifts: local and express lifts, breakdowns, mail chute
+- [x] C. Lifts: local and express lifts, breakdowns, mail chute
 - [ ] D. Reorgs: phase layouts, partitions, rolling desks, turnstiles
 - [ ] E. Meeting rooms: meeting doors, named rooms
 - [ ] F. Campus: travelators, revolving doors, shuttle, belt outage
