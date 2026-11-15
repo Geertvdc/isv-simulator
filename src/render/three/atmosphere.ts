@@ -40,6 +40,24 @@ export interface Atmosphere {
    */
   wash?: { color: number; intensity: number; from: SunPlacement; spread: number };
   /**
+   * One more soft warm wash per floor of a map made of separate rooms (see
+   * `floorRows`, left to right), on top of `wash`: a spot light `height`
+   * world units over a point `forward` grid units in front of the floor's
+   * middle, aimed at a point `depth` rows in from the floor's back wall and
+   * wide enough for a circle `radius` grid units round it (or the floor's
+   * half-width, if larger), soft at the rim. `intensity` per floor in turn,
+   * none for a floor past its end: an office's own lights, brighter on one
+   * floor than on another. No shadows; on every quality, so `low` keeps it.
+   */
+  pools?: {
+    color: number;
+    intensity: number[];
+    height: number;
+    forward: number;
+    depth: number;
+    radius: number;
+  };
+  /**
    * Working light in the world beside the room, never on it: `perSide` point
    * lights down each side, `out` grid units outside the outline and `height`
    * up, `left` and `right` colored, reaching `distance`. No shadows, off on `low`.
@@ -719,21 +737,24 @@ const SPRING_RAIN: Atmosphere = {
   },
   // The office's lights on: a soft warm-white wash on the rooms only, brighter than the street.
   wash: {
-    color: 0xffdcb2,
-    intensity: 1.9,
+    color: 0xffd4a2,
+    intensity: 2.1,
     from: { x: 0, y: 3, height: 12, perMapSize: false },
     spread: 0.8,
   },
-  sky: { sky: 0xccd6e4, ground: 0x7e8680, intensity: 1.4 },
+  // Each floor's own lights on top: warm on the ground floor's grey-green rubber, and a touch
+  // brighter upstairs, so the first floor reads as the lit office over the street.
+  pools: { color: 0xffe2c0, intensity: [1.3, 2.8], height: 9, forward: 2, depth: 3, radius: 4 },
+  sky: { sky: 0xc2d0e6, ground: 0x7e8680, intensity: 1.4 },
   fill: { color: 0xdce2ec, intensity: 1.05 },
   environment: 0.14,
   backdrop: { inner: 0xb2bcc8, outer: 0x7c8898 },
-  fog: { color: 0xa6b0be, start: 0.35, span: 9 },
+  fog: { color: 0x8a96a2, start: 0.35, span: 9 },
   vignette: {
     color: 0x2a3444,
     opacity: 0.3,
     inner: 0.7,
-    saturate: 1.4,
+    saturate: 1.65,
     // Rain haze over the street behind, under the order cards: the far side of the street grey and wet.
     glows: [{ color: 0xc4cedc, opacity: 0.24, x: 0.5, y: 0, reach: 0.62 }],
   },
@@ -756,7 +777,7 @@ const SPRING_RAIN: Atmosphere = {
     near: 0.9,
     far: 4.5,
     top: 4,
-    bottom: -0.6,
+    bottom: -1.4,
     fall: 7,
     length: 0.42,
     slant: 0.12,
@@ -805,6 +826,30 @@ export function washPlacement(
   const distance = Math.hypot(position.x - target.x, position.y - target.y, position.z - target.z);
   const radius = (Math.max(width, height) * wash.spread) / 2;
   return { position, target, angle: Math.atan2(radius, distance) };
+}
+
+/** The per-floor washes (`Atmosphere.pools`): each spot's position, target, half-angle and intensity. */
+export function poolPlacements(
+  atmosphere: Atmosphere,
+  map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles'>>,
+): { position: Vec3; target: Vec3; angle: number; intensity: number }[] {
+  const pools = atmosphere.pools;
+  if (!pools) return [];
+  return floorRows(map).flatMap((run, i) => {
+    const intensity = pools.intensity[i];
+    if (intensity === undefined || intensity <= 0) return [];
+    const cx = (run.x0 + run.x1) / 2;
+    const cy = run.inside + pools.depth;
+    const position = gridToWorld(cx, cy + pools.forward, pools.height);
+    const target = gridToWorld(cx, cy);
+    const distance = Math.hypot(
+      position.x - target.x,
+      position.y - target.y,
+      position.z - target.z,
+    );
+    const radius = Math.max(pools.radius, (run.x1 - run.x0 + 1) / 2);
+    return [{ position, target, angle: Math.atan2(radius, distance), intensity }];
+  });
 }
 
 /** Where the side working lights stand (`Atmosphere.sides`), each with its color. */

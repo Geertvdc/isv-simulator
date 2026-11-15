@@ -40,6 +40,7 @@ import {
   lightWellSpots,
   mullionShade,
   petalSeeds,
+  poolPlacements,
   rainSeeds,
   sideLightSpots,
   snowSeeds,
@@ -654,7 +655,34 @@ describe('the spring rain (hypergrowth)', () => {
       expect(r - b).toBeGreaterThan(15);
     }
     expect(a.vignette?.saturate).toBeGreaterThan(1);
-    expect(a.vignette?.saturate).toBeLessThan(1.6);
+    expect(a.vignette?.saturate).toBeLessThan(1.75);
+  });
+
+  it('lights each floor with its own warm pool, a touch brighter upstairs', () => {
+    const pools = poolPlacements(a, map);
+    expect(pools).toHaveLength(2);
+    const [ground, first] = pools;
+    if (!ground || !first) return;
+    // Left to right: the ground floor (x 1-7, from row 4) and the first floor (x 13-20, from row 1).
+    expect(ground.target.x).toBeGreaterThan(1);
+    expect(ground.target.x).toBeLessThan(7);
+    expect(ground.target.z).toBeGreaterThan(5);
+    expect(first.target.x).toBeGreaterThan(13);
+    expect(first.target.x).toBeLessThan(20);
+    expect(first.target.z).toBeLessThan(ground.target.z);
+    expect(first.intensity).toBeGreaterThan(ground.intensity);
+    for (const p of pools) {
+      expect(p.position.y).toBeGreaterThan(WALL_HEIGHT * 2);
+      // Never wider than the floor round it: a cone under 45°.
+      expect(p.angle).toBeGreaterThan(0);
+      expect(p.angle).toBeLessThan(Math.PI / 4);
+    }
+    const [r, , b] = rgb(a.pools?.color ?? 0);
+    expect(r - b).toBeGreaterThan(15);
+    // The other presets get none.
+    for (const [id, other] of Object.entries(ATMOSPHERES))
+      if (other !== a) expect(poolPlacements(other, map), id).toEqual([]);
+    expect(poolPlacements(DEFAULT_ATMOSPHERE, SHIPPED)).toEqual([]);
   });
 
   it('hangs a row of pendants along the back of each floor, and only there', () => {
