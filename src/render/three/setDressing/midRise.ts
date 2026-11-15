@@ -983,14 +983,21 @@ export const CRANE_TOWER = { storey: 0.12, bare: 3 } as const;
  * slanting across them); the top `CRANE_TOWER.bare` are the bare concrete
  * frame, open slabs on columns with the dark inside showing, orange netting
  * along one edge, the concrete core rising through and rebar on top. The
- * crane stands on it separately (`towerCrane` in `rooftop.ts`).
+ * crane stands on it separately (`towerCrane` in `rooftop.ts`). `bare` sets
+ * how many top storeys are still a frame (3-2's tower is almost done: 1).
  */
-export function craneTower(w: number, d: number, floors: number): SetPiece {
-  return once(`craneTower:${w}:${d}:${floors}`, () =>
+export function craneTower(
+  w: number,
+  d: number,
+  floors: number,
+  bare: number = CRANE_TOWER.bare,
+): SetPiece {
+  const key = bare === CRANE_TOWER.bare ? '' : `:${bare}`;
+  return once(`craneTower:${w}:${d}:${floors}${key}`, () =>
     looks([w, d], 1, (b) => {
       const f = CRANE_TOWER.storey;
       const h = floors * f;
-      const glazed = Math.max(2, floors - CRANE_TOWER.bare);
+      const glazed = Math.max(2, floors - bare);
       const concrete = 0x9a9890;
       const glass = 0x4a76a0;
       // The core, up through it all and a storey over the top.
