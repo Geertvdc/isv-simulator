@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { parseDraftMap } from '../../../sim/draftMap';
+import { parseLevelMap as parseDraftMap } from '../../../sim/level';
 import { DOWN_THE_HALL } from '../../../sim/levels';
-import draftText from '../../../../maps/drafts/scale-up.txt?raw';
+import draftText from '../../../../maps/level-03-scale-up.txt?raw';
 import { LEVEL_LOOKS } from '../../mapLook';
 import type { WallPiece } from '../../mapShape';
 import { tint } from '../kit';

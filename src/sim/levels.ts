@@ -13,18 +13,18 @@ import hypergrowthMap from '../../maps/level-08-hypergrowth.txt?raw';
 import hotDeskingMap from '../../maps/level-09-hot-desking.txt?raw';
 import backToBackMap from '../../maps/level-10-back-to-back.txt?raw';
 import synergyMap from '../../maps/level-11-synergy.txt?raw';
+import synergyPhase2 from '../../maps/level-11-synergy.phase2.txt?raw';
 import theReorgMap from '../../maps/level-12-the-reorg.txt?raw';
+import theReorgPhase2 from '../../maps/level-12-the-reorg.phase2.txt?raw';
+import theReorgPhase3 from '../../maps/level-12-the-reorg.phase3.txt?raw';
 import theAtriumMap from '../../maps/level-13-the-atrium.txt?raw';
 import designSprintMap from '../../maps/level-14-design-sprint.txt?raw';
 import monorepoMap from '../../maps/level-15-monorepo.txt?raw';
 import hackathonMap from '../../maps/level-16-hackathon.txt?raw';
+import hackathonPhase2 from '../../maps/level-16-hackathon.phase2.txt?raw';
 import labShapesMap from '../../maps/lab-shapes.txt?raw';
 import labDevMap from '../../maps/lab-dev.txt?raw';
 import labSpillsMap from '../../maps/lab-spills.txt?raw';
-import labLiftsMap from '../../maps/lab-lifts.txt?raw';
-import labReorgMap from '../../maps/lab-reorg.txt?raw';
-import labReorgPhase2 from '../../maps/lab-reorg.phase2.txt?raw';
-import labReorgPhase3 from '../../maps/lab-reorg.phase3.txt?raw';
 import {
   CHAPTER_STAR_GATES,
   MAX_OPEN_ORDERS,
@@ -169,7 +169,13 @@ const GARAGE_SETTINGS: LevelSettings = {
 export function thresholdsFor(botScore: number): [number, number, number] {
   const at = (share: number) =>
     Math.max(STAR_ROUNDING, Math.round((botScore * share) / STAR_ROUNDING) * STAR_ROUNDING);
-  return [at(STAR_SHARES[0]), at(STAR_SHARES[1]), at(STAR_SHARES[2])];
+  // Three stars stay under the bots' average, also when rounding a small score would reach it.
+  const three = at(STAR_SHARES[2]);
+  return [
+    at(STAR_SHARES[0]),
+    at(STAR_SHARES[1]),
+    three >= botScore ? Math.max(STAR_ROUNDING, three - STAR_ROUNDING) : three,
+  ];
 }
 
 /** A level's measured bot scores and the solo stars that follow from them. */
@@ -198,14 +204,14 @@ export const GARAGE: Level = level('garage', garageMap, {
   ...GARAGE_SETTINGS,
   orderSchedule: { ...GARAGE_SETTINGS.orderSchedule, intervalTicks: 20 * SECOND, maxOpenOrders: 4 },
   // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
-  ...calibrated([205, 355, 475, 570]),
+  ...calibrated([220, 385, 510, 595]),
 });
 
 /** Split down the middle by a counter wall: code on the left, test and ship on the right. */
 export const OPEN_PLAN: Level = level('open-plan', openPlanMap, {
   ...GARAGE_SETTINGS,
   // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
-  ...calibrated([160, 255, 360, 430]),
+  ...calibrated([175, 280, 375, 445]),
   reviewShare: 0.3,
 });
 
@@ -217,7 +223,7 @@ export const OPEN_PLAN: Level = level('open-plan', openPlanMap, {
 export const DOWN_THE_HALL: Level = level('scale-up', downTheHallMap, {
   ...GARAGE_SETTINGS,
   // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
-  ...calibrated([175, 250, 360, 420]),
+  ...calibrated([180, 240, 360, 370]),
   reviewShare: 0.5,
 });
 
@@ -242,7 +248,7 @@ const INCIDENTS: IncidentSchedule = {
 export const SEED_ROUND: Level = level('seed-round', seedRoundMap, {
   ...GARAGE_SETTINGS,
   // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
-  ...calibrated([200, 320, 410, 460]),
+  ...calibrated([170, 275, 325, 345]),
   incidents: CALM_INCIDENTS,
 });
 
@@ -250,7 +256,7 @@ export const SEED_ROUND: Level = level('seed-round', seedRoundMap, {
 export const DEMO_DAY: Level = level('demo-day', demoDayMap, {
   ...GARAGE_SETTINGS,
   // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
-  ...calibrated([150, 245, 355, 440]),
+  ...calibrated([125, 215, 340, 430]),
   reviewShare: 0.3,
   incidents: INCIDENTS,
   spills: { firstLeakTick: 30 * SECOND, everyTicks: 40 * SECOND },
@@ -260,7 +266,7 @@ export const DEMO_DAY: Level = level('demo-day', demoDayMap, {
 export const ON_CALL: Level = level('on-call', onCallMap, {
   ...GARAGE_SETTINGS,
   // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
-  ...calibrated([140, 210, 285, 410]),
+  ...calibrated([45, 135, 295, 350]),
   reviewShare: 0.4,
   incidents: INCIDENTS,
   mopRobot: { clockwise: true },
@@ -272,14 +278,14 @@ export const ON_CALL: Level = level('on-call', onCallMap, {
 export const MIDDLE_MANAGEMENT: Level = level('middle-management', middleManagementMap, {
   ...GARAGE_SETTINGS,
   // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
-  ...calibrated([170, 300, 385, 455]),
+  ...calibrated([165, 260, 365, 440]),
 });
 
 /** Two rooms joined by two narrow doors, a manager who likes standing in them, and incidents. */
 export const HYPERGROWTH: Level = level('hypergrowth', hypergrowthMap, {
   ...GARAGE_SETTINGS,
   // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
-  ...calibrated([160, 295, 400, 460]),
+  ...calibrated([30, 110, 180, 205]),
   incidents: INCIDENTS,
 });
 
@@ -287,7 +293,7 @@ export const HYPERGROWTH: Level = level('hypergrowth', hypergrowthMap, {
 export const HOT_DESKING: Level = level('hot-desking', hotDeskingMap, {
   ...GARAGE_SETTINGS,
   // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
-  ...calibrated([190, 255, 350, 435]),
+  ...calibrated([25, 55, 85, 140]),
   reviewShare: 0.3,
   incidents: INCIDENTS,
 });
@@ -315,54 +321,64 @@ const MEETINGS: MeetingSchedule = {
 export const BACK_TO_BACK: Level = level('back-to-back', backToBackMap, {
   ...GARAGE_SETTINGS,
   // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
-  ...calibrated([165, 290, 380, 435]),
+  ...calibrated([170, 295, 390, 455]),
   meetings: CALM_MEETINGS,
 });
 
 /** The meeting room is up a corridor, a manager wanders it, and production still breaks. */
-export const SYNERGY: Level = level('synergy', synergyMap, {
-  ...GARAGE_SETTINGS,
-  // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
-  ...calibrated([100, 285, 390, 415]),
-  incidents: INCIDENTS,
-  meetings: MEETINGS,
-  // The boardroom folds open and closes again (on maps with reorg phases).
-  reorgs: [
-    { atTick: 45 * SECOND, phase: 2 },
-    { atTick: 90 * SECOND, phase: 1 },
-    { atTick: 135 * SECOND, phase: 2 },
-  ],
-});
+export const SYNERGY: Level = level(
+  'synergy',
+  synergyMap,
+  {
+    ...GARAGE_SETTINGS,
+    // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
+    ...calibrated([105, 200, 345, 395]),
+    incidents: INCIDENTS,
+    meetings: MEETINGS,
+    // The boardroom folds open and closes again.
+    reorgs: [
+      { atTick: 45 * SECOND, phase: 2 },
+      { atTick: 90 * SECOND, phase: 1 },
+      { atTick: 135 * SECOND, phase: 2 },
+    ],
+  },
+  [synergyPhase2],
+);
 
 /** Everything at once: reviews, incidents, a manager and meetings. */
-export const THE_REORG: Level = level('the-reorg', theReorgMap, {
-  ...GARAGE_SETTINGS,
-  // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
-  ...calibrated([170, 275, 390, 450]),
-  reviewShare: 0.3,
-  incidents: INCIDENTS,
-  meetings: MEETINGS,
-  // Silos, Open Plan, Matrix (on maps with reorg phases).
-  reorgs: [
-    { atTick: 60 * SECOND, phase: 2 },
-    { atTick: 120 * SECOND, phase: 3 },
-  ],
-  // Into the lobby on the left and out on the right; flipped in Open Plan.
-  turnstiles: [
-    [
-      { x: 0, y: 1 },
-      { x: 0, y: -1 },
+export const THE_REORG: Level = level(
+  'the-reorg',
+  theReorgMap,
+  {
+    ...GARAGE_SETTINGS,
+    // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
+    ...calibrated([90, 155, 255, 320]),
+    reviewShare: 0.3,
+    incidents: INCIDENTS,
+    meetings: MEETINGS,
+    // Silos, Open Plan, Matrix.
+    reorgs: [
+      { atTick: 60 * SECOND, phase: 2 },
+      { atTick: 120 * SECOND, phase: 3 },
     ],
-    [
-      { x: 0, y: -1 },
-      { x: 0, y: 1 },
+    // Into the lobby on the left and out on the right; flipped in Open Plan.
+    turnstiles: [
+      [
+        { x: 0, y: 1 },
+        { x: 0, y: -1 },
+      ],
+      [
+        { x: 0, y: -1 },
+        { x: 0, y: 1 },
+      ],
+      [
+        { x: 0, y: 1 },
+        { x: 0, y: -1 },
+      ],
     ],
-    [
-      { x: 0, y: 1 },
-      { x: 0, y: -1 },
-    ],
-  ],
-});
+  },
+  [theReorgPhase2, theReorgPhase3],
+);
 
 /** A stage of the company: three levels, open from a total number of stars. */
 export interface Chapter {
@@ -385,8 +401,8 @@ function chapter(id: string, index: number, levels: readonly Level[]): Chapter {
 export const THE_ATRIUM: Level = level('the-atrium', theAtriumMap, {
   ...GARAGE_SETTINGS,
   // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
-  ...calibrated([155, 270, 350, 435]),
-  // The travelator along the front runs east (on maps with one).
+  ...calibrated([155, 275, 340, 435]),
+  // The travelator along the front runs east.
   travelators: [{ x: 1, y: 0 }],
 });
 
@@ -394,7 +410,7 @@ export const THE_ATRIUM: Level = level('the-atrium', theAtriumMap, {
 export const DESIGN_SPRINT: Level = level('design-sprint', designSprintMap, {
   ...GARAGE_SETTINGS,
   // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
-  ...calibrated([170, 325, 420, 500]),
+  ...calibrated([170, 310, 420, 500]),
   designShare: 0.6,
   pairing: true,
 });
@@ -404,27 +420,32 @@ export const MONOREPO: Level = level('monorepo', monorepoMap, {
   ...GARAGE_SETTINGS,
   orderSchedule: { ...GARAGE_SETTINGS.orderSchedule, intervalTicks: 30 * SECOND },
   // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
-  ...calibrated([165, 300, 420, 475]),
+  ...calibrated([160, 300, 405, 480]),
   fullstackShare: 0.6,
   pairing: true,
 });
 
 /** A long belt round a courtyard, ending on a counter, and everything new at once, with incidents. */
-export const HACKATHON: Level = level('hackathon', hackathonMap, {
-  ...GARAGE_SETTINGS,
-  // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
-  ...calibrated([220, 360, 460, 530]),
-  designShare: 0.3,
-  fullstackShare: 0.4,
-  pairing: true,
-  // Every other incident is a belt outage.
-  incidents: { ...CALM_INCIDENTS, beltOutageEvery: 2 },
-  // The partition closes the east lane, then the west, then the east again (on maps with reorg phases).
-  reorgs: [
-    { atTick: 60 * SECOND, phase: 2 },
-    { atTick: 120 * SECOND, phase: 1 },
-  ],
-});
+export const HACKATHON: Level = level(
+  'hackathon',
+  hackathonMap,
+  {
+    ...GARAGE_SETTINGS,
+    // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
+    ...calibrated([120, 220, 325, 360]),
+    designShare: 0.3,
+    fullstackShare: 0.4,
+    pairing: true,
+    // Every other incident is a belt outage.
+    incidents: { ...CALM_INCIDENTS, beltOutageEvery: 2 },
+    // The partition closes the east lane, then the west, then the east again.
+    reorgs: [
+      { atTick: 60 * SECOND, phase: 2 },
+      { atTick: 120 * SECOND, phase: 1 },
+    ],
+  },
+  [hackathonPhase2],
+);
 
 /** The campaign, in order. */
 export const CHAPTERS: readonly Chapter[] = [
@@ -479,14 +500,14 @@ export const LAB_LEVELS: readonly Level[] = [
     mopRobot: { clockwise: true },
   }),
   // Lifts: three floors, a local lift, an express that breaks down, a mail chute.
-  level('lab-lifts', labLiftsMap, {
+  level('lab-lifts', hotDeskingMap, {
     ...GARAGE_SETTINGS,
     liftBreakdowns: [{ lift: 'express', atTick: 20 * SECOND, ticks: 20 * SECOND }],
   }),
   // Reorgs: three layouts round a boardroom, rolling desks, badge turnstiles that flip.
   level(
     'lab-reorg',
-    labReorgMap,
+    theReorgMap,
     {
       ...GARAGE_SETTINGS,
       reorgs: [
@@ -505,7 +526,7 @@ export const LAB_LEVELS: readonly Level[] = [
         ],
       ],
     },
-    [labReorgPhase2, labReorgPhase3],
+    [theReorgPhase2, theReorgPhase3],
   ),
   // Whiteboards, a merge station between counters, keyboards for pairing.
   level('lab-dev', labDevMap, {

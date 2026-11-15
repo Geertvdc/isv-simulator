@@ -64,21 +64,21 @@ function castScene(
     players: 4,
     roleByPlayer: { 1: roles[0], 2: roles[1], 3: roles[2], 4: roles[3] },
     setup(state) {
-      stand(state, 1, { x: 4, y: 7 }, { x: 0, y: 1 });
-      stand(state, 2, { x: 11, y: 7 }, { x: 0, y: 1 });
-      stand(state, 3, { x: 2, y: 4 }, { x: 0, y: 1 });
-      stand(state, 4, { x: 13, y: 4 }, { x: 0, y: 1 });
+      stand(state, 1, { x: 3, y: 7 }, { x: 0, y: 1 });
+      stand(state, 2, { x: 12, y: 8 }, { x: 0, y: 1 });
+      stand(state, 3, { x: 2, y: 6 }, { x: 0, y: 1 });
+      stand(state, 4, { x: 18, y: 7 }, { x: 0, y: 1 });
       give(workOn(openOrder(state, 'feature', 'Center a div'), 1), 1);
       give(workOn(openOrder(state, 'feature', 'Deploy before lunch'), 1), 2);
       if (moment !== 'carry') {
-        stand(state, 1, { x: 6, y: 6 }, { x: 1, y: 0 });
+        stand(state, 1, { x: 7, y: 8 }, { x: 1, y: 0 });
       }
     },
     input: moment === 'carry' ? undefined : (state) => [command(state, 1, { interact: true })],
     ...(moment === 'release'
       ? {
           until: (state: GameState) =>
-            state.tickets.some((t) => t.location.kind === 'flying' && t.location.pos.x > 8),
+            state.tickets.some((t) => t.location.kind === 'flying' && t.location.pos.x > 8.5),
         }
       : { ticks: moment === 'windup' ? 12 : 1 }),
   };
@@ -178,7 +178,7 @@ export const SCENES: readonly Scene[] = [
     ticks: 1,
   },
   {
-    // Two players hold work at the review station at the end of the hall.
+    // Two players hold work at the review station in the far room.
     id: 'review',
     levelId: 'scale-up',
     players: 2,
@@ -186,8 +186,8 @@ export const SCENES: readonly Scene[] = [
       const review = tileAt(state, 'review');
       const ticket = openOrder(state, 'feature', 'Add AI to it', { review: true });
       putOn(workOn(ticket, 1, 0.3), review);
-      standBeside(state, 1, review, 'left');
-      standBeside(state, 2, review, 'right');
+      standBeside(state, 1, review, 'above');
+      standBeside(state, 2, review, 'below');
     },
     input: holdWork(1, 2),
     ticks: 30,
@@ -232,7 +232,7 @@ export const SCENES: readonly Scene[] = [
       standBeside(state, 2, at);
       const ticket = workOn(openOrder(state, 'feature', 'Support Internet Explorer'), 3);
       give(ticket, 1);
-      stand(state, 1, { x: at.x - 2, y: at.y + 1 }, { x: 1, y: 0 });
+      stand(state, 1, { x: at.x - 2, y: at.y }, { x: 1, y: 0 });
     },
     input: holdWork(2),
     until: (state) => state.pipelines.some((p) => p.broken && p.repair >= 0.5),
@@ -321,15 +321,15 @@ export const SCENES: readonly Scene[] = [
     levelId: 'open-plan',
     players: 2,
     setup(state) {
-      const y = 3;
-      putOn(openOrder(state, 'feature', 'Fix flaky test'), { x: 6, y });
+      const y = 5;
+      putOn(openOrder(state, 'feature', 'Fix flaky test'), { x: 7, y });
       give(workOn(openOrder(state, 'feature', 'Add dark mode'), 1), 1);
-      stand(state, 1, { x: 4, y }, { x: 1, y: 0 });
-      stand(state, 2, { x: 8, y }, { x: -1, y: 0 });
+      stand(state, 1, { x: 5, y }, { x: 1, y: 0 });
+      stand(state, 2, { x: 9, y }, { x: -1, y: 0 });
     },
     input: (state) => [command(state, 1, { interact: true })],
     until: (state) =>
-      state.tickets.some((t) => t.location.kind === 'flying' && t.location.pos.x > 6.6),
+      state.tickets.some((t) => t.location.kind === 'flying' && t.location.pos.x > 7.6),
   },
   {
     // Sketching the feature at the whiteboard before anyone codes it.

@@ -1,7 +1,9 @@
 /** Helpers for sim tests: a small map with one of everything, and ways to poke at it. */
 
 import { parseLevelMap } from './level';
-import { type LevelSettings, levelWithMap } from './levels';
+import { expect } from 'vitest';
+import { runBots } from './botRun';
+import { type Level, type LevelSettings, levelWithMap, settingsForPlayers } from './levels';
 import {
   type GameState,
   type InputCommand,
@@ -127,4 +129,21 @@ export function idle(state: GameState, n: number): void {
 /** Puts a ticket in `playerId`'s hands. */
 export function give(playerId: PlayerId, ticket: Ticket): void {
   ticket.location = { kind: 'player', playerId };
+}
+
+/**
+ * One and two bots earn at least 1 star on `level`, on average over a few
+ * seeds (on the bigger maps, with lifts and reorgs, single runs swing a lot).
+ * The campaign star tests are split per chapter so they run in parallel.
+ */
+export function expectBotsEarnAStar(level: Level): void {
+  for (const [bots, seeds] of [
+    [1, [1, 2, 3, 4, 5]],
+    [2, [1, 2, 3]],
+  ] as const) {
+    const average =
+      seeds.reduce((sum, seed) => sum + runBots(level, seed, bots).result.score, 0) / seeds.length;
+    const [oneStar] = settingsForPlayers(level, bots).starThresholds;
+    expect(average, `${level.name}, ${bots} bot(s)`).toBeGreaterThanOrEqual(oneStar);
+  }
 }

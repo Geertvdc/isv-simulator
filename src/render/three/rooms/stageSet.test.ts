@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { parseDraftMap } from '../../../sim/draftMap';
+import { parseLevelMap as parseDraftMap } from '../../../sim/level';
 import { DEMO_DAY } from '../../../sim/levels';
-import draftText from '../../../../maps/drafts/demo-day.txt?raw';
+import draftText from '../../../../maps/level-05-demo-day.txt?raw';
 import { LEVEL_LOOKS } from '../../mapLook';
 import type { Model } from '../kit';
 import { FRONT_WALL_HEIGHT } from '../layout';

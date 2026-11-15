@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { parseDraftMap } from '../../../sim/draftMap';
+import { parseLevelMap as parseDraftMap } from '../../../sim/level';
 import { SEED_ROUND } from '../../../sim/levels';
-import draftText from '../../../../maps/drafts/seed-round.txt?raw';
+import draftText from '../../../../maps/level-04-seed-round.txt?raw';
 import { LEVEL_LOOKS } from '../../mapLook';
 import { type Model, tint } from '../kit';
 import { PALETTE, WALL_COLORS } from '../look';

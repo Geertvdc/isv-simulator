@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { BEFORE_MAPS } from '../fixtures/beforeMaps';
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { type LevelMap, getTile, parseLevelMap } from '../../../sim/level';
@@ -15,8 +16,8 @@ const read = (path: string) =>
 
 /** The shipped garage and the redesign draft: the scene must fit both. */
 const MAPS: Record<string, LevelMap> = {
-  shipped: read('maps/level-01-garage.txt'),
-  draft: read('maps/drafts/garage.txt'),
+  shipped: BEFORE_MAPS['garage'],
+  draft: read('maps/level-01-garage.txt'),
 };
 
 const GROUND = -0.463;

@@ -8,7 +8,9 @@ import {
   NET_PREDICT_SNAP_DISTANCE,
   TICKS_PER_SECOND,
 } from '../sim/balance';
-import { levelById } from '../sim/levels';
+import fixtureGarage from './fixtureGarage.txt?raw';
+import { parseLevelMap } from '../sim/level';
+import { levelWithMap } from '../sim/levels';
 import type { GameEvent } from '../sim/orders';
 import {
   type GameState,
@@ -36,8 +38,8 @@ import {
   resetPrediction,
 } from './prediction';
 
-const GARAGE = levelById('garage');
-if (!GARAGE) throw new Error('no garage');
+/** The garage before the level redesign: the walls and corners these tests steer through. */
+const GARAGE = levelWithMap(parseLevelMap(fixtureGarage));
 
 /** What a player does at tick `t`: walls, a station row, corners, dashes, stops. */
 function script(t: number): { move: Vec; dash: boolean } {
@@ -60,7 +62,7 @@ function command(playerId: PlayerId, t: number): InputCommand {
 }
 
 function newGame(players: PlayerId[] = [1]): GameState {
-  const state = createGame(GARAGE as NonNullable<typeof GARAGE>, 7, players);
+  const state = createGame(GARAGE, 7, players);
   state.nextOrderTick = Number.MAX_SAFE_INTEGER;
   return state;
 }

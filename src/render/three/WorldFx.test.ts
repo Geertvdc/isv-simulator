@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
+import { BEFORE_MAPS } from './fixtures/beforeMaps';
 import { describe, expect, it } from 'vitest';
-import { parseDraftMap } from '../../sim/draftMap';
+import { parseLevelMap as parseDraftMap } from '../../sim/level';
 import { type LevelMap, type Tile, getTile, parseLevelMap } from '../../sim/level';
-import { DEMO_DAY } from '../../sim/levels';
 import { ATMOSPHERES, DEFAULT_ATMOSPHERE, sceneOf } from './atmosphere';
 import {
   SWEEP_FLOOR,
@@ -25,8 +25,8 @@ const read = (path: string) =>
 
 /** Down the Hall, shipped and the redesign draft: the motion must fit both. */
 const MAPS: Record<string, LevelMap> = {
-  shipped: read('maps/level-03-scale-up.txt'),
-  draft: read('maps/drafts/scale-up.txt'),
+  shipped: BEFORE_MAPS['scale-up'],
+  draft: read('maps/level-03-scale-up.txt'),
 };
 
 /** Grid units from the level's outline (0 inside it). */
@@ -79,8 +79,8 @@ describe('ambient motion', () => {
 
 describe('the incident beacon', () => {
   const maps = {
-    shipped: read('maps/level-04-seed-round.txt'),
-    draft: read('maps/drafts/seed-round.txt'),
+    shipped: BEFORE_MAPS['seed-round'],
+    draft: read('maps/level-04-seed-round.txt'),
   };
   for (const [name, map] of Object.entries(maps)) {
     it(`sits on the loft's own beacon, right beside the dashboard, on the ${name} map`, () => {
@@ -149,9 +149,9 @@ describe("the moving heads' sweep", () => {
   const a = ATMOSPHERES['demo-day'];
   const spec = a?.sweep;
   const maps = {
-    shipped: DEMO_DAY.map,
+    shipped: BEFORE_MAPS['demo-day'],
     draft: parseDraftMap(
-      readFileSync(new URL('../../../maps/drafts/demo-day.txt', import.meta.url), 'utf8'),
+      readFileSync(new URL('../../../maps/level-05-demo-day.txt', import.meta.url), 'utf8'),
     ),
   };
 

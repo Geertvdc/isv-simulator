@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import hotDeskingDraft from '../../maps/drafts/hot-desking.txt?raw';
-import hypergrowthDraft from '../../maps/drafts/hypergrowth.txt?raw';
+import hotDeskingDraft from '../../maps/level-09-hot-desking.txt?raw';
+import hypergrowthDraft from '../../maps/level-08-hypergrowth.txt?raw';
 import {
   CHUTE_TICKS,
   EXPRESS_OPEN_TICKS,

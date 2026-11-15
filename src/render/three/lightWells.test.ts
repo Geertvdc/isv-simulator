@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
+import { BEFORE_MAPS } from './fixtures/beforeMaps';
 import { describe, expect, it } from 'vitest';
-import { parseDraftMap } from '../../sim/draftMap';
-import { parseLevelMap } from '../../sim/level';
+import { parseLevelMap as parseDraftMap } from '../../sim/level';
 import {
   ATMOSPHERES,
   DEFAULT_ATMOSPHERE,
@@ -16,8 +16,8 @@ import { onCallLightWells } from './scenes/onCall';
 
 const text = (path: string) => readFileSync(new URL(`../../../${path}`, import.meta.url), 'utf8');
 const MAPS = {
-  shipped: parseLevelMap(text('maps/level-06-on-call.txt')),
-  draft: parseDraftMap(text('maps/drafts/on-call.txt')),
+  shipped: BEFORE_MAPS['on-call'],
+  draft: parseDraftMap(text('maps/level-06-on-call.txt')),
 };
 const night = ATMOSPHERES['on-call'] ?? DEFAULT_ATMOSPHERE;
 

@@ -12,7 +12,7 @@
  * out. `--out=<dir>` writes them somewhere other than `docs/game/images/`. `--server` is the game
  * server the page talks to; a second room member joins it from here for the
  * online lobby shot. `--query=<params>` adds URL params to every scene, like
- * `--query=draft=garage` for a level redesign draft (`npm run draft-shots`).
+ * `--query=quality=low`.
  * Set CHROME to the Chrome binary if it isn't in the usual place.
  */
 

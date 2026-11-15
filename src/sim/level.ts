@@ -78,13 +78,18 @@ export function withPhases(map: LevelMap, phaseTexts: readonly string[]): LevelM
   const later = phaseTexts.map((text, i) => {
     const phase = parseLevelMap(text);
     if (phase.width !== map.width || phase.height !== map.height) {
-      throw new Error(`Reorg phase ${i + 2} is ${phase.width}×${phase.height}, not ${map.width}×${map.height}`);
+      throw new Error(
+        `Reorg phase ${i + 2} is ${phase.width}×${phase.height}, not ${map.width}×${map.height}`,
+      );
     }
     phase.tiles.forEach((tile, index) => {
       const base = map.tiles[index];
-      const moves = (t: Tile | undefined): boolean => t === 'floor' || t === 'wall' || t === 'counter';
+      const moves = (t: Tile | undefined): boolean =>
+        t === 'floor' || t === 'wall' || t === 'counter';
       if (tile !== base && !(moves(tile) && moves(base))) {
-        throw new Error(`Reorg phase ${i + 2} changes a ${base ?? '?'} into a ${tile} at index ${index}`);
+        throw new Error(
+          `Reorg phase ${i + 2} changes a ${base ?? '?'} into a ${tile} at index ${index}`,
+        );
       }
     });
     return { tiles: phase.tiles, marks: phase.marks };

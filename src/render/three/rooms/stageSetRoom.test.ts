@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { BEFORE_MAPS } from '../fixtures/beforeMaps';
 import { getTile } from '../../../sim/level';
-import { parseDraftMap } from '../../../sim/draftMap';
-import { DEMO_DAY } from '../../../sim/levels';
-import draftText from '../../../../maps/drafts/demo-day.txt?raw';
+import { parseLevelMap as parseDraftMap } from '../../../sim/level';
+import draftText from '../../../../maps/level-05-demo-day.txt?raw';
 import { wallPiece } from '../../mapShape';
 import { WALL_HEIGHT } from '../layout';
 import {
@@ -28,7 +28,7 @@ const STEP = {
 const TRUSS_HALF = 0.065;
 
 describe('stageSetRoom', () => {
-  const shipped = DEMO_DAY.map;
+  const shipped = BEFORE_MAPS['demo-day'];
   const draft = parseDraftMap(draftText);
   const maps = [shipped, draft];
   const isOpen = (t: ReturnType<typeof getTile>) => t !== null && t !== 'wall' && t !== 'void';

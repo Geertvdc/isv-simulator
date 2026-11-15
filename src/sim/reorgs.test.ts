@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import hackathonDraft from '../../maps/drafts/hackathon.txt?raw';
-import hackathonPhase2 from '../../maps/drafts/hackathon.phase2.txt?raw';
-import synergyDraft from '../../maps/drafts/synergy.txt?raw';
-import synergyPhase2 from '../../maps/drafts/synergy.phase2.txt?raw';
-import reorgDraft from '../../maps/drafts/the-reorg.txt?raw';
-import reorgPhase2 from '../../maps/drafts/the-reorg.phase2.txt?raw';
-import reorgPhase3 from '../../maps/drafts/the-reorg.phase3.txt?raw';
+import hackathonDraft from '../../maps/level-16-hackathon.txt?raw';
+import hackathonPhase2 from '../../maps/level-16-hackathon.phase2.txt?raw';
+import synergyDraft from '../../maps/level-11-synergy.txt?raw';
+import synergyPhase2 from '../../maps/level-11-synergy.phase2.txt?raw';
+import reorgDraft from '../../maps/level-12-the-reorg.txt?raw';
+import reorgPhase2 from '../../maps/level-12-the-reorg.phase2.txt?raw';
+import reorgPhase3 from '../../maps/level-12-the-reorg.phase3.txt?raw';
 import { REORG_WARNING_TICKS, TICKS_PER_SECOND } from './balance';
 import { botInput, createBot } from './bot';
 import { getTile, parseLevelMap, withPhases } from './level';

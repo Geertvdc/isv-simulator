@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import backToBackDraft from '../../maps/drafts/back-to-back.txt?raw';
+import backToBackDraft from '../../maps/level-10-back-to-back.txt?raw';
 import { TICKS_PER_SECOND } from './balance';
 import { botInput, createBot } from './bot';
 import { meetingRoomName } from './content';

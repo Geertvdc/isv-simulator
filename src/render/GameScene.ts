@@ -109,8 +109,6 @@ export interface GameSceneOptions {
   /** `?demo`: a kiosk for a booth. Starts in the demo, and every menu goes back to it when left alone. */
   kiosk: boolean;
   practiceLevel?: Level;
-  /** `?draft=` with `?scene=`: a redesign draft shown in place of the scene's level of the same id. */
-  draftLevel?: Level;
   online: OnlineOptions | null;
   /** Draws the level and rounds: `createThreeRoundRenderer`, passed in by `main.ts`. */
   roundRenderer: RoundRendererFactory;
@@ -568,10 +566,9 @@ export class GameScene extends Phaser.Scene {
     this.hints = demo ? [] : startHints(level.id, this.options.save);
   }
 
-  /** The scene's level, or the draft from `?draft=` standing in for it. */
+  /** The scene's level (campaign or lab). */
   private sceneLevel(scene: Scene): Level | undefined {
-    const draft = this.options.draftLevel;
-    return draft?.id === scene.levelId ? draft : levelById(scene.levelId);
+    return levelById(scene.levelId);
   }
 
   /** The scene from `?scene=` as a round already playing: no title, lobby or countdown. */

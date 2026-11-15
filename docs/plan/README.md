@@ -27,7 +27,7 @@ The game started as a Theme Hospital-style management sim and pivoted to Overcoo
 | 20 Polish (done)                             | Smooth diagonals, varied road, software-look menus, varied set dressing                                                                                  |
 | 21 Tickets (in progress)                     | Incident blocks shipping, no zombie tickets, issue-tracker style ticket cards                                                                            |
 | 22 Character roles (proposal)                | Generalists and specialists, ticket domains, balance trials, and a new character cast; [proposal](phase-21-character-roles.md)                           |
-| 23 Level redesign (in progress)              | Varied room sizes and shapes, hallways, a layout gimmick per chapter (spills, lifts, reorgs), 1–4 players on one map; [plan](phase-23-level-redesign.md) |
+| 23 Level redesign (rolled out)               | Varied room sizes and shapes, hallways, a layout gimmick per chapter (spills, lifts, reorgs), 1–4 players on one map; [plan](phase-23-level-redesign.md) |
 
 ## How to feed a phase to Claude Code
 
