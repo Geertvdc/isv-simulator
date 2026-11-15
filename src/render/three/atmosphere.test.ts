@@ -6,6 +6,7 @@ import {
   DEMO_DAY,
   DOWN_THE_HALL,
   GARAGE,
+  HYPERGROWTH,
   LEVELS,
   MIDDLE_MANAGEMENT,
   ON_CALL,
@@ -39,6 +40,7 @@ import {
   lightWellSpots,
   mullionShade,
   petalSeeds,
+  rainSeeds,
   sideLightSpots,
   snowSeeds,
   stutterIndex,
@@ -90,6 +92,7 @@ describe('atmosphereFor', () => {
       DEMO_DAY.id,
       ON_CALL.id,
       MIDDLE_MANAGEMENT.id,
+      HYPERGROWTH.id,
     ]);
     for (const level of LEVELS) {
       if (lit.has(level.id)) continue;
@@ -283,10 +286,11 @@ describe('stage lighting', () => {
 describe('the stage wash and the side lights', () => {
   const a = atmosphereFor('demo-day');
 
-  it('leaves every other level without a wash (but the basement work light), side lights or an occlusion override', () => {
+  it('leaves every other level without a wash (but the basement work light and the rainy day office lights), side lights or an occlusion override', () => {
     for (const [id, other] of Object.entries(ATMOSPHERES)) {
       if (id === 'demo-day') continue;
-      if (id !== 'on-call') expect(washPlacement(other, SHIPPED), id).toBeNull();
+      if (id !== 'on-call' && id !== 'hypergrowth')
+        expect(washPlacement(other, SHIPPED), id).toBeNull();
       expect(sideLightSpots(other, SHIPPED), id).toEqual([]);
       expect(other.occlusion, id).toBeUndefined();
     }
@@ -544,9 +548,9 @@ describe('the spring morning (middle-management)', () => {
     expect(a.fill.intensity).toBeLessThan(a.sky.intensity);
     expect(a.vignette?.saturate).toBeGreaterThan(1);
     expect(a.vignette?.saturate).toBeLessThan(1.6);
-    // No other preset is graded: their pictures stay exactly as they were.
+    // No other preset is graded but 3-2's rain: their pictures stay exactly as they were.
     for (const [id, other] of Object.entries(ATMOSPHERES))
-      if (other !== a) expect(other.vignette?.saturate, id).toBeUndefined();
+      if (other !== a && id !== 'hypergrowth') expect(other.vignette?.saturate, id).toBeUndefined();
   });
 
   it('slants faint sunbeams in on the floor beside the room, never over it', () => {
@@ -616,6 +620,88 @@ describe('the spring morning (middle-management)', () => {
       for (let x = 0; x < draft.width; x++)
         if (getTile(draft, x, y) === 'void') expect(mullionShade(a, draft, x, y)).toBe(0);
     expect(mullionShade(DEFAULT_ATMOSPHERE, map, 3, 3)).toBe(0);
+  });
+});
+
+describe('the spring rain (hypergrowth)', () => {
+  const a = atmosphereFor('hypergrowth');
+  const map = HYPERGROWTH.map;
+  const rgb = (c: number) => [(c >> 16) & 255, (c >> 8) & 255, c & 255] as const;
+
+  it("gives hypergrowth its own light, not 3-1's sunny morning", () => {
+    expect(atmosphereFor(LEVEL_LOOKS[HYPERGROWTH.id]?.scene)).toBe(ATMOSPHERES.hypergrowth);
+    expect(a).not.toBe(DEFAULT_ATMOSPHERE);
+    expect(a).not.toBe(ATMOSPHERES['middle-management']);
+  });
+
+  it('keys it high and soft: about 50° up, dimmer than the sky, with blurred shadows', () => {
+    const { position: s, target: t } = sunPlacement(a, map);
+    const elevation = Math.atan2(s.y - t.y, Math.hypot(s.x - t.x, s.z - t.z)) * (180 / Math.PI);
+    expect(elevation).toBeGreaterThan(47);
+    expect(elevation).toBeLessThan(53);
+    expect(a.sun.softness).toBeGreaterThan(4);
+    expect(a.sun.intensity).toBeLessThan(ATMOSPHERES['middle-management']?.sun.intensity ?? 0);
+    expect(a.sky.intensity).toBeGreaterThan(1);
+  });
+
+  it('greys the outside cool and lights the rooms warm', () => {
+    for (const c of [a.sky.sky, a.fill.color, a.fog?.color ?? 0, a.backdrop?.inner ?? 0]) {
+      const [r, , b] = rgb(c);
+      expect(b).toBeGreaterThan(r);
+    }
+    for (const c of [a.lamps?.color ?? 0, a.wash?.color ?? 0]) {
+      const [r, , b] = rgb(c);
+      expect(r - b).toBeGreaterThan(15);
+    }
+    expect(a.vignette?.saturate).toBeGreaterThan(1);
+    expect(a.vignette?.saturate).toBeLessThan(1.6);
+  });
+
+  it('hangs a row of pendants along the back of each floor, and only there', () => {
+    const spots = lampSpots(a, map);
+    // The ground floor's back (row 4, under the post room) and the first floor's (row 1).
+    const ground = spots.filter((p) => p.x < 9);
+    const first = spots.filter((p) => p.x > 11);
+    expect(ground.length).toBeGreaterThan(0);
+    expect(first.length).toBeGreaterThan(0);
+    expect(ground.length + first.length).toBe(spots.length);
+    for (const p of ground) {
+      expect(p.z).toBeGreaterThan(3.5);
+      expect(p.z).toBeLessThan(4.5);
+    }
+    for (const p of first) expect(p.z).toBeLessThan(1.5);
+    for (const p of spots) {
+      // Over a floor tile of the room, never over the shaft or a station.
+      expect(getTile(map, Math.round(p.x), Math.round(p.z))).toBe('floor');
+      expect(p.y).toBe(a.lamps?.height);
+    }
+    // The other presets keep their usual back-wall rows.
+    for (const [id, other] of Object.entries(ATMOSPHERES))
+      if (other !== a) expect(other.lamps?.everyFloor, id).toBeUndefined();
+  });
+
+  it('lets the same rain fall outside the building every time, never over the room or in front', () => {
+    const seeds = rainSeeds(a, map);
+    const rain = a.rain;
+    expect(rain).toBeDefined();
+    if (!rain) return;
+    expect(seeds.length).toBeGreaterThan(100);
+    expect(rainSeeds(a, map)).toEqual(seeds);
+    for (const { at, drop, phase } of seeds) {
+      // Wherever it falls to, with the wind's drift.
+      for (const x of [at.x, at.x + drop * rain.slant]) {
+        const beside = x < -0.5 || x > map.width - 0.5;
+        // Behind the back only where the first row is room: behind void is the post room and the shaft.
+        const behind = at.z < -0.5 && getTile(map, Math.round(at.x), 0) !== 'void';
+        expect(beside || behind).toBe(true);
+      }
+      expect(at.z).toBeLessThan(map.height - 0.5);
+      expect(phase).toBeGreaterThanOrEqual(0);
+      expect(phase).toBeLessThan(1);
+    }
+    expect(rainSeeds(DEFAULT_ATMOSPHERE, SHIPPED)).toEqual([]);
+    for (const [id, other] of Object.entries(ATMOSPHERES))
+      if (other !== a) expect(rainSeeds(other, map), id).toEqual([]);
   });
 });
 

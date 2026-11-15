@@ -27,6 +27,8 @@ export interface Atmosphere {
     from: SunPlacement;
     /** Half the shadow camera's size, as a share of the map's longer side. */
     reach: number;
+    /** The shadows' blur radius instead of the usual 4: higher for an overcast sky's soft ones. */
+    softness?: number;
   };
   /** Hemisphere light: sky color from above, bounce color from the ground. */
   sky: { sky: number; ground: number; intensity: number };
@@ -117,6 +119,13 @@ export interface Atmosphere {
     spacing: number;
     inset: number;
     frontFrom: number;
+    /**
+     * One row of lamps along the back of each floor of a map made of
+     * separate rooms (see `floorRows`) instead of the usual back-wall rows:
+     * per column the first floor tile from the top, down to half the map's
+     * depth, whatever the stations in front of it.
+     */
+    everyFloor?: boolean;
     /** Colors cycled along the lamps (`lampSpots` order) instead of `color`: a stage's gelled par cans. */
     colors?: number[];
     /**
@@ -199,6 +208,28 @@ export interface Atmosphere {
     fall: number;
     sway: number;
     size: number;
+  };
+  /**
+   * Rain falling outside the building, never over the room (see
+   * `rainSeeds`): thin streaks `length` world units long, `perSide` down
+   * each side of the outline and `perBack` per column behind the back of
+   * every column whose first row is room (none behind void: that is inside
+   * the building), `near` to `far` grid units out; each falls from `top` to
+   * `bottom` (world units) at `fall` units a second, drifting `slant` units
+   * sideways per unit it falls. Off on `low`.
+   */
+  rain?: {
+    color: number;
+    opacity: number;
+    perSide: number;
+    perBack: number;
+    near: number;
+    far: number;
+    top: number;
+    bottom: number;
+    fall: number;
+    length: number;
+    slant: number;
   };
   /**
    * The curtain wall's mullions striped across the floor in the sun (see
@@ -669,6 +700,69 @@ const SPRING_MORNING: Atmosphere = {
   mullions: { color: 0x3c4a62, opacity: 0.22, width: 0.28, every: 1.5, fade: 0.3 },
 };
 
+/**
+ * An overcast spring day of rain, lower down in the same mid-rise as the
+ * spring morning: a high, soft, near-white key from the back left (about 50°
+ * up, blurred shadows), a cool grey-blue sky and fill doing most of the
+ * lighting, grey-blue air hazing the wet street, and the office's linear
+ * pendants warm-white along the back of each floor, so the rooms glow
+ * against the street. Rain streaks fall outside only, and a saturation grade
+ * keeps the grey day from greying the stations down.
+ */
+const SPRING_RAIN: Atmosphere = {
+  sun: {
+    color: 0xf4f2ee,
+    intensity: 1.7,
+    from: { x: -5.5, y: -4, height: 8.1, perMapSize: false },
+    reach: 0.95,
+    softness: 9,
+  },
+  // The office's lights on: a soft warm-white wash on the rooms only, brighter than the street.
+  wash: {
+    color: 0xffdcb2,
+    intensity: 1.9,
+    from: { x: 0, y: 3, height: 12, perMapSize: false },
+    spread: 0.8,
+  },
+  sky: { sky: 0xccd6e4, ground: 0x7e8680, intensity: 1.4 },
+  fill: { color: 0xdce2ec, intensity: 1.05 },
+  environment: 0.14,
+  backdrop: { inner: 0xb2bcc8, outer: 0x7c8898 },
+  fog: { color: 0xa6b0be, start: 0.35, span: 9 },
+  vignette: {
+    color: 0x2a3444,
+    opacity: 0.3,
+    inner: 0.7,
+    saturate: 1.4,
+    // Rain haze over the street behind, under the order cards: the far side of the street grey and wet.
+    glows: [{ color: 0xc4cedc, opacity: 0.24, x: 0.5, y: 0, reach: 0.62 }],
+  },
+  lamps: {
+    color: 0xffdcb0,
+    intensity: 16,
+    distance: 4.4,
+    height: 2.1,
+    spacing: 3.5,
+    inset: 0.45,
+    // Back walls only: a pendant by the front wall would hang over the players' heads on screen.
+    frontFrom: 99,
+    everyFloor: true,
+  },
+  rain: {
+    color: 0xe4eaf4,
+    opacity: 0.6,
+    perSide: 70,
+    perBack: 8,
+    near: 0.9,
+    far: 4.5,
+    top: 4,
+    bottom: -0.6,
+    fall: 7,
+    length: 0.42,
+    slant: 0.12,
+  },
+};
+
 /** Presets per `MapLook.scene` id. */
 export const ATMOSPHERES: Readonly<Record<string, Atmosphere>> = {
   garage: GOLDEN_HOUR,
@@ -678,6 +772,7 @@ export const ATMOSPHERES: Readonly<Record<string, Atmosphere>> = {
   'demo-day': STAGE_LIGHTS,
   'on-call': NIGHT_SHIFT,
   'middle-management': SPRING_MORNING,
+  hypergrowth: SPRING_RAIN,
 };
 
 /** The light and air for a scene id; the default for none or an unknown one. */
@@ -763,7 +858,8 @@ export function lampSpots(
   const lamps = atmosphere.lamps;
   if (!lamps) return [];
   // The wall's inner face is half a tile in from its row's center.
-  const rows = backRows(map).map((r) => ({ ...r, y: r.inside - 0.5 + lamps.inset }));
+  const runs = lamps.everyFloor ? floorRows(map) : backRows(map);
+  const rows = runs.map((r) => ({ ...r, y: r.inside - 0.5 + lamps.inset }));
   if (map.height >= lamps.frontFrom) {
     const [x0, x1] = insideSpan(map, map.height - 2);
     rows.push({ y: map.height - 1.5 - lamps.inset, inside: map.height - 2, x0, x1 });
@@ -827,6 +923,31 @@ function backRows(
     (r) => r.inside !== first && (r.x0 > x1 || r.x1 < x0) && r.x1 - r.x0 >= 2,
   );
   return [{ inside: first, x0, x1 }, ...apart];
+}
+
+/**
+ * The back of each floor (`Atmosphere.lamps.everyFloor`): per column the
+ * first floor tile from the top, down to half the map's depth (stations
+ * against the back wall don't count), grouped into runs of neighbouring
+ * columns that share it, each at least three tiles long. Without tiles, the
+ * whole width along row 1.
+ */
+function floorRows(
+  map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles'>>,
+): { inside: number; x0: number; x1: number }[] {
+  if (!map.tiles) return [{ inside: 1, x0: 1, x1: Math.max(1, map.width - 2) }];
+  const full = map as LevelMap;
+  const deepest = Math.floor(map.height * 0.5);
+  const runs: { inside: number; x0: number; x1: number }[] = [];
+  for (let x = 0; x < map.width; x++) {
+    let top: number | null = null;
+    for (let y = 1; y <= deepest && top === null; y++) if (getTile(full, x, y) === 'floor') top = y;
+    if (top === null) continue;
+    const last = runs[runs.length - 1];
+    if (last && last.inside === top && last.x1 === x - 1) last.x1 = x;
+    else runs.push({ inside: top, x0: x, x1: x });
+  }
+  return runs.filter((r) => r.x1 - r.x0 >= 2);
 }
 
 /** The first and last column of a row inside the room: not wall or void (all but the edges without tiles). */
@@ -1184,6 +1305,55 @@ export function petalSeeds(
     }),
   );
   return [...sides, ...over];
+}
+
+/** A raindrop: where its fall starts (world units), how far it falls, and its phase in [0, 1). */
+export interface RainSeed {
+  at: Vec3;
+  drop: number;
+  phase: number;
+}
+
+/**
+ * The raindrops outside the building, the same every time for a map:
+ * `perSide` down each side of the outline from a tile behind it to its
+ * front, and `perBack` per column behind the back of each column whose first
+ * row is room (behind void lies more building: a post room, a lift shaft),
+ * `near` to `far` grid units out. Never over the room, never in front of it.
+ */
+export function rainSeeds(
+  atmosphere: Atmosphere,
+  map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles'>>,
+): RainSeed[] {
+  const rain = atmosphere.rain;
+  if (!rain) return [];
+  const drop = rain.top - rain.bottom;
+  const depth = (i: number) => rain.near + unit(i, 31) * (rain.far - rain.near);
+  const sides = [-1, 1].flatMap((side, s) =>
+    Array.from({ length: rain.perSide }, (_, k) => {
+      const i = s * 1000 + k;
+      const out = depth(i);
+      const x = side < 0 ? -0.5 - out : map.width - 0.5 + out;
+      const z = -1.5 + unit(i, 32) * map.height;
+      return { at: { x, y: rain.top, z }, drop, phase: unit(i, 33) };
+    }),
+  );
+  const columns = Array.from({ length: map.width }, (_, x) => x).filter((x) => {
+    if (!map.tiles) return true;
+    const tile = getTile(map as LevelMap, x, 0);
+    return tile !== null && tile !== 'void';
+  });
+  const back = columns.flatMap((x) =>
+    Array.from({ length: rain.perBack }, (_, k) => {
+      const i = 3000 + x * 16 + k;
+      return {
+        at: { x: x - 0.5 + unit(i, 34), y: rain.top, z: -0.5 - depth(i) },
+        drop,
+        phase: unit(i, 35),
+      };
+    }),
+  );
+  return [...sides, ...back];
 }
 
 /** One sunbeam through the curtain wall: its foot on the floor and the unit direction up toward the sun. */

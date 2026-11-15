@@ -11,12 +11,14 @@ import {
   type FlakeSeed,
   type MoteSeed,
   type PetalSeed,
+  type RainSeed,
   accentSpots,
   blinkOn,
   glintSpots,
   moteSeeds,
   mullionShade,
   petalSeeds,
+  rainSeeds,
   sceneOf,
   snowSeeds,
   stutterIndex,
@@ -260,6 +262,15 @@ export class WorldFx {
     sway: number;
     group: THREE.Group;
   } | null = null;
+  /** Rain streaks falling outside the building (`Atmosphere.rain`), off on `low`. */
+  private rain: {
+    lines: THREE.LineSegments;
+    seeds: RainSeed[];
+    fall: number;
+    length: number;
+    slant: number;
+    group: THREE.Group;
+  } | null = null;
   private shake = { untilMs: 0, intensity: 0 };
   shakeEnabled = true;
 
@@ -300,6 +311,7 @@ export class WorldFx {
     this.buildSweep(atmosphere);
     this.buildNight(world, atmosphere);
     this.buildSpring(atmosphere);
+    this.buildRain(atmosphere);
     this.rug = new THREE.MeshBasicMaterial({
       color: RUG_COLOR,
       transparent: true,
@@ -355,6 +367,7 @@ export class WorldFx {
     this.runSweep(timeMs);
     this.runNight(timeMs);
     this.driftPetals(timeMs);
+    this.fallRain(timeMs);
     for (let i = this.puffs.length - 1; i >= 0; i--) {
       const puff = this.puffs[i];
       if (!puff) continue;
@@ -857,6 +870,65 @@ export class WorldFx {
       group.add(beam);
     }
     this.root.add(group);
+  }
+
+  /**
+   * Rain outside the building (`Atmosphere.rain`): one line segment per drop,
+   * all in one draw call, under a group that `Stage` hides on `low`.
+   */
+  private buildRain(atmosphere: Atmosphere): void {
+    const spec = atmosphere.rain;
+    const seeds = rainSeeds(atmosphere, this.map);
+    if (!spec || seeds.length === 0) return;
+    const group = new THREE.Group();
+    group.userData[AMBIENT_KEY] = true;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute(
+      'position',
+      new THREE.BufferAttribute(new Float32Array(seeds.length * 6), 3),
+    );
+    // Each streak fades in from its top: the tail transparent, the head the rain's color.
+    const colors = new Float32Array(seeds.length * 6);
+    for (let i = 0; i < seeds.length; i++) colors.set([0.35, 0.35, 0.35, 1, 1, 1], i * 6);
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const lines = new THREE.LineSegments(
+      geometry,
+      new THREE.LineBasicMaterial({
+        color: spec.color,
+        vertexColors: true,
+        transparent: true,
+        opacity: spec.opacity,
+        depthWrite: false,
+      }),
+    );
+    lines.frustumCulled = false;
+    group.add(lines);
+    this.root.add(group);
+    this.rain = {
+      lines,
+      seeds,
+      fall: spec.fall,
+      length: spec.length,
+      slant: spec.slant,
+      group,
+    };
+    this.fallRain(0);
+  }
+
+  /** Each drop falls fast on its own loop, slanting a little in the wind. */
+  private fallRain(timeMs: number): void {
+    const r = this.rain;
+    if (!r?.group.visible) return;
+    const position = r.lines.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const t = timeMs / 1000;
+    r.seeds.forEach(({ at, drop, phase }, i) => {
+      const fallen = ((phase + (t * r.fall) / drop) % 1) * drop;
+      const x = at.x + fallen * r.slant;
+      const y = at.y - fallen;
+      position.setXYZ(i * 2, x - r.length * r.slant, y + r.length, at.z);
+      position.setXYZ(i * 2 + 1, x, y, at.z);
+    });
+    position.needsUpdate = true;
   }
 
   /** Each petal falls on its own loop, swaying and blown a little toward the camera. */
