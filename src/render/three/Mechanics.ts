@@ -17,6 +17,7 @@
 import * as THREE from 'three';
 import type { LevelMap } from '../../sim/level';
 import { breakdownWarns, chuteShare, liftBroken, liftChimes } from '../../sim/lifts';
+import { beltsStopped, travelatorDir } from '../../sim/campus';
 import { meetingDoors } from '../../sim/meetings';
 import { reorgTiles, reorgWarning } from '../../sim/reorgs';
 import { isWet, tapWarns } from '../../sim/spills';
@@ -39,6 +40,9 @@ const LIFT_COLOR = 0x5bc0eb;
 /** An express cabin with its doors open here. */
 const EXPRESS_COLOR = 0xf2b134;
 const CHUTE_COLOR = 0x8e7dbe;
+const SHUTTLE_COLOR = 0xffd23f;
+const STRIP_COLOR = 0x6b7280;
+const GLASS_COLOR = 0xbfe6ff;
 const PARTITION_COLOR = 0xb8c0cc;
 const DESK_COLOR = 0x9b6b43;
 const GATE_COLOR = 0x4cd964;
@@ -106,6 +110,7 @@ export class Mechanics {
     this.syncReorg(state, timeMs);
     this.syncGates(state);
     this.syncDoors(state);
+    this.syncCampus(state, timeMs);
   }
 
   private syncPuddles(state: GameState): void {
@@ -202,7 +207,13 @@ export class Mechanics {
             for (let i = 0; i < lift.stops.length - floor; i++) {
               const pip = new THREE.Mesh(
                 new THREE.BoxGeometry(0.1, 0.1, 0.1),
-                flat(lift.kind === 'express' ? EXPRESS_COLOR : LIFT_COLOR),
+                flat(
+                  lift.kind === 'express'
+                    ? EXPRESS_COLOR
+                    : lift.kind === 'shuttle'
+                      ? SHUTTLE_COLOR
+                      : LIFT_COLOR,
+                ),
               );
               const at = gridToWorld(first.x - 0.3 + i * 0.15, first.y - 0.45, 1.2);
               pip.position.set(at.x, at.y, at.z);
@@ -211,7 +222,12 @@ export class Mechanics {
           }
         }
         const here = lift.at === floor;
-        const base = lift.kind === 'express' ? EXPRESS_COLOR : LIFT_COLOR;
+        const base =
+          lift.kind === 'express'
+            ? EXPRESS_COLOR
+            : lift.kind === 'shuttle'
+              ? SHUTTLE_COLOR
+              : LIFT_COLOR;
         let color = LIFT_IDLE;
         if (liftBroken(state, lift) || (breakdownWarns(state, lift) && blink)) color = TAP_LEAK;
         else if (here && lift.phase === 'open') color = liftChimes(state, lift) ? TAP_WARN : base;
@@ -344,6 +360,73 @@ export class Mechanics {
     for (const [key, light] of this.doorLights) {
       if (!seen.has(key)) light.color.setHex(LIFT_IDLE);
     }
+  }
+
+  private campusBuilt = false;
+  private readonly stripMaterial = flat(STRIP_COLOR);
+  private readonly arrowMaterial = flat(GATE_COLOR);
+  private readonly outageMaterial = flat(TAP_LEAK, 0.6);
+  private readonly outage: THREE.Mesh[] = [];
+  private readonly arrows: { mesh: THREE.Mesh; base: number; dir: { x: number; y: number } }[] = [];
+
+  /** Travelators (grey strips with arrows that scroll), revolving doors (a glass drum), stopped belts (red). */
+  private syncCampus(state: GameState, timeMs: number): void {
+    if (!this.campusBuilt) {
+      this.campusBuilt = true;
+      const dirs = state.settings.travelators;
+      for (const mark of this.map.marks) {
+        const at = gridToWorld(mark.x, mark.y, PUDDLE_LIFT * 2);
+        if (mark.kind === 'travelator') {
+          const strip = new THREE.Mesh(this.puddle, this.stripMaterial);
+          strip.position.set(at.x, at.y, at.z);
+          this.root.add(strip);
+          const dir = travelatorDir(this.map, dirs, mark.x, mark.y);
+          if (dir) {
+            const arrow = new THREE.Mesh(
+              new THREE.ConeGeometry(0.16, 0.34, 3).rotateX(Math.PI / 2),
+              this.arrowMaterial,
+            );
+            arrow.rotation.y = Math.atan2(dir.x, dir.y);
+            arrow.position.set(at.x, 0.03, at.z);
+            this.root.add(arrow);
+            this.arrows.push({ mesh: arrow, base: dir.x !== 0 ? at.x : at.z, dir });
+          }
+        } else if (mark.kind === 'revolvingDoor') {
+          const drum = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.46, 0.46, 1.2, 16, 1, true),
+            flat(GLASS_COLOR, 0.35),
+          );
+          drum.position.set(at.x, 0.6, at.z);
+          const wings = new THREE.Mesh(
+            new THREE.BoxGeometry(0.9, 1.1, 0.04),
+            flat(GLASS_COLOR, 0.6),
+          );
+          wings.name = 'wings';
+          wings.position.set(at.x, 0.55, at.z);
+          this.root.add(drum, wings);
+        }
+      }
+      for (const belt of this.map.conveyors) {
+        const plate = new THREE.Mesh(this.puddle, this.outageMaterial);
+        const at = gridToWorld(belt.x, belt.y, blockHeight(this.map, belt.x, belt.y) + 0.03);
+        plate.position.set(at.x, at.y, at.z);
+        plate.visible = false;
+        this.root.add(plate);
+        this.outage.push(plate);
+      }
+    }
+    // Arrows slide a little along the way the strip runs.
+    const shift = ((timeMs / 1000) % 1) * 0.5 - 0.25;
+    for (const { mesh, base, dir } of this.arrows) {
+      if (dir.x !== 0) mesh.position.x = base + shift * dir.x;
+      else mesh.position.z = base + shift * dir.y;
+    }
+    const stopped = beltsStopped(state);
+    const blink = Math.floor(timeMs / 300) % 2 === 0;
+    for (const plate of this.outage) plate.visible = stopped && blink;
+    this.root.traverse((o) => {
+      if (o.name === 'wings') o.rotation.y = timeMs / 600;
+    });
   }
 
   private createRobot(): RobotLook {

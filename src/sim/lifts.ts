@@ -23,12 +23,15 @@ import {
   LIFT_CHIME_TICKS,
   LIFT_OPEN_TICKS,
   LIFT_RIDE_TICKS,
+  SHUTTLE_SPEED,
+  SHUTTLE_WAIT_TICKS,
+  TICKS_PER_SECOND,
 } from './balance';
 import { type GridPoint, type LevelMap, type MarkKind, marksOf } from './level';
 import type { GameState, PlayerId } from './state';
 import { ticketOnTile } from './tickets';
 
-export type LiftKind = 'local' | 'express';
+export type LiftKind = 'local' | 'express' | 'shuttle';
 
 /** The express (or local) lift out of order from `atTick` for `ticks`. */
 export interface LiftBreakdown {
@@ -100,11 +103,19 @@ function cabins(map: LevelMap, kind: MarkKind): GridPoint[][] {
 }
 
 function openTicks(kind: LiftKind): number {
+  if (kind === 'shuttle') return SHUTTLE_WAIT_TICKS;
   return kind === 'express' ? EXPRESS_OPEN_TICKS : LIFT_OPEN_TICKS;
 }
 
-function rideTicks(kind: LiftKind): number {
-  return kind === 'express' ? EXPRESS_RIDE_TICKS : LIFT_RIDE_TICKS;
+/** Ticks from floor `from` to the next one; the shuttle takes as long as the track is. */
+function rideTicks(lift: Pick<Lift, 'kind' | 'stops'>, from = 0, to = 1): number {
+  if (lift.kind === 'shuttle') {
+    const a = lift.stops[from]?.[0];
+    const b = lift.stops[to]?.[0];
+    const tiles = a && b ? Math.abs(a.x - b.x) + Math.abs(a.y - b.y) : 1;
+    return Math.ceil((tiles / SHUTTLE_SPEED) * TICKS_PER_SECOND);
+  }
+  return lift.kind === 'express' ? EXPRESS_RIDE_TICKS : LIFT_RIDE_TICKS;
 }
 
 /** The map's lifts: one local and one express at most, each with two floors or more. */
@@ -113,6 +124,7 @@ export function createLifts(map: LevelMap): Lift[] {
   for (const [kind, mark] of [
     ['local', 'lift'],
     ['express', 'expressLift'],
+    ['shuttle', 'shuttleStop'],
   ] as const) {
     const stops = cabins(map, mark);
     if (stops.length < 2) continue;
@@ -224,14 +236,14 @@ function depart(state: GameState, lift: Lift): void {
       if (!m) continue;
       m.pos = { x: at.x, y: at.y };
       m.path = [];
-      m.waitTicks = rideTicks(lift.kind);
+      m.waitTicks = rideTicks(lift, lift.at, next);
     }
   }
   state.events.push({ type: 'liftDeparted', lift: lift.kind, floor: next });
   lift.riders = riders;
+  lift.until = state.tick + rideTicks(lift, lift.at, next);
   lift.at = next;
   lift.phase = 'riding';
-  lift.until = state.tick + rideTicks(lift.kind);
 }
 
 /** Per tick: lifts leave, arrive and break down; tickets slide down the chutes. */
@@ -283,7 +295,7 @@ export function liftLinks(map: LevelMap): Map<number, GridPoint[]> {
   const cached = linkCache.get(map);
   if (cached) return cached;
   const links = new Map<number, GridPoint[]>();
-  for (const mark of ['lift', 'expressLift'] as const) {
+  for (const mark of ['lift', 'expressLift', 'shuttleStop'] as const) {
     const stops = cabins(map, mark);
     stops.forEach((cabin, floor) => {
       cabin.forEach((tile, slot) => {

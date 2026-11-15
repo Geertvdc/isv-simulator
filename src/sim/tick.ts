@@ -1,3 +1,4 @@
+import { beltsStopped, driftPlayer, revolvingBlocks, updateTravelators } from './campus';
 import { updateConveyors } from './conveyor';
 import {
   finishCoding,
@@ -38,10 +39,12 @@ export function tick(state: GameState, inputs: readonly InputCommand[]): void {
     const input = inputs.find((i) => i.playerId === player.id);
     const gate = gateBlocks(state.gates, player.pos);
     const door = doorBlocks(state, player.id);
-    const blocks = (x: number, y: number): boolean => gate(x, y) || door(x, y);
+    const revolving = revolvingBlocks(state.level, state.players, player.id);
+    const blocks = (x: number, y: number): boolean => gate(x, y) || door(x, y) || revolving(x, y);
     if (movePlayer(state.level, player, input?.move, input?.dash, isWet, blocks)) {
       state.events.push({ type: 'dashed', playerId: player.id });
     }
+    driftPlayer(state.level, state.settings.travelators, player);
   }
   for (const shove of separatePlayers(state.level, state.players)) {
     state.events.push({ type: 'shoved', ...shove });
@@ -63,7 +66,8 @@ export function tick(state: GameState, inputs: readonly InputCommand[]): void {
   finishCoding(state, tickWork);
   finishManualWork(state, tickWork);
   updateFlights(state);
-  updateConveyors(state);
+  if (!beltsStopped(state)) updateConveyors(state);
+  updateTravelators(state);
 
   updatePipelines(state);
   updateSpills(state);

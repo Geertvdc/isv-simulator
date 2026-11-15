@@ -15,7 +15,7 @@ import {
   TICKS_PER_SECOND,
 } from './balance';
 import { canPutDown, settleOn } from './interact';
-import { type GridPoint, getTile, isDrop } from './level';
+import { type GridPoint, getTile, isDrop, markAt } from './level';
 import { type GameState, type Player, type PlayerId, getPlayer } from './state';
 import { type Ticket, loseTicket, ticketCarriedBy } from './tickets';
 
@@ -79,7 +79,8 @@ function fly(state: GameState, ticket: Ticket): void {
   const at = tileOf(pos);
   const tile = getTile(state.level, at.x, at.y);
 
-  if (tile === 'wall') {
+  // Walls stop a throw; so does the glass of a revolving door.
+  if (tile === 'wall' || markAt(state.level, at.x, at.y) === 'revolvingDoor') {
     land(state, ticket, loc.lastFloor);
     return;
   }

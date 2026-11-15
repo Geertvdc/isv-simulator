@@ -70,6 +70,8 @@ export interface IncidentSchedule {
   timeLimitTicks: number;
   /** Work area for the hotfix; defaults to general on existing levels. */
   domain?: TicketDomain;
+  /** Every this many incidents is a belt outage: every belt stops until the hotfix ships. */
+  beltOutageEvery?: number;
 }
 
 /** Counts per shuffled batch of domain-enabled feature orders and its drought bound. */
@@ -131,6 +133,8 @@ export interface LevelSettings {
    * reading order) lets people through. Phases without a list keep phase 1's.
    */
   turnstiles?: readonly (readonly GridPoint[])[];
+  /** The way each travelator run (`Q`, in reading order) moves (Big Tech). */
+  travelators?: readonly GridPoint[];
 }
 
 /** A bot score per team size, solo first. */
@@ -382,6 +386,8 @@ export const THE_ATRIUM: Level = level('the-atrium', theAtriumMap, {
   ...GARAGE_SETTINGS,
   // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
   ...calibrated([155, 270, 350, 435]),
+  // The travelator along the front runs east (on maps with one).
+  travelators: [{ x: 1, y: 0 }],
 });
 
 /** An L-shaped floor round a courtyard: whiteboards first, keyboards built for pairs. */
@@ -411,7 +417,8 @@ export const HACKATHON: Level = level('hackathon', hackathonMap, {
   designShare: 0.3,
   fullstackShare: 0.4,
   pairing: true,
-  incidents: CALM_INCIDENTS,
+  // Every other incident is a belt outage.
+  incidents: { ...CALM_INCIDENTS, beltOutageEvery: 2 },
   // The partition closes the east lane, then the west, then the east again (on maps with reorg phases).
   reorgs: [
     { atTick: 60 * SECOND, phase: 2 },
@@ -578,6 +585,7 @@ export function settingsForPlayers(level: LevelSettings, playerCount: number): L
       ? { liftBreakdowns: level.liftBreakdowns.map((b) => ({ ...b })) }
       : {}),
     ...(level.reorgs ? { reorgs: level.reorgs.map((r) => ({ ...r })) } : {}),
+    ...(level.travelators ? { travelators: level.travelators.map((d) => ({ ...d })) } : {}),
     ...(level.turnstiles
       ? { turnstiles: level.turnstiles.map((p) => p.map((d) => ({ ...d }))) }
       : {}),
