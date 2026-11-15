@@ -563,6 +563,7 @@ export class OnlineSession {
         liveTiles: state.liveTiles,
         wet: state.wet,
         gates: state.gates,
+        travelators: state.settings.travelators ?? [],
         runsFrom: runsFrom(flow, snapshot.serverTick, state.result !== null),
       },
       localBindings(online).map((b) => b.playerId),

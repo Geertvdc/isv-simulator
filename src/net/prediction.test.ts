@@ -79,6 +79,7 @@ function snapshotOf(
     liveTiles: structuredClone(state.liveTiles),
     wet: { ...state.wet },
     gates: structuredClone(state.gates),
+    travelators: [],
     runsFrom,
   };
 }

@@ -436,3 +436,14 @@ export const NET_PREDICT_MAX_TICKS = 60;
 
 /** Ticks a reorg is telegraphed before the walls and desks move (stripes and a countdown). */
 export const REORG_WARNING_TICKS = 3 * TICKS_PER_SECOND;
+
+// ---- Campus (Big Tech): travelators, revolving doors, the shuttle ----
+
+/** Tiles per second a travelator carries whoever stands on it. */
+export const TRAVELATOR_SPEED = 3;
+/** Ticks a ticket lying on a travelator takes to ride one tile. */
+export const TRAVELATOR_TICKET_TICKS = Math.round(TICKS_PER_SECOND / TRAVELATOR_SPEED);
+/** Ticks the shuttle waits at a stop. */
+export const SHUTTLE_WAIT_TICKS = 3 * TICKS_PER_SECOND;
+/** Tiles per second the shuttle crosses at. */
+export const SHUTTLE_SPEED = 4;

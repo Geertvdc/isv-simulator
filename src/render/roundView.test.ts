@@ -63,6 +63,7 @@ describe('predictedView', () => {
         liveTiles: {},
         wet: {},
         gates: [],
+        travelators: [],
         runsFrom: 0,
       },
       [2],

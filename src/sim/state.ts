@@ -120,6 +120,8 @@ export interface GameState {
   nextReorg: number;
   /** One-way badge turnstiles and the way they go now (Enterprise). */
   gates: Gate[];
+  /** Incidents opened so far (some are belt outages). */
+  incidentsOpened: number;
   /** Tick from which the next invite is due; `null` on levels without meetings. */
   nextMeetingTick: number | null;
   /** Bugs on their way back from shipped tickets. */
@@ -205,6 +207,7 @@ export function createGame(
     reorgPhase: 1,
     nextReorg: 0,
     gates: gatesFor(map, level.turnstiles, 1),
+    incidentsOpened: 0,
     nextMeetingTick: level.meetings?.firstTick ?? null,
     pendingBugs: [],
     score: 0,

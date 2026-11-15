@@ -48,6 +48,8 @@ export interface Order {
   steps: StepKind[];
   createdTick: number;
   expiresTick: number;
+  /** An incident that stops every belt until it ships (Big Tech). */
+  beltOutage?: boolean;
 }
 
 /** A bug on its way back after a buggy ship. */
@@ -332,7 +334,17 @@ function updateIncidents(state: GameState): void {
   const [title, s1] = rng.pick(state.rngState, INCIDENT_TITLES);
   const [jitter, s2] = rng.int(s1, -schedule.jitterTicks, schedule.jitterTicks);
   state.rngState = s2;
-  createOrder(state, 'incident', title, TICKET_STEPS.incident, schedule.domain ?? 'general');
+  const order = createOrder(
+    state,
+    'incident',
+    title,
+    TICKET_STEPS.incident,
+    schedule.domain ?? 'general',
+  );
+  state.incidentsOpened++;
+  const every = schedule.beltOutageEvery;
+  if (every !== undefined && every > 0 && state.incidentsOpened % every === 0)
+    order.beltOutage = true;
   state.nextIncidentTick = state.tick + schedule.intervalTicks + jitter;
 }
 
