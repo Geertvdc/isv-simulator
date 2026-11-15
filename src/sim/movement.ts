@@ -55,8 +55,17 @@ function approach(from: Vec, to: Vec, maxStep: number): Vec {
   return { x: from.x + (dx / dist) * maxStep, y: from.y + (dy / dist) * maxStep };
 }
 
+/** Tiles that block one player only, on top of the map's solid tiles (a one-way gate). */
+export type BlockCheck = (x: number, y: number) => boolean;
+
+/** Nothing extra blocks. */
+export const OPEN: BlockCheck = () => false;
+
+/** The extra blocks for the player being moved; set for the length of one step. */
+let extraBlock: BlockCheck = OPEN;
+
 function isSolidAt(map: LevelMap, x: number, y: number): boolean {
-  return isSolid(getTile(map, x, y));
+  return isSolid(getTile(map, x, y)) || extraBlock(x, y);
 }
 
 /**
@@ -215,7 +224,17 @@ export function stepPlayer(
   player: Player,
   rawMove: Vec,
   isWet: WetCheck = DRY,
+  blocks: BlockCheck = OPEN,
 ): void {
+  extraBlock = blocks;
+  try {
+    stepBlocked(map, player, rawMove, isWet);
+  } finally {
+    extraBlock = OPEN;
+  }
+}
+
+function stepBlocked(map: LevelMap, player: Player, rawMove: Vec, isWet: WetCheck): void {
   const move = clampMove(rawMove);
   const moving = length(move) > EPSILON;
   if (player.dashCooldown > 0) player.dashCooldown--;
@@ -269,10 +288,11 @@ export function movePlayer(
   move: Vec = NO_MOVE,
   dash = false,
   isWet: WetCheck = DRY,
+  blocks: BlockCheck = OPEN,
 ): boolean {
   const dashPressed = dash && !player.dashHeld;
   player.dashHeld = dash;
   const dashed = dashPressed && startDash(player, move);
-  stepPlayer(map, player, move, isWet);
+  stepPlayer(map, player, move, isWet, blocks);
   return dashed;
 }

@@ -12,6 +12,7 @@ import type { LiveTiles } from './liveTiles';
 import type { Invite } from './meetings';
 import type { GameEvent, LevelResult, Order, PendingBug } from './orders';
 import { type Pipeline, createPipelines } from './pipeline';
+import { type Gate, gatesFor } from './reorgs';
 import { type RngState, createRng } from './rng';
 import { type Tap, type WetTiles, createTaps } from './spills';
 import { isRoleId, type RoleId, type TicketDomain, type WorkTask } from './roles';
@@ -113,6 +114,12 @@ export interface GameState {
   lifts: Lift[];
   /** Mail chutes: top hatch to bottom hatch (Scale-Up). */
   chutes: Chute[];
+  /** The reorg phase the layout is in (1: the map's own). */
+  reorgPhase: number;
+  /** Index of the next step in `settings.reorgs`. */
+  nextReorg: number;
+  /** One-way badge turnstiles and the way they go now (Enterprise). */
+  gates: Gate[];
   /** Tick from which the next invite is due; `null` on levels without meetings. */
   nextMeetingTick: number | null;
   /** Bugs on their way back from shipped tickets. */
@@ -195,6 +202,9 @@ export function createGame(
     wet: {},
     lifts: createLifts(map),
     chutes: createChutes(map),
+    reorgPhase: 1,
+    nextReorg: 0,
+    gates: gatesFor(map, level.turnstiles, 1),
     nextMeetingTick: level.meetings?.firstTick ?? null,
     pendingBugs: [],
     score: 0,

@@ -78,6 +78,8 @@ export type GameEvent =
   | { type: 'liftArrived'; lift: LiftKind; floor: number }
   /** A ticket slid out of a mail chute's bottom hatch (lifts). */
   | { type: 'chuteDropped'; ticketId: number }
+  /** The walls and desks moved to reorg phase `phase` (reorgs). */
+  | { type: 'reorg'; phase: number }
   | {
       type: 'orderShipped';
       order: Order;

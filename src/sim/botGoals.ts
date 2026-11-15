@@ -145,7 +145,7 @@ export function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Go
           if (!candidatePlayer) throw new Error(`No player ${candidate.playerId}`);
           const walk = nearest(state, candidate.playerId, queueTile);
           if (!walk) return [];
-          const path = findPath(state.level, currentTile(state, candidate.playerId), walk);
+          const path = findPath(state.level, currentTile(state, candidate.playerId), walk, [], [], state.gates);
           if (!path) return [];
           return [
             {
@@ -279,7 +279,7 @@ function meetingGoal(state: GameState, bot: Bot): Goal | null {
   let best: Goal | null = null;
   let bestLength = Infinity;
   for (const tile of free.length > 0 ? free : state.level.meetingTiles) {
-    const path = pathTo(state.level, from, tile);
+    const path = pathTo(state.level, from, tile, [], state.gates);
     if (path && path.length < bestLength) {
       best = { tile, action: 'stand' };
       bestLength = path.length;
