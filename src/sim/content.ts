@@ -242,6 +242,7 @@ export const LEVEL_NAMES: Readonly<Record<string, string>> = {
   'lab-shapes': 'Lab: shapes',
   'lab-dev': 'Lab: dev mechanics',
   'lab-spills': 'Lab: spills',
+  'lab-lifts': 'Lab: lifts',
   'open-plan': 'Open Plan Office',
   // Id from before the Scale-Up chapter; kept so saves still count.
   'scale-up': 'Down the Hall',
@@ -446,7 +447,8 @@ export type IntroPicture =
   | 'merge'
   | 'carousel'
   | 'spill'
-  | 'mop';
+  | 'mop'
+  | 'lift';
 
 /** On the intro card of a level that teaches something new: one line and a picture. */
 export const LEVEL_INTRO_TIPS: Readonly<Record<string, { text: string; picture: IntroPicture }>> = {
@@ -502,6 +504,14 @@ export const REDESIGN_INTRO_TIPS: Readonly<
   'demo-day': {
     picture: 'spill',
     text: 'Wet floor: you slide! The leaky tap floods the floor round it. Hold work at the tap to fix it, or go round.',
+  },
+  hypergrowth: {
+    picture: 'lift',
+    text: 'Two floors! Stand in the lift and it takes you up or down, ticket and all. Drop finished work down the mail chute. The stairs always work.',
+  },
+  'hot-desking': {
+    picture: 'lift',
+    text: 'Three floors. The express skips the middle one but breaks down now and then: then it is the local lift or the stairs.',
   },
   'on-call': {
     picture: 'mop',

@@ -64,12 +64,20 @@ export interface LevelResult {
   stars: number;
 }
 
+import type { LiftKind } from './lifts';
+
 export type GameEvent =
   | { type: 'orderCreated'; order: Order }
   /** A leaky tap started to leak (spills). */
   | { type: 'tapLeaking'; x: number; y: number }
   /** Someone fixed a leaking tap (spills). */
   | { type: 'tapFixed'; x: number; y: number }
+  /** A lift closed its doors and left for `floor` (lifts). */
+  | { type: 'liftDeparted'; lift: LiftKind; floor: number }
+  /** A lift reached `floor` and opened its doors (lifts). */
+  | { type: 'liftArrived'; lift: LiftKind; floor: number }
+  /** A ticket slid out of a mail chute's bottom hatch (lifts). */
+  | { type: 'chuteDropped'; ticketId: number }
   | {
       type: 'orderShipped';
       order: Order;

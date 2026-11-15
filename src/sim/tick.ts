@@ -7,6 +7,7 @@ import {
   newTickWork,
   work,
 } from './interact';
+import { isRiding, updateLifts } from './lifts';
 import { updateManagers } from './manager';
 import { expireInvites, updateMeetings } from './meetings';
 import { movePlayer } from './movement';
@@ -31,6 +32,8 @@ export function tick(state: GameState, inputs: readonly InputCommand[]): void {
 
   const isWet = wetCheck(state);
   for (const player of state.players) {
+    // Between floors in a lift: nowhere to go.
+    if (isRiding(state, player.id)) continue;
     const input = inputs.find((i) => i.playerId === player.id);
     if (movePlayer(state.level, player, input?.move, input?.dash, isWet)) {
       state.events.push({ type: 'dashed', playerId: player.id });
@@ -40,6 +43,7 @@ export function tick(state: GameState, inputs: readonly InputCommand[]): void {
     state.events.push({ type: 'shoved', ...shove });
   }
   updateManagers(state);
+  updateLifts(state);
 
   const tickWork = newTickWork();
   for (const player of state.players) {

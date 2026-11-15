@@ -408,6 +408,20 @@ export const SCENES: readonly Scene[] = [
     ticks: 260,
   },
   {
+    // Lifts: player 1 rides the express with a ticket, player 2 waits for the local lift; a ticket goes down the chute.
+    id: 'lifts',
+    levelId: 'lab-lifts',
+    players: 2,
+    setup(state) {
+      give(workOn(openOrder(state, 'feature', 'Ship the new onboarding'), 1), 1);
+      stand(state, 1, { x: 12, y: 2 }, { x: 0, y: 1 });
+      stand(state, 2, { x: 13, y: 3 }, { x: 0, y: 1 });
+      putOn(workOn(openOrder(state, 'feature', 'Dark mode, again'), 3), { x: 14, y: 4 });
+    },
+    input: () => [],
+    ticks: 150,
+  },
+  {
     // The conveyor bridge carries tickets across the atrium to the test side.
     id: 'conveyor',
     levelId: 'lab-shapes',

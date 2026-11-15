@@ -21,6 +21,7 @@ import { type GridPoint, type LevelMap, getTile } from './level';
 import { isDashing, resolveCollisions } from './movement';
 import { pathTo } from './path';
 import * as rng from './rng';
+import { isLiftHop } from './lifts';
 import { mopLoop } from './spills';
 import type { GameState, Player, Vec } from './state';
 
@@ -65,20 +66,18 @@ const EPSILON = 1e-9;
  * and a mop robot on the `r` loop when the level has one (`mopRobot`).
  */
 export function createManagers(map: LevelMap, mopRobot?: MopRobotSettings): Manager[] {
-  const managers = map.managerSpawns.map(
-    (spawn, i): Manager => ({
-      id: i + 1,
-      kind: 'manager',
-      route: [],
-      pos: { x: spawn.x, y: spawn.y },
-      facing: { x: 0, y: 1 },
-      path: [],
-      waitTicks: MANAGER_PAUSE_MIN_TICKS,
-      stuckTicks: 0,
-      nextBumpTick: 0,
-      walking: false,
-    }),
-  );
+  const managers = map.managerSpawns.map((spawn, i): Manager => ({
+    id: i + 1,
+    kind: 'manager',
+    route: [],
+    pos: { x: spawn.x, y: spawn.y },
+    facing: { x: 0, y: 1 },
+    path: [],
+    waitTicks: MANAGER_PAUSE_MIN_TICKS,
+    stuckTicks: 0,
+    nextBumpTick: 0,
+    walking: false,
+  }));
   const route = mopRobot ? mopLoop(map, mopRobot.clockwise) : [];
   const start = route[0];
   if (start) {
@@ -163,6 +162,8 @@ function walk(state: GameState, manager: Manager): void {
   const dx = next.x - manager.pos.x;
   const dy = next.y - manager.pos.y;
   const dist = Math.hypot(dx, dy);
+  // The next step is a lift ride: wait in the cabin for the lift to take it there.
+  if (isLiftHop(state.level, manager.pos, next)) return;
   const step = (manager.kind === 'mopRobot' ? MOP_ROBOT_SPEED : MANAGER_SPEED) * DT;
   const facing = dist > EPSILON ? { x: dx / dist, y: dy / dist } : manager.facing;
   const to =
