@@ -141,6 +141,8 @@ export const FLOOR_COLORS: Readonly<Record<FloorTheme, readonly [number, number]
   raisedFloor: [0x868b90, 0x969a9f],
   // A rented floor's new carpet tiles, cool blue-grey; the second is the tiles laid the other way.
   corporateCarpet: [0x7f8ea3, 0x7a899c],
+  // A rubber ground floor, grey-green; the second is the seams.
+  mixedFloors: [0x7d8a84, 0x6f7b75],
 };
 
 /** Wall colors per theme: face and top. Caps stay darker than stations, so the eye goes to the stations. */
@@ -162,6 +164,8 @@ export const WALL_COLORS: Readonly<Record<WallTheme, { face: number; top: number
   basement: { face: 0x6f7d74, top: 0x666b70 },
   // Light grey plasterboard under glass partitions, capped with a slim cool aluminium head track.
   midRise: { face: 0xc9ccce, top: 0x80888f },
+  // The same building's partitions, lower down; the stairwell is painted block.
+  lowerFloors: { face: 0xc9ccce, top: 0x80888f },
 };
 
 /** Marks the room's warm lamps, which only `medium` and `high` quality light (see `Stage`). */

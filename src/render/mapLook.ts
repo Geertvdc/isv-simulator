@@ -9,7 +9,8 @@ import type { BlockTile } from '../sim/level';
  * `stageSet` the demo set on the Demo Day stage, `basement` the painted
  * block basement under the loft building (On Call), `midRise` a rented floor
  * of a mid-rise office building: plasterboard and glass partitions (Middle
- * Management). A theme's room dressing, if it has one, is
+ * Management), `lowerFloors` the same building's ground and first floor
+ * mid-move-in, with a lift, a stairwell and a loading bay (Hypergrowth). A theme's room dressing, if it has one, is
  * in `src/render/three/rooms/`.
  */
 export const WALL_THEMES = [
@@ -23,6 +24,7 @@ export const WALL_THEMES = [
   'stageSet',
   'basement',
   'midRise',
+  'lowerFloors',
 ] as const;
 export type WallTheme = (typeof WALL_THEMES)[number];
 
@@ -32,7 +34,8 @@ export type WallTheme = (typeof WALL_THEMES)[number];
  * timber floorboards, `polished` a loft's polished concrete, `stageDeck`
  * painted black-grey stage decks, `raisedFloor` a server room's grey
  * anti-static raised-floor tiles, `corporateCarpet` a rented office floor's
- * new two-tone carpet tiles.
+ * new two-tone carpet tiles, `mixedFloors` a rubber ground floor, carpet
+ * upstairs and concrete stair treads between them.
  */
 export const FLOOR_THEMES = [
   'concrete',
@@ -45,6 +48,7 @@ export const FLOOR_THEMES = [
   'stageDeck',
   'raisedFloor',
   'corporateCarpet',
+  'mixedFloors',
 ] as const;
 export type FloorTheme = (typeof FLOOR_THEMES)[number];
 
@@ -77,7 +81,8 @@ export const LEVEL_LOOKS: Readonly<Record<string, MapLook>> = {
   // Middle Management: a whole floor of a mid-rise, spring morning; meet Derek.
   'middle-management': { walls: 'midRise', floor: 'corporateCarpet', scene: 'middle-management' },
   // Scale-Up: glass walls go in.
-  hypergrowth: { walls: 'glass', floor: 'parquet' },
+  // Hypergrowth: two floors of the same building on a rainy day, more hires than desks.
+  hypergrowth: { walls: 'lowerFloors', floor: 'mixedFloors', scene: 'hypergrowth' },
   'hot-desking': { walls: 'plaster', floor: 'carpet' },
   // Enterprise: carpet and glass as far as the eye can see.
   'back-to-back': { walls: 'glass', floor: 'carpet' },
