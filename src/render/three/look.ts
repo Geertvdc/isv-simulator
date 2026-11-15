@@ -165,7 +165,7 @@ export const WALL_COLORS: Readonly<Record<WallTheme, { face: number; top: number
   // Light grey plasterboard under glass partitions, capped with a slim cool aluminium head track.
   midRise: { face: 0xc9ccce, top: 0x80888f },
   // The same building's partitions, lower down; the stairwell is painted block.
-  lowerFloors: { face: 0xc9ccce, top: 0x80888f },
+  lowerFloors: { face: 0xc0c3bd, top: 0x868d93 },
 };
 
 /** Marks the room's warm lamps, which only `medium` and `high` quality light (see `Stage`). */
@@ -208,7 +208,7 @@ export function createLights(
   cam.near = 1;
   cam.far = 40;
   sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.radius = 4;
+  sun.shadow.radius = SUN.softness ?? 4;
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.025;
 
