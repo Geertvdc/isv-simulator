@@ -17,6 +17,7 @@
 import * as THREE from 'three';
 import type { LevelMap } from '../../sim/level';
 import { breakdownWarns, chuteShare, liftBroken, liftChimes } from '../../sim/lifts';
+import { meetingDoors } from '../../sim/meetings';
 import { reorgTiles, reorgWarning } from '../../sim/reorgs';
 import { isWet, tapWarns } from '../../sim/spills';
 import type { GameState } from '../../sim/state';
@@ -104,6 +105,7 @@ export class Mechanics {
     this.syncChutes(state, timeMs);
     this.syncReorg(state, timeMs);
     this.syncGates(state);
+    this.syncDoors(state);
   }
 
   private syncPuddles(state: GameState): void {
@@ -313,6 +315,34 @@ export class Mechanics {
       const at = gridToWorld(gate.x, gate.y, 0.05);
       arrow.position.set(at.x, at.y, at.z);
       arrow.rotation.y = Math.atan2(gate.dir.x, gate.dir.y);
+    }
+  }
+
+  private readonly doorLights = new Map<string, THREE.MeshBasicMaterial>();
+
+  /** Meeting doors: a light over each, green (free), amber (invite open), red (in session). */
+  private syncDoors(state: GameState): void {
+    const seen = new Set<string>();
+    for (const door of meetingDoors(state)) {
+      const key = `${door.x},${door.y}`;
+      seen.add(key);
+      let light = this.doorLights.get(key);
+      if (!light) {
+        light = flat(GATE_COLOR);
+        const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), light);
+        lamp.name = key;
+        const at = gridToWorld(door.x, door.y, 1.25);
+        lamp.position.set(at.x, at.y, at.z);
+        this.root.add(lamp);
+        this.doorLights.set(key, light);
+      }
+      light.color.setHex(
+        door.light === 'inSession' ? TAP_LEAK : door.light === 'invited' ? TAP_WARN : GATE_COLOR,
+      );
+    }
+    // Doors that left the layout in a reorg: their lamps go dark.
+    for (const [key, light] of this.doorLights) {
+      if (!seen.has(key)) light.color.setHex(LIFT_IDLE);
     }
   }
 

@@ -155,6 +155,7 @@ describe('bot and new mechanics', () => {
       expiresTick: 100,
       attendedTicks: 0,
       attendTicks: 30,
+      room: 0,
     });
     const invited = createBot(1, false, 'role-aware');
     const available = createBot(2, false, 'role-aware');

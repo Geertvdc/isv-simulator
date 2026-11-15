@@ -17,6 +17,7 @@
 import { type GridPoint, type LevelMap } from './level';
 import { isLiftHop } from './lifts';
 import { managerTiles } from './manager';
+import { shutDoors } from './meetings';
 import { pathTo } from './path';
 import { wetTiles } from './spills';
 import { type GameState, type InputCommand, type PlayerId, getPlayer, targetTile } from './state';
@@ -82,7 +83,8 @@ export function botInput(state: GameState, bot: Bot, bots: readonly Bot[]): Inpu
 
   const from = currentTile(state, bot.playerId);
   // Walk around managers when there is a way around; otherwise wait for them to move on.
-  const blocked = managerTiles(state);
+  // Meeting doors shut to this bot count as walls (fallbacks below may still try them).
+  const blocked = [...managerTiles(state), ...shutDoors(state, bot.playerId)];
   // Keep off wet floor (spills) when the dry way round is short enough.
   const wet = wetTiles(state);
   if (goal.action === 'stand') {

@@ -12,7 +12,7 @@ import {
 import { canPutDown, isAtItsStation } from './interact';
 import { type GridPoint, type LevelMap, type Tile, getTile } from './level';
 import { shipBlockedBy } from './orders';
-import { inviteFor } from './meetings';
+import { inviteFor, meetingRooms } from './meetings';
 import { pathTo } from './path';
 import { isBroken } from './pipeline';
 import { roleWorkRate, type RoleId } from './roles';
@@ -275,10 +275,13 @@ function meetingGoal(state: GameState, bot: Bot): Goal | null {
   const others = state.players
     .filter((p) => p.id !== bot.playerId)
     .map((p) => ({ x: Math.round(p.pos.x), y: Math.round(p.pos.y) }));
-  const free = state.level.meetingTiles.filter((t) => !others.some((o) => samePoint(o, t)));
+  // Only the room on the invite counts.
+  const invite = inviteFor(state, bot.playerId);
+  const roomTiles = meetingRooms(state.level)[invite?.room ?? 0] ?? state.level.meetingTiles;
+  const free = roomTiles.filter((t) => !others.some((o) => samePoint(o, t)));
   let best: Goal | null = null;
   let bestLength = Infinity;
-  for (const tile of free.length > 0 ? free : state.level.meetingTiles) {
+  for (const tile of free.length > 0 ? free : roomTiles) {
     const path = pathTo(state.level, from, tile, [], state.gates);
     if (path && path.length < bestLength) {
       best = { tile, action: 'stand' };

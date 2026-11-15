@@ -914,7 +914,7 @@ Gate 2b (mechanics, see [the plan](#gate-2b-and-rollout-plan)):
 - [x] B. Spills: wet floor, leaky tap, mop robot
 - [x] C. Lifts: local and express lifts, breakdowns, mail chute
 - [x] D. Reorgs: phase layouts, partitions, rolling desks, turnstiles
-- [ ] E. Meeting rooms: meeting doors, named rooms
+- [x] E. Meeting rooms: meeting doors, named rooms
 - [ ] F. Campus: travelators, revolving doors, shuttle, belt outage
 - [ ] Couch test of the gimmick levels with the real mechanics
 
