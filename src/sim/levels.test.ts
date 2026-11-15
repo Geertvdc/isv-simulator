@@ -132,12 +132,12 @@ describe('levels', () => {
       for (const tile of ['inbox', 'bugQueue', 'keyboard', 'testBench', 'pipeline', 'ship']) {
         expect(level.map.tiles).toContain(tile);
       }
-      // Big Tech's campus is two tiles wider.
-      expect([14, 16]).toContain(level.map.width);
-      expect(level.map.height).toBe(10);
+      // Sizes differ per level (phase 23); 22×12 is the cap the fit camera allows.
+      expect(level.map.width).toBeLessThanOrEqual(22);
+      expect(level.map.height).toBeLessThanOrEqual(12);
     });
 
-    it(`${level.name}: every review station can be worked from two sides`, () => {
+    it(`${level.name}: every review station can be worked by two players`, () => {
       const { map } = level;
       for (let y = 0; y < map.height; y++) {
         for (let x = 0; x < map.width; x++) {
@@ -148,7 +148,12 @@ describe('levels', () => {
             [0, 1],
             [0, -1],
           ].filter(([dx = 0, dy = 0]) => getTile(map, x + dx, y + dy) === 'floor');
-          expect(open.length).toBeGreaterThanOrEqual(2);
+          // Two sides, or a review tile next to it (side by side they're one station).
+          const twin = [
+            [1, 0],
+            [-1, 0],
+          ].some(([dx = 0, dy = 0]) => getTile(map, x + dx, y + dy) === 'review');
+          expect(open.length >= 2 || (open.length >= 1 && twin)).toBe(true);
         }
       }
       if (level.reviewShare > 0) expect(map.tiles).toContain('review');

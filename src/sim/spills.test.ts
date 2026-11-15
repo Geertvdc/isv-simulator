@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import demoDayDraft from '../../maps/drafts/demo-day.txt?raw';
-import onCallDraft from '../../maps/drafts/on-call.txt?raw';
+import demoDayDraft from '../../maps/level-05-demo-day.txt?raw';
+import onCallDraft from '../../maps/level-06-on-call.txt?raw';
 import {
   MANAGER_BUMP_COOLDOWN_TICKS,
   MOP_TRAIL_TICKS,

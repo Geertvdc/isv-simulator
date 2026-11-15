@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { parseDraftMap } from '../../../sim/draftMap';
-import { MIDDLE_MANAGEMENT } from '../../../sim/levels';
-import draftText from '../../../../maps/drafts/middle-management.txt?raw';
+import { parseLevelMap as parseDraftMap } from '../../../sim/level';
+import { BEFORE_MAPS } from '../fixtures/beforeMaps';
+import draftText from '../../../../maps/level-07-middle-management.txt?raw';
 import { managerOffice } from './managerOffice';
 
 describe('managerOffice', () => {
   it('finds no office on the shipped map, where the manager starts on the open floor', () => {
-    expect(managerOffice(MIDDLE_MANAGEMENT.map)).toBeNull();
+    expect(managerOffice(BEFORE_MAPS['middle-management'])).toBeNull();
   });
 
   it("finds Derek's corner office on the redesign draft, with its one door", () => {

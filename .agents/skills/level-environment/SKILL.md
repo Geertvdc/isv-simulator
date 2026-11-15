@@ -15,7 +15,7 @@ Score history to beat: the garage went from **3/10 to 5.5/10** after round 1 and
 - One level per pass. Prefer the chapter's first level (x-1), so later levels in the chapter can reuse its props and atmosphere.
 - Ask the user for reference images if they didn't give any (Overcooked 2 shots work well). Copy them to the scratchpad (`sips -s format png` also converts `.avif`) so agents can read them.
 - Take a **before** shot (step 2 shows how) and keep it for the plan doc.
-- Check `docs/plan/phase-23-level-redesign.md` and `maps/drafts/<id>.txt`. If the level has a redesign draft, the scene must fit **both** maps (the draft loads with `?draft=<id>`).
+- Check the level's entry in `docs/plan/phase-23-level-redesign.md`: the maps were redrawn there (sizes, rooms, and mechanics like spills, lifts, reorgs and the campus). Reorg levels have a map per phase (`maps/level-NN-<id>.phaseN.txt`): the scene must fit every phase. Levels 1-1 to 3-1 had their pass before the redesign and still carry code for the old layouts (tested against `src/render/three/fixtures/`); leave that alone unless the pass is for that level.
 
 ## 1. Write the brief (`docs/plan/<level>-environment.md`)
 
@@ -50,7 +50,6 @@ Shots for each agent, on its own ports:
 ```bash
 npx vite --port 51NN --strictPort          # background
 npm run screenshots -- --base=http://localhost:51NN --cdp=93NN --only=levels/<id> --out=<scratch>/shipped
-npm run screenshots -- --base=http://localhost:51NN --cdp=93NN --only=levels/<id> --query=draft=<id> --out=<scratch>/draft
 sips -s format png <scratch>/shipped/levels/<id>.webp --out <scratch>/shipped.png
 ```
 
@@ -140,7 +139,7 @@ These are the round-1 lessons and the critic's findings, written as rules so rou
 
 ## 5. Critic
 
-When round 1 is committed, spawn one `general-purpose` agent as an **exacting art director** with no edit rights in its instructions. It takes fresh shots (shipped, draft, `?quality=low`), compares them with the references, the before shot and the brief, and returns:
+When round 1 is committed, spawn one `general-purpose` agent as an **exacting art director** with no edit rights in its instructions. It takes fresh shots (normal and `?quality=low`), compares them with the references, the before shot and the brief, and returns:
 
 1. A verdict scored out of 10 against the reference bar, before vs after.
 2. Prioritised issues, each with the screenshot path and region (x0, y0, x1, y1), why it matters, and a fix with numbers and colours.
@@ -160,7 +159,7 @@ If the result still has clear gaps and the user wants more, run another critic r
 ## 7. Finish
 
 - `npm run check` with everything in.
-- Final shots: both maps, plus one other level. Copy the shipped shot to `docs/game/images/levels/<id>.webp`, and before/after/draft to `docs/plan/images/<level>-environment/`.
+- Final shots: the level (every reorg phase), plus one other level. Copy the shot to `docs/game/images/levels/<id>.webp`, and before/after to `docs/plan/images/<level>-environment/`.
 - In the brief: a before/after image table at the top, a status line, a summary of round 2, the leftovers, and ticked "Done when" boxes.
 - In `docs/game/storyline.md`: link the brief from the intro's list of levels with a brief, and update the level's entry and its row in the running-gags table to what was actually built.
 - Send the user the before and after images, then offer to ship (the `ship` skill).

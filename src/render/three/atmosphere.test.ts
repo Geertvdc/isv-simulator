@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { BEFORE_MAPS } from './fixtures/beforeMaps';
 import { getTile, isSolid } from '../../sim/level';
-import { parseDraftMap } from '../../sim/draftMap';
+import { parseLevelMap as parseDraftMap } from '../../sim/level';
 import {
   DEMO_DAY,
   DOWN_THE_HALL,
@@ -11,13 +12,13 @@ import {
   OPEN_PLAN,
   SEED_ROUND,
 } from '../../sim/levels';
-import draftText from '../../../maps/drafts/garage.txt?raw';
-import openPlanDraft from '../../../maps/drafts/open-plan.txt?raw';
-import scaleUpDraft from '../../../maps/drafts/scale-up.txt?raw';
-import seedRoundDraft from '../../../maps/drafts/seed-round.txt?raw';
-import demoDayDraft from '../../../maps/drafts/demo-day.txt?raw';
-import onCallDraft from '../../../maps/drafts/on-call.txt?raw';
-import middleManagementDraft from '../../../maps/drafts/middle-management.txt?raw';
+import draftText from '../../../maps/level-01-garage.txt?raw';
+import openPlanDraft from '../../../maps/level-02-open-plan.txt?raw';
+import scaleUpDraft from '../../../maps/level-03-scale-up.txt?raw';
+import seedRoundDraft from '../../../maps/level-04-seed-round.txt?raw';
+import demoDayDraft from '../../../maps/level-05-demo-day.txt?raw';
+import onCallDraft from '../../../maps/level-06-on-call.txt?raw';
+import middleManagementDraft from '../../../maps/level-07-middle-management.txt?raw';
 import { LEVEL_LOOKS } from '../mapLook';
 import { WALL_HEIGHT } from './layout';
 import { fitCamera3d, gridToWorld, projectPoint } from '../projection';
@@ -351,7 +352,7 @@ describe('the stage wash and the side lights', () => {
 
 describe('the night shift (on-call)', () => {
   const a = atmosphereFor('on-call');
-  const maps = { shipped: ON_CALL.map, draft: parseDraftMap(onCallDraft) };
+  const maps = { shipped: BEFORE_MAPS['on-call'], draft: parseDraftMap(onCallDraft) };
   const rgb = (c: number) => [(c >> 16) & 255, (c >> 8) & 255, c & 255] as const;
 
   it('gives on-call its own light', () => {
@@ -503,7 +504,10 @@ describe('the night shift (on-call)', () => {
 
 describe('the spring morning (middle-management)', () => {
   const a = atmosphereFor('middle-management');
-  const maps = { shipped: MIDDLE_MANAGEMENT.map, draft: parseDraftMap(middleManagementDraft) };
+  const maps = {
+    shipped: BEFORE_MAPS['middle-management'],
+    draft: parseDraftMap(middleManagementDraft),
+  };
   const rgb = (c: number) => [(c >> 16) & 255, (c >> 8) & 255, c & 255] as const;
 
   it('gives middle-management its own light', () => {
@@ -658,7 +662,7 @@ describe('lampSpots', () => {
   });
 
   const garage = atmosphereFor('garage');
-  const maps = { shipped: GARAGE.map, draft: parseDraftMap(draftText) };
+  const maps = { shipped: BEFORE_MAPS['garage'], draft: parseDraftMap(draftText) };
 
   it('hangs a row just inside the back wall, about 1.7 up, on both garage maps', () => {
     for (const map of Object.values(maps)) {

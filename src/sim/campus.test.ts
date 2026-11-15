@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import atriumDraft from '../../maps/drafts/the-atrium.txt?raw';
-import designSprintDraft from '../../maps/drafts/design-sprint.txt?raw';
-import monorepoDraft from '../../maps/drafts/monorepo.txt?raw';
+import atriumDraft from '../../maps/level-13-the-atrium.txt?raw';
+import designSprintDraft from '../../maps/level-14-design-sprint.txt?raw';
+import monorepoDraft from '../../maps/level-15-monorepo.txt?raw';
 import { SHUTTLE_SPEED, SHUTTLE_WAIT_TICKS, TICKS_PER_SECOND } from './balance';
 import { botInput, createBot } from './bot';
 import { beltsStopped } from './campus';

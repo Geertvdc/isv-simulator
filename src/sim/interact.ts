@@ -215,9 +215,28 @@ export function work(state: GameState, playerId: PlayerId, tickWork: TickWork): 
   if (markAt(state.level, x, y) === 'tap') return workTap(state, x, y);
   if (tile === 'review') {
     const ticket = ticketOnTile(state, x, y);
-    if (!ticket || !stationWorkStep(ticket, tile)) return false;
-    addUnique(reviewers, key, playerId);
-    return true;
+    if (ticket && stationWorkStep(ticket, tile)) {
+      addUnique(reviewers, key, playerId);
+      return true;
+    }
+    // Review tiles side by side are one station: working the empty half
+    // reviews the ticket on the half next to it.
+    if (ticket) return false;
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (getTile(state.level, nx, ny) !== 'review') continue;
+      const next = ticketOnTile(state, nx, ny);
+      if (!next || !stationWorkStep(next, 'review')) continue;
+      addUnique(reviewers, ny * state.level.width + nx, playerId);
+      return true;
+    }
+    return false;
   }
   if (tile === 'pipeline') {
     if (!pipelineAt(state, x, y)?.broken || ticketOnTile(state, x, y)) return false;

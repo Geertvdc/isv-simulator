@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { parseDraftMap } from '../../../sim/draftMap';
+import { parseLevelMap as parseDraftMap } from '../../../sim/level';
 import { MIDDLE_MANAGEMENT } from '../../../sim/levels';
-import draftText from '../../../../maps/drafts/middle-management.txt?raw';
+import draftText from '../../../../maps/level-07-middle-management.txt?raw';
 import { LEVEL_LOOKS } from '../../mapLook';
 import { type Model, tint } from '../kit';
 import { FRONT_WALL_HEIGHT, STATION_HEIGHT, WALL_HEIGHT } from '../layout';

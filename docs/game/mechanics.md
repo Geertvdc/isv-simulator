@@ -88,11 +88,23 @@ Across a counter wall that means: throw it onto the empty counter in the wall fo
 
 Dash is a short burst of speed in the direction you face, about 2 tiles, with a short cooldown. Dash into a teammate and they get shoved out of the way ("Oof!", "Rude!", "Watch it!").
 
+## Spills (from Demo Day)
+
+Wet floor (`_`) is slippery: you speed up and stop much more slowly, so you slide and overshoot. On Demo Day a **leaky tap** (`o`) floods the floor round it (`%`) ring by ring every so often; it drips and wobbles 5 s before. Hold work at the tap for 2 s to fix it, and the floor dries from the outside in. There is always a dry way round. On On Call the **mop robot** drives its loop (`r`) all round the night: it shoves you out of the way like the manager and leaves a trail that stays wet for 6 s.
+
+![A leaky tap floods its zone while the mop robot drives its loop](images/mechanics/spills.webp)
+
 ## The wandering manager (from chapter 3, Scale-Up)
 
 A manager walks from spot to spot, stops for a chat and walks on. Players can't push a manager, and a walking manager shoves anyone in the way: "Got a minute?", "Quick sync?", "Per my last email...". Walk around. Hot Desking has two of them.
 
 ![The manager bumps into a player](images/mechanics/manager.webp)
+
+## Lifts and the mail chute (from Hypergrowth)
+
+Floors are drawn side by side. A **lift** has a cabin (`L`) on each floor it stops at: it stands open for 3 s (a chime a second before it leaves), then everyone standing in the cabin rides to the next floor, keeping their place and what they carry. Managers ride too. The **express** (`l`) is bigger and skips a floor, and on Hot Desking it breaks down now and then (its cabin lights flicker 5 s before). The stairs always work. A **mail chute** (`H`) sends a ticket from the top hatch down to the bottom one in 2 s: people take the lift.
+
+![Three floors with a local lift, an express and a mail chute](images/mechanics/lifts.webp)
 
 ## Meetings (from chapter 4, Enterprise)
 
@@ -101,6 +113,16 @@ A calendar invite pops up for one of the players (each has at most one open): "S
 | Invite                                                                  | In the meeting room                                            |
 | ----------------------------------------------------------------------- | -------------------------------------------------------------- |
 | ![A calendar invite for player 2](images/mechanics/meeting-invite.webp) | ![Sitting out the meeting](images/mechanics/meeting-room.webp) |
+
+## Meeting rooms and doors (from Back to Back)
+
+Meeting rooms have names (the Fishbowl, the Aquarium, the Boardroom) and the invite says which one: only that room counts, and on Back to Back the invites take turns between the two rooms. A **meeting door** (`d`) has a light: green when the room is free, amber when an invite for it is open, red while the meeting is on. While it's red the door is shut to everyone but the invited player; anyone inside can always walk out.
+
+## Reorgs and turnstiles (from Synergy)
+
+On a reorg level the floor plan changes during the round: partitions (`=`) fold away or come back and rolling desks (`D`) roll to their new spot, with whatever ticket sits on them. Tiles that are about to change blink for 3 s first; anyone standing where a wall comes back is moved to the nearest open floor. Synergy's boardroom folds open and closed; The Reorg goes through three floor plans. **Badge turnstiles** (`+`) let people through one way only (follow the green arrow) and flip in a reorg; tickets can be thrown over them, and the staff door next to them is always two-way.
+
+![The Reorg's Silos layout a moment before the walls move](images/mechanics/reorg.webp)
 
 ## Gaps and odd shapes (from chapter 5, Big Tech)
 
@@ -113,6 +135,10 @@ Levels don't have to be a rectangle any more. Blank tiles in a map are **void**:
 `>` `<` `^` `v` are belts: the message queue. Put a ticket on one and it moves one tile every half second along the arrows, onto the next belt and then onto the counter or station the belt points at. A belt waits when what's ahead is full. You can also pick a ticket off a belt as it passes.
 
 ![The conveyor bridge carries tickets across the atrium to the test side](images/mechanics/conveyor.webp)
+
+## The campus (from chapter 5, Big Tech)
+
+A **travelator** (`Q`) carries you along at 3 tiles per second: walking with it is quick, against it slow, and a ticket left on it rides to the end. A **revolving door** (`*`) takes one person at a time, and a thrown ticket bounces off its glass. The **campus shuttle** (`Y`) waits 3 s at one stop, crosses the courtyard and comes back: stand on the stop to ride along. On Hackathon every other incident is a **belt outage**: every belt stops (and blinks red) until the hotfix ships.
 
 ## Design at the whiteboard (from Design Sprint)
 

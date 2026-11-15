@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { BEFORE_MAPS } from '../fixtures/beforeMaps';
 import { getTile } from '../../../sim/level';
-import { parseDraftMap } from '../../../sim/draftMap';
-import { MIDDLE_MANAGEMENT } from '../../../sim/levels';
-import draftText from '../../../../maps/drafts/middle-management.txt?raw';
+import { parseLevelMap as parseDraftMap } from '../../../sim/level';
+import draftText from '../../../../maps/level-07-middle-management.txt?raw';
 import { fitCamera3d, gridToWorld, projectPoint, roundInsets } from '../../projection';
 import { wallPiece } from '../../mapShape';
 import { atmosphereFor, lampSpots } from '../atmosphere';
@@ -17,7 +17,7 @@ import {
 } from './midRiseRoom';
 
 describe('midRiseRoom', () => {
-  const shipped = MIDDLE_MANAGEMENT.map;
+  const shipped = BEFORE_MAPS['middle-management'];
   const draft = parseDraftMap(draftText);
   const maps = [shipped, draft];
   const cheb = (a: { x: number; y: number }, b: { x: number; y: number }) =>

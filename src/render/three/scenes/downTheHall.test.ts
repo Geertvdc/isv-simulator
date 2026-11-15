@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { BEFORE_MAPS } from '../fixtures/beforeMaps';
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { type LevelMap, getTile, parseLevelMap } from '../../../sim/level';
@@ -14,8 +15,8 @@ const read = (path: string) =>
 
 /** The shipped level and the redesign draft: the scene must fit both. */
 const MAPS: Record<string, LevelMap> = {
-  shipped: read('maps/level-03-scale-up.txt'),
-  draft: read('maps/drafts/scale-up.txt'),
+  shipped: BEFORE_MAPS['scale-up'],
+  draft: read('maps/level-03-scale-up.txt'),
 };
 
 const GROUND = -0.463;

@@ -1,6 +1,6 @@
 # Phase 23: Level redesign
 
-**Status:** in progress. Gate 1 (this file, the drafts in `maps/drafts/`, the sketch, report and render tools) is approved. Gate 2a's greybox loader is in: dev builds play any draft with `?draft=<level-id>` and `npm run sim -- --drafts` reports how bots do on them (see [Tools](#tools) and [Greybox bot report](#greybox-bot-report)); the couch test is next. The shipped game doesn't change until the rollout.
+**Status:** rolled out (2026-11-15). The 16 redrawn maps are the shipped maps in `maps/` (reorg levels with a `.phaseN.txt` per later layout), with every mechanic below built (layers A–F) and stars recalibrated with the bots. The draft folder, the `?draft=` loader and the draft tools (`sketch`, `level-report`, `draft-shots`, `sim --drafts`) are gone; the sections below keep the design record, and their tool commands and image links describe how the maps were made. Still open: the couch test with the real mechanics and the art pass for the new maps.
 
 **Goal:** levels that differ in size and shape (small rooms, big halls, two rooms joined by a hallway where people bump into each other) and a layout play element per chapter, not only furniture placement. Today all 16 campaign maps are the same 14×10 rectangle (Big Tech 16×10) with furniture moved around. Every level must work from 1 to 4 players on one map.
 
@@ -916,8 +916,8 @@ Gate 2b (mechanics, see [the plan](#gate-2b-and-rollout-plan)):
 - [x] D. Reorgs: phase layouts, partitions, rolling desks, turnstiles
 - [x] E. Meeting rooms: meeting doors, named rooms
 - [x] F. Campus: travelators, revolving doors, shuttle, belt outage
-- [ ] Couch test of the gimmick levels with the real mechanics
+- [ ] Couch test of the gimmick levels with the real mechanics (bots play every level; humans still to do)
 
 Rollout:
 
-- [ ] G. All 16 drafts are the shipped maps, old maps and draft tooling removed, stars retuned, content, scenes, docs and screenshots updated
+- [x] G. All 16 drafts are the shipped maps, old maps and draft tooling removed, stars retuned, content, scenes and docs updated (screenshots: see the PR)

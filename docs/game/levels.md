@@ -1,24 +1,24 @@
 # Levels
 
-16 levels in 5 chapters, one new mechanic per chapter (Big Tech brings a few). Every level is a 14 × 10 ASCII map (Big Tech's campus is 16 wide) in [`maps/`](../../maps) and lasts 3 minutes. Settings (order pace, reviews, incidents, meetings, star targets) live in `src/sim/levels.ts`, names and blurbs in `src/sim/content.ts`.
+16 levels in 5 chapters, one new mechanic per chapter (Big Tech brings a few). Every level is an ASCII map in [`maps/`](../../maps), from a 10 × 7 garage to 22 × 12 campus halls, and lasts 3 minutes; reorg levels have a map per floor plan (`.phase2.txt`, `.phase3.txt`). Settings (order pace, reviews, incidents, meetings, star targets) live in `src/sim/levels.ts`, names and blurbs in `src/sim/content.ts`.
 
 ## Campaign
 
 A level opens when the level before it has at least 1 star. A chapter also needs enough stars in total over all levels.
 
-| Chapter    | What's new                 | Opens at | Levels                                                                                                                 |
-| ---------- | -------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Garage     | Two founders and a dream.  | —        | [The Garage](#11-the-garage), [Open Plan Office](#12-open-plan-office), [Down the Hall](#13-down-the-hall)             |
-| Startup    | New: production incidents  | 4 ★      | [Seed Round](#21-seed-round), [Demo Day](#22-demo-day), [On Call](#23-on-call)                                         |
-| Scale-Up   | New: the wandering manager | 9 ★      | [Middle Management](#31-middle-management), [Hypergrowth](#32-hypergrowth), [Hot Desking](#33-hot-desking)             |
-| Enterprise | New: meetings              | 13 ★     | [Back to Back](#41-back-to-back), [Synergy](#42-synergy), [The Reorg](#43-the-reorg)                                   |
-| Big Tech   | New: belts, design, merges | 18 ★     | [The Atrium](#51-the-atrium), [Design Sprint](#52-design-sprint), [Monorepo](#53-monorepo), [Hackathon](#54-hackathon) |
+| Chapter    | What's new                             | Opens at | Levels                                                                                                                 |
+| ---------- | -------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Garage     | Two founders and a dream.              | —        | [The Garage](#11-the-garage), [Open Plan Office](#12-open-plan-office), [Down the Hall](#13-down-the-hall)             |
+| Startup    | New: production incidents and spills   | 4 ★      | [Seed Round](#21-seed-round), [Demo Day](#22-demo-day), [On Call](#23-on-call)                                         |
+| Scale-Up   | New: the wandering manager and lifts   | 9 ★      | [Middle Management](#31-middle-management), [Hypergrowth](#32-hypergrowth), [Hot Desking](#33-hot-desking)             |
+| Enterprise | New: meetings and reorgs               | 13 ★     | [Back to Back](#41-back-to-back), [Synergy](#42-synergy), [The Reorg](#43-the-reorg)                                   |
+| Big Tech   | New: belts, design, merges, the campus | 18 ★     | [The Atrium](#51-the-atrium), [Design Sprint](#52-design-sprint), [Monorepo](#53-monorepo), [Hackathon](#54-hackathon) |
 
 Unless a level says otherwise, feature orders come every 20 seconds (solo, a few seconds either way), at most 3 are open at once, features last 75 seconds and bugs 45. More players get orders faster and higher star targets: see [Tickets and events](mechanics.md#orders-and-tickets).
 
 ### Reading the maps
 
-`#` wall · `.` floor · `C` counter · `I` inbox · `B` bug queue · `K` keyboard · `R` review · `T` test bench · `P` pipeline · `S` ship · `X` bin · `1`–`4` player spawns · `M` manager start · `m` meeting room · `W` whiteboard · `G` merge station · `>` `<` `^` `v` conveyor belt · `~` gap · blank: void (no floor). See [Mechanics](mechanics.md#gaps-and-odd-shapes-from-chapter-5-big-tech). See [Stations](stations.md).
+`#` wall · `.` floor · `C` counter · `I` inbox · `B` bug queue · `K` keyboard · `R` review · `T` test bench · `P` pipeline · `S` ship · `X` bin · `1`–`4` player spawns · `M` manager start · `m` meeting room · `W` whiteboard · `G` merge station · `>` `<` `^` `v` conveyor belt · `~` gap · blank: void (no floor) · `_` wet floor · `o` leaky tap · `%` spill zone · `r` mop robot loop · `L` lift cabin · `l` express lift cabin · `H` mail chute hatch · `=` partition · `D` rolling desk · `d` meeting door · `+` badge turnstile · `Q` travelator · `Y` shuttle stop · `*` revolving door. See [Mechanics](mechanics.md). See [Stations](stations.md).
 
 The screenshots show four players on their spawns with a few orders open.
 
@@ -28,90 +28,85 @@ _Two founders and a dream._
 
 ### 1-1 The Garage
 
-> Where every unicorn starts.
+> Where every unicorn starts: one tiny garage.
 
 ![The Garage](images/levels/garage.webp)
 
-One inbox, one bug queue, two keyboards, two test benches, one pipeline everybody shares, a bin for tickets whose order ran out and a single ship hatch. Orders come faster here than in the other Garage levels (every 15 s, up to 4 open), so it isn't a walk in the park. The first time you play it, hints point at the inbox, a keyboard and the ship hatch.
+A single-car garage: the roll-up door is the ship hatch, the workbench is the counter in the middle. Tiny on purpose: four people in here is the joke. Orders come faster than in the other Garage levels (every 20 s, up to 4 open). The first time you play it, hints point at the inbox, a keyboard and the ship hatch.
 
 - **New here:** The basics: pick up, code, test, build, ship.
 - **Extras:** —
-- **Map:** [`maps/level-01-garage.txt`](../../maps/level-01-garage.txt)
+- **Map:** [`maps/level-01-garage.txt`](../../maps/level-01-garage.txt) (10 × 7)
 
 ```text
-##I####B######
-#K.K.....T.T.#
-#............#
-#..1......2..#
-#....CCCC....#
-#............#
-X..3......4.P#
-#............#
-#C..........C#
-######S#######
+##BI#KK#
+#......#
+#..1...###
+X......2T#
+#..CCC...T
+#.3...4..P
+###SS#####
 ```
 
 | Players      | 1          | 2           | 3           | 4           |
 | ------------ | ---------- | ----------- | ----------- | ----------- |
-| ★ / ★★ / ★★★ | 80/150/220 | 140/260/370 | 180/350/510 | 220/420/620 |
+| ★ / ★★ / ★★★ | 75/145/200 | 135/250/345 | 180/330/460 | 210/385/535 |
 
 ### 1-2 Open Plan Office
 
-> A counter wall splits the office. Throw it over!
+> Our first office, split by a desk row. Throw it over!
 
 ![Open Plan Office](images/levels/open-plan.webp)
 
-A counter wall runs down the middle with the review station in it. Keyboards are on the left; test benches, pipelines and ship hatches on the right. Walk around the bottom, or throw tickets over the wall.
+The first rented office: one open room split down the middle by a desk row with the review island in it and a single gap. Keyboards on the left, test benches and pipelines on the right. Walk round through the gap, or throw tickets over the desks.
 
-- **New here:** Throwing. Code reviews (30% of features, two or more players).
+- **New here:** Throwing. Code reviews (two or more players).
 - **Extras:** Reviews 30%
-- **Map:** [`maps/level-02-open-plan.txt`](../../maps/level-02-open-plan.txt)
+- **Map:** [`maps/level-02-open-plan.txt`](../../maps/level-02-open-plan.txt) (16 × 9)
 
 ```text
-##II#B##TT####
-K.....C......P
-K..1..C..2...P
-#.....C......#
-X.....R......#
-C..3..C..4...C
-C.....C......C
-#.....C......#
-#............#
-#########SS###
+##KK##B##TT#
+#..........#
+#..........#####
+X......R.......#
+#.1....R...2...P
+#......C.......P
+#...3..C...4...#
+#..............#
+####II###SS#####
 ```
 
-| Players      | 1         | 2          | 3           | 4           |
-| ------------ | --------- | ---------- | ----------- | ----------- |
-| ★ / ★★ / ★★★ | 50/90/140 | 80/150/230 | 100/210/310 | 130/250/380 |
+| Players      | 1          | 2           | 3           | 4           |
+| ------------ | ---------- | ----------- | ----------- | ----------- |
+| ★ / ★★ / ★★★ | 60/115/160 | 100/180/250 | 130/245/340 | 155/290/400 |
 
 ### 1-3 Down the Hall
 
-> Code reviews are mandatory. The review room is down the hall.
+> Two rooms and a long hallway. Code reviews are down the hall.
 
 ![Down the Hall](images/levels/scale-up.webp)
 
-The review station sits at the end of a long corridor along the bottom. Half of the features need a review, so two players keep making the trip together.
+Two rooms joined by a long 2-wide hallway with 1-wide doors at both ends. The review station is in the far room, so reviews mean a walk down the hall, and the hallway is where people bump into each other.
 
-- **New here:** Reviews on half the features.
+- **New here:** Code reviews down the hall; hallway bumping.
 - **Extras:** Reviews 50%
-- **Map:** [`maps/level-03-scale-up.txt`](../../maps/level-03-scale-up.txt)
+- **Map:** [`maps/level-03-scale-up.txt`](../../maps/level-03-scale-up.txt) (20 × 9)
 
 ```text
-##II##KK##B###
-X............T
-#..1......2..T
-C............#
-#....CCCC....S
-C............S
-#..3......4..P
-#.##########.P
-#..R.........#
-##############
+##II#KK##
+#.......#     ######
+B.1.....#######..3.K
+#.............C....K
+T.......C.......RR.#
+T..CC.2.#######..4.#
+X.......P     #....#
+#.......P     ######
+###SS####
 ```
 
-| Players      | 1         | 2          | 3           | 4           |
-| ------------ | --------- | ---------- | ----------- | ----------- |
-| ★ / ★★ / ★★★ | 50/90/140 | 80/150/230 | 100/210/310 | 130/250/380 |
+| Players      | 1          | 2          | 3           | 4           |
+| ------------ | ---------- | ---------- | ----------- | ----------- |
+| ★ / ★★ / ★★★ | 65/115/160 | 85/155/215 | 125/235/325 | 130/240/335 |
 
 ## Chapter: Startup
 
@@ -123,86 +118,90 @@ _New: production incidents_
 
 ![Seed Round](images/levels/seed-round.webp)
 
-An open loft with a desk island in the middle: four keyboards facing each other, counters between them, two test benches and two pipelines on the right, four ship hatches.
+An L-shaped coworking loft with a desk island in the middle and two pipelines. Production breaks for the first time: the hotfix jumps the bug queue.
 
-- **New here:** Production incidents, on a calm schedule: the first after 30 s, then about every 60 s, 35 s to fix each.
-- **Extras:** Incidents (calm)
-- **Map:** [`maps/level-04-seed-round.txt`](../../maps/level-04-seed-round.txt)
-
-```text
-##II######BB##
-#X..........C#
-#...........T#
-#..KK.1..2..T#
-#..CC....CC..#
-#..CC....CC..#
-#..KK.3..4..P#
-#...........P#
-#C..........C#
-#####SSSS#####
-```
-
-| Players      | 1          | 2           | 3           | 4           |
-| ------------ | ---------- | ----------- | ----------- | ----------- |
-| ★ / ★★ / ★★★ | 70/130/200 | 110/220/340 | 150/300/460 | 180/360/560 |
-
-### 2-2 Demo Day
-
-> A counter wall, a demo to give, and prod on fire.
-
-![Demo Day](images/levels/demo-day.webp)
-
-A counter wall across the whole room with one gap on the right. Inbox, keyboards and review up top; test benches, pipelines and ship hatches down below. Throw it over or take the long way.
-
-- **New here:** Incidents at full pace, plus reviews and throwing.
-- **Extras:** Reviews 30%, incidents
-- **Map:** [`maps/level-05-demo-day.txt`](../../maps/level-05-demo-day.txt)
+- **New here:** Production incidents.
+- **Extras:** incidents
+- **Map:** [`maps/level-04-seed-round.txt`](../../maps/level-04-seed-round.txt) (15 × 11)
 
 ```text
-##II##KK###BB#
-K..1......2..X
-K............#
-#....R.......#
-CCCCCCCCCCC..C
-#............#
-T..3......4..P
-T............P
-#............#
-####SS####SS##
+###############
+#.............#
+#..2..KK......S
+X.....KK...3..S
+#.............#
+#.##.##TT#....#
+#..1.#   #.##.#
+I....#   #....#
+I....#   #....P
+#..C.#   #..4.P
+######   ##BB##
 ```
 
 | Players      | 1          | 2          | 3           | 4           |
 | ------------ | ---------- | ---------- | ----------- | ----------- |
-| ★ / ★★ / ★★★ | 50/100/160 | 90/170/260 | 110/230/360 | 140/280/430 |
+| ★ / ★★ / ★★★ | 60/110/155 | 95/180/250 | 115/210/295 | 120/225/310 |
 
-### 2-3 On Call
+### 2-2 Demo Day
 
-> The long way round, with the pager on.
+> A leaky tap floods the floor. Fix it or slide.
 
-![On Call](images/levels/on-call.webp)
+![Demo Day](images/levels/demo-day.webp)
 
-A ring corridor runs around the review room, which opens only at the bottom. Stations sit on the outside walls, so every ticket takes the long way round.
+A coworking floor and a stage hall with a counter wall between them. In the middle sits a leaky tap: every so often it floods the floor round it, ring by ring, until someone holds work at it. There is always a dry way round.
 
-- **New here:** Long walks while production burns.
-- **Extras:** Reviews 40%, incidents
-- **Map:** [`maps/level-06-on-call.txt`](../../maps/level-06-on-call.txt)
+- **New here:** Spills: wet floor and the leaky tap.
+- **Extras:** Reviews 30%, incidents, leaky tap
+- **Map:** [`maps/level-05-demo-day.txt`](../../maps/level-05-demo-day.txt) (19 × 11)
 
 ```text
-##II##B#######
-X.1........2.T
-#.##########.T
-K.#..R.....#.#
-K.#........#.#
-#.#........#.C
-C.###.CC.###.P
-C............P
-#..3......4..#
-######SS######
+      #######SS####
+      #...........#
+##BBKK#...#.......#
+#.1.......####..###
+#.....#_o_#.......#
+I.....#%_%#..RR...#
+I.KK..#%%%#.......P
+#.....%%%%.....3..P
+#.2...#%%%#....4..#
+###X###%%%#....CC.#
+      ######TT#####
 ```
 
 | Players      | 1         | 2          | 3           | 4           |
 | ------------ | --------- | ---------- | ----------- | ----------- |
-| ★ / ★★ / ★★★ | 50/90/130 | 80/150/220 | 100/210/300 | 130/250/360 |
+| ★ / ★★ / ★★★ | 45/80/115 | 75/140/195 | 120/220/305 | 150/280/385 |
+
+### 2-3 On Call
+
+> Night shift. The mop robot never stops, and it leaves the floor wet.
+
+![On Call](images/levels/on-call.webp)
+
+The night shift: two rooms round a locked server room, joined by corridors at the front and the back. The mop robot drives the ring all night and leaves it wet behind it, so which way round is dry keeps changing.
+
+- **New here:** The mop robot.
+- **Extras:** Reviews 40%, incidents, mop robot
+- **Map:** [`maps/level-06-on-call.txt`](../../maps/level-06-on-call.txt) (18 × 12)
+
+```text
+#BBKK#      ##TT##
+#....########....#
+I.1.rrrrrrrrrr...#
+I...r.......#r...#
+#...r###.####r...#
+#.KKr#P....##r...#
+#.2.r##....P#rRR.#
+#...r####.###r...#
+X...r........r.3.#
+#...rrrrrrrrrr.4.#
+#....########....#
+##SS##      ######
+```
+
+| Players      | 1        | 2         | 3           | 4           |
+| ------------ | -------- | --------- | ----------- | ----------- |
+| ★ / ★★ / ★★★ | 15/30/40 | 45/90/120 | 105/190/265 | 120/230/315 |
 
 ## Chapter: Scale-Up
 
@@ -214,86 +213,92 @@ _New: the wandering manager_
 
 ![Middle Management](images/levels/middle-management.webp)
 
-Wide aisles between two short counter rows, two of each station and four ship hatches. Plenty of room, which you'll need.
+The biggest single open floor so far, with a corner office and a meeting room (quiet for now). One manager wanders the aisles and walks right into you.
 
-- **New here:** The wandering manager, and nothing else new.
+- **New here:** The wandering manager.
 - **Extras:** 1 manager
-- **Map:** [`maps/level-07-middle-management.txt`](../../maps/level-07-middle-management.txt)
+- **Map:** [`maps/level-07-middle-management.txt`](../../maps/level-07-middle-management.txt) (22 × 12)
 
 ```text
-###II####BB###
-#X....M.....C#
-#K..........T#
-#K..C....C..T#
-#C..C.12.C..C#
-#C..C.34.C..C#
-#P..........P#
-#C..........C#
-#C..........C#
-#####SSSS#####
+  ##II####KKK###TT####
+  #..................#
+  B..1...............#
+  B..................#
+#########.######.....#
+#.C.....#.#mmmm#.....#
+#....M....#mCCm#.....P
+#########.#.##.#.....P
+  #..................#
+  X..2.........4.....#
+  ##.......3........##
+   ##SS##############
 ```
 
 | Players      | 1          | 2          | 3           | 4           |
 | ------------ | ---------- | ---------- | ----------- | ----------- |
-| ★ / ★★ / ★★★ | 60/120/170 | 90/200/290 | 130/260/390 | 150/320/480 |
+| ★ / ★★ / ★★★ | 60/105/150 | 90/170/235 | 130/235/330 | 155/285/395 |
 
 ### 3-2 Hypergrowth
 
-> Two rooms, two doors, one manager standing in them.
+> Two floors, one lift and a mail chute. The stairs are a long way round.
 
 ![Hypergrowth](images/levels/hypergrowth.webp)
 
-Two rooms joined by two narrow doors. Code at the top, pipelines and ship hatches at the bottom. The manager likes to stand right in the doorway.
+The company now has two floors, drawn side by side: the ground floor (inbox, bugs, pipelines, ship) and the first floor (keyboards, test benches). A lift joins them, the stairs are a long way round, and a mail chute drops finished work from upstairs to the ground floor. The manager rides the lift too.
 
-- **New here:** Manager plus incidents.
-- **Extras:** 1 manager, incidents
-- **Map:** [`maps/level-08-hypergrowth.txt`](../../maps/level-08-hypergrowth.txt)
+- **New here:** Lifts and the mail chute.
+- **Extras:** incidents, 1 manager
+- **Map:** [`maps/level-08-hypergrowth.txt`](../../maps/level-08-hypergrowth.txt) (22 × 12)
 
 ```text
-##II###BB#####
-#X..1..#...2T#
-#K.....#....T#
-#K..........C#
-#C..M..#.....#
-####.###.#####
-#C...........#
-#P..3......4P#
-#C...........#
-####SS####SS##
+            ##KK#KK###
+            #........#
+            #.....3..T
+##II#BB##   H........T
+#.1...LL#   #LL......#
+#.....LL#   #LL..M...#
+X.......#   #.....4..#
+#.......H   #........#
+S.......#   ######.###
+S.2.....##########.#
+#..................#
+####PP##############
 ```
 
-| Players      | 1          | 2          | 3           | 4           |
-| ------------ | ---------- | ---------- | ----------- | ----------- |
-| ★ / ★★ / ★★★ | 50/100/160 | 90/170/260 | 110/230/360 | 140/280/430 |
+| Players      | 1        | 2         | 3          | 4          |
+| ------------ | -------- | --------- | ---------- | ---------- |
+| ★ / ★★ / ★★★ | 10/20/25 | 40/70/100 | 65/115/160 | 70/135/185 |
 
 ### 3-3 Hot Desking
 
-> Rows of desks and two managers in the aisles.
+> Three floors, an express lift that breaks down and two managers.
 
 ![Hot Desking](images/levels/hot-desking.webp)
 
-Rows of counter desks with two review stations in the middle and two managers walking the aisles between them.
+Three floors: a lobby, the desks and the test floor. The local lift stops everywhere and holds two; the express skips the middle floor and takes the whole team, but it breaks down for 20 s twice a round. A mail chute runs from the top floor to the lobby, and two managers ride the lifts.
 
-- **New here:** Two managers, reviews and incidents.
-- **Extras:** 2 managers, reviews 30%, incidents
-- **Map:** [`maps/level-09-hot-desking.txt`](../../maps/level-09-hot-desking.txt)
+- **New here:** The express lift and breakdowns.
+- **Extras:** Reviews 30%, incidents, 2 managers
+- **Map:** [`maps/level-09-hot-desking.txt`](../../maps/level-09-hot-desking.txt) (22 × 12)
 
 ```text
-##II##BB##KK##
-X.1.........2T
-#.CCC.RR.CCC.T
-#............#
-K.M.CCC.CCC..#
-K............C
-#.CCC.M..CCC.P
-C............P
-#.3........4.#
-#####SS#######
+########   ###TT######
+#.mmmm.#   #ll.......P
+#.mRRm.#   #ll..4....P
+#......#   #LL.......#
+#.####.#   ###H####.##
+#....ll#          #.#
+I.1..ll#   ########.##
+I......H   #L........#
+B.....L#   #L..KK..3.#
+B..2..L#####...KK..M.#
+#..M.................#
+##SS#X################
 ```
 
-| Players      | 1          | 2          | 3           | 4           |
-| ------------ | ---------- | ---------- | ----------- | ----------- |
-| ★ / ★★ / ★★★ | 50/100/160 | 90/170/260 | 110/230/360 | 140/280/430 |
+| Players      | 1        | 2        | 3        | 4         |
+| ------------ | -------- | -------- | -------- | --------- |
+| ★ / ★★ / ★★★ | 10/15/20 | 20/35/50 | 30/55/75 | 50/90/125 |
 
 ## Chapter: Enterprise
 
@@ -301,90 +306,143 @@ _New: meetings_
 
 ### 4-1 Back to Back
 
-> Calendar invites! Go sit in the meeting room or lose points.
+> Calendar invites, two meeting rooms, doors that shut while you meet.
 
 ![Back to Back](images/levels/back-to-back.webp)
 
-A calm office with a glass meeting room on the right (the `m` tiles).
+HQ: two offices off a corridor and two glass meeting rooms, the Fishbowl between the offices and the Aquarium off the corridor. Invites take turns between the rooms, and a room's doors shut on everyone but the invited player while the meeting runs, so the shortcut through the Fishbowl comes and goes.
 
-- **New here:** Meetings, on a calm schedule: the first invite after 20 s, then about every 45 s (solo), 25 s to get there.
-- **Extras:** Meetings (calm)
-- **Map:** [`maps/level-10-back-to-back.txt`](../../maps/level-10-back-to-back.txt)
+- **New here:** Calendar invites, named rooms, meeting doors.
+- **Extras:** meetings
+- **Map:** [`maps/level-10-back-to-back.txt`](../../maps/level-10-back-to-back.txt) (21 × 12)
 
 ```text
-###II###BB####
-#X..........T#
-#K...1..2...T#
-#K..........C#
-#C..CCC...####
-#C........#mm#
-#P..3..4...mm#
-#P........#mm#
-#C........####
-#####SS#######
+#B#KKII#     ##KK#B##
+#......#######......#
+X..1...#mmmmm#...3..#
+#......dmmCmmd......#
+#...2..#mmmmm#..4...#
+#.#C##.#######.##C#.#
+#...................#
+#...................#
+###T##PSSP#T###d#d###
+             #mmmmm#
+             #mmCmm#
+             #######
 ```
 
-| Players      | 1          | 2          | 3           | 4           |
-| ------------ | ---------- | ---------- | ----------- | ----------- |
-| ★ / ★★ / ★★★ | 50/100/150 | 90/170/250 | 110/230/330 | 140/280/410 |
+| Players      | 1          | 2           | 3           | 4           |
+| ------------ | ---------- | ----------- | ----------- | ----------- |
+| ★ / ★★ / ★★★ | 60/110/155 | 105/190/265 | 135/255/350 | 160/295/410 |
 
 ### 4-2 Synergy
 
-> Meetings, a manager and incidents. Lots of synergy.
+> The boardroom walls fold away on a schedule. Reorg!
 
 ![Synergy](images/levels/synergy.webp)
 
-The meeting room is up a corridor in the top right. A manager wanders the main room and production still breaks.
+Dev and ops on either side of the boardroom, joined by a narrow front passage and a corridor round the back. On a schedule the boardroom walls fold away into one big hall, then close again; its table desks roll out to the edges and back with whatever is on them.
 
-- **New here:** Meetings at full pace with a manager and incidents.
-- **Extras:** Meetings, 1 manager, incidents
-- **Map:** [`maps/level-11-synergy.txt`](../../maps/level-11-synergy.txt)
+- **New here:** Reorgs: walls and desks that move.
+- **Extras:** incidents, meetings, 1 manager, 3 reorgs
+- **Map:** [`maps/level-11-synergy.txt`](../../maps/level-11-synergy.txt), [`level-11-synergy.phase2.txt`](../../maps/level-11-synergy.phase2.txt) (20 × 10)
 
 ```text
-##II##BB######
-X..1...#.mmm.#
-K......#.mmm.#
-K..CC........#
-C......#######
-#..M....2....#
-T...CCCC.....P
-T..3......4..P
-C............C
-####SS##SS####
+  ################
+  #......M.......#
+  #..............#
+#B#.##.##..##.##.###
+X......=mmmm=......T
+#...2..=mDDm=..3...T
+I......=mmmm=......#
+I.1....======....4.P
+#..................P
+##KK#########KK#SS##
 ```
 
-| Players      | 1         | 2          | 3           | 4           |
-| ------------ | --------- | ---------- | ----------- | ----------- |
-| ★ / ★★ / ★★★ | 50/90/140 | 80/150/230 | 100/210/310 | 130/250/380 |
+Phase 2:
+
+```text
+  ################
+  #......M.......#
+  #..............#
+#B#.##.##..##.##.###
+X.......mmmm.......T
+#...2..Dm..mD..3...T
+I.......mmmm.......#
+I.1..............4.P
+#..................P
+##KK#########KK#SS##
+```
+
+| Players      | 1        | 2          | 3           | 4           |
+| ------------ | -------- | ---------- | ----------- | ----------- |
+| ★ / ★★ / ★★★ | 35/70/95 | 70/130/180 | 120/225/310 | 140/255/355 |
 
 ### 4-3 The Reorg
 
-> Everything, everywhere, all at once.
+> Three floor plans in one round, and turnstiles that flip.
 
 ![The Reorg](images/levels/the-reorg.webp)
 
-Two review stations, four keyboards, a meeting room in the corner, a manager in the middle, incidents and meetings. Everything the game has.
+The finale of Enterprise: three floor plans round a fixed boardroom, Silos, Open Plan and Matrix, a minute each. Walls, doors and desks move; badge turnstiles into the shipping lobby only go one way and flip in Open Plan. The staff door is always two-way.
 
-- **New here:** Everything at once.
-- **Extras:** Reviews 30%, incidents, meetings, 1 manager
-- **Map:** [`maps/level-12-the-reorg.txt`](../../maps/level-12-the-reorg.txt)
+- **New here:** Three floor plans and badge turnstiles.
+- **Extras:** Reviews 30%, incidents, meetings, 1 manager, 2 reorgs
+- **Map:** [`maps/level-12-the-reorg.txt`](../../maps/level-12-the-reorg.txt), [`level-12-the-reorg.phase2.txt`](../../maps/level-12-the-reorg.phase2.txt), [`level-12-the-reorg.phase3.txt`](../../maps/level-12-the-reorg.phase3.txt) (22 × 12)
 
 ```text
-##II##BBKK####
-X.1.......#mm#
-#..R......#mm#
-K.....M......#
-K..CCCC..CC..#
-#............T
-#.CC..R..CC..T
-C..3......4..P
-C.......2....P
-######SS######
+##IIB#KK######RR######
+#.......======...M...K
+#.1.....======.......K
+X...2...=mmmm=...3...#
+#.......dmCCmd.......#
+#..DD...=mmmm=...DD..#
+T.......======....4..T
+#....................#
+#######+##.###+#######
+     #..........#
+     P..........P
+     #####SS#####
 ```
 
-| Players      | 1         | 2          | 3           | 4           |
-| ------------ | --------- | ---------- | ----------- | ----------- |
-| ★ / ★★ / ★★★ | 50/90/140 | 80/150/240 | 100/210/320 | 130/250/390 |
+Phase 2:
+
+```text
+##IIB#KK######RR######
+#................M...K
+#.1......DDDD........K
+X...2....mmmm....3...#
+#........mCCm........#
+#........mmmm........#
+T.................4..T
+#....................#
+#######+##.###+#######
+     #..........#
+     P..........P
+     #####SS#####
+```
+
+Phase 3:
+
+```text
+##IIB#KK######RR######
+#........=DD=....M...K
+#.1.....======.......K
+X...2...dmmmmd...3...#
+#.==D====mCCm====D==.#
+#.......=mmmm=.......#
+T.......======....4..T
+#....................#
+#######+##.###+#######
+     #..........#
+     P..........P
+     #####SS#####
+```
+
+| Players      | 1        | 2          | 3          | 4           |
+| ------------ | -------- | ---------- | ---------- | ----------- |
+| ★ / ★★ / ★★★ | 30/60/80 | 55/100/140 | 90/165/230 | 110/210/290 |
 
 ## Chapter: Big Tech
 
@@ -392,116 +450,139 @@ _New: belts, design, merges._
 
 ### 5-1 The Atrium
 
-> An atrium in the middle. Throw it across, ride the belt or walk round.
+> Two buildings, an atrium, belts, a skybridge and a travelator.
 
 ![The Atrium](images/levels/the-atrium.webp)
 
-Two office halves across an atrium. Inbox, bug queue and keyboards on the left; test benches and pipelines on the right; ship on the left again. Throw across the gap onto the counters on the far edge, put tickets on the belt bridges (one each way), or walk round along the bottom.
+Two buildings face each other across an atrium. Ways across: a 1-wide skybridge, two belt bridges and a travelator along the front that runs east. Anything dropped into the atrium is gone.
 
-- **New here:** Gaps you throw across, conveyor belts, a long way round.
-- **Extras:** No reviews, no incidents
-- **Map:** [`maps/level-13-the-atrium.txt`](../../maps/level-13-the-atrium.txt)
+- **New here:** Gaps, belts, the travelator.
+- **Extras:** —
+- **Map:** [`maps/level-13-the-atrium.txt`](../../maps/level-13-the-atrium.txt) (22 × 12)
 
 ```text
-#II##BB###TT####
-K..1...~~C..2..P
-K......~~C.....P
-#......~~......#
-#....>>>>>>C...#
-#......~~......#
-#...C<<<<<<....#
-X.4...C~~....3.T
-#..............#
-###SS###########
+##II#KK##
+K.......#~~~~
+K..1....#~~~~##BB#TT##
+#.......>>>>>C.......P
+S........~~~~........P
+S..2.................#
+#........~~~~....3...T
+X.......C<<<<<.....4.T
+#.......#~~~~#.......#
+####.####~~~~#.......#
+    QQQQQQQQQ........#
+             #########
 ```
 
-| Players      | 1          | 2           | 3           | 4           |
-| ------------ | ---------- | ----------- | ----------- | ----------- |
-| ★ / ★★ / ★★★ | 80/160/230 | 140/260/390 | 180/360/530 | 220/430/640 |
+| Players      | 1          | 2          | 3           | 4           |
+| ------------ | ---------- | ---------- | ----------- | ----------- |
+| ★ / ★★ / ★★★ | 55/100/140 | 95/180/250 | 120/220/305 | 150/285/390 |
 
 ### 5-2 Design Sprint
 
-> Whiteboards before keyboards. Pair up to code faster.
+> Whiteboards behind a revolving door. Pair up to code faster.
 
 ![Design Sprint](images/levels/design-sprint.webp)
 
-An L-shaped office (the corner is void). Whiteboards along the top and the side, a keyboard island built for two, the test benches and pipelines far away at the end of the long arm.
+A cosy design studio behind a revolving door (one person at a time) and a hatch, a hallway, and a big engineering hall built for pairing. Designed tickets leave the studio over a belt.
 
-- **New here:** Design at the whiteboard, pair programming.
-- **Extras:** 60% of features start with design, pairing
-- **Map:** [`maps/level-14-design-sprint.txt`](../../maps/level-14-design-sprint.txt)
+- **New here:** Design at the whiteboard, pair programming, the revolving door.
+- **Extras:** design 60%, pairing
+- **Map:** [`maps/level-14-design-sprint.txt`](../../maps/level-14-design-sprint.txt) (18 × 10)
 
 ```text
-##II##WW##
-#...1....#
-K........W
-K..CKKC..W
-#........#######
-B.2..........3.T
-#.....CCCC.....T
-X..............P
-#..4...........P
-####SS##########
+###W###
+#.....#  #BB##TT##
+W..2..>>>C.......P
+W.....#  #.KK....P
+#.....#  #.......#
+##*#C##  #....KK.#
+I.1.......3......#
+I..............4.X
+##########.......#
+         ###SS####
 ```
 
 | Players      | 1          | 2           | 3           | 4           |
 | ------------ | ---------- | ----------- | ----------- | ----------- |
-| ★ / ★★ / ★★★ | 90/180/260 | 150/300/440 | 210/400/600 | 250/490/730 |
+| ★ / ★★ / ★★★ | 60/110/155 | 110/200/280 | 145/275/380 | 175/325/450 |
 
 ### 5-3 Monorepo
 
-> Full-stack features: code the front end and the back end, then merge them.
+> Front end and back end in two towers. Merge in the middle, or take the shuttle.
 
 ![Monorepo](images/levels/monorepo.webp)
 
-Keyboards on both sides of an atrium (any keyboard codes either half), the merge station just below the gap, and a belt across the top. Orders come a bit slower (every 24 s) but most are full-stack.
+Two towers, front end and back end, with the integration room between them. Each team codes its half at home and puts it on its belt to the merge station; the campus shuttle crosses the courtyard at the back.
 
-- **New here:** Full-stack orders: front end + back end, merged at G.
-- **Extras:** 60% full-stack, pairing, orders every 24 s
-- **Map:** [`maps/level-15-monorepo.txt`](../../maps/level-15-monorepo.txt)
+- **New here:** Full-stack merges and the shuttle.
+- **Extras:** full-stack 60%, pairing
+- **Map:** [`maps/level-15-monorepo.txt`](../../maps/level-15-monorepo.txt) (22 × 12)
 
 ```text
-##II###~~###KK##
-K..1...~~...2..K
-K......~~......K
-#..>>>>>>>>C...#
-#......~~......#
-#..C...~~...C..#
-#......G.......#
-X.4...........3T
-B..............#
-###SS####TT#PP##
+###K###        ###K###
+#.....#~~~~~~~~#.....#
+I..1..Y~~~~~~~~Y..2..I
+#.....#~~~~~~~~#.....B
+#.....>>>>v<<<<<.....B
+#..KK.#TT#G#PP##.KK..#
+#.....#...3.......4..#
+#.....#...CC.........#
+#..............#.....#
+#..............#.....#
+X.....####SS####.....X
+#######        #######
 ```
 
 | Players      | 1          | 2           | 3           | 4           |
 | ------------ | ---------- | ----------- | ----------- | ----------- |
-| ★ / ★★ / ★★★ | 90/180/270 | 150/300/450 | 210/400/610 | 250/490/740 |
+| ★ / ★★ / ★★★ | 55/105/145 | 105/195/270 | 140/265/365 | 170/310/430 |
 
 ### 5-4 Hackathon
 
-> A belt round the middle and every new idea at once.
+> Everything at once: belts, spills, a lift, a partition and belt outages.
 
 ![Hackathon](images/levels/hackathon.webp)
 
-A long belt runs round a void in the middle and drops tickets on the counter at the bottom: put one on anywhere and it comes round. Whiteboards, a merge station, design, full-stack orders, pairing and incidents.
+The finale: a big hall with a U belt round a pit, a design room and a server room, and a callback to every chapter: hatches, a spill in front of the snack table, a lift into the server room and a partition that closes one lane, then the other. Every other incident is a belt outage.
 
-- **New here:** Everything new at once, on a loop.
-- **Extras:** 30% design, 40% full-stack, pairing, incidents
-- **Map:** [`maps/level-16-hackathon.txt`](../../maps/level-16-hackathon.txt)
+- **New here:** Everything at once, belt outages.
+- **Extras:** design 30%, full-stack 40%, pairing, incidents (every other one a belt outage), 2 reorgs
+- **Map:** [`maps/level-16-hackathon.txt`](../../maps/level-16-hackathon.txt), [`level-16-hackathon.phase2.txt`](../../maps/level-16-hackathon.phase2.txt) (22 × 12)
 
 ```text
-#II##WW###BB#KK#
-#.1.........2..#
-#...>>>>>>>v...#
-#...^      v...T
-K...^      v...T
-K...^      v...#
-#...^<<<<v<<...#
-#.3...G..CC..4.#
-X..............#
-###SS###TT##PP##
+##W####II#BB#KK##
+#....#.1.......L#
+W....#..........##TT##
+W.......>>>>>v..#L...#
+#.3..#..^~~~~v==#....P
+#....C..^~~~~v..#..4.P
+##.###..^~~~~v..#....#
+#............v..C....X
+G........____C.......#
+#..KK.....CC....######
+#......2........#
+######TT##SS#####
 ```
 
-| Players      | 1          | 2           | 3           | 4           |
-| ------------ | ---------- | ----------- | ----------- | ----------- |
-| ★ / ★★ / ★★★ | 90/180/270 | 150/310/460 | 210/410/620 | 250/500/760 |
+Phase 2:
+
+```text
+##W####II#BB#KK##
+#....#.1.......L#
+W....#..........##TT##
+W.......>>>>>v..#L...#
+#.3..#==^~~~~v..#....P
+#....C..^~~~~v..#..4.P
+##.###..^~~~~v..#....#
+#............v..C....X
+G........____C.......#
+#..KK.....CC....######
+#......2........#
+######TT##SS#####
+```
+
+| Players      | 1         | 2          | 3           | 4           |
+| ------------ | --------- | ---------- | ----------- | ----------- |
+| ★ / ★★ / ★★★ | 40/80/110 | 75/145/200 | 115/210/295 | 125/235/325 |

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import garage from '../../maps/level-01-garage.txt?raw';
-import { FUTURE_CHARS } from './draftMap';
 import {
   MARK_CHARS,
   type Tile,
@@ -102,31 +101,19 @@ describe('parseLevelMap', () => {
 
   it('parses the garage', () => {
     const map = parseLevelMap(garage);
-    expect(map.width).toBe(14);
-    expect(map.height).toBe(10);
-    expect(map.tiles).toHaveLength(14 * 10);
+    expect(map.width).toBe(10);
+    expect(map.height).toBe(7);
+    expect(map.tiles).toHaveLength(10 * 7);
     expect(map.spawns).toEqual([
-      { x: 3, y: 3 },
-      { x: 10, y: 3 },
-      { x: 3, y: 6 },
-      { x: 10, y: 6 },
+      { x: 3, y: 2 },
+      { x: 7, y: 3 },
+      { x: 2, y: 5 },
+      { x: 6, y: 5 },
     ]);
     expect(getTile(map, 0, 0)).toBe('wall');
-    expect(getTile(map, 2, 0)).toBe('inbox');
-    expect(getTile(map, 7, 0)).toBe('bugQueue');
-    expect(getTile(map, 1, 1)).toBe('keyboard');
-    expect(getTile(map, 3, 1)).toBe('keyboard');
-    expect(getTile(map, 9, 1)).toBe('testBench');
-    expect(getTile(map, 11, 1)).toBe('testBench');
-    expect(getTile(map, 5, 4)).toBe('counter');
-    expect(getTile(map, 12, 6)).toBe('pipeline');
-    expect(getTile(map, 1, 8)).toBe('counter');
-    expect(getTile(map, 6, 9)).toBe('ship');
-    // Room to stand below every desk.
-    for (const x of [1, 3, 9, 11]) expect(getTile(map, x, 2)).toBe('floor');
-    expect(getTile(map, 12, 7)).toBe('floor');
-    expect(getTile(map, 0, 6)).toBe('bin');
-    expect(getTile(map, 1, 6)).toBe('floor');
+    expect(getTile(map, 2, 0)).toBe('bugQueue');
+    expect(getTile(map, 3, 0)).toBe('inbox');
+    expect(getTile(map, 9, 1)).toBe('void');
   });
 });
 
@@ -257,12 +244,11 @@ describe('map marks (level redesign mechanics)', () => {
     expect(parseLevelMap(garage).marks).toEqual([]);
   });
 
-  it('stands every mark on the tile the draft tools use as its stand-in', () => {
-    for (const [char, { tile }] of Object.entries(MARK_CHARS)) {
-      const standIn = FUTURE_CHARS[char]?.standIn;
-      expect(standIn, char).toBeDefined();
-      expect(parseLevelMap(`${standIn ?? ''}1234`).tiles[0], char).toBe(tile);
-    }
-    expect(Object.keys(MARK_CHARS).sort()).toEqual(Object.keys(FUTURE_CHARS).sort());
+  it('stands every mark on the tile it plays as when its mechanic is idle', () => {
+    expect(MARK_CHARS['=']?.tile).toBe('wall');
+    expect(MARK_CHARS.D?.tile).toBe('counter');
+    expect(MARK_CHARS.o?.tile).toBe('counter');
+    expect(MARK_CHARS.H?.tile).toBe('counter');
+    for (const char of '_%rLldQY*+') expect(MARK_CHARS[char]?.tile, char).toBe('floor');
   });
 });

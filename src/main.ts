@@ -101,18 +101,8 @@ const params = new URLSearchParams(window.location.search);
 const sceneId = params.get('scene');
 const shownScene = sceneId === null ? null : (sceneById(sceneId) ?? null);
 if (sceneId !== null && !shownScene) console.warn(`No scene '${sceneId}'`);
-// `?draft=<level-id>[&phase=<N>]` (dev builds only): plays a level redesign draft from
-// `maps/drafts/` with the level's settings; with `?scene=level-<id>`, shows it in that scene.
-const draftLevel =
-  import.meta.env.DEV && params.has('draft')
-    ? ((await (await import('./render/scene/draftLevel')).loadDraftLevel(params)) ?? undefined)
-    : undefined;
 const practiceLevel =
-  import.meta.env.DEV && params.get('lab') === 'lab-roles'
-    ? levelById('lab-roles')
-    : shownScene
-      ? undefined
-      : draftLevel;
+  import.meta.env.DEV && params.get('lab') === 'lab-roles' ? levelById('lab-roles') : undefined;
 // A scene never touches the save.
 const storage = shownScene || practiceLevel ? null : browserStorage();
 const save = loadSave(storage);
@@ -134,7 +124,6 @@ const scene = new GameScene({
   unlockAll: wantsUnlockAll(params, import.meta.env.DEV && !shownScene),
   scene: shownScene,
   practiceLevel,
-  draftLevel,
   // `?demo`: a kiosk for a booth, bots play whenever nobody does.
   kiosk: !shownScene && params.has('demo'),
   roundRenderer: createThreeRoundRenderer,

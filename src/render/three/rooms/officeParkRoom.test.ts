@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { BEFORE_MAPS } from '../fixtures/beforeMaps';
 import { getTile, parseLevelMap } from '../../../sim/level';
-import { parseDraftMap } from '../../../sim/draftMap';
-import { OPEN_PLAN } from '../../../sim/levels';
-import draftText from '../../../../maps/drafts/open-plan.txt?raw';
+import { parseLevelMap as parseDraftMap } from '../../../sim/level';
+import draftText from '../../../../maps/level-02-open-plan.txt?raw';
 import { wallPiece } from '../../mapShape';
 import { WALL_DECO_MODELS } from '../roomModels';
 import { gridToWorld } from '../../projection';
@@ -18,7 +18,7 @@ import {
 const coords = (k: string) => k.split(',').map(Number) as [number, number];
 
 describe('officeParkRoom', () => {
-  const shipped = OPEN_PLAN.map;
+  const shipped = BEFORE_MAPS['open-plan'];
   const draft = parseDraftMap(draftText);
   const maps = [shipped, draft];
 

@@ -145,7 +145,14 @@ export function chooseGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Go
           if (!candidatePlayer) throw new Error(`No player ${candidate.playerId}`);
           const walk = nearest(state, candidate.playerId, queueTile);
           if (!walk) return [];
-          const path = findPath(state.level, currentTile(state, candidate.playerId), walk, [], [], state.gates);
+          const path = findPath(
+            state.level,
+            currentTile(state, candidate.playerId),
+            walk,
+            [],
+            [],
+            state.gates,
+          );
           if (!path) return [];
           return [
             {
@@ -358,6 +365,24 @@ function reviewHelpGoal(state: GameState, bot: Bot, bots: readonly Bot[]): Goal 
   const tile = nearest(state, bot.playerId, waiting);
   if (!tile) return null;
   bot.helping = tile;
+  // No free spot at the ticket's tile (a review desk against a wall): work the empty
+  // review tile beside it, which counts for the same station.
+  const others = state.players
+    .filter((p) => p.id !== bot.playerId)
+    .map((p) => ({ x: Math.round(p.pos.x), y: Math.round(p.pos.y) }));
+  const from = currentTile(state, bot.playerId);
+  if (!findPath(state.level, from, tile, others, [], state.gates)) {
+    const twin = [
+      { x: tile.x + 1, y: tile.y },
+      { x: tile.x - 1, y: tile.y },
+    ].find(
+      (t) =>
+        getTile(state.level, t.x, t.y) === 'review' &&
+        !ticketOnTile(state, t.x, t.y) &&
+        findPath(state.level, from, t, others, [], state.gates),
+    );
+    if (twin) return { tile: twin, action: 'work', besideOthers: true };
+  }
   return { tile, action: 'work', besideOthers: true };
 }
 

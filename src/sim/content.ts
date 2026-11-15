@@ -284,22 +284,22 @@ export const LEVEL_NAMES: Readonly<Record<string, string>> = {
 
 /** One line under each level's name on the level select, by level id. */
 export const LEVEL_BLURBS: Readonly<Record<string, string>> = {
-  garage: 'Where every unicorn starts.',
-  'open-plan': 'A counter wall splits the office. Throw it over!',
-  'scale-up': 'Code reviews are mandatory. The review room is down the hall.',
+  garage: 'Where every unicorn starts: one tiny garage.',
+  'open-plan': 'Our first office, split by a desk row. Throw it over!',
+  'scale-up': 'Two rooms and a long hallway. Code reviews are down the hall.',
   'seed-round': 'Real customers! Production breaks. Hotfixes jump the bug queue.',
-  'demo-day': 'A counter wall, a demo to give, and prod on fire.',
-  'on-call': 'The long way round, with the pager on.',
+  'demo-day': 'A leaky tap floods the floor. Fix it or slide.',
+  'on-call': 'Night shift. The mop robot never stops, and it leaves the floor wet.',
   'middle-management': 'Meet your new manager. Mind the walking status update.',
-  hypergrowth: 'Two rooms, two doors, one manager standing in them.',
-  'hot-desking': 'Rows of desks and two managers in the aisles.',
-  'back-to-back': 'Calendar invites! Go sit in the meeting room or lose points.',
-  synergy: 'Meetings, a manager and incidents. Lots of synergy.',
-  'the-reorg': 'Everything, everywhere, all at once.',
-  'the-atrium': 'An atrium in the middle. Throw it across, ride the belt or walk round.',
-  'design-sprint': 'Whiteboards before keyboards. Pair up to code faster.',
-  monorepo: 'Full-stack features: code the front end and the back end, then merge them.',
-  hackathon: 'A belt round the middle and every new idea at once.',
+  hypergrowth: 'Two floors, one lift and a mail chute. The stairs are a long way round.',
+  'hot-desking': 'Three floors, an express lift that breaks down and two managers.',
+  'back-to-back': 'Calendar invites, two meeting rooms, doors that shut while you meet.',
+  synergy: 'The boardroom walls fold away on a schedule. Reorg!',
+  'the-reorg': 'Three floor plans in one round, and turnstiles that flip.',
+  'the-atrium': 'Two buildings, an atrium, belts, a skybridge and a travelator.',
+  'design-sprint': 'Whiteboards behind a revolving door. Pair up to code faster.',
+  monorepo: 'Front end and back end in two towers. Merge in the middle, or take the shuttle.',
+  hackathon: 'Everything at once: belts, spills, a lift, a partition and belt outages.',
 };
 
 /** Chapter names, by chapter id. */
@@ -314,10 +314,10 @@ export const CHAPTER_NAMES: Readonly<Record<string, string>> = {
 /** One line under each chapter's name: its new mechanic. */
 export const CHAPTER_BLURBS: Readonly<Record<string, string>> = {
   garage: 'Two founders and a dream.',
-  startup: 'New: production incidents',
-  'scale-up': 'New: the wandering manager',
-  enterprise: 'New: meetings',
-  'big-tech': 'New: belts, design, merges',
+  startup: 'New: production incidents and spills',
+  'scale-up': 'New: the wandering manager and lifts',
+  enterprise: 'New: meetings and reorgs',
+  'big-tech': 'New: belts, design, merges, the campus',
 };
 
 /** Shown on the results when the score beats the best so far. */
@@ -514,15 +514,6 @@ export const LEVEL_INTRO_TIPS: Readonly<Record<string, { text: string; picture: 
     picture: 'meeting',
     text: 'Calendar invites: the invited player sits in the meeting room for a few seconds, or you lose points.',
   },
-};
-
-/**
- * Intro tips for the redesigned levels (phase 23), by level id. They join
- * `LEVEL_INTRO_TIPS` in the rollout, when these levels get their new maps.
- */
-export const REDESIGN_INTRO_TIPS: Readonly<
-  Record<string, { text: string; picture: IntroPicture }>
-> = {
   'demo-day': {
     picture: 'spill',
     text: 'Wet floor: you slide! The leaky tap floods the floor round it. Hold work at the tap to fix it, or go round.',

@@ -116,12 +116,12 @@ describe('targetTile', () => {
 
   it('picks the counter a player is pressed against', () => {
     const state = newGame();
-    // Above the counter island at (5..8, 4).
+    // Above the counter island at (3..5, 4).
     const player = state.players[0];
     if (!player) throw new Error('no player');
-    player.pos = { x: 6, y: 3 };
+    player.pos = { x: 4, y: 3 };
     for (let i = 0; i < 60; i++) tick(state, [input(state, { x: 0, y: 1 })]);
-    expect(targetTile(state, 1)).toEqual({ x: 6, y: 4 });
-    expect(state.level.tiles[4 * state.level.width + 6]).toBe('counter');
+    expect(targetTile(state, 1)).toEqual({ x: 4, y: 4 });
+    expect(state.level.tiles[4 * state.level.width + 4]).toBe('counter');
   });
 });

@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs';
+import { BEFORE_MAPS } from '../fixtures/beforeMaps';
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { type LevelMap, getTile, parseLevelMap } from '../../../sim/level';
-import { parseDraftMap } from '../../../sim/draftMap';
+import { type LevelMap, getTile } from '../../../sim/level';
+import { parseLevelMap as parseDraftMap } from '../../../sim/level';
 import { projectPoint } from '../../projection';
 import { WALL_HEIGHT } from '../layout';
 import { managerOffice } from '../rooms/managerOffice';
@@ -23,8 +24,8 @@ const text = (path: string) =>
 
 /** The shipped level and the redesign draft: the scene must fit both. */
 const MAPS: Record<string, LevelMap> = {
-  shipped: parseLevelMap(text('maps/level-07-middle-management.txt')),
-  draft: parseDraftMap(text('maps/drafts/middle-management.txt')),
+  shipped: BEFORE_MAPS['middle-management'],
+  draft: parseDraftMap(text('maps/level-07-middle-management.txt')),
 };
 
 const GROUND = -0.463;

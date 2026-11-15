@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { BEFORE_MAPS } from '../fixtures/beforeMaps';
 import { getTile } from '../../../sim/level';
-import { parseDraftMap } from '../../../sim/draftMap';
-import { SEED_ROUND } from '../../../sim/levels';
-import draftText from '../../../../maps/drafts/seed-round.txt?raw';
+import { parseLevelMap as parseDraftMap } from '../../../sim/level';
+import draftText from '../../../../maps/level-04-seed-round.txt?raw';
 import { wallPiece } from '../../mapShape';
 import { gridToWorld } from '../../projection';
 import {
@@ -15,7 +15,7 @@ import {
 } from './loftRoom';
 
 describe('loftRoom', () => {
-  const shipped = SEED_ROUND.map;
+  const shipped = BEFORE_MAPS['seed-round'];
   const draft = parseDraftMap(draftText);
   const maps = [shipped, draft];
   const isOpen = (t: ReturnType<typeof getTile>) => t !== null && t !== 'wall' && t !== 'void';

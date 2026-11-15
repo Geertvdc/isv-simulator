@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { BEFORE_MAPS } from '../fixtures/beforeMaps';
 import { getTile } from '../../../sim/level';
-import { parseDraftMap } from '../../../sim/draftMap';
-import { ON_CALL } from '../../../sim/levels';
-import draftText from '../../../../maps/drafts/on-call.txt?raw';
+import { parseLevelMap as parseDraftMap } from '../../../sim/level';
+import draftText from '../../../../maps/level-06-on-call.txt?raw';
 import { wallPiece } from '../../mapShape';
 import { atmosphereFor, lampSpots } from '../atmosphere';
 import { WALL_HEIGHT } from '../layout';
@@ -19,7 +19,7 @@ import {
 } from './basementRoom';
 
 describe('basementRoom', () => {
-  const shipped = ON_CALL.map;
+  const shipped = BEFORE_MAPS['on-call'];
   const draft = parseDraftMap(draftText);
   const maps = [shipped, draft];
   const isOpen = (t: ReturnType<typeof getTile>) => t !== null && t !== 'wall' && t !== 'void';
