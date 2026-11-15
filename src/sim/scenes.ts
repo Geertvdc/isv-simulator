@@ -161,6 +161,7 @@ export function invite(state: GameState, id: PlayerId, title: string, left = 0.8
     expiresTick: created + timeLimit,
     attendedTicks: 0,
     attendTicks: state.settings.meetings?.attendTicks ?? 4 * 60,
+    room: 0,
   };
   state.invites.push(result);
   return result;

@@ -226,9 +226,29 @@ export const NO_WEBGL_TEXT =
 
 /** Over a meeting room. */
 export const MEETING_ROOM_TEXT = 'Meeting room';
+
+/** Meeting room names per level, rooms in reading order (`meetingRooms`). */
+const MEETING_ROOM_NAMES: Readonly<Record<string, readonly string[]>> = {
+  'back-to-back': ['Fishbowl', 'Aquarium'],
+  synergy: ['Boardroom'],
+  'the-reorg': ['Boardroom'],
+  'middle-management': ['Huddle room'],
+  'hot-desking': ['Quiet room'],
+};
+
+/** The name of meeting room `room` on `levelId`: its own, or "Meeting room". */
+export function meetingRoomName(levelId: string, room: number): string {
+  return MEETING_ROOM_NAMES[levelId]?.[room] ?? MEETING_ROOM_TEXT;
+}
+
+/** How the invite card names the room: "the Fishbowl", or "the meeting room". */
+export function inviteRoomText(levelId: string, room: number): string {
+  const name = MEETING_ROOM_NAMES[levelId]?.[room];
+  return name ? `the ${name}` : 'the meeting room';
+}
 /** On a player's invite card in the HUD. */
-export function inviteText(playerNumber: number): string {
-  return `P${playerNumber}: to the meeting room!`;
+export function inviteText(playerNumber: number, room = 'the meeting room'): string {
+  return `P${playerNumber}: to ${room}!`;
 }
 /** Pops up when a meeting was sat out in time. */
 export const MEETING_DONE_TEXT = 'Meeting over!';

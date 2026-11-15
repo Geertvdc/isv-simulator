@@ -9,7 +9,7 @@ import {
 } from './interact';
 import { isRiding, updateLifts } from './lifts';
 import { updateManagers } from './manager';
-import { expireInvites, updateMeetings } from './meetings';
+import { doorBlocks, expireInvites, updateMeetings } from './meetings';
 import { movePlayer } from './movement';
 import { expireOrders, updateLevelTimer, updateOrders } from './orders';
 import { updatePipelines } from './pipeline';
@@ -36,7 +36,9 @@ export function tick(state: GameState, inputs: readonly InputCommand[]): void {
     // Between floors in a lift: nowhere to go.
     if (isRiding(state, player.id)) continue;
     const input = inputs.find((i) => i.playerId === player.id);
-    const blocks = gateBlocks(state.gates, player.pos);
+    const gate = gateBlocks(state.gates, player.pos);
+    const door = doorBlocks(state, player.id);
+    const blocks = (x: number, y: number): boolean => gate(x, y) || door(x, y);
     if (movePlayer(state.level, player, input?.move, input?.dash, isWet, blocks)) {
       state.events.push({ type: 'dashed', playerId: player.id });
     }

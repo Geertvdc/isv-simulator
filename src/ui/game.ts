@@ -8,6 +8,7 @@ import {
   PAUSE_HINT,
   commitHead,
   commitSubject,
+  inviteRoomText,
   inviteText,
   orderNumber,
   PIPELINE_BROKE_TEXT,
@@ -47,12 +48,16 @@ interface InviteCard {
 }
 
 /** A calendar invite in the HUD: whose it is, its subject, time left and time sat. */
-function createInviteCard(invite: Invite): InviteCard {
+function createInviteCard(invite: Invite, levelId: string): InviteCard {
   const card = el('div', 'invite');
   card.style.setProperty('--player-color', playerCssColor(invite.playerId));
   const head = el('div', 'invite-head');
   const time = el('span', 'invite-time');
-  const who = el('span', 'invite-who', inviteText(invite.playerId));
+  const who = el(
+    'span',
+    'invite-who',
+    inviteText(invite.playerId, inviteRoomText(levelId, invite.room)),
+  );
   who.prepend(playerBadge(invite.playerId));
   head.append(who, time);
   const bar = el('div', 'invite-bar');
@@ -106,7 +111,7 @@ export function mountGameHud(
     for (const invite of state.invites) {
       let entry = inviteCards.get(invite.id);
       if (!entry) {
-        entry = createInviteCard(invite);
+        entry = createInviteCard(invite, state.levelId);
         inviteCards.set(invite.id, entry);
         invites.append(entry.card);
       }

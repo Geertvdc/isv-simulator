@@ -1,16 +1,11 @@
 import Phaser from 'phaser';
 import { type HintId, hintLabel } from '../../flow/hints';
 import { stationWorkStep } from '../../sim/interact';
-import {
-  MEETING_ROOM_TEXT,
-  TICKET_EXPIRED_STAMP,
-  commitHead,
-  orderNumber,
-  pairingText,
-} from '../../sim/content';
+import { TICKET_EXPIRED_STAMP, commitHead, orderNumber, pairingText } from '../../sim/content';
 import { type LevelMap, getTile } from '../../sim/level';
 import { orderOf, shipBlockedBy } from '../../sim/orders';
 import { pipelineWarning } from '../../sim/pipeline';
+import { meetingRooms, roomName } from '../../sim/meetings';
 import { tapFixShare } from '../../sim/spills';
 import type { GameState } from '../../sim/state';
 import { type QueueKind, type Ticket, isPart, isShippable, queuedTickets } from '../../sim/tickets';
@@ -114,7 +109,8 @@ export class Overlays {
   private readonly taps = new Map<string, Phaser.GameObjects.Graphics>();
   private readonly hints = new Map<HintId, Phaser.GameObjects.Container>();
   private readonly debugLabels: { text: Phaser.GameObjects.Text; at: Vec3 }[] = [];
-  private readonly meetingLabel: { text: Phaser.GameObjects.Text; at: Vec3 } | null = null;
+  /** One name label per meeting room (made on the first sync: names depend on the level). */
+  private meetingLabels: { text: Phaser.GameObjects.Text; at: Vec3 }[] | null = null;
   private readonly popups: { label: Phaser.GameObjects.Text; at: Vec3; startMs: number }[] = [];
   /** Where each hint points, worked out once. */
   private readonly hintAnchors = new Map<HintId, { at: Vec3; tileX: number } | null>();
@@ -124,13 +120,6 @@ export class Overlays {
     private readonly scene: Phaser.Scene,
     private readonly map: LevelMap,
   ) {
-    const tiles = map.meetingTiles;
-    if (tiles.length > 0) {
-      const cx = tiles.reduce((sum, t) => sum + t.x, 0) / tiles.length;
-      const top = Math.min(...tiles.map((t) => t.y));
-      const text = this.text(MEETING_ROOM_TEXT, 13, '#e6dcff').setOrigin(0.5, 0);
-      this.meetingLabel = { text, at: gridToWorld(cx, top - 0.45) };
-    }
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
         const tile = getTile(map, x, y);
@@ -158,6 +147,12 @@ export class Overlays {
     project: Project,
   ): void {
     const { state } = view;
+    this.meetingLabels ??= meetingRooms(this.map).map((tiles, room) => {
+      const cx = tiles.reduce((sum, t) => sum + t.x, 0) / tiles.length;
+      const top = Math.min(...tiles.map((t) => t.y));
+      const text = this.text(roomName(state, room), 13, '#e6dcff').setOrigin(0.5, 0);
+      return { text, at: gridToWorld(cx, top - 0.45) };
+    });
     this.syncCards(view, project);
     this.syncQueueCounts(state, project);
     this.syncInvites(view, project);
@@ -182,7 +177,7 @@ export class Overlays {
       place(popup.label, { ...p, y: p.y - POPUP_RISE * p.scale * t }, 1e6);
       popup.label.setAlpha(1 - t * t * t);
     }
-    if (this.meetingLabel) place(this.meetingLabel.text, project(this.meetingLabel.at));
+    for (const label of this.meetingLabels ?? []) place(label.text, project(label.at));
     for (const { text, at } of this.debugLabels) {
       text.setVisible(this.debug);
       if (this.debug) place(text, project(at), 1e6);
