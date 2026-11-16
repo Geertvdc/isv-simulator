@@ -377,7 +377,7 @@ The company outgrows one room: 3-1 is one big corporate floor with a real corner
 
 #### Scale-Up mechanics (spec for the build phase)
 
-- **Lift (`L`):** a cabin of 1 to 4 tiles on each floor it stops at; the level lists which cabins pair up. On a fixed cycle (doors open about 3 s, ride about 2 s) everyone standing in the cabin, with what they carry, moves to the paired cabin on the next floor, keeping their place in the cabin. Telegraph: a light above the doors and a door chime 1 s before departure; floor numbers over the doors. Managers ride too and take a place. Solo: never needs a second player; the stairs are always there. 4 players: the cabin is the queue. Bots: a path edge between paired cabins weighted by the expected wait. Stand-in: floor.
+- **Lift (`L`):** a cabin of 1 to 4 tiles on each floor it stops at; the level lists which cabins pair up. On a fixed cycle (doors open about 3 s, ride about 2 s) everyone standing in the cabin, with what they carry, moves to the paired cabin on the next floor, keeping their place in the cabin. The cabin is a car with doors: they shut in the last second before it leaves and stay shut while it is elsewhere, riders wait in the shut car and step out when it opens on the next floor, and paths never walk through a car. Build cars with walls round them and one door side. Telegraph: a light above the doors and a door chime 1 s before departure; floor numbers over the doors. Managers ride too and take a place. Solo: never needs a second player; the stairs are always there. 4 players: the cabin is the queue. Bots: a path edge between paired cabins weighted by the expected wait. Stand-in: floor.
 - **Express lift (`l`):** like `L`, but it skips the middle floor and has a bigger cabin (2×2) with a longer cycle. Telegraph: amber cabin floor and an "E" over the doors. Solo: worth it only when it is about to leave. 4 players: takes the whole team in one go. Bots: same as `L`. Stand-in: floor.
 - **Lift breakdown:** a level setting, not a tile (for example `liftBreakdowns: [{ lift: 'express', at: 60, seconds: 20 }]`). The express goes out of order once or twice a round for about 20 s, telegraphed 5 s ahead (cabin lights flicker, an "Out of order" sign drops over the doors, a sad chime). People inside get out on the floor they are on. Everyone uses the local lift or the stairs meanwhile, so the local lift crowds and the stairwell fills. Never blocks solo: the local lift and the stairs keep working. Bots: drop the edge while it is broken. Stand-in: none (the setting is ignored).
 - **Mail chute (`H`):** a one-way pair of hatches, upstairs to downstairs. Put or throw a ticket on the top hatch; after about 2 s it slides out of the bottom hatch, where anyone picks it up. Only tickets fit, people take the lift. Telegraph: a down arrow on both hatches and a rattle while a ticket travels. Reuses counters and throwing. Solo: saves carrying the ticket down, but you still walk down to deploy or ship. 4 players: the floor above sends work down without anyone leaving. Bots: a ticket-only edge from top to bottom hatch. Stand-in: counter.
@@ -429,10 +429,10 @@ The company outgrows one room: 3-1 is one big corporate floor with a real corner
               ##KK#KK###
               #........#
               #.....3..T
-  ##II#BB##   H........T
-  #.1...LL#   #LL......#
-  #.....LL#   #LL..M...#
-  X.......#   #.....4..#
+  #IIBB####   ###......T
+  #.1..#LL#   #LL#.....#
+  #....#LL#   #LL#.M...#
+  X.......#   H.....4..#
   #.......H   #........#
   S.......#   ######.###
   S.2.....##########.#
@@ -440,8 +440,9 @@ The company outgrows one room: 3-1 is one big corporate floor with a real corner
   ####PP##############
   ```
 
-- **Lift pairing:** one lift: the ground cabin (6–7,4–5) ↔ the first-floor cabin (13–14,4–5), facing each other across the shaft. Holds 4 (or 3 and the manager).
-- **Mail chute:** the first-floor hatch (12,3, in the left wall, used from 13,3) → the ground hatch (8,7, in the right wall, used from 7,7).
+- **Lift pairing:** one lift: the ground car (6–7,4–5) ↔ the first-floor car (13–14,4–5), either side of the shaft. Each car has walls on three sides and its doors at the front, toward the camera. Holds 4 (or 3 and the manager).
+- **Mail chute:** the first-floor hatch (12,6, in the shaft wall beside the upstairs lift lobby, used from 13,6) → the ground hatch (8,7, in the right wall, used from 7,7).
+- **Lift redesign (2026-11-16):** the cars were walled in so the lift is a place you walk into, not a patch of floor: the inbox and bug queue moved one tile left (1–2 and 3–4, row 3) to make room for the ground car's left wall, and the chute's top hatch moved from (12,3) to (12,6) because the upstairs car's back wall took its only access tile. Recalibrated: bots [15, 120, 165, 235].
 - **Sketch:** ![3-2 Hypergrowth, current left, draft right](images/level-redesign/hypergrowth.svg)
 - **3D render:** ![3-2 Hypergrowth draft in the game](images/level-redesign/hypergrowth-3d.webp)
 - **Report:** (stand-in: no lift, so the stairwell is the only way up)

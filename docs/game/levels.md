@@ -244,7 +244,7 @@ The biggest single open floor so far, with a corner office and a meeting room (q
 
 ![Hypergrowth](images/levels/hypergrowth.webp)
 
-The company now has two floors, drawn side by side: the ground floor (inbox, bugs, pipelines, ship) and the first floor (keyboards, test benches). A lift joins them, the stairs are a long way round, and a mail chute drops finished work from upstairs to the ground floor. The manager rides the lift too.
+The company now has two floors, drawn side by side: the ground floor (inbox, bugs, pipelines, ship) and the first floor (keyboards, test benches). A lift joins them: walk into the car, the doors slide shut, and they open on the other floor. The stairs are a long way round, and a mail chute drops finished work from upstairs to the ground floor. The manager rides the lift too.
 
 - **New here:** Lifts and the mail chute.
 - **Extras:** incidents, 1 manager
@@ -254,10 +254,10 @@ The company now has two floors, drawn side by side: the ground floor (inbox, bug
             ##KK#KK###
             #........#
             #.....3..T
-##II#BB##   H........T
-#.1...LL#   #LL......#
-#.....LL#   #LL..M...#
-X.......#   #.....4..#
+#IIBB####   ###......T
+#.1..#LL#   #LL#.....#
+#....#LL#   #LL#.M...#
+X.......#   H.....4..#
 #.......H   #........#
 S.......#   ######.###
 S.2.....##########.#
@@ -265,9 +265,9 @@ S.2.....##########.#
 ####PP##############
 ```
 
-| Players      | 1        | 2         | 3          | 4          |
-| ------------ | -------- | --------- | ---------- | ---------- |
-| ★ / ★★ / ★★★ | 10/20/25 | 40/70/100 | 65/115/160 | 70/135/185 |
+| Players      | 1       | 2         | 3          | 4          |
+| ------------ | ------- | --------- | ---------- | ---------- |
+| ★ / ★★ / ★★★ | 5/10/10 | 40/80/110 | 60/105/150 | 80/155/210 |
 
 ### 3-3 Hot Desking
 
@@ -296,9 +296,9 @@ B..2..L#####...KK..M.#
 ##SS#X################
 ```
 
-| Players      | 1        | 2        | 3        | 4         |
-| ------------ | -------- | -------- | -------- | --------- |
-| ★ / ★★ / ★★★ | 10/15/20 | 20/35/50 | 30/55/75 | 50/90/125 |
+| Players      | 1       | 2        | 3        | 4         |
+| ------------ | ------- | -------- | -------- | --------- |
+| ★ / ★★ / ★★★ | 5/10/10 | 20/35/50 | 20/35/50 | 40/80/110 |
 
 ## Chapter: Enterprise
 
@@ -583,6 +583,6 @@ G........____C.......#
 ######TT##SS#####
 ```
 
-| Players      | 1         | 2          | 3           | 4           |
-| ------------ | --------- | ---------- | ----------- | ----------- |
-| ★ / ★★ / ★★★ | 40/80/110 | 75/145/200 | 115/210/295 | 125/235/325 |
+| Players      | 1        | 2          | 3           | 4           |
+| ------------ | -------- | ---------- | ----------- | ----------- |
+| ★ / ★★ / ★★★ | 35/70/95 | 70/130/180 | 105/195/270 | 130/235/330 |
