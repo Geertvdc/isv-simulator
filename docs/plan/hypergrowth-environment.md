@@ -1,10 +1,10 @@
 # Hypergrowth environment pass
 
-**Status:** brief written; round 1 next. Level 3-2 (`hypergrowth`, "Hypergrowth"), the second level of the Scale-Up chapter, gets a hand-built world after [Middle Management](middle-management-environment.md) (3-1), in the same building.
+**Status:** two rounds done (build, critic review, fixes). Level 3-2 (`hypergrowth`, "Hypergrowth"), the second level of the Scale-Up chapter, gets a hand-built world after [Middle Management](middle-management-environment.md) (3-1), in the same building.
 
-| Before                                          |
-| ----------------------------------------------- |
-| ![](images/hypergrowth-environment/before.webp) |
+| Before                                          | After                                          |
+| ----------------------------------------------- | ---------------------------------------------- |
+| ![](images/hypergrowth-environment/before.webp) | ![](images/hypergrowth-environment/after.webp) |
 
 **Goal:** the world around the level tells one story, the way Overcooked 2 levels do. Render only (`src/render/`); the sim, maps and balance don't change.
 
@@ -107,12 +107,50 @@ Three agents in one worktree at once, with strict file ownership. The shared plu
 | **World** | `scenes/hypergrowth.ts` (+test), `setDressing/hypergrowth.ts`                                                                                                                                              |
 | **Light** | `atmosphere.ts` (+test), `stage.ts`, `WorldFx.ts`, `createLights` in `look.ts`                                                                                                                             |
 
+## Rounds
+
+Round 1 ran three agents at once (Room, World, Light), with Overcooked 2 shots and our finished 3-1 frame as the bar. The critic scored it **6/10** (before: 3/10; 3-1 about 7). The frame was full, and the open lift shaft (LIFT 1, the car with Segfault on its roof, the WELCOME TO YOTTA banner), the post room with its queue of new starters, the van in the rain and the rain itself all read. What held it back:
+
+- "Upstairs" didn't read: the street outside the first floor sat at the same level and scale as outside the ground floor.
+- The stairwell read as a conveyor belt between two blank grey plateaus.
+- The lift door tops (luminance 169) and some boxes (orange, saturation 0.56) outshone the stations.
+- The grade was flat and grey (saturation 0.217); the rubber floor read as cool as the street.
+- Smaller: the van clipped by the frame edge, a crane tower too small to read "almost done", cotton-candy cherry trees, a dark mat beside the ship that read as a hole, a black ellipse and a floating box in the shaft, thin ground-floor wall tops.
+
+Round 2, in three chunks:
+
+- **Room:** stair treads with risers, steel nosings, a "0" stencil at the foot and a "1" at the top, and a continuous safety-yellow handrail; two-tone coursed block on the stairwell; a glass balustrade upstairs; lift tops 0x7e868d with a big amber floor indicator facing up; cardboard 0x877c6b; low box, welcome-pack and chair clusters on the ground floor's walls; a lighter mat and visible wet tracks from the bay to the lift; the rubber floor 0x828a80.
+- **World:** the street behind and right of the first floor dropped a storey (new optional `Scene.horizonY` and `GroundPatch.y`), with smaller cars, trees and a bus behind the glass, and public steps where the street drops; the van and driver fully in frame, the van's rear turned to the bay; an almost-done tower with two bare top floors, orange netting, a hoist and the crane; wet cherry trees with leaves and trunks; quieter boxes; a clean shaft; WET FLOOR pictograms, puddles and petals out front.
+- **Light:** a warm pool per floor (upstairs brighter), a cooler sky and fog 0x8a96a2, the grade's saturate at 1.65 for this level only, rain down to the lowered street.
+
+Measured on the final shots:
+
+| Measure                                    | Before | Round 1 | Final   |
+| ------------------------------------------ | ------ | ------- | ------- |
+| Frame mean luminance                       | 92.1   | 104.8   | 107.5   |
+| Frame mean luminance, `quality=low`        |        | 105.1   | 108.3   |
+| Frame saturation                           | 0.38   | 0.217   | 0.254   |
+| Ground floor minus street left (luminance) |        | 45      | 60      |
+| Lift door tops                             |        | 169     | 133–139 |
+
+Open Plan's frame differs from its docs shot by 1.15 per channel (animation): unchanged.
+
+Left for later:
+
+- **"Upstairs" reads only moderately.** The façade band under the first floor faces away from this near-top-down camera; the drop shows mostly as a smaller street through the glass.
+- **The stair ramp is beaten by the light.** The treads ramp from dark to light in the data, but on screen the flight reads warm to cool.
+- **The crane tower is still small** (about 65 px above the hoarding) and greyed by the fog.
+- **Small text:** the WET FLOOR pictogram, the onboarding checklist and the DESKS ARRIVING note are only just legible at 1440×810; the chairs in plastic read as a dark lump.
+- **The ship station's mint** is darker than the warm rubber floor round it; it separates by hue, not brightness.
+- **The first-floor carpet is about as bright as the yellow test bench** (157 vs 155); the bench stands out by saturation.
+- The critic did not re-score round 2. Not checked on a real GPU.
+
 ## Done when
 
-- [ ] The shot reads as "a startup's two new floors in the same office building on a rainy day, hiring faster than the desks arrive" without explanation, and nothing in it reads as food or a kitchen.
-- [ ] The storyline beat reads with no explanation: the ground floor full of desk boxes and balloons, the lift between the floors, new starters with welcome packs, the van unloading more desks in the rain.
-- [ ] The outside connects to the play: tickets come in at the post room, ship out of the loading bay; the lift and the chute look like a lift and a chute.
-- [ ] The running gags are in place: the welcome banner over the lift, Prod on the landing, Segfault riding the lift, the crane tower almost done, the onboarding checklist.
-- [ ] No flat empty ground and no void in the 1440×810 frame.
-- [ ] Stations, players, Derek, the lift cabins and the chute hatches read at a glance; nothing hides them.
-- [ ] `npm run check` passes; other levels look as before.
+- [x] The shot reads as "a startup's two new floors in the same office building on a rainy day, hiring faster than the desks arrive" without explanation, and nothing in it reads as food or a kitchen.
+- [x] The storyline beat reads with no explanation: the ground floor full of desk boxes and balloons, the lift between the floors, new starters with welcome packs, the van unloading more desks in the rain.
+- [x] The outside connects to the play: tickets come in at the post room, ship out of the loading bay; the lift and the chute look like a lift and a chute.
+- [x] The running gags are in place: the welcome banner over the lift, Prod on the landing, Segfault riding the lift, the crane tower almost done, the onboarding checklist.
+- [x] No flat empty ground and no void in the 1440×810 frame.
+- [x] Stations, players, Derek, the lift cabins and the chute hatches read at a glance; nothing hides them.
+- [x] `npm run check` passes; other levels look as before.

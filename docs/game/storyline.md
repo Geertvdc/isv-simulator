@@ -4,7 +4,7 @@ The campaign tells one story: **YOTTA**, a startup founded by two people in Mom'
 
 This page is canon for level design and environment passes. A level's map, its world, its props and its light should all tell this level's beat. The players never read this page, so **the story has to show in the world**: in the backdrop, the props, the people outside and the signs on the walls.
 
-Where a level already has an environment brief, that brief is the detailed version and wins on details: [garage](../plan/garage-environment.md), [open plan](../plan/open-plan-environment.md), [down the hall](../plan/down-the-hall-environment.md), [seed round](../plan/seed-round-environment.md), [demo day](../plan/demo-day-environment.md), [on call](../plan/on-call-environment.md), [middle management](../plan/middle-management-environment.md). Everything else here is a starting point: change it when a pass finds something funnier, and update this page when you do.
+Where a level already has an environment brief, that brief is the detailed version and wins on details: [garage](../plan/garage-environment.md), [open plan](../plan/open-plan-environment.md), [down the hall](../plan/down-the-hall-environment.md), [seed round](../plan/seed-round-environment.md), [demo day](../plan/demo-day-environment.md), [on call](../plan/on-call-environment.md), [middle management](../plan/middle-management-environment.md), [hypergrowth](../plan/hypergrowth-environment.md). Everything else here is a starting point: change it when a pass finds something funnier, and update this page when you do.
 
 ## The arc in one table
 
@@ -154,9 +154,9 @@ _New: the wandering manager._ YOTTA has money, headcount and a manager. It doesn
 - **Where and when:** two floors of the same building, joined by one tiny lift and a long stairwell. A rainy spring day.
 - **The joke:** they hire faster than the desks arrive. The ground floor is full of unopened desk boxes and welcome balloons, and the lift is always full of new starters with welcome packs.
 - **Mechanic in the story:** the lift, the stairs and a mail chute: work goes up to the developers and comes down to be shipped. Derek rides the lift.
-- **Inbox and ship:** the inbox is the ground-floor post room; the ship hatch is the loading bay out into the rain.
-- **Outside:** rain on the windows, the street with umbrellas, a delivery van unloading more desk boxes, the crane tower almost done.
-- **Running gags:** a YOTTA welcome banner over the lift, Prod on the landing in a bigger pot, Segfault riding the lift, the plan as an onboarding checklist.
+- **Inbox and ship:** the inbox is the ground-floor post room's pass-through (pigeonholes, a franking machine, mail sacks, a queue of new starters with violet welcome totes); the ship hatch is the loading bay's roller shutter out into the rain, where a courier van is unloading more desk boxes.
+- **Outside:** rain, the wet street right outside the ground floor and a storey below the first floor's glass, umbrellas, wet cherry trees, the courier van at the loading bay, and across the street the crane tower almost done: two bare top floors in orange netting, the crane still on the roof. Between the floors, the open lift shaft.
+- **Running gags:** a violet WELCOME TO YOTTA banner strung across the top of the lift shaft, Prod on the stair landing in a bigger pot, Segfault asleep on the roof of the lift car in the shaft, the plan as an onboarding checklist (DAY 1 ticks, then `1. Build it`, `2. ???`, `3. Profit`) by the post room hatch.
 - **Level design hooks:** two floors side by side as islands; the solo player waits for the lift or takes the stairs.
 - **How it ends:** there are more people than desks. Someone suggests hot desking.
 
@@ -269,7 +269,7 @@ A quick lookup for set dressing. "—" means it's not in that level.
 | 2-2   | LED pitch slide            | on a stage monitor  | reserved seat        | front row, RESERVED         | scout taking notes      | —                 |
 | 2-3   | sticker on a cage rack     | by the storage cage | warmest server       | —                           | —                       | —                 |
 | 3-1   | vinyl beside reception     | reception           | Derek's chair        | —                           | Derek's old lanyard     | half-clad         |
-| 3-2   | welcome banner             | landing             | riding the lift      | —                           | —                       | almost done       |
+| 3-2   | banner over the lift shaft | stair landing       | on the lift car roof | —                           | —                       | almost done       |
 | 3-3   | on the lockers             | unbookable desk     | empty locker         | —                           | —                       | finished, TO LET  |
 | 4-1   | steel letters in the lobby | corridor planter    | boardroom table      | meeting room; visitor bay   | level with them         | they're inside it |
 | 4-2   | side by side with MONOLITH | sticky-note parking | flip chart           | —                           | executives visiting     | —                 |
