@@ -10,7 +10,6 @@ import {
   chuteFaceModel,
   chuteHatchCounter,
   floorNumberModel,
-  liftHeadModel,
   loadingBayModel,
   mixedFloorModel,
   mixedLook,
@@ -123,11 +122,6 @@ export const LOWER_FLOORS_ROOM: RoomDressing<LowerFloorsRoom> = {
         yaw: DOOR_YAW[plan.loadingBay.side],
       });
     }
-    for (const l of plan.lifts)
-      place(`liftHead:${l.floor}`, () => liftHeadModel(l.floor), {
-        at: gridToWorld(l.mid.x, l.mid.y),
-        yaw: 0,
-      });
     for (const h of plan.hatches)
       place(`chuteFace:${h.top}`, () => chuteFaceModel(h.top), {
         at: gridToWorld(h.x, h.y),

@@ -21,6 +21,7 @@ import {
 } from '../projection';
 import type { RoundFrame, RoundRenderer } from '../RoundRenderer';
 import { OVERLAY_SCALE, Overlays, POPUP_HEIGHT, type ScreenPoint, overlayScale } from './Overlays';
+import { inShutCar } from '../../sim/lifts';
 import { withoutReorgTiles } from '../../sim/reorgs';
 import { Mechanics } from './Mechanics';
 import { People } from './People';
@@ -141,7 +142,10 @@ export class ThreeRoundRenderer implements RoundRenderer {
       }
       // Turns grey when its order runs out.
       mesh.geometry = geometry;
-      mesh.visible = placed.visible;
+      // A ticket carried in a shut lift car rides out of sight with its carrier.
+      const loc = ticket.location;
+      mesh.visible =
+        placed.visible && !(loc.kind === 'player' && inShutCar(state, 'player', loc.playerId));
       putAt(mesh, placed.pos);
       mesh.rotation.y = placed.yaw;
     }

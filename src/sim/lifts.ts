@@ -228,6 +228,14 @@ export function liftDoorBlocks(state: GameState, pos: { x: number; y: number }):
   };
 }
 
+/** Whether a player or manager rides a shut lift car (render hides them inside it). */
+export function inShutCar(state: GameState, kind: Rider['kind'], id: number): boolean {
+  return state.lifts.some(
+    (l) =>
+      hasDoors(l) && l.phase === 'riding' && l.riders.some((r) => r.kind === kind && r.id === id),
+  );
+}
+
 function slotOf(cabin: readonly GridPoint[], pos: { x: number; y: number }): number {
   const x = Math.round(pos.x);
   const y = Math.round(pos.y);

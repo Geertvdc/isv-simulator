@@ -6,6 +6,7 @@ import {
   THROW_HOLD_TICKS,
 } from '../../sim/balance';
 import type { GameEvent } from '../../sim/orders';
+import { inShutCar } from '../../sim/lifts';
 import { isDashing } from '../../sim/movement';
 import { type GameState, type Player, type PlayerId } from '../../sim/state';
 import { ticketCarriedBy } from '../../sim/tickets';
@@ -135,6 +136,8 @@ export class People {
       const acting = isDashing(player) || player.throwCharge > 0;
       const yaw = shownYaw(person.facing, simYaw, speed, PLAYER_MAX_SPEED, acting, timeMs);
       this.place(person, gridToWorld(pos.x, pos.y), yaw, dt);
+      // Riding a shut lift car: out of sight inside it.
+      person.character.root.visible = !inShutCar(state, 'player', player.id);
       applyPose(
         person.character,
         playerPose(this.poseInput(state, player, person, timeMs, dt, speed), timeMs),
@@ -157,6 +160,7 @@ export class People {
         this.managers.set(manager.id, person);
       }
       this.place(person, gridToWorld(pos.x, pos.y), facingYaw(manager.facing), dt);
+      person.character.root.visible = !inShutCar(state, 'manager', manager.id);
       const fullSpeed = MANAGER_SPEED * 1.6;
       const moving = noteMotion(person.motion, pos, timeMs) && !over;
       stepGait(person.gait, moving && manager.walking ? MANAGER_SPEED : 0, fullSpeed, dt);

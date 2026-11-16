@@ -78,7 +78,18 @@ describe('lowerFloorsRoom', () => {
         expect(spawns.has(k)).toBe(false);
   });
 
-  it('frames the lift doors in the walls beside the cabins, facing across the shaft', () => {
+  it('clads every wall round each lift car in steel, its shaft wall facing across the shaft', () => {
+    for (const k of cabins) {
+      const [x = 0, y = 0] = k.split(',').map(Number);
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ] as const)
+        if (getTile(map, x + dx, y + dy) === 'wall')
+          expect(plan.swaps[key(x + dx, y + dy)]).toMatch(/^lift:/);
+    }
     const doors = liftDoors(map);
     expect(doors.map((d) => d.floor)).toEqual([0, 1]);
     for (const d of doors) {
@@ -202,7 +213,7 @@ describe('lowerFloorsRoom', () => {
           expect(Math.abs(x - f.x)).toBeGreaterThanOrEqual(0.5 + PENDANT_HALF - 0.15 - 1e-9);
       }
     }
-    // Both floors get theirs.
-    expect(new Set(got.map((f) => f.z)).size).toBe(2);
+    // Upstairs gets its; the ground floor's back row is all inbox and bug queue, so none hangs there.
+    expect(got.some((f) => f.z < 2)).toBe(true);
   });
 });
