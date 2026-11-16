@@ -21,7 +21,7 @@ import { type GridPoint, type LevelMap, getTile } from './level';
 import { isDashing, resolveCollisions } from './movement';
 import { pathTo } from './path';
 import * as rng from './rng';
-import { isLiftHop } from './lifts';
+import { isLiftHop, liftDoorBlocks } from './lifts';
 import { mopLoop } from './spills';
 import type { GameState, Player, Vec } from './state';
 
@@ -164,6 +164,8 @@ function walk(state: GameState, manager: Manager): void {
   const dist = Math.hypot(dx, dy);
   // The next step is a lift ride: wait in the cabin for the lift to take it there.
   if (isLiftHop(state.level, manager.pos, next)) return;
+  // Lift doors shut: wait outside for the lift.
+  if (liftDoorBlocks(state, manager.pos)(Math.round(next.x), Math.round(next.y))) return;
   const step = (manager.kind === 'mopRobot' ? MOP_ROBOT_SPEED : MANAGER_SPEED) * DT;
   const facing = dist > EPSILON ? { x: dx / dist, y: dy / dist } : manager.facing;
   const to =

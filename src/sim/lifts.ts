@@ -9,6 +9,11 @@
  * managers) rides to the next floor, keeping their place in the cabin. It
  * runs up and down the floors in turn. The express just has fewer floors.
  *
+ * Lifts (not the shuttle) have doors: a cabin only lets people in while the
+ * lift stands open at that floor, and not in its last second there (the
+ * chime, while the doors close). Riders wait in the closed cabin for the ride
+ * and step out of the cabin on the next floor when its doors open.
+ *
  * A breakdown (level setting) keeps a lift open where it is for a while.
  *
  * The mail chute is a pair of hatches (`H`, counters), the first in reading
@@ -28,6 +33,7 @@ import {
   TICKS_PER_SECOND,
 } from './balance';
 import { type GridPoint, type LevelMap, type MarkKind, marksOf } from './level';
+import type { BlockCheck } from './movement';
 import type { GameState, PlayerId } from './state';
 import { ticketOnTile } from './tickets';
 
@@ -176,6 +182,52 @@ export function isRiding(state: GameState, playerId: PlayerId): boolean {
   );
 }
 
+/** Whether a lift has doors: lifts do, the shuttle (an open cart) doesn't. */
+export function hasDoors(lift: Pick<Lift, 'kind'>): boolean {
+  return lift.kind !== 'shuttle';
+}
+
+/** Whether the cabin at `floor` lets people in: the lift stands open there and isn't about to leave. */
+export function cabinOpen(state: GameState, lift: Lift, floor: number): boolean {
+  if (!hasDoors(lift)) return true;
+  return lift.at === floor && lift.phase === 'open' && !liftChimes(state, lift);
+}
+
+/** How far a cabin's doors are open, 0 (shut) to 1, for render: they close over the chime second. */
+export function doorShare(state: GameState, lift: Lift, floor: number): number {
+  if (!hasDoors(lift)) return 1;
+  if (lift.at !== floor || lift.phase !== 'open') return 0;
+  if (liftBroken(state, lift)) return 1;
+  return Math.max(0, Math.min(1, (lift.until - state.tick) / LIFT_CHIME_TICKS));
+}
+
+/** The closed cabin (lift, floor) that tile (x, y) belongs to, if any. */
+function closedCabinAt(state: GameState, x: number, y: number): GridPoint[] | undefined {
+  for (const lift of state.lifts) {
+    if (!hasDoors(lift)) continue;
+    for (let floor = 0; floor < lift.stops.length; floor++) {
+      const cabin = lift.stops[floor] ?? [];
+      if (!cabin.some((t) => t.x === x && t.y === y)) continue;
+      return cabinOpen(state, lift, floor) ? undefined : cabin;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Closed lift doors, for someone at `pos`: the tiles of every closed cabin
+ * they aren't standing in. Whoever is inside can still walk about and out.
+ */
+export function liftDoorBlocks(state: GameState, pos: { x: number; y: number }): BlockCheck {
+  if (!state.lifts.some(hasDoors)) return () => false;
+  const hx = Math.round(pos.x);
+  const hy = Math.round(pos.y);
+  return (x, y) => {
+    const cabin = closedCabinAt(state, x, y);
+    return cabin !== undefined && !cabin.some((t) => t.x === hx && t.y === hy);
+  };
+}
+
 function slotOf(cabin: readonly GridPoint[], pos: { x: number; y: number }): number {
   const x = Math.round(pos.x);
   const y = Math.round(pos.y);
@@ -214,14 +266,8 @@ function board(state: GameState, lift: Lift): Rider[] {
   return riders;
 }
 
-function depart(state: GameState, lift: Lift): void {
-  let next = lift.at + lift.dir;
-  if (next < 0 || next >= lift.stops.length) {
-    lift.dir = lift.dir === 1 ? -1 : 1;
-    next = lift.at + lift.dir;
-  }
-  const to = lift.stops[next] ?? [];
-  const riders = board(state, lift).filter((r) => r.slot < to.length);
+/** Puts riders on their places in cabin `to`. */
+function moveRiders(state: GameState, riders: readonly Rider[], to: readonly GridPoint[]): void {
   for (const r of riders) {
     const at = to[r.slot];
     if (!at) continue;
@@ -236,12 +282,35 @@ function depart(state: GameState, lift: Lift): void {
       if (!m) continue;
       m.pos = { x: at.x, y: at.y };
       m.path = [];
-      m.waitTicks = rideTicks(lift, lift.at, next);
     }
   }
+}
+
+function depart(state: GameState, lift: Lift): void {
+  let next = lift.at + lift.dir;
+  if (next < 0 || next >= lift.stops.length) {
+    lift.dir = lift.dir === 1 ? -1 : 1;
+    next = lift.at + lift.dir;
+  }
+  const to = lift.stops[next] ?? [];
+  const riders = board(state, lift).filter((r) => r.slot < to.length);
+  const ride = rideTicks(lift, lift.at, next);
+  for (const r of riders) {
+    if (r.kind === 'player') {
+      const p = state.players.find((pl) => pl.id === r.id);
+      if (!p) continue;
+      p.vel = { x: 0, y: 0 };
+      p.dashTicks = 0;
+    } else {
+      const m = state.managers.find((mg) => mg.id === r.id);
+      if (m) m.waitTicks = ride;
+    }
+  }
+  // An open cart moves its riders at once; a lift waits for its doors to open at the other end.
+  if (!hasDoors(lift)) moveRiders(state, riders, to);
   state.events.push({ type: 'liftDeparted', lift: lift.kind, floor: next });
   lift.riders = riders;
-  lift.until = state.tick + rideTicks(lift, lift.at, next);
+  lift.until = state.tick + ride;
   lift.at = next;
   lift.phase = 'riding';
 }
@@ -251,6 +320,7 @@ export function updateLifts(state: GameState): void {
   for (const lift of state.lifts) {
     if (lift.phase === 'riding') {
       if (state.tick < lift.until) continue;
+      if (hasDoors(lift)) moveRiders(state, lift.riders, lift.stops[lift.at] ?? []);
       lift.phase = 'open';
       lift.riders = [];
       lift.until = state.tick + openTicks(lift.kind);
@@ -283,6 +353,27 @@ export function updateLifts(state: GameState): void {
 /** The ticket on a chute's top hatch, and how far down it is (0 to 1), for render. */
 export function chuteShare(state: GameState, chute: Chute): number {
   return chute.since === null ? 0 : Math.min(1, (state.tick - chute.since) / CHUTE_TICKS);
+}
+
+const cabinCache = new WeakMap<LevelMap, Map<number, number>>();
+
+/**
+ * The lift cabins with doors (local and express), by tile index: a number per
+ * cabin, so paths can tell walking about inside one cabin from leaving it.
+ */
+export function doorCabins(map: LevelMap): Map<number, number> {
+  const cached = cabinCache.get(map);
+  if (cached) return cached;
+  const byTile = new Map<number, number>();
+  let n = 0;
+  for (const mark of ['lift', 'expressLift'] as const) {
+    for (const cabin of cabins(map, mark)) {
+      for (const t of cabin) byTile.set(t.y * map.width + t.x, n);
+      n++;
+    }
+  }
+  cabinCache.set(map, byTile);
+  return byTile;
 }
 
 const linkCache = new WeakMap<LevelMap, Map<number, GridPoint[]>>();

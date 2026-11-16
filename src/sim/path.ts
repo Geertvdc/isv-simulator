@@ -2,7 +2,7 @@
 
 import { type GridPoint, type LevelMap, getTile, isSolid } from './level';
 import { LIFT_PATH_STEPS } from './balance';
-import { liftLinks } from './lifts';
+import { doorCabins, liftLinks } from './lifts';
 import { type Gate, gateRefuses } from './reorgs';
 
 export const NEIGHBOURS: readonly GridPoint[] = [
@@ -21,6 +21,9 @@ export const NEIGHBOURS: readonly GridPoint[] = [
  * A step costs 1; a lift ride to the next floor costs `LIFT_PATH_STEPS` (the
  * wait and the ride), so a walk takes the stairs when they're quicker. On a
  * map without lifts this is a plain breadth-first search.
+ *
+ * A lift cabin is not a corridor: a walk goes into a cabin to ride it, and
+ * only leaves a cabin it rode in (or started in), never one it walked into.
  */
 export function searchPath(
   map: LevelMap,
@@ -33,6 +36,10 @@ export function searchPath(
   if (isGoal(from)) return [];
   const blockedKeys = new Set(blocked.map(key));
   const links = liftLinks(map);
+  const cabinOf = doorCabins(map);
+  /** Cabin tiles reached by riding (or the start): a walk may leave the cabin from them. */
+  const rode = new Set<number>();
+  if (cabinOf.has(key(from))) rode.add(key(from));
   const cameFrom = new Map<number, GridPoint | null>([[key(from), null]]);
   const cost = new Map<number, number>([[key(from), 0]]);
   // Tiles by their cost (Dial's algorithm): costs are small whole numbers.
@@ -66,6 +73,11 @@ export function searchPath(
         }
         if (blockedKeys.has(key(next))) continue;
         if (stepCost === 1 && gateRefuses(gates, at, next)) continue;
+        const inCabin = cabinOf.get(key(at));
+        const sameCabin = inCabin !== undefined && inCabin === cabinOf.get(key(next));
+        if (stepCost === 1 && inCabin !== undefined && !sameCabin && !rode.has(key(at))) continue;
+        if (stepCost !== 1 || (sameCabin && rode.has(key(at)))) rode.add(key(next));
+        else rode.delete(key(next));
         cameFrom.set(key(next), at);
         cost.set(key(next), nextCost);
         if (isGoal(next)) {
