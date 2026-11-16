@@ -35,4 +35,19 @@ describe('groundModel', () => {
   it('leaves out a kind nobody paints', () => {
     expect(vertices({ ground: [patch('lava')], tufts: [] })).toBe(0);
   });
+
+  it('moves a patch with a `y` up or down by it, and leaves the others where they were', () => {
+    const top = (y?: number) => {
+      const { body } = groundModel({
+        ground: [{ ...patch('concrete'), ...(y === undefined ? {} : { y }) }],
+        tufts: [],
+      });
+      body.computeBoundingBox();
+      const max = body.boundingBox?.max.y ?? Number.NaN;
+      body.dispose();
+      return max;
+    };
+    expect(top(-1.2)).toBeCloseTo(top() - 1.2);
+    expect(top(0)).toBeCloseTo(top());
+  });
 });

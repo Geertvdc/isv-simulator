@@ -13,6 +13,8 @@ import {
   deskBoxStack,
   dockCanopy,
   doormat,
+  dropRail,
+  facadeBand,
   FLOOR,
   frankingMachine,
   heldBalloon,
@@ -41,8 +43,12 @@ import {
   wetFloorSign,
   welcomeBalloon,
   wheelieBin,
+  almostDoneTower,
+  roadBarrier,
+  streetSteps,
+  wetCherry,
 } from '../setDressing/hypergrowth';
-import { bus, CRANE_TOWER, cherryTree, craneTower, curtainWall } from '../setDressing/midRise';
+import { bus, curtainWall } from '../setDressing/midRise';
 import { segfaultCat } from '../setDressing/onCall';
 import { redLight } from '../setDressing/rooftop';
 import type { SetPiece } from '../setDressing/shared';
@@ -94,8 +100,21 @@ import {
 
 /** The wet street out to the horizon: rain-dark asphalt. */
 const HORIZON = 0x4f565d;
-/** Street pieces are a little smaller than the bay's: the first floor looks down on them. */
+/** Street pieces are a little smaller than the bay's. */
 const STREET = 0.85;
+/**
+ * The street round the first floor lies a storey down (`DROP` under the
+ * slab's foot), behind and right of it, and its pieces are `LOW` times
+ * smaller again: the first floor looks down on them.
+ */
+const DROP = -1.2;
+const LOW = 0.8;
+/**
+ * Behind the first floor the street a storey down starts this much further
+ * back: the first tiles past the building hide under its back wall and
+ * stations, so the road and the bus show through the glass.
+ */
+const LOW_BACK = 0.9;
 /** The cherry trees along the pavements, scaled up from 3-1's (seen far below there). */
 const TREE = 2.3;
 /** How far the building's outer wall stands off the room's back and right walls. */
@@ -106,12 +125,16 @@ const ROAD = 1.65;
 const FAR_WALK = 0.9;
 /** The apron in front of the loading bay, out from the building. */
 const APRON = 1.85;
-/** The one-storey building face seen from the first floor down (the right side). */
-const FACE = 0.5;
 /** The lift: its car's floor, the frame's header, the counterweight's bottom (above the pit). */
 const CAR_BOTTOM = 1.4;
 const HEADER = 3.05;
 const CW_BOTTOM = 0.3;
+/**
+ * The courier's van: its size, how far it turns its rear in toward the bay,
+ * how far its rear stands out from the wall and past the bay's back edge,
+ * and half its length (scaled).
+ */
+const VAN = { size: 0.9, yaw: 0.15, out: 0.75, past: -0.15, half: 0.98 * 0.9 } as const;
 /** Where a person holds a carried thing: out in front and up (scaled with them). */
 const CARRY = { reach: 0.34, lift: 0.53 } as const;
 /** The screen the scene is composed for. */
@@ -127,12 +150,14 @@ const HUD: readonly (readonly [number, number, number, number])[] = [
 ];
 /** The order cards' right edge on screen. */
 const CARDS_RIGHT = 700;
+/** The tower across the road: width, depth, storey height, the crane's mast and jib. */
+const TOWER = { w: 2.6, d: 1.3, storey: 0.22, mast: 0.6, jib: 2.6, crane: 0.85 } as const;
 /** The living props. */
 const ALIVE: ReadonlyMap<SetPiece, AliveKind> = new Map<SetPiece, AliveKind>([
   [segfaultCat, 'purr'],
   [redLight, 'blink'],
   [vanHazards, 'blink'],
-  [cherryTree, 'sway'],
+  [wetCherry, 'sway'],
   [umbrellaWalker, 'bob'],
   [welcomeBalloon, 'bob'],
   [heldBalloon, 'bob'],
@@ -372,8 +397,9 @@ export function hypergrowthScene(map: LevelMap): Scene {
     put(piece, x, z, yaw, variant, 'near', lift, size);
     return true;
   };
-  const patch = (kind: string, x0: number, x1: number, z0: number, z1: number) => {
-    if (x1 - x0 > 0.01 && z1 - z0 > 0.01) ground.push({ kind, x0, x1, z0, z1 });
+  const patch = (kind: string, x0: number, x1: number, z0: number, z1: number, y = 0) => {
+    if (x1 - x0 > 0.01 && z1 - z0 > 0.01)
+      ground.push({ kind, x0, x1, z0, z1, ...(y !== 0 ? { y } : {}) });
   };
   const person = (x: number, z: number, yaw: number, pose: ScenePose) =>
     people.push({ at: gridToWorld(x, z, GROUND), yaw, pose });
@@ -405,35 +431,45 @@ export function hypergrowthScene(map: LevelMap): Scene {
   const far = 8;
 
   // ---- Ground: the wet streets round the building ----
+  // At the slab's foot round the ground floor (left, behind the post room, in
+  // front); a storey down (`DROP`) behind and right of the first floor, past
+  // `jx`, the shaft's right side.
+  const jx = shaft.x1;
   const leftLine = L - 0.18;
   const walkL = leftLine - WALK;
   const roadL = walkL - ROAD;
   const backWalk = backLine - WALK;
   const backRoad = backWalk - ROAD;
   const backFar = backRoad - FAR_WALK;
-  const faceR = rightLine + FACE;
-  const walkR = faceR + WALK;
+  const walkR = rightLine + WALK;
   const roadR = walkR + ROAD;
   const frontWalk = F + 1.3;
+  // A storey down behind the first floor, all of it further back.
+  const lowWalk = backWalk - LOW_BACK;
+  const lowRoad = backRoad - LOW_BACK;
+  const lowFar = lowRoad - FAR_WALK * 0.5;
   const apronZ0 = Math.min(binZ - 2.7, shipZ0 - 4.2);
-  // Far out: more pavement under the shops and the site.
-  patch('walk', edgeL - far, edgeR + far, topZ - far, backFar);
-  // The back street: pavement, road, the far pavement; the side streets the same.
-  patch('road:x', edgeL - far, edgeR + far, backRoad, backWalk);
-  patch('walk', edgeL - far, edgeR + far, backFar, backRoad);
-  patch('walk:petals', roadL, walkR, backWalk, backLine);
+  /** Whether (x, z) is out on the street a storey down. */
+  const isLow = (x: number, z: number) => (z < backLine && x >= jx) || x > rightLine;
+  // Up: the back street behind the post room, the side street, the front.
+  patch('walk', edgeL - far, jx, topZ - far, backFar);
+  patch('road:x', edgeL - far, jx, backRoad, backWalk);
+  patch('walk', edgeL - far, jx, backFar, backRoad);
+  patch('walk:petals', roadL, jx, backWalk, backLine);
   patch('road:z', roadL - ROAD, roadL, backWalk, frontZ + far);
-  patch('road:z', walkR, roadR, backWalk, frontZ + far);
   patch('walk', edgeL - far, roadL - ROAD, backFar, frontZ + far);
-  patch('walk', roadR, edgeR + far, backWalk, frontZ + far);
   patch('walk:petals', roadL, leftLine, backLine, apronZ0);
   patch('apron', roadL, leftLine, apronZ0, frontWalk);
-  patch('walk:petals', faceR, walkR, backLine, frontZ + far);
-  patch('face', rightLine, faceR, backLine, frontWalk);
-  // The front: wet pavement to a kerb, the road beyond.
-  patch('walk', leftLine, rightLine, F, frontWalk);
-  patch('walk', roadL, faceR, frontWalk, frontWalk + 0.15);
-  patch('road:x', roadL, walkR, frontWalk + 0.15, frontZ + far);
+  patch('front', leftLine, rightLine, F, frontWalk);
+  patch('walk', roadL, rightLine, frontWalk, frontWalk + 0.15);
+  patch('road:x', roadL, rightLine, frontWalk + 0.15, frontZ + far);
+  // Down: behind the first floor and down its right side.
+  patch('walk', jx, edgeR + far, lowFar, lowRoad, DROP);
+  patch('road:x', jx, edgeR + far, lowRoad, lowWalk, DROP);
+  patch('walk:petals', jx, walkR, lowWalk, backLine + 0.3, DROP);
+  patch('walk:petals', rightLine - 0.3, walkR, backLine, frontZ + far, DROP);
+  patch('road:z', walkR, roadR, lowWalk, frontZ + far, DROP);
+  patch('walk', roadR, edgeR + far, lowWalk, frontZ + far, DROP);
   // The shaft's pit, down between the floors.
   patch('pit', shaft.x0, shaft.x1, backLine + 0.09, shaft.z1);
   // "LOADING" painted on the apron by the bay, the yellow bay box.
@@ -462,6 +498,14 @@ export function hypergrowthScene(map: LevelMap): Scene {
   put(rainOnGlass(rightLine - glassX0, 2.2), glassX0, backZ - 0.03, 0, 0, 'far');
   put(curtainWall(F - backZ), rightLine, backZ, -Math.PI / 2, 0, 'far');
   put(rainOnGlass(F - backZ, 2.2), rightLine + 0.03, backZ, -Math.PI / 2, 0, 'far');
+  // Under the glass, a storey down to the street: the ground floor's shops.
+  put(facadeBand(rightLine - jx, -DROP), rightLine, backLine, Math.PI, 0, 'near', DROP);
+  // (Down the side only as far as clears the timer.)
+  put(facadeBand(F - 2 - backLine, -DROP), rightLine, F - 2, Math.PI / 2, 0, 'near', DROP);
+  // Where the back street drops: the coping and its railing, steps down the pavement, the road shut.
+  put(dropRail(backWalk + 0.02 - lowFar), jx, backWalk + 0.02);
+  put(streetSteps(5, WALK - 0.2, -DROP), jx, (backWalk + backLine) / 2, 0, 0, 'near', DROP);
+  put(roadBarrier(ROAD - 0.1), jx - 0.3, backRoad + 0.05);
   // The strip of carpet inside the side glass, the landing's floor.
   put(
     raisedFloor(rightLine - R - 0.07, (landing ? landing.z0 : F) - B, 'carpet'),
@@ -539,52 +583,60 @@ export function hypergrowthScene(map: LevelMap): Scene {
     put(segfaultCat, cx - 0.32, cz + 0.22, 0.35, 0, 'near', CAR_BOTTOM + LIFT.carH + 0.02, 1.15);
     put(welcomeBalloon, cx + 0.62, cz - 0.42, 0, 0, 'near', CAR_BOTTOM + LIFT.carH + 0.38);
     put(pitLadder(0.75), shaft.x1 - 0.45, shaft.z1 - 0.02, Math.PI);
-    // A desk box that went down the shaft, tipped in the pit at the back.
-    put(deskBoxStack, cx - 0.5, backZ + 1.4, 0.7, 0);
   }
 
   // ---- The loading bay, out into the rain ----
   {
     const canopyLen = shipZ1 - shipZ0 + 0.3;
     put(dockCanopy(canopyLen), L - 0.02, shipZ0 - 0.15, -Math.PI / 2);
-    // The van backed up to the bay along the wall, its rear doors open, its cab toward the back.
-    const vx = leftLine - 0.87;
-    const vz = shipZ0 - 0.3 - 0.98;
-    put(deliveryVan, vx, vz, Math.PI / 2);
-    put(vanHazards, vx, vz, Math.PI / 2);
+    // The van backed up to the bay, its rear doors open and angled in at the
+    // hatch, its cab out toward the back; a touch smaller, so it all shows.
+    const vyaw = Math.PI / 2 + VAN.yaw;
+    const vx = leftLine - VAN.out - Math.sin(VAN.yaw) * VAN.half;
+    const vz = shipZ0 + VAN.past - Math.cos(VAN.yaw) * VAN.half;
+    put(deliveryVan, vx, vz, vyaw, 0, 'near', 0, VAN.size);
+    put(vanHazards, vx, vz, vyaw, 0, 'near', 0, VAN.size);
     // The bin and the cardboard cage behind the van, as near the bin hatch as it leaves room.
     const bz = Math.min(binZ + 0.05, vz - 1.4);
     put(wheelieBin, leftLine - 0.4, bz, Math.PI / 2 + 0.15);
     put(recyclingCage, leftLine - 0.62, bz - 0.95, -Math.PI / 2 - 0.04);
     // The pallet of desks on its pump truck behind them, the driver carrying a box in.
     put(palletTruck, leftLine - 1.05, bz - 2.35, Math.PI / 2 + 0.1);
-    const dx = leftLine - 0.95;
-    const dz = shipZ0 + 0.55;
-    const dyaw = Math.PI / 2 - 0.2;
+    const dx = leftLine - 0.9;
+    const dz = shipZ0 + 0.3;
+    const dyaw = Math.PI / 2 + 0.1;
     person(dx, dz, dyaw, 'carrying');
     held(carriedBox, dx, dz, dyaw);
   }
 
   // ---- The street: trees, umbrellas, cars, a bus ----
-  /** Whether a street prop at (x, z), `r` round, keeps off the building. */
+  /** Whether a street prop at (x, z), `r` round, keeps off the building (and off the drop's edge). */
   const inStreet = (x: number, z: number, r: number) => {
     if (!offSlab(x, z, r)) return false;
     if (x > leftLine - r && x < rightLine + r && z > backLine - r) return false;
+    if (z < backLine && Math.abs(x - jx) < r + 0.1) return false;
     return true;
   };
+  /** How high the street is at (x, z), and how big its pieces are there. */
+  const level = (x: number, z: number) => (isLow(x, z) ? DROP : 0);
+  const scaleAt = (x: number, z: number) => (isLow(x, z) ? STREET * LOW : STREET);
   for (const [x, z, v] of [
     [roadL + WALK * 0.55, backLine - WALK * 0.55, 0],
     [post.x0 + 3.6, backLine - WALK * 0.6, 1],
-    [shaft.x1 + 3.2, backLine - WALK * 0.55, 2],
-    [rightLine - 2.2, backLine - WALK * 0.6, 3],
-    [faceR + WALK * 0.55, backLine + 2.4, 1],
-    [faceR + WALK * 0.55, backLine + 6.2, 2],
+    [jx + 2.6, lowWalk + 0.5, 2],
+    [rightLine - 3.4, lowWalk + 0.45, 3],
+    [rightLine + WALK * 0.6, backLine + 2.4, 1],
+    [rightLine + WALK * 0.6, backLine + 6.2, 2],
+    [roadR + 0.5, backLine + 0.6, 0],
+    [roadR + 0.5, backLine + 4.4, 3],
+    [roadR + 0.5, backLine + 8.2, 1],
     [walkL + WALK * 0.4, (backLine + apronZ0) / 2 + 0.6, 0],
   ] as const) {
     if (!inStreet(x, z, 0.3)) continue;
-    const size = (x > rightLine ? TREE * STREET : TREE) * (0.94 + unit(x, z, 9) * 0.12);
-    if (clear(x, z, 0.3 * size, 0.42 * size))
-      put(cherryTree, x, z, unit(x, z, 11) * 6, v, 'near', 0, size);
+    const y = level(x, z);
+    const size = TREE * (y < 0 ? LOW : 1) * (0.94 + unit(x, z, 9) * 0.12);
+    if (clear(x, z, 0.3 * size, y + 0.5 * size, 0.3 * size, y))
+      put(wetCherry, x, z, unit(x, z, 11) * 6, v, 'near', y, size);
   }
   {
     // People under umbrellas along the pavements, out of the HUD.
@@ -593,84 +645,87 @@ export function hypergrowthScene(map: LevelMap): Scene {
       [walkL + WALK * 0.5, backLine + 1.2, 0.2],
       [post.x0 + 1.6, backLine - WALK * 0.45, Math.PI / 2],
       [post.x0 + 5.4, backLine - WALK * 0.5, -Math.PI / 2],
-      [shaft.x1 + 1.4, backLine - WALK * 0.45, Math.PI / 2],
-      [rightLine - 0.8, backLine - WALK * 0.5, -Math.PI / 2],
-      [faceR + WALK * 0.5, backLine + 4.2, Math.PI],
-      [faceR + WALK * 0.45, backLine + 0.6, 0],
+      [jx + 4.2, lowWalk + 0.45, Math.PI / 2],
+      [rightLine - 1.6, lowWalk + 0.5, -Math.PI / 2],
+      [rightLine + WALK * 0.55, backLine + 4.2, Math.PI],
+      [rightLine + WALK * 0.5, backLine + 0.9, 0],
     ] as const) {
       if (!inStreet(x, z, 0.35)) continue;
-      if (putClear(umbrellaWalker, x, z, 0.4 * STREET, 1.45 * STREET, yaw, k, 0, STREET)) k++;
+      const sz = scaleAt(x, z);
+      if (putClear(umbrellaWalker, x, z, 0.4 * sz, 1.45 * sz, yaw, k, level(x, z), sz)) k++;
     }
   }
   /** A car at (x, z) heading `yaw`, if it's on the street and in the frame. */
   const car = (x: number, z: number, yaw: number, v: number) => {
-    if (inStreet(x, z, 0.3) && onScreen(x, z, 0, 10)) put(wetCar, x, z, yaw, v, 'far', 0, STREET);
+    const y = level(x, z);
+    if (inStreet(x, z, 0.7) && onScreen(x, z, y, 10))
+      put(wetCar, x, z, yaw, v, 'far', y, scaleAt(x, z));
   };
   for (let k = 0; k < 9; k++) {
     const lane = k % 2;
     const x = edgeL + 1.5 + k * 2.6 + unit(k, 3, 13) * 0.9;
     if (x > edgeR) break;
-    car(x, backRoad + ROAD * (lane ? 0.28 : 0.72), lane ? Math.PI : 0, k);
+    const road = x < jx ? backRoad : lowRoad;
+    car(x, road + ROAD * (lane ? 0.28 : 0.72), lane ? Math.PI : 0, k);
   }
   for (let k = 0; k < 4; k++) {
-    car(walkR + ROAD * 0.3, backWalk + 0.9 + k * 2.1, -Math.PI / 2, k + 2);
+    car(
+      walkR + ROAD * (k % 2 ? 0.72 : 0.3),
+      lowWalk + 0.9 + k * 2.1,
+      k % 2 ? Math.PI / 2 : -Math.PI / 2,
+      k + 2,
+    );
     car(roadL + ROAD * 0.3 - ROAD, backWalk + 1.2 + k * 2.4, Math.PI / 2, k + 4);
   }
   {
-    // The bus on the back road, behind the first floor's glass, its lights on.
-    const bx = Math.min(rightLine - 3, shaft.x1 + 4.6);
-    put(bus, bx, backRoad + ROAD * 0.3, Math.PI, 0, 'far', 0, 2.2);
+    // The bus on the back road a storey down, behind the first floor's glass, its lights on.
+    const bx = Math.min(rightLine - 3, jx + 4.6);
+    put(bus, bx, lowRoad + ROAD * 0.3, Math.PI, 0, 'far', DROP, 2.2 * LOW);
   }
 
-  // ---- Across the road: the shops, and the crane tower behind its hoarding ----
+  // ---- Across the road: the shops, and the tower almost done behind its hoarding ----
   const siteZ = backFar;
-  let towerX = edgeR;
+  const lowSiteZ = lowFar;
   {
-    // Built at 3-1's scale (it stood far below there) and brought up close: `S` times bigger.
-    const S = 1.4;
-    const tw = 1.4;
-    const td = 0.8;
-    const tz = siteZ - 0.2;
-    const cs = 0.75;
-    const mast = 0.55;
-    const jib = 1.5;
+    const { w: tw, d: td, storey, mast, jib, crane: cs } = TOWER;
+    const tz = lowSiteZ - 0.3;
     const fits = (x: number, floors: number) => {
-      const h = floors * CRANE_TOWER.storey * S;
-      const a = screenBox(x - (tw * S) / 2, x + (tw * S) / 2, 0, h + 0.1, tz - td * S, tz);
+      const h = DROP + floors * storey;
+      const a = screenBox(x - tw / 2, x + tw / 2, DROP, h + 0.2, tz - td, tz);
       const c = screenBox(
-        x - 0.4 * cs * S,
-        x + jib * cs * S,
+        x - 0.4 * jib * cs,
+        x + jib * cs,
         h,
-        h + (mast + 0.35) * cs * S,
-        tz - (td * S) / 2 - 0.1,
-        tz - (td * S) / 2 + 0.1,
+        h + (mast + 0.45) * cs,
+        tz - td / 2 - 0.1,
+        tz - td / 2 + 0.1,
       );
       return (
-        Math.min(a[0], c[0]) > CARDS_RIGHT + 60 &&
+        Math.min(a[0], c[0]) > CARDS_RIGHT + 20 &&
         Math.max(a[2], c[2]) < 1360 &&
         Math.min(a[1], c[1]) > 3
       );
     };
-    for (let floors = 16; floors >= 5; floors--) {
+    for (let floors = 14; floors >= 3; floors--) {
       const xs: number[] = [];
       for (let x = xAt(CARDS_RIGHT, tz); x < xAt(1440, tz); x += 0.1)
         if (fits(x, floors)) xs.push(x);
       const last = xs[xs.length - 1];
       const first = xs[0];
       if (first === undefined || last === undefined) continue;
-      const tx = Math.round(((first + last) / 2 + (last - first) * 0.2) * 20) / 20;
-      const h = floors * CRANE_TOWER.storey * S;
-      put(craneTower(tw, td, floors, 1), tx, tz, 0, 0, 'far', 0, S);
-      const cz = tz - (td * S) / 2;
-      put(cityCrane(mast, jib), tx, cz, 0, 0, 'far', h, cs * S);
-      put(redLight, tx + (jib - 0.05) * cs * S, cz, 0, 0, 'far', h + (mast + 0.12) * cs * S, S);
-      put(redLight, tx, cz, 0, 0, 'far', h + (mast + 0.33) * cs * S, S);
-      towerX = tx;
+      const tx = Math.round(((first + last) / 2) * 20) / 20;
+      const h = DROP + floors * storey;
+      put(almostDoneTower(tw, td, floors, storey), tx, tz, 0, 0, 'far', DROP);
+      const cz = tz - td / 2;
+      put(cityCrane(mast, jib), tx, cz, 0, 0, 'far', h, cs);
+      put(redLight, tx + (jib - 0.05) * cs, cz, 0, 0, 'far', h + (mast + 0.12) * cs, 1.2);
+      put(redLight, tx, cz, 0, 0, 'far', h + (mast + 0.33) * cs, 1.2);
       break;
     }
-    patch('site', towerX - 3.2, edgeR + far, topZ - far, siteZ - 0.05);
-    put(hoarding(edgeR + 2 - (towerX - 3.2)), towerX - 3.2, siteZ - 0.05, 0, 0, 'far');
-    put(shopRow(towerX - 3.3 - (edgeL - 2)), edgeL - 2, siteZ - 0.05, 0, 0, 'far');
+    // The site behind the hoarding, a storey down like the street; the shops up on the left.
+    patch('site', jx, edgeR + far, topZ - far, lowSiteZ - 0.05, DROP);
+    put(hoarding(edgeR + 2 - jx), jx, lowSiteZ - 0.05, 0, 0, 'far', DROP);
+    put(shopRow(jx - 0.1 - (edgeL - 2)), edgeL - 2, siteZ - 0.05, 0, 0, 'far');
     // Down the far side of the left road, more shops, side on.
     put(
       shopRow(siteZ - 0.05 - (topZ - 2)),
@@ -706,7 +761,15 @@ export function hypergrowthScene(map: LevelMap): Scene {
     );
   }
 
-  return { horizon: HORIZON, ground, painters: PAINTERS, pieces, people, tufts: [] };
+  return {
+    horizon: HORIZON,
+    horizonY: DROP,
+    ground,
+    painters: PAINTERS,
+    pieces,
+    people,
+    tufts: [],
+  };
 }
 
 // ---- The scene's own ground ----
@@ -780,8 +843,11 @@ function road(along: 'x' | 'z'): GroundPainter {
   };
 }
 
-/** Wet pavement: flags darkened by the rain with paler joints, puddles, and fallen blossom if `petals`. */
-function walk(petals: boolean): GroundPainter {
+/**
+ * Wet pavement: flags darkened by the rain with paler joints, puddles
+ * (`wet` of them a square tile, `r` their size), and fallen blossom if `petals`.
+ */
+function walk(petals: boolean, wet = 0.07, r = 0.22): GroundPainter {
   return (b, g, salt) => {
     const top = 0.02;
     const base = 0x6e7376;
@@ -801,7 +867,7 @@ function walk(petals: boolean): GroundPainter {
           0,
         );
       }
-    puddles(b, g, top, salt + 3, 0.07, 0.22);
+    puddles(b, g, top, salt + 3, wet, r);
     if (petals) {
       const w = g.x1 - g.x0;
       const d = g.z1 - g.z0;
@@ -809,7 +875,7 @@ function walk(petals: boolean): GroundPainter {
       for (let k = 0; k < count; k++) {
         const x = g.x0 + shade(k, 51, salt) * w;
         const z = g.z0 + shade(k, 53, salt) * d;
-        const c = shade(k, 55, salt) > 0.5 ? 0xe2a6bc : 0xd894ae;
+        const c = shade(k, 55, salt) > 0.5 ? 0xd4b0bc : 0xc8a0ae;
         b.box(
           0.035,
           0.002,
@@ -865,7 +931,7 @@ const bay: GroundPainter = (b, g) => {
     b.box(0.45, 0.002, 0.05, yel, { at: [g.x0 + 0.3, y, z], rot: [0, 0.7, 0] }, 0);
 };
 
-/** The shaft's pit: dark concrete, a yellow-black edge round it, a puddle that caught the rain, an oil stain. */
+/** The shaft's pit: dark concrete, a yellow-black edge round it, a puddle that caught the rain. */
 const pit: GroundPainter = (b, g, salt) => {
   const top = 0.006;
   fill(b, g, top - 0.003, 0x34373b);
@@ -897,43 +963,6 @@ const pit: GroundPainter = (b, g, salt) => {
         0,
       );
   puddle(b, g.x0 + w * 0.3, g.z0 + d * 0.62, top, 0.32);
-  b.cylinder(
-    0.25,
-    0.25,
-    0.002,
-    0x24262a,
-    { at: [g.x0 + w * 0.7, top + 0.002, g.z0 + d * 0.3] },
-    14,
-  );
-};
-
-/**
- * The building's face below the first floor's glass, seen from above as the
- * drop to the street: a pale slab edge, the dark band, the shop glass of the
- * ground floor below, lit warm, a canopy edge; the building is toward −x.
- */
-const face: GroundPainter = (b, g) => {
-  const top = 0.012;
-  const len = g.z1 - g.z0;
-  const cz = (g.z0 + g.z1) / 2;
-  const band = (u0: number, u1: number, c: number) =>
-    b.box(u1 - u0, 0.003, len, c, { at: [g.x0 + (u0 + u1) / 2, top, cz] }, 0);
-  const w = g.x1 - g.x0;
-  band(0, w * 0.12, 0xa8acb0);
-  band(w * 0.12, w * 0.32, 0x4a525c);
-  band(w * 0.32, w * 0.78, 0x6a6458);
-  band(w * 0.78, w, 0x3e4248);
-  for (let z = g.z0 + 0.4; z < g.z1; z += 0.8)
-    b.box(w * 0.46, 0.003, 0.03, 0x3a3e44, { at: [g.x0 + w * 0.55, top + 0.001, z] }, 0);
-  for (let z = g.z0 + 0.8, k = 0; z < g.z1 - 0.4; k++, z += 1.6)
-    b.box(
-      w * 0.4,
-      0.003,
-      0.5,
-      k % 2 ? 0xc8b48a : 0xb8a888,
-      { at: [g.x0 + w * 0.55, top + 0.002, z] },
-      0,
-    );
 };
 
 /** The building site behind the hoarding: muddy gravel, puddles, a stack of materials. */
@@ -948,9 +977,9 @@ const PAINTERS: Readonly<Record<string, GroundPainter>> = {
   'road:z': road('z'),
   walk: walk(false),
   'walk:petals': walk(true),
+  front: walk(true, 0.22, 0.12),
   apron,
   bay,
   pit,
-  face,
   site,
 };
