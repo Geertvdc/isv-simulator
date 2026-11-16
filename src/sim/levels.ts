@@ -285,7 +285,7 @@ export const MIDDLE_MANAGEMENT: Level = level('middle-management', middleManagem
 export const HYPERGROWTH: Level = level('hypergrowth', hypergrowthMap, {
   ...GARAGE_SETTINGS,
   // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
-  ...calibrated([30, 110, 180, 205]),
+  ...calibrated([15, 120, 165, 235]),
   incidents: INCIDENTS,
 });
 
@@ -293,7 +293,7 @@ export const HYPERGROWTH: Level = level('hypergrowth', hypergrowthMap, {
 export const HOT_DESKING: Level = level('hot-desking', hotDeskingMap, {
   ...GARAGE_SETTINGS,
   // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
-  ...calibrated([25, 55, 85, 140]),
+  ...calibrated([15, 55, 55, 120]),
   reviewShare: 0.3,
   incidents: INCIDENTS,
 });
@@ -432,7 +432,7 @@ export const HACKATHON: Level = level(
   {
     ...GARAGE_SETTINGS,
     // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
-    ...calibrated([120, 220, 325, 360]),
+    ...calibrated([105, 200, 300, 365]),
     designShare: 0.3,
     fullstackShare: 0.4,
     pairing: true,

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { DEMO_BOTS, MAX_OPEN_ORDERS, ORDER_RATE_BY_PLAYERS, STAR_SHARES } from './balance';
+import {
+  DEMO_BOTS,
+  MAX_OPEN_ORDERS,
+  ORDER_RATE_BY_PLAYERS,
+  STAR_ROUNDING,
+  STAR_SHARES,
+} from './balance';
 import { MAX_PLAYERS, getTile } from './level';
 import {
   DEMO_LEVEL_IDS,
@@ -93,8 +99,12 @@ describe('settingsForPlayers', () => {
         const count = i + 1;
         const stars = settingsForPlayers(level, count).starThresholds;
         expect(stars).toEqual(thresholdsFor(bot));
-        // Three stars without a perfect run: within rounding of 90% of the bots' average.
-        expect(Math.abs(stars[2] - bot * STAR_SHARES[2])).toBeLessThanOrEqual(2.5);
+        // Three stars without a perfect run: within rounding of 90% of the bots' average
+        // (a step further down when rounding a small score would reach the average).
+        const bumped = Math.round((bot * STAR_SHARES[2]) / STAR_ROUNDING) * STAR_ROUNDING >= bot;
+        expect(Math.abs(stars[2] - bot * STAR_SHARES[2])).toBeLessThanOrEqual(
+          bumped ? 2.5 + STAR_ROUNDING : 2.5,
+        );
         expect(stars[2]).toBeLessThan(bot);
       }
       expect(level.starThresholds).toEqual(thresholdsFor(bots[0]));

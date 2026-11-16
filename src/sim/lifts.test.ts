@@ -4,6 +4,7 @@ import hypergrowthDraft from '../../maps/level-08-hypergrowth.txt?raw';
 import {
   CHUTE_TICKS,
   EXPRESS_OPEN_TICKS,
+  EXPRESS_RIDE_TICKS,
   LIFT_OPEN_TICKS,
   LIFT_RIDE_TICKS,
   TICKS_PER_SECOND,
@@ -11,13 +12,23 @@ import {
 import { botInput, createBot } from './bot';
 import { parseLevelMap } from './level';
 import { HOT_DESKING, HYPERGROWTH, levelWithMap } from './levels';
-import { createChutes, createLifts, isRiding, liftChimes, liftLinks } from './lifts';
+import {
+  cabinOpen,
+  createChutes,
+  createLifts,
+  doorShare,
+  isRiding,
+  liftChimes,
+  liftLinks,
+} from './lifts';
 import { pathTo } from './path';
 import { type GameState, createGame } from './state';
 import { addTicket, cmd, give, idle } from './testing';
 import { tick } from './tick';
 
 const SECOND = TICKS_PER_SECOND;
+/** From the lift's first departure to its doors opening at the next floor. */
+const FIRST_RIDE = LIFT_OPEN_TICKS + LIFT_RIDE_TICKS + 1;
 
 /**
  * Two floors side by side: a 2-tile cabin on each (top floor on the right,
@@ -95,9 +106,13 @@ describe('lift rides', () => {
     give(1, ticket);
     idle(state, LIFT_OPEN_TICKS + 1);
     expect(state.events).toContainEqual({ type: 'liftDeparted', lift: 'local', floor: 1 });
+    // Doors shut: still in the cabin upstairs, riding.
+    expect(state.players[0]?.pos).toEqual({ x: 12, y: 1 });
+    expect(isRiding(state, 1)).toBe(true);
+    idle(state, LIFT_RIDE_TICKS);
     expect(state.players[0]?.pos).toEqual({ x: 3, y: 2 });
     expect(ticket.location).toEqual({ kind: 'player', playerId: 1 });
-    expect(isRiding(state, 1)).toBe(true);
+    expect(isRiding(state, 1)).toBe(false);
   });
 
   it("holds riders still until it arrives, then opens and goes back after it's stood open", () => {
@@ -107,12 +122,13 @@ describe('lift rides', () => {
     for (let i = 0; i < LIFT_RIDE_TICKS - 1; i++) {
       tick(state, [cmd(state, 1, { move: { x: 0, y: 1 } })]);
     }
-    expect(state.players[0]?.pos).toEqual({ x: 2, y: 2 });
+    expect(state.players[0]?.pos).toEqual({ x: 11, y: 1 });
     idle(state, 1);
+    expect(state.players[0]?.pos).toEqual({ x: 2, y: 2 });
     expect(state.events).toContainEqual({ type: 'liftArrived', lift: 'local', floor: 1 });
     expect(isRiding(state, 1)).toBe(false);
     expect(state.lifts[0]?.dir).toBe(1);
-    idle(state, LIFT_OPEN_TICKS + 1);
+    idle(state, LIFT_OPEN_TICKS + LIFT_RIDE_TICKS + 1);
     expect(state.players[0]?.pos).toEqual({ x: 11, y: 1 });
   });
 
@@ -154,7 +170,7 @@ describe('lift rides', () => {
     if (!manager) throw new Error('no manager');
     manager.pos = { x: 12, y: 1 };
     manager.waitTicks = 10 * SECOND;
-    idle(state, LIFT_OPEN_TICKS + 1);
+    idle(state, FIRST_RIDE);
     expect(manager.pos).toEqual({ x: 3, y: 2 });
   });
 
@@ -165,7 +181,7 @@ describe('lift rides', () => {
     standIn(state, 1, 11, 1);
     idle(state, 9 * SECOND);
     expect(state.players[0]?.pos).toEqual({ x: 11, y: 1 });
-    idle(state, 2 * SECOND + LIFT_OPEN_TICKS);
+    idle(state, 2 * SECOND + LIFT_OPEN_TICKS + LIFT_RIDE_TICKS);
     expect(state.players[0]?.pos).toEqual({ x: 2, y: 2 });
   });
 
@@ -176,8 +192,91 @@ describe('lift rides', () => {
     const state = game([1], map);
     expect(state.lifts[0]?.kind).toBe('express');
     standIn(state, 1, 2, 1);
-    idle(state, EXPRESS_OPEN_TICKS + 1);
+    idle(state, EXPRESS_OPEN_TICKS + EXPRESS_RIDE_TICKS + 1);
     expect(state.players[0]?.pos).toEqual({ x: 10, y: 1 });
+  });
+});
+
+describe('lift doors', () => {
+  /** Walks player 1 for `ticks` ticks. */
+  function walk(state: GameState, move: { x: number; y: number }, ticks: number): void {
+    for (let i = 0; i < ticks; i++) tick(state, [cmd(state, 1, { move })]);
+  }
+
+  it('keeps a cabin shut while the lift is on another floor', () => {
+    const state = game();
+    // The lift stands open upstairs: downstairs the doors are shut.
+    standIn(state, 1, 2, 3);
+    walk(state, { x: 0, y: -1 }, SECOND);
+    expect(Math.round(state.players[0]?.pos.y ?? 0)).toBe(3);
+  });
+
+  it('lets people in while it stands open, and not in the last second', () => {
+    const state = game();
+    const lift = state.lifts[0];
+    if (!lift) throw new Error('no lift');
+    expect(cabinOpen(state, lift, 0)).toBe(true);
+    expect(cabinOpen(state, lift, 1)).toBe(false);
+    standIn(state, 1, 11, 2);
+    walk(state, { x: 0, y: -1 }, SECOND / 2);
+    expect(Math.round(state.players[0]?.pos.y ?? 0)).toBe(1);
+    idle(state, LIFT_OPEN_TICKS - SECOND);
+    expect(cabinOpen(state, lift, 0)).toBe(false);
+    expect(doorShare(state, lift, 0)).toBeLessThanOrEqual(1);
+  });
+
+  it('closes the doors over the chime second', () => {
+    const state = game();
+    const lift = state.lifts[0];
+    if (!lift) throw new Error('no lift');
+    expect(doorShare(state, lift, 0)).toBe(1);
+    idle(state, LIFT_OPEN_TICKS - SECOND / 2);
+    expect(doorShare(state, lift, 0)).toBeCloseTo(0.5, 1);
+    idle(state, SECOND);
+    expect(doorShare(state, lift, 0)).toBe(0);
+    expect(doorShare(state, lift, 1)).toBe(0);
+  });
+
+  it('lets whoever is inside walk out while the doors close', () => {
+    const state = game();
+    standIn(state, 1, 11, 1);
+    idle(state, LIFT_OPEN_TICKS - SECOND / 2);
+    walk(state, { x: 0, y: 1 }, SECOND / 3);
+    expect(state.players[0]?.pos.y).toBeGreaterThan(1.5);
+  });
+
+  it('walks round a cabin, not through it', () => {
+    const map = parseLevelMap(
+      ['#######', '#1.LL.#', '#.....#', '#######', '#.LL..#', '#234..#', '#######'].join('\n'),
+    );
+    const path = pathTo(map, { x: 2, y: 1 }, { x: 5, y: 1 });
+    expect(path?.some((p) => p.y === 1 && (p.x === 3 || p.x === 4))).toBe(false);
+  });
+});
+
+describe('Hypergrowth lift cars', () => {
+  it('have one door side each: the cabins are dead ends', () => {
+    const map = parseLevelMap(hypergrowthDraft);
+    const lift = createLifts(map)[0];
+    if (!lift) throw new Error('no lift');
+    for (const cabin of lift.stops) {
+      const sides = new Set<string>();
+      for (const t of cabin) {
+        for (const [name, dx, dy] of [
+          ['up', 0, -1],
+          ['right', 1, 0],
+          ['down', 0, 1],
+          ['left', -1, 0],
+        ] as const) {
+          const x = t.x + dx;
+          const y = t.y + dy;
+          if (cabin.some((c) => c.x === x && c.y === y)) continue;
+          const tile = map.tiles[y * map.width + x];
+          if (tile === 'floor') sides.add(name);
+        }
+      }
+      expect([...sides]).toEqual(['down']);
+    }
   });
 });
 

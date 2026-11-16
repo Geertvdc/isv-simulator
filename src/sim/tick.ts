@@ -8,7 +8,7 @@ import {
   newTickWork,
   work,
 } from './interact';
-import { isRiding, updateLifts } from './lifts';
+import { isRiding, liftDoorBlocks, updateLifts } from './lifts';
 import { updateManagers } from './manager';
 import { doorBlocks, expireInvites, updateMeetings } from './meetings';
 import { movePlayer } from './movement';
@@ -40,7 +40,9 @@ export function tick(state: GameState, inputs: readonly InputCommand[]): void {
     const gate = gateBlocks(state.gates, player.pos);
     const door = doorBlocks(state, player.id);
     const revolving = revolvingBlocks(state.level, state.players, player.id);
-    const blocks = (x: number, y: number): boolean => gate(x, y) || door(x, y) || revolving(x, y);
+    const lift = liftDoorBlocks(state, player.pos);
+    const blocks = (x: number, y: number): boolean =>
+      gate(x, y) || door(x, y) || revolving(x, y) || lift(x, y);
     if (movePlayer(state.level, player, input?.move, input?.dash, isWet, blocks)) {
       state.events.push({ type: 'dashed', playerId: player.id });
     }
