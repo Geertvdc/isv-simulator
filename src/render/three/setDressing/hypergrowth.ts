@@ -51,9 +51,9 @@ function bar(b: ModelBuilder, a: V3, c: V3, t: number, color: number): void {
 // ---- Colors ----
 
 /** Flat-pack desk boxes: a muted cardboard, darker than every station top. */
-export const BOX = 0xa88a62;
+export const BOX = 0x9c8a6e;
 const BOX_EDGE = tint(BOX, -0.14);
-const BOX_TAPE = 0xbca27a;
+const BOX_TAPE = 0xb0a284;
 const BOX_INK = 0x4e3e2c;
 /** YOTTA violet, and the white of the welcome balloons. */
 export const VIOLET = 0x8a64d8;
@@ -125,6 +125,7 @@ function letters(
   z: number,
   px: number,
   color: number,
+  draw?: (u: number, v: number, w: number, h: number) => void,
 ): void {
   const cols = textWidth(text);
   Array.from(text).forEach((ch, k) => {
@@ -139,7 +140,9 @@ function letters(
         let e = c;
         while (e < 3 && glyph[r * 3 + e] === '1') e++;
         const left = x + (k * 4 + c - cols / 2) * px;
-        flat(b, (e - c) * px, px, 0.006, color, [left + ((e - c) * px) / 2, y + (2 - r) * px, z]);
+        const u = left + ((e - c) * px) / 2;
+        if (draw) draw(u, y + (2 - r) * px, (e - c) * px, px);
+        else flat(b, (e - c) * px, px, 0.006, color, [u, y + (2 - r) * px, z]);
         c = e;
       }
     }
@@ -1077,18 +1080,57 @@ export const doormat = looks([0.9, 0.55], 1, (b) => {
   for (let x = -0.36; x <= 0.36; x += 0.06) flat(b, 0.03, 0.006, 0.45, 0x52504a, [x, 0.022, 0]);
 });
 
-/** A yellow WET FLOOR A-frame sign standing open, about 0.5 high. */
+/**
+ * A yellow WET FLOOR A-frame sign standing open, about 0.5 high: on its
+ * front a black warning triangle with the slipping man in it (head, body,
+ * an arm up, legs flying), WET FLOOR in black letters under it.
+ */
 export const wetFloorSign = looks([0.35, 0.35], 1, (b) => {
   const y = 0xe0b820;
-  for (const s of [-1, 1]) {
-    b.box(0.3, 0.5, 0.02, y, { at: [0, 0.24, s * 0.08], rot: [s * 0.3, 0, 0] }, 0.008);
-    // The black warning triangle and the words on the front.
-    if (s > 0) {
-      flat(b, 0.12, 0.12, 0.004, 0x1c1c1c, [0, 0.32, 0.105], [0.3, 0, Math.PI / 4]);
-      flat(b, 0.07, 0.07, 0.006, y, [0, 0.32, 0.108], [0.3, 0, Math.PI / 4]);
-      flat(b, 0.2, 0.025, 0.004, 0x1c1c1c, [0, 0.16, 0.135], [0.3, 0, 0]);
-    }
+  const ink = 0x1c1c1c;
+  const lean = 0.3;
+  const c = Math.cos(lean);
+  const sn = Math.sin(lean);
+  /** A point on the front panel's face: u across, v about as high (along its slope), `out` off it. */
+  const P = (u: number, v: number, out = 0): V3 => {
+    const h = v - 0.24;
+    const n = 0.012 + out;
+    return [u, 0.24 + h * c - n * sn, 0.08 + h * sn + n * c];
+  };
+  for (const s of [-1, 1])
+    b.box(0.3, 0.5, 0.02, y, { at: [0, 0.24, s * 0.08], rot: [s * lean, 0, 0] }, 0.008);
+  const face = (w: number, h: number, u: number, v: number, roll = 0, out = 0) => {
+    flat(b, w, h, 0.004, ink, P(u, v, out), [lean, 0, roll]);
+  };
+  // The warning triangle: three thick black sides.
+  const tv = 0.32;
+  const r = 0.085;
+  const corner = (k: number): [number, number] => {
+    const a = Math.PI / 2 + (k * Math.PI * 2) / 3;
+    return [Math.cos(a) * r, tv + Math.sin(a) * r];
+  };
+  for (let k = 0; k < 3; k++) {
+    const [u0, v0] = corner(k);
+    const [u1, v1] = corner(k + 1);
+    face(
+      Math.hypot(u1 - u0, v1 - v0) + 0.02,
+      0.022,
+      (u0 + u1) / 2,
+      (v0 + v1) / 2,
+      Math.atan2(v1 - v0, u1 - u0),
+    );
   }
+  // The slipping man inside it.
+  b.sphere(0.012, ink, { at: P(0.02, tv + 0.035, 0.004) }, [1, 1, 0.4]);
+  face(0.016, 0.05, 0.005, tv + 0.0, 0.5, 0.003);
+  face(0.04, 0.012, 0.03, tv + 0.012, -0.6, 0.003);
+  face(0.012, 0.045, -0.025, tv - 0.03, 1.1, 0.003);
+  face(0.012, 0.04, 0.012, tv - 0.035, -0.4, 0.003);
+  // WET FLOOR under it.
+  for (const [k, word] of ['WET', 'FLOOR'].entries())
+    letters(b, word, 0, 0.0, 0, 0.012, ink, (u, v, w, h) => {
+      face(w, h, u, 0.19 - k * 0.075 + v, 0, 0.002);
+    });
   flat(b, 0.32, 0.03, 0.04, 0xd0a818, [0, 0.49, 0]);
 });
 
@@ -1144,3 +1186,200 @@ export const prodTub = looks([0.9, 0.9], 1, (b) => {
   b.torus(0.04, 0.008, VIOLET, { at: [0, 0.82, 0], rot: [Math.PI / 2, 0, 0] });
   flat(b, 0.07, 0.05, 0.006, 0xf0eef4, [0.04, 0.76, 0.05]);
 });
+
+// ---- A storey down: the street round the first floor ----
+
+/** The ground-floor façade under the first floor's glass: spandrel, shop glass, its slab edge. */
+const SPANDREL = 0x6a7076;
+const SHOP_GLASS = 0x3e4a56;
+const SLAB_GREY = 0x9a9a94;
+
+/**
+ * The building's ground floor under the first floor, `len` along +x from 0,
+ * its face at z = 0 facing +z, `h` high (a storey, from the street a storey
+ * down up to the slab): a pale slab edge at the top, the grey spandrel, the
+ * shops' dark glass in mullions, a canopy over each shop sticking out 0.45
+ * (the part seen from upstairs) and the warm light of the shop windows
+ * spilling onto the wet pavement in front.
+ */
+export function facadeBand(len: number, h: number): SetPiece {
+  return once(`facade:${len.toFixed(2)}:${h.toFixed(2)}`, () =>
+    looks([len, 0.6], 1, (b) => {
+      flat(b, len, h, 0.2, SPANDREL, [len / 2, h / 2, -0.1]);
+      flat(b, len + 0.02, 0.07, 0.24, SLAB_GREY, [len / 2, h - 0.035, -0.1]);
+      flat(b, len, h * 0.58, 0.01, SHOP_GLASS, [len / 2, 0.06 + h * 0.29, 0.005]);
+      flat(b, len, 0.06, 0.03, 0x3a3e44, [len / 2, 0.03, 0.01]);
+      const shop = 1.6;
+      for (let k = 0, x = 0.1; x < len - 0.4; k++, x += shop) {
+        const w = Math.min(shop - 0.2, len - x - 0.1);
+        const cx = x + w / 2;
+        for (const mx of [x, x + w])
+          flat(b, 0.04, h * 0.6, 0.03, 0x2e3238, [mx, 0.06 + h * 0.3, 0.012]);
+        // The canopy over the shop, its pale front edge, the drip of rain off it.
+        const c = nth([0x4a5a62, 0x5a5048, 0x4e5866], k);
+        b.box(w, 0.04, 0.46, c, { at: [cx, h * 0.68, 0.23], rot: [-0.12, 0, 0] }, 0);
+        flat(b, w, 0.05, 0.02, tint(c, 0.35), [cx, h * 0.68 - 0.03, 0.46]);
+        // The window's light on the pavement.
+        flat(b, w * 0.8, 0.003, 0.5, 0xa8a084, [cx, 0.032, 0.62]);
+        flat(b, w * 0.6, 0.003, 0.3, 0xb8ae8e, [cx, 0.034, 0.52]);
+      }
+    }),
+  );
+}
+
+/**
+ * Public steps down from the street to the street a storey lower: `n`
+ * concrete steps descending along +x, `w` wide (across z, centred), from
+ * `h` high at x = 0 to the ground; pale nosings, a dark handrail each side.
+ */
+export function streetSteps(n: number, w: number, h: number): SetPiece {
+  return once(`steps:${n}:${w.toFixed(2)}:${h.toFixed(2)}`, () =>
+    looks([n * 0.26, w], 1, (b) => {
+      const run = 0.26;
+      for (let k = 0; k < n; k++) {
+        const top = h - ((k + 1) * h) / (n + 1);
+        flat(b, run, top, w, tint(0x8c8a83, (k % 2) * 0.04), [k * run + run / 2, top / 2, 0]);
+        flat(b, 0.05, 0.006, w, 0xc0bcb2, [k * run + 0.03, top + 0.003, 0]);
+      }
+      for (const s of [-1, 1]) {
+        bar(
+          b,
+          [0, h + 0.36, (s * w) / 2],
+          [n * run, h / (n + 1) + 0.36, (s * w) / 2],
+          0.03,
+          0x3a3e44,
+        );
+        for (let k = 0; k <= n; k += 2) {
+          const top = k === 0 ? h : h - (k * h) / (n + 1);
+          flat(b, 0.025, 0.36, 0.025, 0x3a3e44, [k * run, top + 0.18, (s * w) / 2]);
+        }
+      }
+    }),
+  );
+}
+
+/**
+ * Where the street drops a storey: a concrete coping along −z from 0, `len`
+ * long, its edge at x = 0 (the drop toward +x), with a railing on it.
+ */
+export function dropRail(len: number): SetPiece {
+  return once(`dropRail:${len.toFixed(2)}`, () =>
+    looks([0.2, len], 1, (b) => {
+      flat(b, 0.16, 0.08, len, 0xa8a49a, [-0.08, 0.04, -len / 2]);
+      flat(b, 0.03, 0.03, len, 0x3a3e44, [-0.08, 0.42, -len / 2]);
+      for (let z = -0.05; z > -len; z -= 0.5)
+        flat(b, 0.025, 0.36, 0.025, 0x3a3e44, [-0.08, 0.24, z]);
+    }),
+  );
+}
+
+/** A ROAD CLOSED barrier: red and white boards on dark feet, `len` along +z from 0, 0.4 high. */
+export function roadBarrier(len: number): SetPiece {
+  return once(`barrier:${len.toFixed(2)}`, () =>
+    looks([0.2, len], 1, (b) => {
+      for (let z = 0.1; z < len; z += 0.8) {
+        flat(b, 0.12, 0.04, 0.1, 0x2a2c30, [0, 0.02, z]);
+        flat(b, 0.025, 0.32, 0.025, 0x2a2c30, [0, 0.18, z]);
+      }
+      for (let k = 0, z = 0; z < len - 0.01; k++, z += 0.2)
+        flat(b, 0.03, 0.12, Math.min(0.2, len - z), k % 2 ? 0xe8e4dc : 0xb03a32, [
+          0,
+          0.3,
+          z + Math.min(0.2, len - z) / 2,
+        ]);
+    }),
+  );
+}
+
+/** Rain-stripped cherry blossom, muted; the green leaf clumps showing where the rain knocked it off. */
+const BLOSSOM = [0xc8a0ae, 0xd4b0bc] as const;
+const LEAF = 0x7a9a68;
+const TRUNK = 0x4a3a30;
+
+/**
+ * A cherry tree after a night of rain, about 0.5 across before scaling: a
+ * dark trunk standing clear under the canopy and branches up into it, a
+ * canopy of muted pink puffs with green leaf clumps between them.
+ */
+export const wetCherry = looks([0.5, 0.5], 4, (b, v) => {
+  b.cylinder(0.014, 0.02, 0.32, TRUNK, { at: [0, 0.16, 0] }, 6);
+  for (let k = 0; k < 3; k++) {
+    const a = (k / 3) * Math.PI * 2 + v * 0.8;
+    bar(b, [0, 0.24, 0], [Math.cos(a) * 0.12, 0.36, Math.sin(a) * 0.12], 0.016, TRUNK);
+  }
+  const puffs = 7;
+  for (let k = 0; k < puffs; k++) {
+    const a = (k / puffs) * Math.PI * 2 + v * 0.9;
+    const r = k === 0 ? 0 : 0.1 + hash01(k, v, 3) * 0.05;
+    const leaf = (k + v) % 3 === 1;
+    b.sphere(
+      leaf ? 0.08 : 0.095 + hash01(k, v, 5) * 0.03,
+      leaf ? tint(LEAF, (hash01(k, v, 9) - 0.5) * 0.12) : nth(BLOSSOM, k + v),
+      { at: [Math.cos(a) * r, 0.38 + hash01(k, v, 7) * 0.05, Math.sin(a) * r] },
+      [1, 0.7, 1],
+    );
+  }
+});
+
+/**
+ * The tower across the street, almost done: `floors` storeys `storey` high,
+ * `w` × `d`, its front at z = 0 facing +z, centred on x. Every floor but the
+ * top two glazed (muted sky glass in dark mullions, a white slab edge, a
+ * reflection slanting across); the top two still a frame: bare grey slab
+ * edges and columns, the inside in shadow, orange safety netting hung over
+ * the lower of them; the core up through the roof, rebar, a yellow hoist
+ * cage up the front.
+ */
+export function almostDoneTower(w: number, d: number, floors: number, storey: number): SetPiece {
+  return once(`tower:${w}:${d}:${floors}:${storey}`, () =>
+    looks([w, d], 1, (b) => {
+      const f = storey;
+      const h = floors * f;
+      const glazed = floors - 2;
+      const edge = 0.06;
+      flat(b, w * 0.3, h + f * 0.6, d * 0.4, 0x8a8a84, [w * 0.15, (h + f * 0.6) / 2, -d / 2]);
+      for (let k = 0; k <= floors; k++) {
+        const y = k * f;
+        flat(b, w + 0.04, edge, d + 0.04, k <= glazed ? 0xdcdedb : SLAB_GREY, [
+          0,
+          y + edge / 2,
+          -d / 2,
+        ]);
+        if (k === floors) continue;
+        const iy = y + edge + (f - edge) / 2;
+        const ih = f - edge;
+        if (k < glazed) {
+          flat(b, w - 0.02, ih, d - 0.02, 0x4a7aa6, [0, iy, -d / 2]);
+          for (let x = -w / 2 + 0.25; x < w / 2 - 0.05; x += 0.25)
+            flat(b, 0.025, ih, 0.012, 0x2a3440, [x, iy, 0.0]);
+          for (let z = -0.25; z > -d + 0.05; z -= 0.25)
+            flat(b, 0.012, ih, 0.025, 0x2a3440, [w / 2, iy, z]);
+        } else {
+          flat(b, w - 0.2, ih, d - 0.2, 0x55585a, [0, iy, -d / 2]);
+          for (let x = -w / 2 + 0.05; x <= w / 2; x += (w - 0.1) / 5)
+            for (const z of [-0.05, -d + 0.05]) flat(b, 0.08, ih, 0.08, SLAB_GREY, [x, iy, z]);
+          for (let z = -0.05; z > -d; z -= (d - 0.1) / 2)
+            flat(b, 0.08, ih, 0.08, SLAB_GREY, [w / 2 - 0.05, iy, z]);
+          if (k === glazed) {
+            // The netting hung over the front and the side, strands in a lighter orange.
+            flat(b, w * 0.72, ih * 0.9, 0.012, 0xb87038, [-w * 0.12, iy, 0.03]);
+            for (let x = -w * 0.48 + 0.05; x < w * 0.24; x += 0.07)
+              flat(b, 0.008, ih * 0.9, 0.016, 0xc87a3a, [x, iy, 0.032]);
+            flat(b, w * 0.72, 0.02, 0.016, 0xc87a3a, [-w * 0.12, iy + ih * 0.44, 0.032]);
+            flat(b, 0.012, ih * 0.9, d * 0.6, 0xa86e42, [w / 2 + 0.03, iy, -d * 0.35]);
+          }
+        }
+      }
+      // The reflection, slanting across the glass.
+      const gh = glazed * f;
+      flat(b, 0.24, gh * 1.1, 0.006, 0xb8ccdc, [-w * 0.2, gh / 2, 0.01], [0, 0, -0.45]);
+      flat(b, 0.09, gh * 1.05, 0.006, 0xaac0d2, [-w * 0.2 + 0.28, gh / 2, 0.01], [0, 0, -0.45]);
+      // Rebar up from the top slab, the hoist cage up the front.
+      for (let x = -w / 2 + 0.1; x < w / 2; x += 0.25)
+        flat(b, 0.014, 0.16, 0.014, 0x6a4a3a, [x, h + 0.14, -0.1]);
+      flat(b, 0.22, h + f * 0.5, 0.18, 0xc8a032, [w * 0.36, (h + f * 0.5) / 2, 0.1]);
+      for (let y = 0.1; y < h + f * 0.4; y += 0.14)
+        flat(b, 0.23, 0.02, 0.19, 0x5a4a28, [w * 0.36, y, 0.1]);
+    }),
+  );
+}

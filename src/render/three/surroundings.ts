@@ -420,7 +420,14 @@ export class Surroundings {
     );
     this.geometries.push(horizon);
     const plane = new THREE.Mesh(horizon, material);
-    put(plane, gridToWorld((map.width - 1) / 2, (map.height - 1) / 2, GROUND_Y - 0.002));
+    put(
+      plane,
+      gridToWorld(
+        (map.width - 1) / 2,
+        (map.height - 1) / 2,
+        GROUND_Y + (scene.horizonY ?? 0) - 0.002,
+      ),
+    );
     plane.receiveShadow = true;
     this.root.add(plane);
     const { body } = groundModel(scene);

@@ -209,13 +209,32 @@ describe('hypergrowthScene', () => {
     if (!van || !hazards) throw new Error('no van');
     expect(van.at.x).toBeLessThan(-0.5);
     const ship = map.tiles.flatMap((t, i) => (t === 'ship' ? [Math.floor(i / map.width)] : []));
-    // Its rear (local −x, here toward +z) at the bay's back edge.
-    const rearZ = van.at.z + 0.98;
+    // Its rear (local −x) toward the bay: at the bay's back edge, turned in at the wall.
+    const half = 0.98 * van.scale[0];
+    const rearX = van.at.x - Math.cos(van.yaw) * half;
+    const rearZ = van.at.z + Math.sin(van.yaw) * half;
     expect(Math.abs(rearZ - (Math.min(...ship) - 0.5))).toBeLessThan(0.6);
+    expect(rearX).toBeGreaterThan(van.at.x);
+    // Van and driver wholly on screen, a few pixels in from the edge, above the legend.
     for (const v of worldPoints(van)) {
       const s = projectPoint(pose, v);
-      expect(s.x).toBeGreaterThan(0);
+      expect(s.x).toBeGreaterThan(6);
       expect(s.y).toBeGreaterThan(0);
+      expect(s.y).toBeLessThan(619);
+    }
+    const driver = scene.people.find((p) => p.at.x < -0.5 && p.at.z > plan.postRoom.z1 + 1);
+    if (!driver) throw new Error('no driver');
+    for (const [dx, dy, dz] of [
+      [-0.25, 0, -0.25],
+      [-0.25, 1.3, 0.25],
+      [0.25, 0, 0.25],
+    ] as const) {
+      const s = projectPoint(pose, {
+        x: driver.at.x + dx,
+        y: driver.at.y + dy,
+        z: driver.at.z + dz,
+      });
+      expect(s.x).toBeGreaterThan(6);
       expect(s.y).toBeLessThan(619);
     }
     expect(hazards.alive).toBe('blink');
@@ -238,6 +257,36 @@ describe('hypergrowthScene', () => {
       expect(l.hot).toBe(true);
       const s = projectPoint(pose, l.at);
       expect(s.x).toBeGreaterThan(700);
+      expect(s.x).toBeLessThan(1370);
+      expect(s.y).toBeGreaterThan(0);
+    }
+  });
+
+  it('drops the street behind and right of the first floor a storey, its pieces smaller', () => {
+    expect(scene.horizonY).toBeCloseTo(-1.2);
+    const low = scene.ground.filter((g) => (g.y ?? 0) < -1);
+    expect(low.some((g) => g.x0 >= plan.shaft.x1 - 0.01 && g.z1 <= plan.back + 0.31)).toBe(true);
+    expect(low.some((g) => g.x1 > plan.right + 1 && g.z1 > front)).toBe(true);
+    // The ground floor's streets stay at the slab's foot.
+    for (const g of scene.ground.filter((q) => (q.y ?? 0) === 0 && q.kind !== 'pit'))
+      expect(
+        g.x1 <= plan.right + 0.01 && (g.z0 >= plan.back - 0.01 || g.x1 <= plan.shaft.x1 + 0.01),
+        g.kind,
+      ).toBe(true);
+    const cars = find(hyper.wetCar);
+    const down = cars.filter((c) => c.at.y < GROUND - 1);
+    expect(down.length).toBeGreaterThanOrEqual(3);
+    for (const c of down) expect(c.scale[0]).toBeLessThan(0.7);
+    expect(find(hyper.facadeBand(plan.right - plan.shaft.x1, 1.2)).length).toBe(1);
+  });
+
+  it('builds the tower across the road almost done, its crane long, clear of the HUD', () => {
+    const crane = scene.pieces.find((p) => p.piece === hyper.cityCrane(0.6, 2.6));
+    if (!crane) throw new Error('no crane');
+    expect(2.6 * crane.scale[0]).toBeGreaterThanOrEqual(2.2);
+    for (const v of worldPoints(crane)) {
+      const s = projectPoint(pose, v);
+      expect(s.x).toBeGreaterThan(690);
       expect(s.x).toBeLessThan(1370);
       expect(s.y).toBeGreaterThan(0);
     }

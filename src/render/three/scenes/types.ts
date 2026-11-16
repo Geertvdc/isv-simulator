@@ -24,6 +24,11 @@ export interface GroundPatch {
   z1: number;
   /** Which way a lawn's mowing stripes (or a painter's own stripes) run. */
   stripes?: 'x' | 'z';
+  /**
+   * How far the patch sits above the ground (negative: below it), for a
+   * street a storey down; 0 when left out.
+   */
+  y?: number;
 }
 
 /**
@@ -95,6 +100,12 @@ export interface ScenePerson {
 export interface Scene {
   /** The color of the big ground plane under everything, out to the horizon (a lawn, asphalt, cobbles). */
   horizon: number;
+  /**
+   * How far the horizon plane sits above the ground (negative: below it),
+   * when the scene's patches drop below the slab's foot somewhere; 0 when
+   * left out. Patches must then cover all the ground seen at 0.
+   */
+  horizonY?: number;
   /** Ground surfaces, drawn over the horizon plane in order. */
   ground: GroundPatch[];
   /** The scene's own ground kinds, by name; tried before the built-in ones. */

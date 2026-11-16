@@ -291,6 +291,34 @@ describe('Surroundings', () => {
       expect(seen).toEqual(new Set([true, false]));
       hot.destroy();
     });
+
+    it("lays the horizon at the slab's foot, or `horizonY` from it", () => {
+      const scenes = SCENES as Record<string, (m: typeof map) => Scene>;
+      /** The lowest mesh's height in a one-off scene's world (the horizon plane). */
+      const horizon = (horizonY?: number) => {
+        scenes['test-horizon'] = () => ({
+          horizon: 0x222222,
+          ...(horizonY === undefined ? {} : { horizonY }),
+          ground: [],
+          pieces: [],
+          people: [],
+          tufts: [],
+        });
+        try {
+          const w = new Surroundings(map, undefined, 'test-horizon');
+          const ys: number[] = [];
+          w.root.traverse((o) => {
+            if (o instanceof THREE.Mesh) ys.push(o.getWorldPosition(new THREE.Vector3()).y);
+          });
+          w.destroy();
+          return Math.min(...ys);
+        } finally {
+          delete scenes['test-horizon'];
+        }
+      };
+      expect(horizon(-1.2)).toBeCloseTo(horizon() - 1.2);
+      expect(horizon(0)).toBeCloseTo(horizon());
+    });
   });
 
   it('salts every level apart by its map', () => {

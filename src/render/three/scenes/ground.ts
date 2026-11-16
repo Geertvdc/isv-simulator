@@ -1,3 +1,4 @@
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { type Model, ModelBuilder, tint } from '../kit';
 import { tileHash } from '../../mapShape';
 import { tuft } from '../setDressing/suburb';
@@ -62,17 +63,38 @@ export function shade(i: number, j: number, salt: number): number {
 /**
  * The scene's ground as one model: each patch painted by the scene's own
  * painter for its kind if it has one, else by the built-in one (a kind
- * neither knows is left out), then the tufts.
+ * neither knows is left out), then the tufts. A patch with a `y` is painted
+ * as usual, then moved up (or down) by it.
  */
 export function groundModel(scene: Pick<Scene, 'ground' | 'tufts' | 'painters'>): Model {
   const b = new ModelBuilder();
+  const raised = new Map<number, ModelBuilder>();
   scene.ground.forEach((g, k) => {
+    const y = g.y ?? 0;
+    let into = b;
+    if (y !== 0) {
+      into = raised.get(y) ?? new ModelBuilder();
+      raised.set(y, into);
+    }
     const own = scene.painters?.[g.kind];
-    if (own) own(b, g, k);
-    else if (isBuiltIn(g.kind)) surface(b, g, g.kind, k);
+    if (own) own(into, g, k);
+    else if (isBuiltIn(g.kind)) surface(into, g, g.kind, k);
   });
   for (const [x, z, s] of scene.tufts) tuft(b, x, z, s, TUFT);
-  return b.build();
+  const model = b.build();
+  if (raised.size === 0) return model;
+  const parts = [model.body];
+  for (const [y, rb] of raised) {
+    const body = rb.build().body;
+    body.translate(0, y, 0);
+    parts.push(body);
+  }
+  const body = mergeGeometries(
+    parts.filter((p) => 'position' in p.attributes),
+    false,
+  );
+  for (const p of parts) p.dispose();
+  return { ...model, body };
 }
 
 function isBuiltIn(kind: string): kind is BuiltIn {
