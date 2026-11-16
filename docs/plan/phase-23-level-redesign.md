@@ -1,6 +1,6 @@
 # Phase 23: Level redesign
 
-**Status:** rolled out (2026-11-15). The 16 redrawn maps are the shipped maps in `maps/` (reorg levels with a `.phaseN.txt` per later layout), with every mechanic below built (layers A–F) and stars recalibrated with the bots. The draft folder, the `?draft=` loader and the draft tools (`sketch`, `level-report`, `draft-shots`, `sim --drafts`) are gone; the sections below keep the design record, and their tool commands and image links describe how the maps were made. Still open: the couch test with the real mechanics and the art pass for the new maps.
+**Status:** rolled out (2026-11-15). The 16 redrawn maps are the shipped maps in `maps/` (reorg levels with a `.phaseN.txt` per later layout), with every mechanic below built (layers A–F) and stars recalibrated with the bots. The draft folder, the `?draft=` loader and the draft tools (`sketch`, `level-report`, `draft-shots`, `sim --drafts`) are gone; the sections below keep the design record, and their tool commands and image links describe how the maps were made. Each level's entry links its shipped map and shows the shipped level in the game (**Shipped**, the same shots as [Levels](../game/levels.md), retaken 2026-11-16); the sketch and the draft render are the gate-1 record and can show an older layout (3-2's lift cars, for one, were walled in after it). Still open: the couch test with the real mechanics and the art pass for the new maps.
 
 **Goal:** levels that differ in size and shape (small rooms, big halls, two rooms joined by a hallway where people bump into each other) and a layout play element per chapter, not only furniture placement. Today all 16 campaign maps are the same 14×10 rectangle (Big Tech 16×10) with furniture moved around. Every level must work from 1 to 4 players on one map.
 
@@ -126,13 +126,13 @@ Each level gets: the draft map, the sketch (current left, draft right), its repo
 
 ### Chapter 1: Garage
 
-Layout gimmick: no new code: the founder's house (rooms, serving hatch, hallway). Sketches: [garage](images/level-redesign/garage.svg), [open-plan](images/level-redesign/open-plan.svg), [scale-up](images/level-redesign/scale-up.svg). 3D renders: [garage](images/level-redesign/garage-3d.webp), [open-plan](images/level-redesign/open-plan-3d.webp), [scale-up](images/level-redesign/scale-up-3d.webp).
+Layout gimmick: no new code: the founder's house (rooms, serving hatch, hallway). Sketches: [garage](images/level-redesign/garage.svg), [open-plan](images/level-redesign/open-plan.svg), [scale-up](images/level-redesign/scale-up.svg). Draft renders (greybox): [garage](images/level-redesign/garage-3d.webp), [open-plan](images/level-redesign/open-plan-3d.webp), [scale-up](images/level-redesign/scale-up-3d.webp).
 
 #### 1-1 The Garage (`garage`)
 
 **Concept:** 10×7 small. One single-car garage, roll-up door is the ship hatch, workbench counters. Gimmick: none (tutorial). 1p / 4p: Short solo loop; 4p crowding is the joke.
 
-- **Draft:** `maps/drafts/garage.txt`
+- **Map** (drafted here, now shipped): [`maps/level-01-garage.txt`](../../maps/level-01-garage.txt)
 
   ```text
   ##BI#KK#
@@ -144,8 +144,9 @@ Layout gimmick: no new code: the founder's house (rooms, serving hatch, hallway)
   ###SS#####
   ```
 
+- **Shipped:** ![1-1 The Garage as shipped, in the game](../game/images/levels/garage.webp)
 - **Sketch:** ![1-1 The Garage, current left, draft right](images/level-redesign/garage.svg)
-- **3D render:** ![1-1 The Garage draft in the game](images/level-redesign/garage-3d.webp)
+- **Draft render** (greybox at gate 1, before the mechanics and art were built): ![1-1 The Garage draft in the game](images/level-redesign/garage-3d.webp)
 - **Report:**
 
   | Level                    | Size  | Floor | Stations             | Solo run | Loop | Chokepoints           | Reachable |
@@ -162,7 +163,7 @@ Layout gimmick: no new code: the founder's house (rooms, serving hatch, hallway)
 
 **Concept:** 16×9 medium. First rented office: open room split by a desk-row divider with one gap and a review island; throw over it. Gimmick: rooms, throwing. 1p / 4p: Walk-around exists for solo.
 
-- **Draft:** `maps/drafts/open-plan.txt`
+- **Map** (drafted here, now shipped): [`maps/level-02-open-plan.txt`](../../maps/level-02-open-plan.txt)
 
   ```text
   ##KK##B##TT#
@@ -176,8 +177,9 @@ Layout gimmick: no new code: the founder's house (rooms, serving hatch, hallway)
   ####II###SS#####
   ```
 
+- **Shipped:** ![1-2 Open Plan Office as shipped, in the game](../game/images/levels/open-plan.webp)
 - **Sketch:** ![1-2 Open Plan Office, current left, draft right](images/level-redesign/open-plan.svg)
-- **3D render:** ![1-2 Open Plan Office draft in the game](images/level-redesign/open-plan-3d.webp)
+- **Draft render** (greybox at gate 1, before the mechanics and art were built): ![1-2 Open Plan Office draft in the game](images/level-redesign/open-plan-3d.webp)
 - **Report:**
 
   | Level                          | Size  | Floor | Stations                | Solo run | Loop | Chokepoints    | Reachable |
@@ -194,7 +196,7 @@ Layout gimmick: no new code: the founder's house (rooms, serving hatch, hallway)
 
 **Concept:** 20×9 large. Two rooms joined by a long hallway (2 wide, 1-wide doors at both ends); review room at the far end. Gimmick: hallway bumping. 1p / 4p: Spawns 3/4 in far room.
 
-- **Draft:** `maps/drafts/scale-up.txt`
+- **Map** (drafted here, now shipped): [`maps/level-03-scale-up.txt`](../../maps/level-03-scale-up.txt)
 
   ```text
   ##II#KK##
@@ -208,8 +210,9 @@ Layout gimmick: no new code: the founder's house (rooms, serving hatch, hallway)
   ###SS####
   ```
 
+- **Shipped:** ![1-3 Down the Hall as shipped, in the game](../game/images/levels/scale-up.webp)
 - **Sketch:** ![1-3 Down the Hall, current left, draft right](images/level-redesign/scale-up.svg)
-- **3D render:** ![1-3 Down the Hall draft in the game](images/level-redesign/scale-up-3d.webp)
+- **Draft render** (greybox at gate 1, before the mechanics and art were built): ![1-3 Down the Hall draft in the game](images/level-redesign/scale-up-3d.webp)
 - **Report:**
 
   | Level                       | Size  | Floor | Stations                | Solo run | Loop | Chokepoints       | Reachable |
@@ -224,7 +227,7 @@ Layout gimmick: no new code: the founder's house (rooms, serving hatch, hallway)
 
 ### Chapter 2: Startup
 
-Layout gimmick: **Spills** (`_` wet floor: players slide and overshoot). From 2-2 on, the spills move: a **leaky tap** (`o`) floods a **spill zone** (`%`) during the round, and in 2-3 a **mop robot** drives a loop (`r`) and leaves a wet trail. 2-1 has no spills: it teaches incidents in a new building shape. Sketches: [seed-round](images/level-redesign/seed-round.svg), [demo-day](images/level-redesign/demo-day.svg), [on-call](images/level-redesign/on-call.svg). 3D renders: [seed-round](images/level-redesign/seed-round-3d.webp), [demo-day](images/level-redesign/demo-day-3d.webp), [on-call](images/level-redesign/on-call-3d.webp).
+Layout gimmick: **Spills** (`_` wet floor: players slide and overshoot). From 2-2 on, the spills move: a **leaky tap** (`o`) floods a **spill zone** (`%`) during the round, and in 2-3 a **mop robot** drives a loop (`r`) and leaves a wet trail. 2-1 has no spills: it teaches incidents in a new building shape. Sketches: [seed-round](images/level-redesign/seed-round.svg), [demo-day](images/level-redesign/demo-day.svg), [on-call](images/level-redesign/on-call.svg). Draft renders (greybox): [seed-round](images/level-redesign/seed-round-3d.webp), [demo-day](images/level-redesign/demo-day-3d.webp), [on-call](images/level-redesign/on-call-3d.webp).
 
 The sketches draw wet tiles glossy blue, the spill zone as light blue with a dashed ring, the tap as a brown `o` block and the robot route as a ringed dot. The 3D renders use stand-ins until these are built: wet floor, spill zone and robot route show as plain floor, and the tap shows as a counter. Each level below says where they are. The report reads `_`, `%` and `r` as floor, so its numbers are for walking dry. Each level that has a spill zone also gets a "flooded" report row, with `%` read as wall: the routes if nobody wants to cross the wet floor.
 
@@ -251,7 +254,7 @@ The sketches draw wet tiles glossy blue, the spill zone as light blue with a das
 
 **Concept:** 15×11 medium. Coworking loft in a U round the building's stairwell, with the founders' office and the server closet as real rooms in the two arms. Gimmick: none new (incidents). 1p / 4p: Two pipelines, two ways round the pod.
 
-- **Draft:** `maps/drafts/seed-round.txt`
+- **Map** (drafted here, now shipped): [`maps/level-04-seed-round.txt`](../../maps/level-04-seed-round.txt)
 
   ```text
   ###############
@@ -267,8 +270,9 @@ The sketches draw wet tiles glossy blue, the spill zone as light blue with a das
   ######   ##BB##
   ```
 
+- **Shipped:** ![2-1 Seed Round as shipped, in the game](../game/images/levels/seed-round.webp)
 - **Sketch:** ![2-1 Seed Round, current left, draft right](images/level-redesign/seed-round.svg)
-- **3D render:** ![2-1 Seed Round draft in the game](images/level-redesign/seed-round-3d.webp)
+- **Draft render** (greybox at gate 1, before the mechanics and art were built): ![2-1 Seed Round draft in the game](images/level-redesign/seed-round-3d.webp)
 - **Report:**
 
   | Level                    | Size  | Floor | Stations             | Solo run | Loop | Chokepoints            | Reachable |
@@ -290,7 +294,7 @@ The sketches draw wet tiles glossy blue, the spill zone as light blue with a das
 
 **Concept:** 19×11 large. Coworking room, a foyer with a leaking kombucha tap, and a hall with the stage behind it; the ship is the demo screen on the stage. Gimmick: **Spills intro + leaky tap** (new). 1p / 4p: Dry route over the stage always exists.
 
-- **Draft:** `maps/drafts/demo-day.txt`
+- **Map** (drafted here, now shipped): [`maps/level-05-demo-day.txt`](../../maps/level-05-demo-day.txt)
 
   ```text
         #######SS####
@@ -306,8 +310,9 @@ The sketches draw wet tiles glossy blue, the spill zone as light blue with a das
         ######TT#####
   ```
 
+- **Shipped:** ![2-2 Demo Day as shipped, in the game](../game/images/levels/demo-day.webp)
 - **Sketch:** ![2-2 Demo Day, current left, draft right](images/level-redesign/demo-day.svg)
-- **3D render:** ![2-2 Demo Day draft in the game](images/level-redesign/demo-day-3d.webp)
+- **Draft render** (greybox at gate 1, before the mechanics and art were built): ![2-2 Demo Day draft in the game](images/level-redesign/demo-day-3d.webp)
 - **Report:**
 
   | Level                            | Size  | Floor | Stations                | Solo run | Loop | Chokepoints       | Reachable |
@@ -332,7 +337,7 @@ The sketches draw wet tiles glossy blue, the spill zone as light blue with a das
 
 **Concept:** 18×12 large. Night shift: an H of two rooms joined by two corridors round an enclosed server room, and a mop robot driving the ring. Gimmick: **Mop robot** (new). 1p / 4p: Ring gives two ways round; the robot decides which is dry.
 
-- **Draft:** `maps/drafts/on-call.txt`
+- **Map** (drafted here, now shipped): [`maps/level-06-on-call.txt`](../../maps/level-06-on-call.txt)
 
   ```text
   #BBKK#      ##TT##
@@ -349,8 +354,9 @@ The sketches draw wet tiles glossy blue, the spill zone as light blue with a das
   ##SS##      ######
   ```
 
+- **Shipped:** ![2-3 On Call as shipped, in the game](../game/images/levels/on-call.webp)
 - **Sketch:** ![2-3 On Call, current left, draft right](images/level-redesign/on-call.svg)
-- **3D render:** ![2-3 On Call draft in the game](images/level-redesign/on-call-3d.webp)
+- **Draft render** (greybox at gate 1, before the mechanics and art were built): ![2-3 On Call draft in the game](images/level-redesign/on-call-3d.webp)
 - **Report:**
 
   | Level                 | Size  | Floor | Stations                | Solo run | Loop | Chokepoints                                                      | Reachable |
@@ -371,7 +377,7 @@ The sketches draw wet tiles glossy blue, the spill zone as light blue with a das
 
 ### Chapter 3: Scale-Up
 
-Layout gimmick: **Lifts** (`L` lift cabin, `l` express lift cabin), plus a **mail chute** (`H`). Sketches: [middle-management](images/level-redesign/middle-management.svg), [hypergrowth](images/level-redesign/hypergrowth.svg), [hot-desking](images/level-redesign/hot-desking.svg). 3D renders: [middle-management](images/level-redesign/middle-management-3d.webp), [hypergrowth](images/level-redesign/hypergrowth-3d.webp), [hot-desking](images/level-redesign/hot-desking-3d.webp).
+Layout gimmick: **Lifts** (`L` lift cabin, `l` express lift cabin), plus a **mail chute** (`H`). Sketches: [middle-management](images/level-redesign/middle-management.svg), [hypergrowth](images/level-redesign/hypergrowth.svg), [hot-desking](images/level-redesign/hot-desking.svg). Draft renders (greybox): [middle-management](images/level-redesign/middle-management-3d.webp), [hypergrowth](images/level-redesign/hypergrowth-3d.webp), [hot-desking](images/level-redesign/hot-desking-3d.webp).
 
 The company outgrows one room: 3-1 is one big corporate floor with a real corner office and a meeting room, 3-2 splits the company over two floors, 3-3 over three. The floors are drawn side by side as separate islands with an empty shaft between them. None of the new parts are built yet, so the tools read `L` and `l` as floor and `H` as a counter: the floors are only joined by their stairwells, and the report's `cut` rows on 3-2 and 3-3 are those stairwells, as intended (with lifts built they become detours). The 3D renders show cabins as plain floor and hatches as counters. Throws stop at walls, so a ticket only changes floor by lift, by stairs or down the chute. The chapter's existing mechanic is the wandering manager (`M`). The meeting rooms (`m` floor, walls, doors, a table) are real rooms, but they stay quiet in this chapter: calendar invites only start in Enterprise.
 
@@ -387,7 +393,7 @@ The company outgrows one room: 3-1 is one big corporate floor with a real corner
 
 **Concept:** 22×12 large. Biggest single floor so far, a corner office that sticks out of the building and a meeting room, one manager. Gimmick: none new (manager in real rooms). 1p / 4p: Wide side aisle for 4, one narrow aisle past the office door.
 
-- **Draft:** `maps/drafts/middle-management.txt`
+- **Map** (drafted here, now shipped): [`maps/level-07-middle-management.txt`](../../maps/level-07-middle-management.txt)
 
   ```text
     ##II####KKK###TT####
@@ -405,8 +411,9 @@ The company outgrows one room: 3-1 is one big corporate floor with a real corner
   ```
 
 - **Rooms:** the manager's corner office (1–7,5–6) with a desk (2,5) and one door (8,6) onto the middle aisle; the meeting room (11–14,5–6) with a table (12–13,6) and two doors on the front side (11,7) and (14,7).
+- **Shipped:** ![3-1 Middle Management as shipped, in the game](../game/images/levels/middle-management.webp)
 - **Sketch:** ![3-1 Middle Management, current left, draft right](images/level-redesign/middle-management.svg)
-- **3D render:** ![3-1 Middle Management draft in the game](images/level-redesign/middle-management-3d.webp)
+- **Draft render** (greybox at gate 1, before the mechanics and art were built): ![3-1 Middle Management draft in the game](images/level-redesign/middle-management-3d.webp)
 - **Report:**
 
   | Level                           | Size  | Floor | Stations             | Solo run | Loop | Chokepoints                            | Reachable |
@@ -423,7 +430,7 @@ The company outgrows one room: 3-1 is one big corporate floor with a real corner
 
 **Concept:** 22×12 large. Two floors as separate islands: ground (inbox, bugs, pipelines, ship) and first floor (keyboards, tests). One lift, a long 1-wide stairwell, and a mail chute down; the manager rides. Gimmick: **Lifts intro + mail chute**. 1p / 4p: Solo waits for the lift or takes the stairs; the chute sends work down.
 
-- **Draft:** `maps/drafts/hypergrowth.txt`
+- **Map** (drafted here, now shipped): [`maps/level-08-hypergrowth.txt`](../../maps/level-08-hypergrowth.txt)
 
   ```text
               ##KK#KK###
@@ -443,8 +450,9 @@ The company outgrows one room: 3-1 is one big corporate floor with a real corner
 - **Lift pairing:** one lift: the ground car (6–7,4–5) ↔ the first-floor car (13–14,4–5), either side of the shaft. Each car has walls on three sides and its doors at the front, toward the camera. Holds 4 (or 3 and the manager).
 - **Mail chute:** the first-floor hatch (12,6, in the shaft wall beside the upstairs lift lobby, used from 13,6) → the ground hatch (8,7, in the right wall, used from 7,7).
 - **Lift redesign (2026-11-16):** the cars were walled in so the lift is a place you walk into, not a patch of floor: the inbox and bug queue moved one tile left (1–2 and 3–4, row 3) to make room for the ground car's left wall, and the chute's top hatch moved from (12,3) to (12,6) because the upstairs car's back wall took its only access tile. Recalibrated: bots [15, 120, 165, 235].
+- **Shipped:** ![3-2 Hypergrowth as shipped, in the game](../game/images/levels/hypergrowth.webp)
 - **Sketch:** ![3-2 Hypergrowth, current left, draft right](images/level-redesign/hypergrowth.svg)
-- **3D render:** ![3-2 Hypergrowth draft in the game](images/level-redesign/hypergrowth-3d.webp)
+- **Draft render** (greybox at gate 1, before the mechanics and art were built): ![3-2 Hypergrowth draft in the game](images/level-redesign/hypergrowth-3d.webp)
 - **Report:** (stand-in: no lift, so the stairwell is the only way up)
 
   | Level                     | Size  | Floor | Stations             | Solo run | Loop | Chokepoints                            | Reachable |
@@ -463,7 +471,7 @@ The company outgrows one room: 3-1 is one big corporate floor with a real corner
 
 **Concept:** 22×12 large. Three floors: an express lift that skips a floor and a local lift that stops at every floor. The express breaks down for a stretch, a mail chute runs from the top floor to the ground, and the reviews happen in a meeting room. Two managers. Gimmick: **three floors, express lift, lift breakdown**. 1p / 4p: Local lift and stairs always work; the express takes the team.
 
-- **Draft:** `maps/drafts/hot-desking.txt`
+- **Map** (drafted here, now shipped): [`maps/level-09-hot-desking.txt`](../../maps/level-09-hot-desking.txt)
 
   ```text
   ########   ###TT######
@@ -484,8 +492,9 @@ The company outgrows one room: 3-1 is one big corporate floor with a real corner
 - **Lift pairing:** **express** (`l`, 2×2): ground (5–6,5–6) ↔ second floor (12–13,1–2), skipping the first. **Local** (`L`, holds 2): ground (6,8–9) ↔ first floor (12,7–8) ↔ second floor (12–13,3), one floor per ride.
 - **Mail chute:** the second-floor hatch (14,4, used from 14,3) → the ground hatch (7,7, used from 6,7), past the first floor.
 - **Breakdown:** the express is out of order for 20 s at about 1:00 and again at about 2:15, telegraphed 5 s ahead.
+- **Shipped:** ![3-3 Hot Desking as shipped, in the game](../game/images/levels/hot-desking.webp)
 - **Sketch:** ![3-3 Hot Desking, current left, draft right](images/level-redesign/hot-desking.svg)
-- **3D render:** ![3-3 Hot Desking draft in the game](images/level-redesign/hot-desking-3d.webp)
+- **Draft render** (greybox at gate 1, before the mechanics and art were built): ![3-3 Hot Desking draft in the game](images/level-redesign/hot-desking-3d.webp)
 - **Report:** (stand-in: no lifts, so the stairs are the only way up)
 
   | Level                     | Size  | Floor | Stations                | Solo run | Loop | Chokepoints                           | Reachable |
@@ -506,7 +515,7 @@ The company outgrows one room: 3-1 is one big corporate floor with a real corner
 
 ### Chapter 4: Enterprise
 
-Layout gimmick: **Reorgs** (`=` partitions, `D` rolling desks), with two Enterprise extras: **meeting doors** (`d`) and **badge turnstiles** (`+`). Sketches: [back-to-back](images/level-redesign/back-to-back.svg), [synergy](images/level-redesign/synergy.svg), [the-reorg](images/level-redesign/the-reorg.svg). 3D renders: [back-to-back](images/level-redesign/back-to-back-3d.webp), [synergy](images/level-redesign/synergy-3d.webp) ([phase 2](images/level-redesign/synergy-phase2-3d.webp)), [the-reorg](images/level-redesign/the-reorg-3d.webp) ([phase 2](images/level-redesign/the-reorg-phase2-3d.webp), [phase 3](images/level-redesign/the-reorg-phase3-3d.webp)).
+Layout gimmick: **Reorgs** (`=` partitions, `D` rolling desks), with two Enterprise extras: **meeting doors** (`d`) and **badge turnstiles** (`+`). Sketches: [back-to-back](images/level-redesign/back-to-back.svg), [synergy](images/level-redesign/synergy.svg), [the-reorg](images/level-redesign/the-reorg.svg). Draft renders (greybox): [back-to-back](images/level-redesign/back-to-back-3d.webp), [synergy](images/level-redesign/synergy-3d.webp) ([phase 2](images/level-redesign/synergy-phase2-3d.webp)), [the-reorg](images/level-redesign/the-reorg-3d.webp) ([phase 2](images/level-redesign/the-reorg-phase2-3d.webp), [phase 3](images/level-redesign/the-reorg-phase3-3d.webp)).
 
 Every meeting room in this chapter is a real room: `#` (or partition) walls on all sides, doors 1–2 tiles wide, a table in the middle and the `m` floor inside. The 3D renders cut the front walls down as usual, so the side walls and the door gaps show. The future chars are stand-ins in the tools: `=` is a wall, `D` a counter, `d` and `+` are floor (an open door, an open gate). Each level is also checked with `d` and `+` as walls (a meeting in session, a turnstile going the wrong way): every station stays reachable from every spawn in every phase.
 
@@ -521,7 +530,7 @@ Every meeting room in this chapter is a real room: `#` (or partition) walls on a
 
 **Concept:** 21×12 large. HQ: a corridor with two offices and two glass meeting rooms off it; back-to-back meetings alternate rooms. Gimmick: meeting doors, named rooms. 1p / 4p: Corridor 2 wide, every door has a twin.
 
-- **Draft:** `maps/drafts/back-to-back.txt`
+- **Map** (drafted here, now shipped): [`maps/level-10-back-to-back.txt`](../../maps/level-10-back-to-back.txt)
 
   ```text
   #B#KKII#     ##KK#B##
@@ -538,8 +547,9 @@ Every meeting room in this chapter is a real room: `#` (or partition) walls on a
                #######
   ```
 
+- **Shipped:** ![4-1 Back to Back as shipped, in the game](../game/images/levels/back-to-back.webp)
 - **Sketch:** ![4-1 Back to Back, current left, draft right](images/level-redesign/back-to-back.svg)
-- **3D render:** ![4-1 Back to Back draft in the game](images/level-redesign/back-to-back-3d.webp)
+- **Draft render** (greybox at gate 1, before the mechanics and art were built): ![4-1 Back to Back draft in the game](images/level-redesign/back-to-back-3d.webp)
 - **Report:**
 
   | Level                      | Size  | Floor | Stations             | Solo run | Loop | Chokepoints   | Reachable |
@@ -556,7 +566,7 @@ Every meeting room in this chapter is a real room: `#` (or partition) walls on a
 
 **Concept:** 20×10 large. The boardroom sits between dev and ops, up a back corridor; its walls fold away on a schedule and the whole floor becomes one hall, then the room closes again. Gimmick: **Reorg intro** (a folding room). 1p / 4p: The front passage and the corridor are always open.
 
-- **Draft:** phase 1 `maps/drafts/synergy.txt` (boardroom closed), phase 2 `maps/drafts/synergy.phase2.txt` (walls folded away)
+- **Map** (drafted here, now shipped): phase 1 [`maps/level-11-synergy.txt`](../../maps/level-11-synergy.txt) (boardroom closed), phase 2 [`maps/level-11-synergy.phase2.txt`](../../maps/level-11-synergy.phase2.txt) (walls folded away)
 
   ```text
   Phase 1: closed             Phase 2: open hall
@@ -572,8 +582,9 @@ Every meeting room in this chapter is a real room: `#` (or partition) walls on a
   ##KK#########KK#SS##        ##KK#########KK#SS##
   ```
 
+- **Shipped:** ![4-2 Synergy as shipped, in the game](../game/images/levels/synergy.webp)
 - **Sketch:** ![4-2 Synergy, current left, draft phases right](images/level-redesign/synergy.svg)
-- **3D render:** ![4-2 Synergy draft phase 1 in the game](images/level-redesign/synergy-3d.webp) ![4-2 Synergy draft phase 2 in the game](images/level-redesign/synergy-phase2-3d.webp)
+- **Draft render** (greybox at gate 1, before the mechanics and art were built): ![4-2 Synergy draft phase 1 in the game](images/level-redesign/synergy-3d.webp) ![4-2 Synergy draft phase 2 in the game](images/level-redesign/synergy-phase2-3d.webp)
 - **Report:**
 
   | Level                        | Size  | Floor | Stations             | Solo run | Loop | Chokepoints             | Reachable |
@@ -601,7 +612,7 @@ Every meeting room in this chapter is a real room: `#` (or partition) walls on a
 
 **Concept:** 22×12 large. The whole floor reorganises twice per round, three really different floor plans round a fixed boardroom: Silos, Open Plan, Matrix. Walls, doors and desks all move; badge turnstiles into the shipping lobby flip direction each phase. Gimmick: Reorgs, meeting doors, turnstiles (finale). 1p / 4p: Telegraphed 3 s ahead, the staff door is always two-way.
 
-- **Draft:** phase 1 "Silos" `maps/drafts/the-reorg.txt`, phase 2 "Open Plan" `maps/drafts/the-reorg.phase2.txt`, phase 3 "Matrix" `maps/drafts/the-reorg.phase3.txt`
+- **Map** (drafted here, now shipped): phase 1 "Silos" [`maps/level-12-the-reorg.txt`](../../maps/level-12-the-reorg.txt), phase 2 "Open Plan" [`maps/level-12-the-reorg.phase2.txt`](../../maps/level-12-the-reorg.phase2.txt), phase 3 "Matrix" [`maps/level-12-the-reorg.phase3.txt`](../../maps/level-12-the-reorg.phase3.txt)
 
   ```text
   Phase 1: Silos              Phase 2: Open Plan          Phase 3: Matrix
@@ -619,8 +630,9 @@ Every meeting room in this chapter is a real room: `#` (or partition) walls on a
        #####SS#####                #####SS#####                #####SS#####
   ```
 
+- **Shipped:** ![4-3 The Reorg as shipped, in the game](../game/images/levels/the-reorg.webp)
 - **Sketch:** ![4-3 The Reorg, current left, draft phases right](images/level-redesign/the-reorg.svg)
-- **3D render:** ![4-3 The Reorg draft phase 1 in the game](images/level-redesign/the-reorg-3d.webp) ![4-3 The Reorg draft phase 2 in the game](images/level-redesign/the-reorg-phase2-3d.webp) ![4-3 The Reorg draft phase 3 in the game](images/level-redesign/the-reorg-phase3-3d.webp)
+- **Draft render** (greybox at gate 1, before the mechanics and art were built): ![4-3 The Reorg draft phase 1 in the game](images/level-redesign/the-reorg-3d.webp) ![4-3 The Reorg draft phase 2 in the game](images/level-redesign/the-reorg-phase2-3d.webp) ![4-3 The Reorg draft phase 3 in the game](images/level-redesign/the-reorg-phase3-3d.webp)
 - **Report:**
 
   | Level                          | Size  | Floor | Stations                | Solo run | Loop | Chokepoints    | Reachable |
@@ -667,7 +679,7 @@ Every meeting room in this chapter is a real room: `#` (or partition) walls on a
 
 ### Chapter 5: Big Tech
 
-Layout gimmick: **Campus** (`Q` travelators, `Y` shuttle, `*` revolving doors) on top of gaps and belts: separate buildings, an atrium, skybridges. The finale calls back every earlier chapter. Sketches: [the-atrium](images/level-redesign/the-atrium.svg), [design-sprint](images/level-redesign/design-sprint.svg), [monorepo](images/level-redesign/monorepo.svg), [hackathon](images/level-redesign/hackathon.svg). 3D renders: [the-atrium](images/level-redesign/the-atrium-3d.webp), [design-sprint](images/level-redesign/design-sprint-3d.webp), [monorepo](images/level-redesign/monorepo-3d.webp), [hackathon](images/level-redesign/hackathon-3d.webp) ([phase 2](images/level-redesign/hackathon-phase2-3d.webp)).
+Layout gimmick: **Campus** (`Q` travelators, `Y` shuttle, `*` revolving doors) on top of gaps and belts: separate buildings, an atrium, skybridges. The finale calls back every earlier chapter. Sketches: [the-atrium](images/level-redesign/the-atrium.svg), [design-sprint](images/level-redesign/design-sprint.svg), [monorepo](images/level-redesign/monorepo.svg), [hackathon](images/level-redesign/hackathon.svg). Draft renders (greybox): [the-atrium](images/level-redesign/the-atrium-3d.webp), [design-sprint](images/level-redesign/design-sprint-3d.webp), [monorepo](images/level-redesign/monorepo-3d.webp), [hackathon](images/level-redesign/hackathon-3d.webp) ([phase 2](images/level-redesign/hackathon-phase2-3d.webp)).
 
 Each level from 5-2 on adds one element no earlier level has. None of them is built yet: the tools read `Q`, `Y` and `*` as floor (stand-in `.`), so the 3D renders show plain floor there, and the reachability check never counts on a shuttle ride.
 
@@ -680,7 +692,7 @@ Each level from 5-2 on adds one element no earlier level has. None of them is bu
 
 **Concept:** 22×12 large. Two buildings across a real atrium (gaps), a 1-wide skybridge, belt bridges and a travelator along the front. Gimmick: gaps, belts, **travelator**. 1p / 4p: Skybridge + travelator round for solo.
 
-- **Draft:** `maps/drafts/the-atrium.txt`
+- **Map** (drafted here, now shipped): [`maps/level-13-the-atrium.txt`](../../maps/level-13-the-atrium.txt)
 
   ```text
   ##II#KK##
@@ -697,8 +709,9 @@ Each level from 5-2 on adds one element no earlier level has. None of them is bu
                #########
   ```
 
+- **Shipped:** ![5-1 The Atrium as shipped, in the game](../game/images/levels/the-atrium.webp)
 - **Sketch:** ![5-1 The Atrium, current left, draft right](images/level-redesign/the-atrium.svg)
-- **3D render:** ![5-1 The Atrium draft in the game](images/level-redesign/the-atrium-3d.webp)
+- **Draft render** (greybox at gate 1, before the mechanics and art were built): ![5-1 The Atrium draft in the game](images/level-redesign/the-atrium-3d.webp)
 - **Report:**
 
   | Level                    | Size  | Floor | Stations             | Solo run | Loop | Chokepoints             | Reachable |
@@ -715,7 +728,7 @@ Each level from 5-2 on adds one element no earlier level has. None of them is bu
 
 **Concept:** 18×10 medium. Cosy design studio (whiteboards) behind a revolving door, a hallway, a big engineering hall built for pairing. Gimmick: design, pairing, **revolving door**. 1p / 4p: Studio fits 2.
 
-- **Draft:** `maps/drafts/design-sprint.txt`
+- **Map** (drafted here, now shipped): [`maps/level-14-design-sprint.txt`](../../maps/level-14-design-sprint.txt)
 
   ```text
   ###W###
@@ -730,8 +743,9 @@ Each level from 5-2 on adds one element no earlier level has. None of them is bu
            ###SS####
   ```
 
+- **Shipped:** ![5-2 Design Sprint as shipped, in the game](../game/images/levels/design-sprint.webp)
 - **Sketch:** ![5-2 Design Sprint, current left, draft right](images/level-redesign/design-sprint.svg)
-- **3D render:** ![5-2 Design Sprint draft in the game](images/level-redesign/design-sprint-3d.webp)
+- **Draft render** (greybox at gate 1, before the mechanics and art were built): ![5-2 Design Sprint draft in the game](images/level-redesign/design-sprint-3d.webp)
 - **Report:**
 
   | Level                       | Size  | Floor | Stations                | Solo run | Loop | Chokepoints | Reachable |
@@ -748,7 +762,7 @@ Each level from 5-2 on adds one element no earlier level has. None of them is bu
 
 **Concept:** 22×12 large. FE tower and BE tower with the integration (merge) room as a real room between them; 2-wide doors, belts across, a shuttle over the courtyard. Gimmick: merge, belts, **campus shuttle**. 1p / 4p: Teams split FE/BE.
 
-- **Draft:** `maps/drafts/monorepo.txt`
+- **Map** (drafted here, now shipped): [`maps/level-15-monorepo.txt`](../../maps/level-15-monorepo.txt)
 
   ```text
   ###K###        ###K###
@@ -765,8 +779,9 @@ Each level from 5-2 on adds one element no earlier level has. None of them is bu
   #######        #######
   ```
 
+- **Shipped:** ![5-3 Monorepo as shipped, in the game](../game/images/levels/monorepo.webp)
 - **Sketch:** ![5-3 Monorepo, current left, draft right](images/level-redesign/monorepo.svg)
-- **3D render:** ![5-3 Monorepo draft in the game](images/level-redesign/monorepo-3d.webp)
+- **Draft render** (greybox at gate 1, before the mechanics and art were built): ![5-3 Monorepo draft in the game](images/level-redesign/monorepo-3d.webp)
 - **Report:**
 
   | Level                  | Size  | Floor | Stations                | Solo run | Loop | Chokepoints | Reachable |
@@ -785,7 +800,7 @@ Each level from 5-2 on adds one element no earlier level has. None of them is bu
 
 **Concept:** 22×12 large. Big hall with a U belt round a pit (with an exit), a design room and a server room; one callback per earlier chapter. Gimmick: everything, **belt outage**. 1p / 4p: Many routes.
 
-- **Draft:** phase 1 `maps/drafts/hackathon.txt` (east lane closed), phase 2 `maps/drafts/hackathon.phase2.txt` (west lane closed)
+- **Map** (drafted here, now shipped): phase 1 [`maps/level-16-hackathon.txt`](../../maps/level-16-hackathon.txt) (east lane closed), phase 2 [`maps/level-16-hackathon.phase2.txt`](../../maps/level-16-hackathon.phase2.txt) (west lane closed)
 
   ```text
   ##W####II#BB#KK##         ##W####II#BB#KK##
@@ -802,8 +817,9 @@ Each level from 5-2 on adds one element no earlier level has. None of them is bu
   ######TT##SS#####         ######TT##SS#####
   ```
 
+- **Shipped:** ![5-4 Hackathon as shipped, in the game](../game/images/levels/hackathon.webp)
 - **Sketch:** ![5-4 Hackathon, current left, draft phases right](images/level-redesign/hackathon.svg)
-- **3D render:** ![5-4 Hackathon draft phase 1 in the game](images/level-redesign/hackathon-3d.webp) ![5-4 Hackathon draft phase 2 in the game](images/level-redesign/hackathon-phase2-3d.webp)
+- **Draft render** (greybox at gate 1, before the mechanics and art were built): ![5-4 Hackathon draft phase 1 in the game](images/level-redesign/hackathon-3d.webp) ![5-4 Hackathon draft phase 2 in the game](images/level-redesign/hackathon-phase2-3d.webp)
 - **Report:**
 
   | Level                          | Size  | Floor | Stations                   | Solo run | Loop | Chokepoints                             | Reachable |
