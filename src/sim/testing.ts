@@ -136,6 +136,9 @@ export function give(playerId: PlayerId, ticket: Ticket): void {
  * seeds (on the bigger maps, with lifts and reorgs, single runs swing a lot).
  * The campaign star tests are split per chapter so they run in parallel.
  */
+/** Bot star runs play whole rounds (8 per level); CI runners are a few times slower than a laptop. */
+export const BOT_STAR_TIMEOUT_MS = 90_000;
+
 export function expectBotsEarnAStar(level: Level): void {
   for (const [bots, seeds] of [
     [1, [1, 2, 3, 4, 5]],
