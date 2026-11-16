@@ -15,10 +15,10 @@ import { MID_RISE_WALL_TOP_PROPS } from './midRiseWallTops';
  */
 
 /** Flat-pack cardboard: muted, darker than every station top; its tape and print. */
-export const CARDBOARD = 0xa88a62;
-const CARDBOARD_DARK = 0x8a6e4c;
-const PRINT = 0x4e3c2a;
-const TAPE = 0xb89c70;
+export const CARDBOARD = 0x877c6b;
+const CARDBOARD_DARK = 0x6e6556;
+const PRINT = 0x4a3e30;
+const TAPE = 0xa69c88;
 export const BALLOON_VIOLET = 0x7a5cd0;
 const TOTE = 0x5e48a8;
 const WHITE_PRINT = 0xe8e4f4;
@@ -109,7 +109,14 @@ function wrappedChair(
       0,
     );
   }
-  g.pane(0.38, 0.5, 0.38, 0xd8e4ec, { at: [0, 0.26, -0.03] });
+  if (!lying) g.pane(0.38, 0.5, 0.38, 0xd8e4ec, { at: [0, 0.26, -0.03] });
+  else
+    // The cling film's glints and twisted ends, so the chair still reads through it.
+    for (const [y, zz] of [
+      [0.24, 0.16],
+      [0.42, -0.17],
+    ] as const)
+      g.box(0.36, 0.012, 0.012, 0xe4eef4, { at: [0, y, zz] }, 0);
   // The wrap's twisted ends and the CAUTION sticker.
   g.box(0.08, 0.06, 0.004, 0xd8b42a, { at: [0.1, 0.38, -0.112] }, 0);
 }
@@ -237,30 +244,94 @@ export const LOWER_TOPS: Readonly<Record<TopKind, () => Model>> = {
     monitorBox(b, 0, 0, -0.12, 0.1);
     deskBox(b, 0.02, 0, 0.16, -0.12, 0.02);
   }),
+  // At the top of the stairs, low: a monitor box lying flat on a flat-pack, a laptop sleeve on it.
+  kitLow: prop((b) => {
+    deskBox(b, 0, 0, 0, 0.05, -0.02);
+    lyingMonitor(b, 0.04, 0.12, 0.02, -0.1);
+    b.box(0.3, 0.02, 0.21, 0x4a4f56, { at: [-0.05, 0.27, 0.0], rot: [0, 0.25, 0] }, 0.005);
+  }),
+  // New laptops in a low stack beside a lying monitor box.
+  laptopsLow: prop((b) => {
+    for (let k = 0; k < 4; k++)
+      b.box(
+        0.34,
+        0.022,
+        0.24,
+        k % 2 ? 0x8d949b : 0x4a4f56,
+        {
+          at: [-0.2 + (k % 2) * 0.01, 0.011 + k * 0.024, (k % 3) * 0.006],
+          rot: [0, (k - 2) * 0.05, 0],
+        },
+        0.005,
+      );
+    b.box(0.12, 0.05, 0.09, 0xd8dada, { at: [-0.16, 0.12, 0], rot: [0, 0.3, 0] }, 0.006);
+    lyingMonitor(b, 0.2, 0, 0.02, 0.15);
+  }),
 };
 
-/** How high anything lying on the low front wall reaches at most (over the wall's top). */
-export const LOWER_FRONT_MAX_HEIGHT = 0.25;
+/** A monitor box lying on its back at (x, y, z), the printed screen facing up. */
+function lyingMonitor(b: ModelBuilder, x: number, y: number, z: number, yaw: number): void {
+  const g = framed(b, [x, y, z], [0, yaw, 0]);
+  const w = 0.5;
+  const h = 0.12;
+  const d = 0.36;
+  g.box(w, h, d, 0x948e80, { at: [0, h / 2, 0] }, 0.008);
+  g.box(0.32, 0.002, 0.2, 0x2a2d33, { at: [-0.04, h + 0.001, 0] }, 0);
+  g.box(0.28, 0.002, 0.16, 0x3a5470, { at: [-0.04, h + 0.002, 0] }, 0);
+  text(g, '27', 0.18, h / 2, d / 2 + 0.001, 0.01, 0x2a2d33, 0.002);
+}
 
-/** Low things on the ground floor's front wall: a hand high at most. */
+/** How high anything lying on the low walls reaches at most (over the wall's top), but a balloon. */
+export const LOWER_FRONT_MAX_HEIGHT = 0.3;
+
+/** Low things on the ground floor's low walls: a hand high at most, flat clusters. */
 export const LOWER_FRONTS: Readonly<Record<FrontKind, () => Model>> = {
-  flatBox: prop((b) => {
-    deskBox(b, 0, 0, 0, 0.1, 0.02);
+  // Flat-packs two high, the top one turned, a third lying beside.
+  lowBoxes: prop((b) => {
+    deskBox(b, -0.04, 0, -0.04, 0.06, 0);
+    deskBox(b, -0.02, 0.12, -0.02, -0.1, -0.05);
+    deskBox(b, 0.42, 0, 0.06, Math.PI / 2 - 0.15, 0.03);
   }),
-  tote: prop((b) => {
-    b.box(0.3, 0.05, 0.26, TOTE, { at: [0, 0.025, 0], rot: [0, 0.3, 0] }, 0.01);
-    b.torus(0.06, 0.008, tint(TOTE, -0.15), {
-      at: [0.05, 0.05, -0.08],
-      rot: [Math.PI / 2, 0, 0.3],
-    });
-    const g = framed(b, [0, 0.052, 0], [-Math.PI / 2, 0.3, 0]);
-    text(g, 'YOTTA', 0, 0, 0, 0.01, WHITE_PRINT, 0.002);
+  // An open box of welcome packs (violet totes with handles up), a tote dropped beside it.
+  lowPacks: prop((b) => {
+    const w = 0.46;
+    const h = 0.16;
+    const d = 0.34;
+    b.box(w, h, d, CARDBOARD, { at: [0, h / 2, 0] }, 0.008);
+    b.box(w - 0.03, 0.01, d - 0.03, CARDBOARD_DARK, { at: [0, h - 0.004, 0] }, 0);
+    for (let k = 0; k < 4; k++) {
+      const x = -0.15 + k * 0.1;
+      b.box(
+        0.09,
+        0.1,
+        0.2,
+        tint(TOTE, (k % 2) * 0.08),
+        { at: [x, h + 0.0, 0], rot: [0, 0, (k - 1.5) * 0.08] },
+        0.006,
+      );
+      b.torus(
+        0.028,
+        0.006,
+        tint(TOTE, -0.15),
+        { at: [x, h + 0.06, 0], rot: [0, Math.PI / 2, 0] },
+        Math.PI,
+      );
+    }
+    text(b, 'WELCOME', 0, h * 0.55, d / 2 + 0.001, 0.009, TOTE, 0.002);
+    // The dropped tote.
+    b.box(0.28, 0.05, 0.24, TOTE, { at: [0.42, 0.025, 0.08], rot: [0, 0.3, 0] }, 0.01);
+    const g = framed(b, [0.42, 0.052, 0.08], [-Math.PI / 2, 0, 0.3]);
+    text(g, 'YOTTA', 0, 0, 0, 0.009, WHITE_PRINT, 0.002);
   }),
-  umbrella: prop((b) => {
-    // A closed umbrella lying along the wall, dripping into a little puddle on the coping.
-    b.cylinder(0.035, 0.012, 0.62, 0x2e3a5a, { at: [0, 0.035, 0], rot: [0, 0, Math.PI / 2] }, 10);
-    b.cylinder(0.01, 0.01, 0.12, 0x2a2c30, { at: [-0.36, 0.035, 0], rot: [0, 0, Math.PI / 2] }, 6);
-    b.torus(0.03, 0.01, 0x2a2c30, { at: [-0.42, 0.035, 0.03], rot: [Math.PI / 2, 0, 0] }, Math.PI);
-    b.cylinder(0.12, 0.12, 0.002, 0x6a7a86, { at: [0.2, 0.001, 0.08] }, 16);
+  // A chair lying on its back in its plastic, a flat-pack beside.
+  lowChairs: prop((b) => {
+    wrappedChair(b, -0.12, 0.1, 0.05, 0.2, true);
+    deskBox(b, 0.3, 0, -0.02, 0.2, -0.03);
+  }),
+  // Flat-packs two high, a small violet balloon tied on.
+  lowBalloon: prop((b) => {
+    deskBox(b, 0, 0, 0, 0.05, 0);
+    deskBox(b, 0.02, 0.12, 0.01, -0.12, -0.05);
+    balloon(b, 0.16, 0.24, 0.1, 0.36);
   }),
 };

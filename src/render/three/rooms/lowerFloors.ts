@@ -1,6 +1,7 @@
 import { gridToWorld } from '../../projection';
 import { FRONT_WALL_HEIGHT, WALL_HEIGHT } from '../layout';
 import {
+  BALUSTRADE_MODELS,
   BLOCK_MODELS,
   LIFT_MODELS,
   LOWER_WALL_ART,
@@ -8,6 +9,7 @@ import {
   bannerModel,
   chuteFaceModel,
   chuteHatchCounter,
+  floorNumberModel,
   liftHeadModel,
   loadingBayModel,
   mixedFloorModel,
@@ -15,6 +17,7 @@ import {
   mixedTone,
   postHatchModel,
   railModel,
+  slabEdgeModel,
 } from '../roomModels/lowerFloors';
 import {
   MID_RISE_FOUNDATION_LOOKS,
@@ -56,8 +59,10 @@ const FLAT = new Set([
   ...[false, true].flatMap((low) =>
     Array.from({ length: 16 }, (_, arms) => `headRidge:${low}:${arms}`),
   ),
-  'rail:true',
-  'rail:false',
+  ...[true, false].flatMap((low) => [`rail:${low}:true`, `rail:${low}:false`]),
+  'floorNumber:0',
+  'floorNumber:1',
+  'slabEdge',
 ]);
 
 /** The chute hatch: one model whatever its run (the map has no other counters). */
@@ -84,7 +89,7 @@ export const LOWER_FLOORS_ROOM: RoomDressing<LowerFloorsRoom> = {
   floor: { theme: 'mixedFloors', model: mixedFloorModel, look: mixedLook, tone: mixedTone },
   foundation: { model: midRiseFoundationModel, looks: MID_RISE_FOUNDATION_LOOKS },
   counter: () => HATCH,
-  swapModels: { ...SOLID_MODELS, ...BLOCK_MODELS, ...LIFT_MODELS },
+  swapModels: { ...SOLID_MODELS, ...BLOCK_MODELS, ...LIFT_MODELS, ...BALUSTRADE_MODELS },
   flat: FLAT,
   lamp: {
     model: pendantModel,
@@ -98,8 +103,12 @@ export const LOWER_FLOORS_ROOM: RoomDressing<LowerFloorsRoom> = {
         () => headRidgeModel(low ? FRONT_WALL_HEIGHT : WALL_HEIGHT, arms),
         { at: gridToWorld(x, y), yaw: 0 },
       );
-    for (const { x, y, low, yaw } of plan.rails)
-      place(`rail:${low}`, () => railModel(low), { at: gridToWorld(x, y), yaw });
+    for (const { x, y, low, yaw, post } of plan.rails)
+      place(`rail:${low}:${post}`, () => railModel(low, post), { at: gridToWorld(x, y), yaw });
+    for (const { x, y, n } of plan.floorNumbers)
+      place(`floorNumber:${n}`, () => floorNumberModel(n), { at: gridToWorld(x, y), yaw: 0 });
+    for (const { x, y, yaw } of plan.slabEdges)
+      place('slabEdge', slabEdgeModel, { at: gridToWorld(x, y), yaw });
     if (plan.postHatch) {
       const span = plan.postHatch.tiles.length;
       place(`postHatch:${span}`, () => postHatchModel(span), {

@@ -134,8 +134,10 @@ describe('LOWER_FLOORS_ROOM', () => {
       expect(box.max.z - box.min.z, kind).toBeLessThan(1.1);
       expect(box.max.y, kind).toBeLessThan(0.75);
     }
-    for (const p of Object.values(LOWER_FRONTS))
-      expect(bounds(p()).max.y).toBeLessThanOrEqual(LOWER_FRONT_MAX_HEIGHT);
+    for (const [kind, p] of Object.entries(LOWER_FRONTS))
+      expect(bounds(p()).max.y, kind).toBeLessThanOrEqual(
+        kind === 'lowBalloon' ? 0.75 : LOWER_FRONT_MAX_HEIGHT,
+      );
     expect(bounds(railModel(true)).max.y).toBeLessThan(FRONT_WALL_HEIGHT + 0.3);
   });
 

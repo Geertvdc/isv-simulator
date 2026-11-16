@@ -9,13 +9,16 @@ import {
   FLOOR_WEAR,
   FLOOR_WEAR_KINDS,
   LOWER_ART_HALF,
+  BALUSTRADE_LOOKS,
+  STAIR_RAMP,
+  balustradeSwap,
   blockSwap,
   liftSwap,
 } from '../rooms/lowerFloorsRoom';
 import { CARPET_WEAR_KINDS } from '../rooms/midRiseRoom';
 import type { StationModel } from '../stationModels';
 import { framed, text } from './basement';
-import { ALU, MID_RISE_WALL_ART, YOTTA_VIOLET, carpetFloorModel } from './midRise';
+import { ALU, GLASS_CORE, MID_RISE_WALL_ART, YOTTA_VIOLET, carpetFloorModel } from './midRise';
 
 /**
  * The ground and first floor of 3-1's mid-rise, mid-move-in (wall theme
@@ -58,6 +61,9 @@ function glowBox(
 
 /** Brushed stainless: the lift's doors and frames, the chute. */
 export const STEEL = 0xa3abb2;
+/** The lift frame's top plate, seen from above: darker than the stations, never a white slab. */
+export const LIFT_TOP = 0x7e868d;
+const DOOR_SEAM = 0x3a3e44;
 const STEEL_DARK = 0x737b83;
 const STEEL_EDGE = 0x5a6168;
 /** The midRise partitions' plasterboard, for the lift frame's bulkhead. */
@@ -68,8 +74,16 @@ const MARKER_RED = 0xc0302a;
 /** Safety yellow and black, dulled a touch so it never outshines a station. */
 const HAZARD = 0xd8b42a;
 const HAZARD_BLACK = 0x2a2c30;
-/** The lit floor indicator's amber. */
+/** The lit floor indicator's amber, and its display's black. */
 const INDICATOR = 0xffb040;
+const INDICATOR_AMBER = 0xe0a030;
+const DISPLAY = 0x24262a;
+/** Safety yellow for the stairwell's handrail. */
+export const RAIL_YELLOW = 0xc8a032;
+/** The floor numbers stencilled on the stairwell's concrete. */
+const STENCIL = 0xe8e4d8;
+/** The first floor's slab edge. */
+const SLAB_EDGE = 0x5a6168;
 
 // ---- The floor ----
 
@@ -92,14 +106,15 @@ export function mixedTone(x: number, y: number, salt: number): number {
 export const MIXED_LOOKS = FLOOR_WEAR_KINDS * VARIANTS;
 
 /** The walk-off mat's ribbed charcoal-blue, its border; the post room's pale lino and its edge strip. */
-export const MAT = 0x4c5661;
-const MAT_BORDER = 0x3c434b;
+export const MAT = 0x68747e;
+const MAT_BORDER = 0x4a525a;
 export const LINO = 0xaab0a2;
 const LINO_EDGE = 0x868b80;
 /** Concrete treads and the steel nosings. */
 export const TREAD = 0x9a9b95;
-const NOSING = 0xb2b8bd;
+const NOSING = 0xa3abb2;
 const INSERT = 0x3d4247;
+const RISER = 0x4a4f55;
 
 /** A thin decal on the floor (`w` along x, `d` along z), a hair over the surface. */
 function decal(
@@ -125,7 +140,10 @@ export function mixedFloorModel(look: number): Model {
   const wear = Math.floor(look / VARIANTS) % FLOOR_WEAR_KINDS;
   if (wear >= FLOOR_WEAR.carpet && wear < FLOOR_WEAR.carpet + CARPET_WEAR_KINDS)
     return warmed(carpetFloorModel((wear - FLOOR_WEAR.carpet) * VARIANTS + variant));
-  if (wear >= FLOOR_WEAR.stairX) return stairModel(wear - FLOOR_WEAR.stairX, variant);
+  if (wear >= FLOOR_WEAR.stairX) {
+    const k = wear - FLOOR_WEAR.stairX;
+    return stairModel(Math.floor(k / STAIR_RAMP), k % STAIR_RAMP, variant);
+  }
   return rubberModel(wear, variant);
 }
 
@@ -171,8 +189,9 @@ function rubberModel(wear: number, variant: number): Model {
   decal(b, 1.3, 0.16, tint(base, 0.035), 0.05 * (variant - 1), 0.1 * (variant - 1), 0.0008, 0.75);
   // A welded seam on one tile in three (the sheet's 2 m rolls).
   if (variant === 0) decal(b, 0.008, 1, tint(base, -0.1), -0.494, 0, 0.0009);
-  const wet = tint(base, -0.13);
-  const sheen = tint(base, 0.1);
+  // Wet: 8% darker over a darker lane, tracks and prints a further step down, a glossy sheen.
+  const wet = tint(base, -0.16);
+  const sheen = tint(base, 0.2);
   if (wear === FLOOR_WEAR.trackX || wear === FLOOR_WEAR.trackZ) {
     const along = wear === FLOOR_WEAR.trackX ? 0 : Math.PI / 2;
     tracks(b, along, 0.5, wet, sheen, variant);
@@ -196,6 +215,9 @@ function rubberModel(wear: number, variant: number): Model {
   return b.build();
 }
 
+/** The wet lane the trolley drags in: the rubber 8% darker. */
+const LANE = () => tint(FLOOR_COLORS.mixedFloors[0], -0.08);
+
 /** Trolley wheel tracks and wet footprints across a tile along `along` (0 along x). */
 function tracks(
   b: ModelBuilder,
@@ -206,25 +228,28 @@ function tracks(
   variant: number,
 ): void {
   const g = framed(b, [0, 0, 0], [0, along, 0]);
-  for (const s of [-1, 1]) decal(g, len * 2, 0.022, wet, 0, s * 0.17, 0.0024);
-  decal(g, len * 2, 0.008, sheen, 0, -0.165, 0.0026);
-  // Footprints, alternating, a stride apart, wet and faint, between the tracks.
+  // A wet lane the trolley's dragged in, glossy: the wheel tracks in it, a sheen down one side.
+  decal(g, len * 2, 0.46, LANE(), 0, 0, 0.0016);
+  for (const s of [-1, 1]) decal(g, len * 2, 0.05, wet, 0, s * 0.17, 0.0024);
+  decal(g, len * 2, 0.03, sheen, 0, -0.1, 0.0026);
+  // Footprints, alternating, a stride apart, wet, between the tracks.
   for (let k = 0; k < 2; k++) {
     const x = -0.25 + k * 0.5 + (variant - 1) * 0.04;
-    const z = k % 2 ? 0.05 : -0.05;
-    decal(g, 0.11, 0.06, wet, x, z, 0.0026);
-    decal(g, 0.04, 0.05, wet, x - 0.085, z, 0.0026);
+    const z = k % 2 ? 0.06 : -0.06;
+    decal(g, 0.14, 0.08, wet, x, z, 0.0026);
+    decal(g, 0.05, 0.07, wet, x - 0.11, z, 0.0026);
+    decal(g, 0.05, 0.016, sheen, x + 0.02, z - 0.02, 0.003);
   }
 }
 
 /** Half a track, from the tile's middle out to the side `s` (−1 or 1) along `along`. */
 function tracksHalf(b: ModelBuilder, along: number, s: number, wet: number, sheen: number): void {
   const g = framed(b, [0, 0, 0], [0, along, 0]);
-  for (const k of [-1, 1])
-    decal(g, 0.5 + 0.17, 0.022, wet, s * 0.165 + s * k * 0.0, k * 0.17, 0.0024);
-  decal(g, 0.5, 0.008, sheen, s * 0.25, -0.165, 0.0026);
-  decal(g, 0.11, 0.06, wet, s * 0.28, 0.04, 0.0026);
-  decal(g, 0.04, 0.05, wet, s * 0.28 - s * 0.085, 0.04, 0.0026);
+  decal(g, 0.73, 0.46, LANE(), s * 0.135, 0, 0.0016);
+  for (const k of [-1, 1]) decal(g, 0.5 + 0.17, 0.05, wet, s * 0.165, k * 0.17, 0.0024);
+  decal(g, 0.5, 0.03, sheen, s * 0.25, -0.1, 0.0026);
+  decal(g, 0.14, 0.08, wet, s * 0.28, 0.05, 0.0026);
+  decal(g, 0.05, 0.07, wet, s * 0.28 - s * 0.11, 0.05, 0.0026);
 }
 
 /** The bit for each side of a mat or lino tile's `edges`: back, front, left, right. */
@@ -241,8 +266,9 @@ function matModel(b: ModelBuilder, edges: number): Model {
   b.box(1, 0.012, 1, base, { at: [0, -0.006, 0] }, 0);
   // The mat runs to the tile's edges where it carries on, stops 0.06 short where it ends.
   const inset = (bit: number) => (edges & bit ? 0.06 : 0);
-  const x0 = -0.5 + inset(4);
-  const x1 = 0.5 - inset(8);
+  // Never wider than 0.9 of the tile across the bay.
+  const x0 = -0.5 + Math.max(0.05, inset(4));
+  const x1 = 0.5 - Math.max(0.05, inset(8));
   const z0 = -0.5 + inset(1);
   const z1 = 0.5 - inset(2);
   const cx = (x0 + x1) / 2;
@@ -301,15 +327,23 @@ function linoModel(b: ModelBuilder, edges: number, variant: number): Model {
   return b.build();
 }
 
+/** A tread's tone `t` of the way up the flight (0 the foot, 1 the top): darker below, lighter above. */
+const toned = (t: number) => -0.2 + 0.28 * Math.max(0, Math.min(1, t));
+const treadTone = (t: number) => tint(TREAD, toned(t));
+
 /**
  * A stretch of the stairwell's flight (`kind` 0 along x, 1 along z, 2 a
- * landing): concrete treads a third of a tile deep, each with a steel
- * nosing and its dark anti-slip insert across the walking direction and
- * the riser's shadow behind it, a painted strip down each side.
+ * landing; `step` how far up the flight, of `STAIR_RAMP`): concrete treads a
+ * third of a tile deep, each a shade lighter than the one below it (the
+ * flight ramps from dark at the foot to light at the top), each with its
+ * dark riser line on its lower edge, a steel nosing and its anti-slip insert,
+ * a painted strip down each side.
  */
-function stairModel(kind: number, variant: number): Model {
+function stairModel(kind: number, step: number, variant: number): Model {
   const b = new ModelBuilder();
-  b.box(1, 0.012, 1, TREAD, { at: [0, -0.006, 0] }, 0);
+  const at = (k: number) => (step + k / 3) / (STAIR_RAMP - 1 + 2 / 3);
+  const base = treadTone(at(1));
+  b.box(1, 0.012, 1, base, { at: [0, -0.006, 0] }, 0);
   if (kind === 2) {
     // The landing: plain concrete with a nosing round it and a few pores.
     for (const [x, z] of [
@@ -317,24 +351,45 @@ function stairModel(kind: number, variant: number): Model {
       [0.25, -0.2],
       [0.05, 0.3],
     ] as const)
-      decal(b, 0.03, 0.02, tint(TREAD, -0.1), x, z);
-    decal(b, 0.9, 0.03, tint(TREAD, 0.08), 0, 0.42, 0.0018);
+      decal(b, 0.03, 0.02, tint(base, -0.1), x, z);
+    decal(b, 0.94, 0.04, NOSING, 0, 0.45, 0.0018);
+    decal(b, 0.94, 0.014, RISER, 0, 0.485, 0.0016);
     return b.build();
   }
+  // Up the flight is local +x: along x toward +x, along z toward −z (the turn maps +x there).
   const g = framed(b, [0, 0, 0], [0, kind === 0 ? 0 : Math.PI / 2, 0]);
-  // Three treads a tile, the nosings along z (across the flight running along x).
   for (let k = 0; k < 3; k++) {
     const x = -0.5 + (k + 0.5) / 3;
-    const tone = tint(TREAD, (k + variant) % 2 ? 0.025 : -0.02);
-    decal(g, 1 / 3 - 0.01, 0.9, tone, x, 0, 0.0008);
-    // The riser's shadow behind each nosing, then the nosing and its insert.
+    const t = at(k);
+    const tone = tint(TREAD, toned(t) + ((k + variant) % 2 ? 0.012 : -0.012));
+    decal(g, 1 / 3 - 0.004, 0.94, tone, x, 0, 0.0008);
+    // The riser on the tread's lower edge, then the nosing just over it and its insert.
     const nx = x - 1 / 6;
-    decal(g, 0.045, 0.92, tint(TREAD, -0.28), nx + 0.05, 0, 0.0012);
-    decal(g, 0.04, 0.94, NOSING, nx + 0.02, 0, 0.0018);
-    decal(g, 0.014, 0.88, INSERT, nx + 0.02, 0, 0.0024);
+    decal(g, 0.02, 0.96, RISER, nx + 0.01, 0, 0.0014);
+    decal(g, 0.045, 0.94, NOSING, nx + 0.0425, 0, 0.0018);
+    decal(g, 0.014, 0.86, INSERT, nx + 0.045, 0, 0.0024);
+    // A shadow line under the next nosing, at the tread's back.
+    decal(g, 0.012, 0.92, tint(tone, -0.12), x + 1 / 6 - 0.008, 0, 0.0012);
   }
   // The painted strips down both sides (where the walls meet the treads).
-  for (const s of [-1, 1]) decal(g, 1, 0.05, tint(TREAD, -0.18), 0, s * 0.475, 0.003);
+  for (const s of [-1, 1]) decal(g, 1, 0.05, tint(base, -0.18), 0, s * 0.475, 0.003);
+  return b.build();
+}
+
+/** A floor number stencilled on the stairwell's concrete, readable from the front: FLOOR over a big digit. */
+export function floorNumberModel(n: number): Model {
+  const b = new ModelBuilder();
+  const g = framed(b, [0, 0.004, 0], [-Math.PI / 2, 0, 0]);
+  text(g, `${n}`, 0, 0.04, 0, 0.055, STENCIL, 0.002);
+  text(g, 'FLOOR', 0, -0.31, 0, 0.014, STENCIL, 0.002);
+  return b.build();
+}
+
+/** The first floor's slab edge on an outer wall's face (+z): a dark band at the floor's level. */
+export function slabEdgeModel(): Model {
+  const b = new ModelBuilder();
+  b.box(1.02, 0.08, 0.05, SLAB_EDGE, { at: [0, -0.02, 0.525] }, 0);
+  b.box(1.02, 0.008, 0.052, tint(SLAB_EDGE, 0.2), { at: [0, 0.024, 0.525] }, 0);
   return b.build();
 }
 
@@ -342,7 +397,7 @@ function stairModel(kind: number, variant: number): Model {
 
 /** The stairwell's paint: pale above, a blue-grey dado below with its darker band, a dark kick plinth. */
 export const BLOCK_UPPER = 0xc0c3bd;
-export const BLOCK_DADO = 0x7d8b95;
+export const BLOCK_DADO = 0x8c949a;
 const BLOCK_BAND = 0x52606b;
 const BLOCK_KICK = 0x3a4147;
 const COPING_EDGE = 0x959a9e;
@@ -355,20 +410,40 @@ const CAP = 0.05;
 const LIP = 0.03;
 const LIP_H = 0.045;
 
-/** Cast-concrete coping on a wall `h` tall: its slab, a lip band proud of the faces, a joint. */
-function coping(b: ModelBuilder, h: number): void {
-  const { top } = WALL_COLORS.lowerFloors;
+/**
+ * The wall's top at `h`: the blocks themselves seen from above, painted, in
+ * a staggered bond (joints every course across, every block length along,
+ * each block a shade off the next), a slim cast lip band round it.
+ */
+function blockTop(b: ModelBuilder, h: number, paint: number, seed: number): void {
   const lip = 1 + LIP * 2;
   const bandY = h - 0.008 - LIP_H / 2;
   b.box(lip, LIP_H, lip, COPING_EDGE, { at: [0, bandY, 0] }, 0);
   b.box(lip - 0.004, 0.008, lip - 0.004, tint(COPING_EDGE, -0.5), {
     at: [0, bandY - LIP_H / 2 - 0.004, 0],
   });
-  b.box(1, CAP, 1, top, { at: [0, h - CAP / 2, 0] }, 0);
-  b.box(0.008, 0.002, 1, tint(top, -0.2), { at: [-0.496, h + 0.001, 0] }, 0);
+  b.box(1, CAP, 1, paint, { at: [0, h - CAP / 2, 0] }, 0);
+  const joint = tint(paint, -0.15);
+  const rows = Math.round(1 / COURSE);
+  for (let r = 0; r < rows; r++) {
+    const z = -0.5 + (r + 0.5) * COURSE;
+    if (r > 0) b.box(1, 0.002, 0.016, joint, { at: [0, h + 0.001, z - COURSE / 2] }, 0);
+    const shift = r % 2 ? BLOCK_W / 2 : 0;
+    for (let u = -0.5 + shift, i = 0; u < 0.5; u += BLOCK_W, i++) {
+      if (u > -0.49) b.box(0.016, 0.002, COURSE, joint, { at: [u, h + 0.001, z] }, 0);
+      const hh = tileHash(r + seed * 5, i + seed);
+      const k = ((hh % 5) - 2) * 0.018;
+      const x0 = Math.max(-0.5, u);
+      const x1 = Math.min(0.5, u + BLOCK_W);
+      if (k !== 0 && x1 - x0 > 0.05)
+        b.box(x1 - x0 - 0.018, 0.0012, COURSE - 0.018, tint(paint, k), {
+          at: [(x0 + x1) / 2, h + 0.0004, z],
+        });
+    }
+  }
 }
 
-/** The block's coursing on a face from `y0` to `y1`: grooves every course, the joints staggered. */
+/** The block's coursing on a face from `y0` to `y1`: grooves every course, the joints staggered, blocks a shade off. */
 function coursing(
   b: ModelBuilder,
   on: Face,
@@ -377,37 +452,31 @@ function coursing(
   paint: number,
   seed: number,
 ): void {
-  const groove = tint(paint, -0.24);
+  const groove = tint(paint, -0.18);
   const courses = Math.max(1, Math.round((y1 - y0) / COURSE));
   const hh = (y1 - y0) / courses;
   for (let i = 0; i < courses; i++) {
     const c0 = y0 + i * hh;
-    if (i > 0) b.box(1, 0.007, 0.004, groove, on(0, c0), 0);
+    if (i > 0) b.box(1, 0.016, 0.004, groove, on(0, c0), 0);
     const shift = i % 2 ? BLOCK_W / 2 : 0;
-    for (let u = -0.5 + shift; u < 0.5; u += BLOCK_W)
-      if (u > -0.49) b.box(0.007, hh - 0.007, 0.004, groove, on(u, c0 + hh / 2), 0);
-    const h = tileHash(i + seed * 7, seed + 13);
-    if (h % 5 === 0) {
-      const u = -0.5 + shift + BLOCK_W / 2 + BLOCK_W * ((h >> 4) % 2);
-      if (Math.abs(u) < 0.3)
-        b.box(
-          BLOCK_W - 0.012,
-          hh - 0.012,
-          0.003,
-          tint(paint, h % 2 ? 0.04 : -0.04),
-          on(u, c0 + hh / 2),
-          0,
-        );
+    for (let u = -0.5 + shift, j = 0; u < 0.5; u += BLOCK_W, j++) {
+      if (u > -0.49) b.box(0.016, hh - 0.016, 0.004, groove, on(u, c0 + hh / 2), 0);
+      const h = tileHash(i + seed * 7, j + seed + 13);
+      const k = ((h % 5) - 2) * 0.02;
+      const x0 = Math.max(-0.5, u);
+      const x1 = Math.min(0.5, u + BLOCK_W);
+      if (k !== 0 && x1 - x0 > 0.05)
+        b.box(x1 - x0 - 0.02, hh - 0.02, 0.003, tint(paint, k), on((x0 + x1) / 2, c0 + hh / 2), 0);
     }
   }
 }
 
 /**
- * A wall of the stairwell: painted concrete block, pale above and a
- * blue-grey dado below with a darker band, on a dark kick plinth, the
- * coursing on every face, under cast-concrete coping. `look` adds boot
- * scuffs on the dado or a patched block. The low front wall is the dado
- * and its plinth, coursed.
+ * A wall of the stairwell: painted concrete block, two-tone (pale above, a
+ * mid blue-grey dado below with a darker band) on a dark kick plinth, the
+ * coursing on every face and on its top, a slim cast lip round the top.
+ * `look` adds boot scuffs on the dado or a patched block. The low front
+ * wall is the dado and its plinth, coursed, its top in the dado's paint.
  */
 export function blockWallModel(piece: WallPiece, look: number): Model {
   const b = new ModelBuilder();
@@ -417,14 +486,14 @@ export function blockWallModel(piece: WallPiece, look: number): Model {
     b.box(1.01, 0.05, 1.01, BLOCK_KICK, { at: [0, 0.025, 0] }, 0);
     for (const on of faces(0.502))
       b.box(
-        0.007,
+        0.014,
         h - CAP - 0.06,
         0.004,
         tint(BLOCK_DADO, -0.16),
         on(-0.3 + 0.4 * (look % 2), 0.05 + (h - CAP - 0.05) / 2),
         0,
       );
-    coping(b, h);
+    blockTop(b, h, tint(BLOCK_DADO, 0.06), look + 3);
     return b.build();
   }
   const h = WALL_HEIGHT;
@@ -448,7 +517,7 @@ export function blockWallModel(piece: WallPiece, look: number): Model {
         [-0.06, KICK_H + 0.1, 0.1, -0.06],
         [0.24, KICK_H + 0.05, 0.14, 0.08],
       ] as const)
-        mark(w, 0.012, tint(BLOCK_DADO, -0.22), u, y, r);
+        mark(w, 0.014, tint(BLOCK_DADO, -0.22), u, y, r);
     } else if (look === 2) {
       // A block patched with fresh paint, two rawlplug holes where a sign hung.
       mark(BLOCK_W - 0.02, COURSE - 0.02, tint(BLOCK_UPPER, 0.06), 0.1, DADO_H + COURSE * 1.5);
@@ -456,7 +525,7 @@ export function blockWallModel(piece: WallPiece, look: number): Model {
       mark(0.014, 0.014, tint(BLOCK_UPPER, -0.45), -0.14, 0.84);
     }
   });
-  coping(b, h);
+  blockTop(b, h, tint(BLOCK_UPPER, -0.3), look);
   return b.build();
 }
 
@@ -470,32 +539,79 @@ export const BLOCK_MODELS: Readonly<Record<string, () => Model>> = Object.fromEn
   ),
 );
 
-/** A steel handrail: on brackets on a full wall's front face, or on short posts along a low wall's top. */
-export function railModel(low: boolean): Model {
+/**
+ * The stairwell's safety-yellow handrail: along a low wall's top on a post
+ * (`post`, every second tile), or on a full wall's front face on a bracket.
+ * The rail runs the tile's whole length, so a run reads continuous.
+ */
+export function railModel(low: boolean, post = true): Model {
   const b = new ModelBuilder();
-  const rail = 0x5c6873;
+  const steel = 0x5c6873;
   if (low) {
-    const y = FRONT_WALL_HEIGHT + 0.17;
-    const z = -0.22;
-    b.cylinder(0.022, 0.022, 1.0, rail, { at: [0, y, z], rot: [0, 0, Math.PI / 2] }, 10);
-    b.box(
-      0.03,
-      y - FRONT_WALL_HEIGHT,
-      0.03,
-      tint(rail, -0.2),
-      { at: [0, (y + FRONT_WALL_HEIGHT) / 2, z] },
-      0.006,
-    );
-    b.box(0.07, 0.012, 0.07, tint(rail, -0.25), { at: [0, FRONT_WALL_HEIGHT + 0.006, z] }, 0);
+    const y = FRONT_WALL_HEIGHT + 0.2;
+    const z = -0.3;
+    b.cylinder(0.022, 0.022, 1.004, RAIL_YELLOW, { at: [0, y, z], rot: [0, 0, Math.PI / 2] }, 10);
+    b.box(1.004, 0.004, 0.01, tint(RAIL_YELLOW, 0.3), { at: [0, y + 0.02, z - 0.006] }, 0);
+    if (post) {
+      b.box(0.032, y - FRONT_WALL_HEIGHT, 0.032, tint(RAIL_YELLOW, -0.2), {
+        at: [0, (y + FRONT_WALL_HEIGHT) / 2, z],
+      });
+      b.box(0.08, 0.014, 0.08, steel, { at: [0, FRONT_WALL_HEIGHT + 0.007, z] }, 0);
+    }
     return b.build();
   }
-  const y = 0.66;
+  const y = 0.68;
   const z = 0.58;
-  b.cylinder(0.02, 0.02, 1.0, rail, { at: [0, y, z], rot: [0, 0, Math.PI / 2] }, 10);
-  b.box(0.022, 0.06, 0.08, tint(rail, -0.2), { at: [0, y - 0.035, 0.54] }, 0.006);
-  b.box(0.05, 0.05, 0.012, tint(rail, -0.25), { at: [0, y - 0.06, 0.508] }, 0);
+  b.cylinder(0.022, 0.022, 1.004, RAIL_YELLOW, { at: [0, y, z], rot: [0, 0, Math.PI / 2] }, 10);
+  b.box(1.004, 0.004, 0.01, tint(RAIL_YELLOW, 0.3), { at: [0, y + 0.02, z - 0.004] }, 0);
+  if (post) {
+    b.box(0.024, 0.06, 0.08, steel, { at: [0, y - 0.035, 0.54] }, 0.006);
+    b.box(0.05, 0.05, 0.012, tint(steel, -0.25), { at: [0, y - 0.06, 0.508] }, 0);
+  }
   return b.build();
 }
+
+// ---- The glass balustrade over the stairs ----
+
+const BAL_FACE = WALL_COLORS.midRise.face;
+const BAL_GLASS = 0xdbe7ee;
+const BAL_TOP = 0.98;
+
+/**
+ * The first floor's front wall over the stairs as 3-1's glass partition, cut
+ * down to a balustrade: plasterboard to the low wall's height on its
+ * aluminium skirting, then clear glass in an aluminium shoe up to a slim
+ * aluminium head track, a post at the tile's −x end; `look` adds a glint.
+ */
+export function balustradeModel(look: number): Model {
+  const b = new ModelBuilder();
+  const h = FRONT_WALL_HEIGHT;
+  b.box(1, h, 1, BAL_FACE, { at: [0, h / 2, 0] }, 0);
+  b.box(1.012, 0.05, 1.012, 0x8d949b, { at: [0, 0.025, 0] }, 0);
+  b.box(1.0, 0.012, 1.0, GLASS_CORE, { at: [0, h + 0.006, 0] }, 0);
+  const z = 0.18;
+  b.box(1.0, 0.05, 0.08, ALU, { at: [0, h + 0.025, z] }, 0.006);
+  b.pane(1.0, BAL_TOP - h - 0.05, 0.014, BAL_GLASS, {
+    at: [0, (BAL_TOP + h + 0.05) / 2, z],
+  });
+  b.box(1.004, 0.035, 0.07, ALU, { at: [0, BAL_TOP, z] }, 0.006);
+  b.box(1.004, 0.004, 0.02, tint(ALU, 0.25), { at: [0, BAL_TOP + 0.019, z] }, 0);
+  b.box(0.03, BAL_TOP - h, 0.05, tint(ALU, -0.1), { at: [-0.485, (BAL_TOP + h) / 2, z] }, 0.004);
+  if (look % 2)
+    b.box(0.05, (BAL_TOP - h) * 0.7, 0.016, 0xa3b0b9, {
+      at: [0.18, (BAL_TOP + h) / 2, z + 0.004],
+      rot: [0, 0, 0.6],
+    });
+  return b.build();
+}
+
+/** Every balustrade swap model, by its name in the plan's `swaps`. */
+export const BALUSTRADE_MODELS: Readonly<Record<string, () => Model>> = Object.fromEntries(
+  Array.from({ length: BALUSTRADE_LOOKS }, (_, look) => [
+    balustradeSwap(look),
+    () => balustradeModel(look),
+  ]),
+);
 
 // ---- The lift ----
 
@@ -521,9 +637,13 @@ export function liftFrameModel(axis: 'x' | 'z', ends: number): Model {
   g.box(1, WALL_HEIGHT - 0.04, 0.84, PLASTER, { at: [0, (WALL_HEIGHT - 0.04) / 2, 0] }, 0);
   // The top: the lift's steel head frame, a dark border round a brushed plate, rivets.
   g.box(1.02, 0.04, 1.02, STEEL_EDGE, { at: [0, WALL_HEIGHT - 0.02, 0] }, 0);
-  g.box(0.86, 0.012, 0.8, STEEL, { at: [0, WALL_HEIGHT + 0.004, 0] }, 0);
+  g.box(0.86, 0.012, 0.8, LIFT_TOP, { at: [0, WALL_HEIGHT + 0.004, 0] }, 0);
   for (const k of [-0.25, 0, 0.25])
-    g.box(0.84, 0.002, 0.006, tint(STEEL, 0.12), { at: [0, WALL_HEIGHT + 0.011, k] }, 0);
+    g.box(0.84, 0.002, 0.006, tint(LIFT_TOP, 0.1), { at: [0, WALL_HEIGHT + 0.011, k] }, 0);
+  // The doors' seam seen from above: across the top where the leaves meet.
+  const seamU = minus && plus ? 0 : minus ? 0.5 : plus ? -0.5 : null;
+  if (seamU !== null)
+    g.box(0.03, 0.004, 1.02, DOOR_SEAM, { at: [seamU, WALL_HEIGHT + 0.012, 0] }, 0);
   for (const [rx, rz] of [
     [-0.46, -0.44],
     [0.46, -0.44],
@@ -581,50 +701,40 @@ export const LIFT_MODELS: Readonly<Record<string, () => Model>> = Object.fromEnt
 );
 
 /** How tall the lift's floor indicator stands over the wall. */
-export const LIFT_HEAD_H = 0.3;
+export const LIFT_HEAD_H = 0.1;
 
 /**
- * The lift's floor indicator, standing on the wall top over the doors and
- * facing the camera: a brushed-steel box, a black display with the floor's
- * number lit amber and the up and down arrows.
+ * The lift's floor indicator on the wall top over the doors, facing up (the
+ * camera looks down on it), tipped a little toward the front: a steel bezel,
+ * a black display with the floor's number big in amber and the up and down
+ * arrows, the one it's going lit.
  */
 export function liftHeadModel(floor: number): Model {
-  const b = new ModelBuilder();
-  const y0 = WALL_HEIGHT + 0.02;
-  const h = LIFT_HEAD_H - 0.02;
-  b.box(0.5, h, 0.1, STEEL, { at: [0, y0 + h / 2, 0] }, 0.012);
-  b.box(0.44, 0.07, 0.004, 0x2a2f36, { at: [0, y0 + h - 0.05, 0.051] }, 0);
-  text(b, 'LIFT', 0, y0 + h - 0.05, 0.053, 0.011, 0xe8ecf0, 0.003);
-  b.box(0.36, h - 0.13, 0.004, 0x15171a, { at: [0, y0 + (h - 0.09) / 2, 0.051] }, 0);
-  b.add(
-    new THREE.PlaneGeometry(0.1, 0.11),
-    0x3a2410,
-    { at: [-0.06, y0 + (h - 0.09) / 2, 0.0535] },
-    'glow',
-  );
-  const dy = y0 + (h - 0.09) / 2;
-  text(b, `${floor}`, -0.06, dy, 0.054, 0.02, INDICATOR, 0.003);
-  // Up and down arrows, the one it's going lit.
-  const ax = 0.09;
-  b.add(
-    new THREE.ConeGeometry(0.03, 0.04, 3),
-    floor === 0 ? INDICATOR : 0x4a3a20,
-    {
-      at: [ax, dy + 0.035, 0.055],
-    },
-    floor === 0 ? 'glow' : 'body',
-  );
-  b.add(
-    new THREE.ConeGeometry(0.03, 0.04, 3),
-    floor === 0 ? 0x4a3a20 : INDICATOR,
-    {
-      at: [ax, dy - 0.035, 0.055],
-      rot: [0, 0, Math.PI],
-    },
-    floor === 0 ? 'body' : 'glow',
-  );
-  b.box(0.1, 0.012, 0.06, STEEL_DARK, { at: [0, y0 - 0.005, 0] }, 0);
-  return b.build();
+  const root = new ModelBuilder();
+  const y0 = WALL_HEIGHT + 0.03;
+  const b = framed(root, [0, y0, 0], [-Math.PI / 2 + 0.35, 0, 0]);
+  const w = 0.66;
+  const h = 0.46;
+  b.box(w, h, 0.04, STEEL_DARK, { at: [0, 0, -0.02] }, 0.01);
+  b.box(w - 0.06, h - 0.06, 0.004, DISPLAY, { at: [0, 0, 0.002] }, 0);
+  b.add(new THREE.PlaneGeometry(0.26, 0.34), 0x3a2410, { at: [-0.1, 0, 0.0045] }, 'glow');
+  text(b, `${floor}`, -0.1, 0, 0.006, 0.058, INDICATOR_AMBER, 0.003);
+  const ax = 0.17;
+  for (const [up, dy] of [
+    [true, 0.07],
+    [false, -0.07],
+  ] as const) {
+    const lit = up === (floor === 0);
+    b.add(
+      new THREE.ConeGeometry(0.05, 0.07, 3),
+      lit ? INDICATOR_AMBER : 0x4a3a20,
+      { at: [ax, dy, 0.006], rot: [0, 0, up ? 0 : Math.PI] },
+      lit ? 'glow' : 'body',
+    );
+  }
+  // Its foot on the wall top.
+  root.box(0.5, 0.03, 0.2, STEEL_DARK, { at: [0, WALL_HEIGHT + 0.015, 0.05] }, 0);
+  return root.build();
 }
 
 /** The welcome banner: the wire over the shaft between its posts, the banner, the balloons. */
@@ -1053,12 +1163,40 @@ export const LOWER_WALL_ART: Readonly<Record<string, () => Model>> = {
     return b.build();
   },
   clock: MID_RISE_WALL_ART.clock ?? (() => new ModelBuilder().build()),
-  fireExit: MID_RISE_WALL_ART.fireExit ?? (() => new ModelBuilder().build()),
+  fireExit: () => fireExitSign(),
   directory0: () => directory(0),
   directory1: () => directory(1),
   stencil1: () => stencil('1'),
   yotta: MID_RISE_WALL_ART.yottaSmall ?? (() => new ModelBuilder().build()),
 };
+
+/** A big green FIRE EXIT sign on the stairwell's block: the running figure, the door, an arrow up the flight. */
+function fireExitSign(): Model {
+  const b = new ModelBuilder();
+  const z = 0.506;
+  const cy = 0.86;
+  const green = 0x2a9a5a;
+  const white = 0xf2f4f0;
+  b.box(0.44, 0.2, 0.016, green, { at: [0, cy, z + 0.008] }, 0.006);
+  b.box(0.4, 0.16, 0.002, tint(green, 0.08), { at: [0, cy, z + 0.017] }, 0);
+  const f = z + 0.019;
+  // The door.
+  b.box(0.05, 0.12, 0.002, white, { at: [-0.15, cy, f] }, 0);
+  b.box(0.034, 0.104, 0.002, green, { at: [-0.15, cy, f + 0.001] }, 0);
+  // The running figure.
+  b.sphere(0.014, white, { at: [-0.07, cy + 0.045, f] });
+  b.box(0.022, 0.05, 0.002, white, { at: [-0.075, cy + 0.008, f], rot: [0, 0, 0.4] }, 0);
+  b.box(0.012, 0.045, 0.002, white, { at: [-0.095, cy - 0.035, f], rot: [0, 0, -0.6] }, 0);
+  b.box(0.012, 0.045, 0.002, white, { at: [-0.055, cy - 0.032, f], rot: [0, 0, 0.7] }, 0);
+  b.box(0.04, 0.01, 0.002, white, { at: [-0.06, cy + 0.02, f], rot: [0, 0, -0.3] }, 0);
+  // The arrow, right and up the flight.
+  b.box(0.12, 0.024, 0.002, white, { at: [0.08, cy, f] }, 0);
+  b.add(new THREE.ConeGeometry(0.035, 0.05, 3), white, {
+    at: [0.16, cy, f],
+    rot: [0, 0, -Math.PI / 2],
+  });
+  return b.build();
+}
 
 /** The floor directory beside a lift: both floors, the one you're on marked violet. */
 function directory(here: number): Model {

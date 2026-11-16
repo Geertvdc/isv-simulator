@@ -61,18 +61,31 @@ export const FLOOR_WEAR = {
   mat: 24,
   /** 3-1's carpet tiles upstairs: `carpet + CARPET_WEAR`. */
   carpet: 40,
-  /** Concrete stair treads, the flight running along x, along z, or turning on a landing. */
+  /**
+   * Concrete stair treads, the flight running along x, along z, or turning
+   * on a landing: `stairX + step`, `stairZ + step`, `stairTurn + step`, `step`
+   * how far up the flight the tile is (0 at the foot, `STAIR_RAMP - 1` at the top).
+   */
   stairX: 40 + CARPET_WEAR_KINDS,
-  stairZ: 41 + CARPET_WEAR_KINDS,
-  stairTurn: 42 + CARPET_WEAR_KINDS,
+  stairZ: 40 + CARPET_WEAR_KINDS + 8,
+  stairTurn: 40 + CARPET_WEAR_KINDS + 16,
 } as const;
+/** How many steps of tone the stairwell's flight ramps through, foot to top. */
+export const STAIR_RAMP = 8;
 /** How many wear kinds there are. */
-export const FLOOR_WEAR_KINDS = FLOOR_WEAR.stairTurn + 1;
+export const FLOOR_WEAR_KINDS = FLOOR_WEAR.stairTurn + STAIR_RAMP;
 
 /** The swap for a stairwell's painted block wall: its piece and look. */
 export const BLOCK_LOOKS = 3;
 export const blockSwap = (piece: 'wall' | 'wall-front' | 'wall-inner', look: number) =>
   `block:${piece}:${look}`;
+/**
+ * The swap for a floor's low front wall over the stairwell (the stairs'
+ * block wall in front of it): 3-1's glass partition as a balustrade, the
+ * first floor looking down on the stairs.
+ */
+export const BALUSTRADE_LOOKS = 2;
+export const balustradeSwap = (look: number) => `balustrade:${look}`;
 /**
  * The swap for one tile of a lift's steel door frame: the floor it's on,
  * the run's axis, and which of its ends (a bit for −, a bit for +) end the
@@ -99,7 +112,7 @@ export const LOWER_ART_HALF: Readonly<Record<LowerArt, number>> = {
   newStarters: 0.42,
   desksTuesday: 0.3,
   clock: 0.15,
-  fireExit: 0.2,
+  fireExit: 0.24,
   directory0: 0.3,
   directory1: 0.3,
   stencil1: 0.2,
@@ -129,7 +142,9 @@ export type TopKind =
   | 'boxedMonitors'
   | 'laptops'
   | 'deskFan'
-  | 'monitorBox';
+  | 'monitorBox'
+  | 'kitLow'
+  | 'laptopsLow';
 
 /** A wall-top prop: its tile, its kind, a lean toward its cluster's partner, and a turn. */
 export interface TopProp {
@@ -142,8 +157,12 @@ export interface TopProp {
   yaw: number;
 }
 
-/** What lies on the low front wall of a floor: never more than a hand high. */
-export type FrontKind = 'flatBox' | 'tote' | 'umbrella';
+/**
+ * What lies on a floor's low walls: never more than a hand high (but for a
+ * balloon on its string): flat-packs two high, an open box of welcome packs
+ * with a tote, a chair lying in its plastic, flat-packs with a balloon.
+ */
+export type FrontKind = 'lowBoxes' | 'lowPacks' | 'lowChairs' | 'lowBalloon';
 
 /** One floor's lift door frame: its wall tiles in a run, the side of the cabin it's on. */
 export interface LiftDoor {
@@ -192,8 +211,18 @@ export interface LowerFloorsRoom {
   fronts: { x: number; y: number; kind: FrontKind; yaw: number }[];
   /** The aluminium head track along every partition top (not the block walls, not the lifts). */
   headTracks: HeadTrack[];
-  /** The handrail on the stairwell's walls: on a low wall's top, or on a full wall's face (`yaw` as for art). */
-  rails: { x: number; y: number; low: boolean; yaw: number }[];
+  /**
+   * The handrail on the stairwell's walls: on a low wall's top, or on a full
+   * wall's face (`yaw` as for art); a post (or bracket) on every second tile.
+   */
+  rails: { x: number; y: number; low: boolean; yaw: number; post: boolean }[];
+  /** The floor numbers stencilled on the stairwell's floor: 0 at the foot, 1 at the top. */
+  floorNumbers: { x: number; y: number; n: number }[];
+  /**
+   * The first floor's slab edge: each outer wall face of the first floor
+   * (`yaw` turns a model facing +z onto it), so it reads as upstairs.
+   */
+  slabEdges: { x: number; y: number; yaw: number }[];
   /** The post room's pass-through at the inbox, the loading bay's shutter at the ship. */
   postHatch: Doorway | null;
   loadingBay: Doorway | null;
@@ -264,8 +293,14 @@ export function lowerFloorsRoom(map: LevelMap): LowerFloorsRoom {
     if (ON_SOLID.has(a.art))
       swaps[key(a.x, a.y)] = solidSwap(((tileHash(a.x + 7, a.y + 19) ^ salt) >>> 5) % SOLID_LOOKS);
 
+  for (const k of balustrades(map, zones, block)) {
+    const [x = 0, y = 0] = k.split(',').map(Number);
+    swaps[k] = balustradeSwap(((tileHash(x + 5, y + 2) ^ salt) >>> 3) % BALUSTRADE_LOOKS);
+  }
+
   const tracks = findTracks(map, zones, loadingBay, lifts, cabins);
-  const floorWear = floorWearOf(map, zones, stairs, tracks, postHatch, loadingBay, cabins);
+  const climb = stairClimb(zones, stairs);
+  const floorWear = floorWearOf(map, zones, stairs, climb, tracks, postHatch, loadingBay, cabins);
   const doors = [postHatch, loadingBay];
   return {
     zones,
@@ -284,10 +319,13 @@ export function lowerFloorsRoom(map: LevelMap): LowerFloorsRoom {
       doors,
       new Set(wallArt.filter((a) => STANDING_ART.has(a.art)).map((a) => key(a.x, a.y))),
       salt,
+      swaps,
     ),
     fronts: frontProps(map, zones, block, doors),
     headTracks: headTracks(map, swaps),
     rails: stairRails(map, block, stairs),
+    floorNumbers: floorNumbers(climb),
+    slabEdges: slabEdges(map, zones),
     postHatch,
     loadingBay,
     lifts,
@@ -399,6 +437,55 @@ function blockWalls(map: LevelMap, zones: Readonly<Record<string, Zone>>): Set<s
 }
 
 /**
+ * The first floor's low walls with the stairwell's block wall right in
+ * front of them: they become a glass balustrade over the stairs.
+ */
+function balustrades(
+  map: LevelMap,
+  zones: Readonly<Record<string, Zone>>,
+  block: ReadonlySet<string>,
+): Set<string> {
+  const out = new Set<string>();
+  for (let y = 0; y < map.height; y++)
+    for (let x = 0; x < map.width; x++)
+      if (
+        getTile(map, x, y) === 'wall' &&
+        wallPiece(map, x, y) === 'wall-front' &&
+        zones[key(x, y - 1)] === 'first' &&
+        block.has(key(x, y + 1)) &&
+        !block.has(key(x, y))
+      )
+        out.add(key(x, y));
+  return out;
+}
+
+/**
+ * The first floor's slab edge: every face of a wall beside the first floor
+ * with the outside past it (off the map or void), but the front (the
+ * camera's side has the stairs).
+ */
+function slabEdges(
+  map: LevelMap,
+  zones: Readonly<Record<string, Zone>>,
+): LowerFloorsRoom['slabEdges'] {
+  const out: LowerFloorsRoom['slabEdges'] = [];
+  for (let y = 0; y < map.height; y++)
+    for (let x = 0; x < map.width; x++) {
+      if (getTile(map, x, y) !== 'wall') continue;
+      let first = false;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) if (zones[key(x + dx, y + dy)] === 'first') first = true;
+      if (!first) continue;
+      for (const side of ['back', 'left', 'right'] as const) {
+        const { dx, dy } = OUT[side];
+        if (outside(map, x + dx, y + dy))
+          out.push({ x, y, yaw: side === 'back' ? Math.PI : SIDE_YAW[side] });
+      }
+    }
+  return out;
+}
+
+/**
  * The trolley tracks and wet footprints: the fewest-turn shortest path over
  * the ground floor's plain floor from just inside the loading bay to the
  * tile in front of the ground floor's lift cabin, round every spawn.
@@ -490,6 +577,7 @@ function floorWearOf(
   map: LevelMap,
   zones: Readonly<Record<string, Zone>>,
   stairs: ReadonlySet<string>,
+  climb: Readonly<Record<string, number>>,
   tracks: readonly GridPoint[],
   post: Doorway | null,
   bay: Doorway | null,
@@ -504,8 +592,10 @@ function floorWearOf(
     if (zone === 'stairs') {
       const alongX = stairs.has(key(x - 1, y)) || stairs.has(key(x + 1, y));
       const alongZ = stairs.has(key(x, y - 1)) || stairs.has(key(x, y + 1));
+      const step = Math.round((climb[k] ?? 0) * (STAIR_RAMP - 1));
       out[k] =
-        alongX && alongZ ? FLOOR_WEAR.stairTurn : alongZ ? FLOOR_WEAR.stairZ : FLOOR_WEAR.stairX;
+        (alongX && alongZ ? FLOOR_WEAR.stairTurn : alongZ ? FLOOR_WEAR.stairZ : FLOOR_WEAR.stairX) +
+        step;
     } else if (zone === 'first') out[k] = FLOOR_WEAR.carpet + CARPET_WEAR.none;
     else out[k] = FLOOR_WEAR.rubber;
   }
@@ -577,6 +667,57 @@ function floorWearOf(
     )[0];
   if (odd) out[key(odd.x, odd.y)] = FLOOR_WEAR.carpet + CARPET_WEAR.odd;
   return out;
+}
+
+/**
+ * How far up the stairwell each of its tiles is, 0 at the foot (the end
+ * beside the ground floor) to 1 at the top (beside the first floor): its
+ * steps from the foot over the whole flight's.
+ */
+function stairClimb(
+  zones: Readonly<Record<string, Zone>>,
+  stairs: ReadonlySet<string>,
+): Record<string, number> {
+  const touches = (k: string, zone: Zone) => {
+    const [x = 0, y = 0] = k.split(',').map(Number);
+    return STEPS.some(([dx, dy]) => zones[key(x + dx, y + dy)] === zone);
+  };
+  const feet = [...stairs].filter((k) => touches(k, 'ground'));
+  const dist: Record<string, number> = {};
+  const todo = [...feet];
+  for (const k of feet) dist[k] = 0;
+  for (let i = 0; i < todo.length; i++) {
+    const k = todo[i] ?? '';
+    const [x = 0, y = 0] = k.split(',').map(Number);
+    for (const [dx, dy] of STEPS) {
+      const n = key(x + dx, y + dy);
+      if (stairs.has(n) && dist[n] === undefined) {
+        dist[n] = (dist[k] ?? 0) + 1;
+        todo.push(n);
+      }
+    }
+  }
+  const most = Math.max(1, ...Object.values(dist));
+  const out: Record<string, number> = {};
+  for (const k of stairs) out[k] = (dist[k] ?? 0) / most;
+  return out;
+}
+
+/** The floor numbers on the stairwell's floor: 0 on the foot's tile, 1 on the top's. */
+function floorNumbers(climb: Readonly<Record<string, number>>): LowerFloorsRoom['floorNumbers'] {
+  const tiles = Object.entries(climb)
+    .map(([k, c]) => {
+      const [x = 0, y = 0] = k.split(',').map(Number);
+      return { x, y, c };
+    })
+    .sort((a, b) => a.c - b.c || a.y - b.y || a.x - b.x);
+  const foot = tiles[0];
+  const top = tiles[tiles.length - 1];
+  if (!foot || !top || foot === top) return [];
+  return [
+    { x: foot.x, y: foot.y, n: 0 },
+    { x: top.x, y: top.y, n: 1 },
+  ];
 }
 
 // ---- The lift and the chute ----
@@ -805,7 +946,8 @@ function headTracks(map: LevelMap, swaps: Readonly<Record<string, string>>): Hea
   const partition = (x: number, y: number) =>
     getTile(map, x, y) === 'wall' &&
     !(swaps[key(x, y)]?.startsWith('block') ?? false) &&
-    !(swaps[key(x, y)]?.startsWith('lift') ?? false);
+    !(swaps[key(x, y)]?.startsWith('lift') ?? false) &&
+    !(swaps[key(x, y)]?.startsWith('balustrade') ?? false);
   const out: HeadTrack[] = [];
   for (let y = 0; y < map.height; y++)
     for (let x = 0; x < map.width; x++) {
@@ -834,10 +976,13 @@ function stairRails(
   for (const k of block) {
     const [x = 0, y = 0] = k.split(',').map(Number);
     const piece = wallPiece(map, x, y);
-    if (piece === 'wall-front' && stairs.has(key(x, y - 1))) out.push({ x, y, low: true, yaw: 0 });
+    const post = (x + y) % 2 === 0;
+    if (piece === 'wall-front' && stairs.has(key(x, y - 1)))
+      out.push({ x, y, low: true, yaw: 0, post });
     else if (piece === 'wall-front' && stairs.has(key(x, y + 1)))
-      out.push({ x, y, low: true, yaw: Math.PI });
-    else if (piece === 'wall' && stairs.has(key(x, y + 1))) out.push({ x, y, low: false, yaw: 0 });
+      out.push({ x, y, low: true, yaw: Math.PI, post });
+    else if (piece === 'wall' && stairs.has(key(x, y + 1)))
+      out.push({ x, y, low: false, yaw: 0, post });
   }
   return out.sort((a, b) => a.y - b.y || a.x - b.x);
 }
@@ -876,6 +1021,7 @@ function topProps(
   doors: readonly (Doorway | null)[],
   art: ReadonlySet<string>,
   salt: number,
+  swaps: Readonly<Record<string, string>> = {},
 ): TopProp[] {
   const nearDoor = (x: number, y: number, reach: number) =>
     doors.some((d) => d?.tiles.some((t) => cheb(t, { x, y }) <= reach));
@@ -958,13 +1104,57 @@ function topProps(
         }
       });
   }
+  out.push(...landingKit(map, swaps, salt));
   return out;
 }
 
 /**
- * Low things on the ground floor's front wall (low walls with the outside
- * in front, a floor behind, clear of the doors and the stations): a flat
- * desk box, a violet welcome tote, a dripping umbrella, spread along it.
+ * The first floor's kit waiting at the top of the stairs: on the stairwell's
+ * block wall right in front of the glass balustrade (a wall behind it, so it
+ * hides no one), low, leaning back against the glass, at both ends of the run.
+ */
+function landingKit(
+  map: LevelMap,
+  swaps: Readonly<Record<string, string>>,
+  salt: number,
+): TopProp[] {
+  const run: GridPoint[] = [];
+  for (let y = 0; y < map.height; y++)
+    for (let x = 0; x < map.width; x++)
+      if (
+        getTile(map, x, y) === 'wall' &&
+        (swaps[key(x, y - 1)]?.startsWith('balustrade') ?? false) &&
+        (swaps[key(x, y)]?.startsWith('block') ?? false)
+      )
+        run.push({ x, y });
+  if (run.length < 4) return [];
+  run.sort((a, b) => a.y - b.y || a.x - b.x);
+  // Both ends of each straight bit of the run (one tile on its own, once).
+  const ends: GridPoint[] = [];
+  run.forEach((p, i) => {
+    const prev = run[i - 1];
+    const next = run[i + 1];
+    const startsBit = !prev || prev.y !== p.y || prev.x !== p.x - 1;
+    const endsBit = !next || next.y !== p.y || next.x !== p.x + 1;
+    if ((startsBit || endsBit) && !ends.includes(p)) ends.push(p);
+  });
+  const kinds: TopKind[] = ['kitLow', 'laptopsLow', 'kitLow'];
+  return ends.map((p, i) => ({
+    x: p.x,
+    y: p.y,
+    low: false,
+    kind: kinds[i % kinds.length] ?? 'kitLow',
+    toward: { dx: i === 0 ? 1 : -1, dy: -1 },
+    yaw: ((((tileHash(p.x, p.y + 9) ^ salt) >>> 2) % 5) - 2) * 0.08,
+  }));
+}
+
+/**
+ * The ground floor's low walls dressed as story: on the front wall (low
+ * walls with the outside in front, the floor behind, clear of the doors and
+ * the stations) flat-packs two high, an open box of welcome packs and a
+ * chair lying in its plastic, spread along it; on the left wall's low bit
+ * between two stations (not the doors), flat-packs with a balloon.
  */
 function frontProps(
   map: LevelMap,
@@ -972,7 +1162,9 @@ function frontProps(
   block: ReadonlySet<string>,
   doors: readonly (Doorway | null)[],
 ): LowerFloorsRoom['fronts'] {
-  const kinds: FrontKind[] = ['flatBox', 'tote', 'umbrella'];
+  const kinds: FrontKind[] = ['lowBoxes', 'lowPacks', 'lowChairs'];
+  const doorTile = (x: number, y: number) =>
+    doors.some((d) => d?.tiles.some((t) => t.x === x && t.y === y));
   const free: GridPoint[] = [];
   for (let y = 0; y < map.height; y++)
     for (let x = 1; x < map.width - 1; x++)
@@ -991,14 +1183,27 @@ function frontProps(
   const out: LowerFloorsRoom['fronts'] = [];
   for (let i = 0; i < n; i++) {
     const p = free[Math.round(((i + 0.5) * free.length) / n - 0.5)];
-    if (!p || out.some((q) => Math.abs(q.x - p.x) < 2 && q.y === p.y)) continue;
+    if (!p || out.some((q) => q.x === p.x && q.y === p.y)) continue;
     out.push({
       x: p.x,
       y: p.y,
-      kind: kinds[i] ?? 'flatBox',
-      yaw: ((tileHash(p.x, p.y) % 5) - 2) * 0.1,
+      kind: kinds[i] ?? 'lowBoxes',
+      yaw: ((tileHash(p.x, p.y) % 5) - 2) * 0.08,
     });
   }
+  // The left wall: a low wall with the outside left, the ground floor right, a station behind.
+  const left: GridPoint[] = [];
+  for (let y = 1; y < map.height - 1; y++)
+    if (
+      getTile(map, 0, y) === 'wall' &&
+      wallPiece(map, 0, y) === 'wall-front' &&
+      zones[key(1, y)] === 'ground' &&
+      !doorTile(0, y - 1) &&
+      getTile(map, 0, y - 1) !== 'floor'
+    )
+      left.push({ x: 0, y });
+  const l = left[0];
+  if (l) out.push({ x: l.x, y: l.y, kind: 'lowBalloon', yaw: Math.PI / 2 });
   return out;
 }
 
