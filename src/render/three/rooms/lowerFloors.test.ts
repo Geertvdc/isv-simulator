@@ -14,7 +14,6 @@ import {
   bannerModel,
   blockWallModel,
   chuteHatchCounter,
-  liftHeadModel,
   loadingBayModel,
   postHatchModel,
   railModel,
@@ -90,14 +89,7 @@ describe('LOWER_FLOORS_ROOM', () => {
     }
     for (const piece of ['wall', 'wall-front', 'wall-inner'] as const)
       expect(vertices(blockWallModel(piece, 1))).toBeGreaterThan(0);
-    for (const m of [
-      postHatchModel(2),
-      loadingBayModel(2),
-      liftHeadModel(0),
-      liftHeadModel(1),
-      railModel(true),
-      railModel(false),
-    ])
+    for (const m of [postHatchModel(2), loadingBayModel(2), railModel(true), railModel(false)])
       expect(vertices(m)).toBeGreaterThan(0);
     for (const [name, art] of Object.entries(LOWER_WALL_ART)) {
       const box = bounds(art());

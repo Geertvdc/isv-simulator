@@ -17,6 +17,7 @@ import {
   createChutes,
   createLifts,
   doorShare,
+  inShutCar,
   isRiding,
   liftChimes,
   liftLinks,
@@ -243,6 +244,16 @@ describe('lift doors', () => {
     idle(state, LIFT_OPEN_TICKS - SECOND / 2);
     walk(state, { x: 0, y: 1 }, SECOND / 3);
     expect(state.players[0]?.pos.y).toBeGreaterThan(1.5);
+  });
+
+  it('hides riders in the shut car until it opens on the next floor', () => {
+    const state = game();
+    standIn(state, 1, 11, 1);
+    expect(inShutCar(state, 'player', 1)).toBe(false);
+    idle(state, LIFT_OPEN_TICKS + 1);
+    expect(inShutCar(state, 'player', 1)).toBe(true);
+    idle(state, LIFT_RIDE_TICKS);
+    expect(inShutCar(state, 'player', 1)).toBe(false);
   });
 
   it('walks round a cabin, not through it', () => {

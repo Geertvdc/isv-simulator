@@ -45,18 +45,6 @@ function faces(half: number): Face[] {
   ];
 }
 
-/** A glowing box (a lit display, an LED), in the glow layer. */
-function glowBox(
-  b: ModelBuilder,
-  w: number,
-  h: number,
-  d: number,
-  color: number,
-  place: Place,
-): void {
-  b.add(new THREE.BoxGeometry(w, h, d), color, place, 'glow');
-}
-
 // ---- Materials ----
 
 /** Brushed stainless: the lift's doors and frames, the chute. */
@@ -66,18 +54,12 @@ export const LIFT_TOP = 0x7e868d;
 const DOOR_SEAM = 0x3a3e44;
 const STEEL_DARK = 0x737b83;
 const STEEL_EDGE = 0x5a6168;
-/** The midRise partitions' plasterboard, for the lift frame's bulkhead. */
-const PLASTER = WALL_COLORS.midRise.face;
 const INK = 0x2a2d33;
 const PAPER = 0xe8e8e2;
 const MARKER_RED = 0xc0302a;
 /** Safety yellow and black, dulled a touch so it never outshines a station. */
 const HAZARD = 0xd8b42a;
 const HAZARD_BLACK = 0x2a2c30;
-/** The lit floor indicator's amber, and its display's black. */
-const INDICATOR = 0xffb040;
-const INDICATOR_AMBER = 0xe0a030;
-const DISPLAY = 0x24262a;
 /** Safety yellow for the stairwell's handrail. */
 export const RAIL_YELLOW = 0xc8a032;
 /** The floor numbers stencilled on the stairwell's concrete. */
@@ -615,83 +597,49 @@ export const BALUSTRADE_MODELS: Readonly<Record<string, () => Model>> = Object.f
 
 // ---- The lift ----
 
-/** The lift doors' height and the lintel over them. */
-const DOOR_H = 0.9;
-const LINTEL_H = 0.07;
+/** The corner posts at the shell's ends. */
 const JAMB_W = 0.08;
 
 /**
- * One tile of a lift's door frame in the wall beside its cabin, its run
- * along `axis`, the jambs at the ends in `ends` (− 1, + 2): brushed-steel
- * door leaves on both faces under a steel lintel (the closed doors' seam
- * where the run's middle is), the jambs proud of the wall, a steel sill, the
- * partition's plasterboard bulkhead over it under the head track, and on
- * the run's + end the call-button plate.
+ * One tile of the lift car's shell, the wall round its cabin, its run along
+ * `axis`: brushed-steel cladding with panel seams on both faces, a handrail
+ * on each face at hip height (only the inside one shows from the car), a
+ * steel kick strip, and the lift's head plate on top. The car's doors are
+ * the doorway's (`liftCars.ts`), not the wall's. `ends` (− 1, + 2) marks the
+ * run's ends, where the panels stop on a darker corner post.
  */
 export function liftFrameModel(axis: 'x' | 'z', ends: number): Model {
   const b = new ModelBuilder();
   const g = framed(b, [0, 0, 0], [0, axis === 'x' ? 0 : -Math.PI / 2, 0]);
   const minus = (ends & 1) !== 0;
   const plus = (ends & 2) !== 0;
-  // The wall's core and the bulkhead over the doors, in the partitions' plasterboard.
-  g.box(1, WALL_HEIGHT - 0.04, 0.84, PLASTER, { at: [0, (WALL_HEIGHT - 0.04) / 2, 0] }, 0);
-  // The top: the lift's steel head frame, a dark border round a brushed plate, rivets.
+  const h = WALL_HEIGHT - 0.04;
+  // The core in steel, its panels, the head plate on top.
+  g.box(1, h, 0.84, STEEL, { at: [0, h / 2, 0] }, 0);
   g.box(1.02, 0.04, 1.02, STEEL_EDGE, { at: [0, WALL_HEIGHT - 0.02, 0] }, 0);
   g.box(0.86, 0.012, 0.8, LIFT_TOP, { at: [0, WALL_HEIGHT + 0.004, 0] }, 0);
   for (const k of [-0.25, 0, 0.25])
     g.box(0.84, 0.002, 0.006, tint(LIFT_TOP, 0.1), { at: [0, WALL_HEIGHT + 0.011, k] }, 0);
-  // The doors' seam seen from above: across the top where the leaves meet.
-  const seamU = minus && plus ? 0 : minus ? 0.5 : plus ? -0.5 : null;
-  if (seamU !== null)
-    g.box(0.03, 0.004, 1.02, DOOR_SEAM, { at: [seamU, WALL_HEIGHT + 0.012, 0] }, 0);
-  for (const [rx, rz] of [
-    [-0.46, -0.44],
-    [0.46, -0.44],
-    [-0.46, 0.44],
-    [0.46, 0.44],
-  ] as const)
-    g.box(0.02, 0.006, 0.02, STEEL_DARK, { at: [rx, WALL_HEIGHT + 0.003, rz] }, 0);
   for (const s of [-1, 1]) {
-    const z = s * 0.45;
-    const u0 = -0.5 + (minus ? JAMB_W : 0);
-    const u1 = 0.5 - (plus ? JAMB_W : 0);
-    const w = u1 - u0;
-    const cu = (u0 + u1) / 2;
-    // The leaf, its brushed lines, the seam where it meets the next (or its middle, alone).
-    g.box(w, DOOR_H, 0.06, STEEL, { at: [cu, DOOR_H / 2, z] }, 0);
-    for (const k of [0.2, 0.45, 0.7])
-      g.box(w - 0.02, 0.006, 0.002, tint(STEEL, 0.1), { at: [cu, DOOR_H * k, z + s * 0.031] }, 0);
-    const seams = minus && plus ? [cu] : [minus ? u1 : u0].filter((u) => Math.abs(u) > 0.4);
-    for (const u of seams) g.box(0.014, DOOR_H, 0.064, STEEL_EDGE, { at: [u, DOOR_H / 2, z] }, 0);
-    // The lintel and the sill.
-    g.box(1.0, LINTEL_H, 0.08, STEEL_DARK, { at: [0, DOOR_H + LINTEL_H / 2, z] }, 0.008);
-    g.box(1.0, 0.012, 0.12, STEEL_DARK, { at: [0, 0.006, z + s * 0.04] }, 0);
-    // The jambs.
-    for (const [on, u] of [
-      [minus, -0.5 + JAMB_W / 2],
-      [plus, 0.5 - JAMB_W / 2],
-    ] as const)
-      if (on)
-        g.box(
-          JAMB_W,
-          DOOR_H + LINTEL_H,
-          0.1,
-          STEEL_DARK,
-          { at: [u, (DOOR_H + LINTEL_H) / 2, z + s * 0.01] },
-          0.01,
-        );
-    // The call button beside the + jamb: a steel plate, one lit button.
-    if (plus) {
-      const u = 0.5 - JAMB_W / 2;
-      g.box(0.05, 0.14, 0.012, STEEL, { at: [u, 0.52, z + s * 0.066] }, 0);
-      glowBox(g, 0.026, 0.026, 0.006, INDICATOR, { at: [u, 0.55, z + s * 0.073] });
-      g.box(0.026, 0.026, 0.006, STEEL_DARK, { at: [u, 0.49, z + s * 0.073] }, 0);
-    }
+    const z = s * 0.421;
+    // Panel seams: the tile's two panels, brushed lines across.
+    for (const u of [-0.5, 0]) g.box(0.014, h, 0.004, DOOR_SEAM, { at: [u + 0.25, h / 2, z] }, 0);
+    for (const k of [0.25, 0.5, 0.75])
+      g.box(0.98, 0.005, 0.003, tint(STEEL, 0.1), { at: [0, h * k, z] }, 0);
+    // The handrail on its brackets, the kick strip.
+    g.box(1, 0.035, 0.035, STEEL_DARK, { at: [0, 0.48, z + s * 0.05] }, 0.012);
+    for (const u of [-0.3, 0.3])
+      g.box(0.025, 0.025, 0.05, STEEL_DARK, { at: [u, 0.48, z + s * 0.025] }, 0);
+    g.box(1, 0.1, 0.01, STEEL_EDGE, { at: [0, 0.05, z + s * 0.004] }, 0);
   }
+  for (const [on, u] of [
+    [minus, -0.5 + JAMB_W / 2],
+    [plus, 0.5 - JAMB_W / 2],
+  ] as const)
+    if (on) g.box(JAMB_W, h, 0.88, STEEL_DARK, { at: [u, h / 2, 0] }, 0.01);
   return b.build();
 }
 
-/** Every lift-frame swap model, by its name in the plan's `swaps`. */
 export const LIFT_MODELS: Readonly<Record<string, () => Model>> = Object.fromEntries(
   [0, 1, 2, 3].flatMap((floor) =>
     (['x', 'z'] as const).flatMap((axis) =>
@@ -699,43 +647,6 @@ export const LIFT_MODELS: Readonly<Record<string, () => Model>> = Object.fromEnt
     ),
   ),
 );
-
-/** How tall the lift's floor indicator stands over the wall. */
-export const LIFT_HEAD_H = 0.1;
-
-/**
- * The lift's floor indicator on the wall top over the doors, facing up (the
- * camera looks down on it), tipped a little toward the front: a steel bezel,
- * a black display with the floor's number big in amber and the up and down
- * arrows, the one it's going lit.
- */
-export function liftHeadModel(floor: number): Model {
-  const root = new ModelBuilder();
-  const y0 = WALL_HEIGHT + 0.03;
-  const b = framed(root, [0, y0, 0], [-Math.PI / 2 + 0.35, 0, 0]);
-  const w = 0.66;
-  const h = 0.46;
-  b.box(w, h, 0.04, STEEL_DARK, { at: [0, 0, -0.02] }, 0.01);
-  b.box(w - 0.06, h - 0.06, 0.004, DISPLAY, { at: [0, 0, 0.002] }, 0);
-  b.add(new THREE.PlaneGeometry(0.26, 0.34), 0x3a2410, { at: [-0.1, 0, 0.0045] }, 'glow');
-  text(b, `${floor}`, -0.1, 0, 0.006, 0.058, INDICATOR_AMBER, 0.003);
-  const ax = 0.17;
-  for (const [up, dy] of [
-    [true, 0.07],
-    [false, -0.07],
-  ] as const) {
-    const lit = up === (floor === 0);
-    b.add(
-      new THREE.ConeGeometry(0.05, 0.07, 3),
-      lit ? INDICATOR_AMBER : 0x4a3a20,
-      { at: [ax, dy, 0.006], rot: [0, 0, up ? 0 : Math.PI] },
-      lit ? 'glow' : 'body',
-    );
-  }
-  // Its foot on the wall top.
-  root.box(0.5, 0.03, 0.2, STEEL_DARK, { at: [0, WALL_HEIGHT + 0.015, 0.05] }, 0);
-  return root.build();
-}
 
 /** The welcome banner: the wire over the shaft between its posts, the banner, the balloons. */
 export function bannerModel(banner: Banner): Model {

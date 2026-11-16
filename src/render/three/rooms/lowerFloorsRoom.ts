@@ -272,7 +272,8 @@ export function lowerFloorsRoom(map: LevelMap): LowerFloorsRoom {
   const postHatch = findDoorways(map, 'inbox')[0] ?? null;
   const loadingBay = findDoorways(map, 'ship')[0] ?? null;
   const lifts = liftDoors(map);
-  const liftTiles = new Set(lifts.flatMap((l) => l.tiles.map((t) => key(t.x, t.y))));
+  const shell = carShell(map);
+  const liftTiles = new Set(Object.keys(shell));
   const cabins = new Set(createLifts(map).flatMap((l) => l.stops.flat().map((t) => key(t.x, t.y))));
   const hatches = chuteHatches(map);
 
@@ -283,11 +284,7 @@ export function lowerFloorsRoom(map: LevelMap): LowerFloorsRoom {
     const look = ((tileHash(x + 3, y + 29) ^ salt) >>> 6) % BLOCK_LOOKS;
     swaps[k] = blockSwap(wallPiece(map, x, y), look);
   }
-  for (const l of lifts)
-    l.tiles.forEach((t, i) => {
-      const ends = (i === 0 ? 1 : 0) | (i === l.tiles.length - 1 ? 2 : 0);
-      swaps[key(t.x, t.y)] = liftSwap(l.floor, l.axis, ends);
-    });
+  for (const [k, s] of Object.entries(shell)) swaps[k] = liftSwap(s.floor, s.axis, s.ends);
   const wallArt = placeWallArt(map, zones, block, liftTiles, lifts);
   for (const a of wallArt)
     if (ON_SOLID.has(a.art))
@@ -765,6 +762,36 @@ export function liftDoors(map: LevelMap): LiftDoor[] {
   return out;
 }
 
+/**
+ * The lift car's shell: every wall tile beside a cabin, by `x,y`, with the
+ * floor it's on, its run's axis (along the cabin's side) and which of its
+ * ends (− 1, + 2) end the run.
+ */
+export function carShell(
+  map: LevelMap,
+): Record<string, { floor: number; axis: 'x' | 'z'; ends: number }> {
+  const out: Record<string, { floor: number; axis: 'x' | 'z'; ends: number }> = {};
+  const lift = createLifts(map)[0];
+  if (!lift) return out;
+  lift.stops.forEach((cabin, floor) => {
+    for (const t of cabin)
+      for (const [dx, dy] of STEPS) {
+        const x = t.x + dx;
+        const y = t.y + dy;
+        const k = key(x, y);
+        if (getTile(map, x, y) !== 'wall' || out[k]) continue;
+        out[k] = { floor, axis: dx !== 0 ? 'z' : 'x', ends: 0 };
+      }
+  });
+  for (const [k, s] of Object.entries(out)) {
+    const [x = 0, y = 0] = k.split(',').map(Number);
+    const [ax, ay] = s.axis === 'x' ? [1, 0] : [0, 1];
+    const runs = (n: string | undefined) => n !== undefined && out[n]?.axis === s.axis;
+    s.ends = (runs(key(x - ax, y - ay)) ? 0 : 1) | (runs(key(x + ax, y + ay)) ? 0 : 2);
+  }
+  return out;
+}
+
 /** The chute's hatches, each turned to face out of its room (over the shaft) with its MAIL plate. */
 function chuteHatches(map: LevelMap): Hatch[] {
   const out: Hatch[] = [];
@@ -923,16 +950,19 @@ function placeWallArt(
     take('fireExit', lo);
     take('stencil1', hi);
   }
-  // The floor directories: on the wall beside each lift run, facing the shaft.
+  // The floor directories: on the wall beside each lift's shaft wall, facing the shaft.
   for (const [l, art] of [
     [groundLift, 'directory0'],
     [firstLift, 'directory1'],
   ] as const) {
     if (!l || l.axis !== 'z') continue;
     const x = l.tiles[0]?.x ?? 0;
-    const last = Math.max(...l.tiles.map((t) => t.y));
-    const p = { x, y: last + 1 };
-    if (getTile(map, p.x, p.y) !== 'wall' || liftTiles.has(key(p.x, p.y))) continue;
+    const ys = l.tiles.map((t) => t.y);
+    // Below the run, else above it (a chute hatch may take the wall below).
+    const p = [Math.max(...ys) + 1, Math.min(...ys) - 1]
+      .map((y) => ({ x, y }))
+      .find((q) => getTile(map, q.x, q.y) === 'wall' && !liftTiles.has(key(q.x, q.y)));
+    if (!p) continue;
     take(art, p, l.side === 'right' ? Math.PI / 2 : -Math.PI / 2);
   }
   return out.sort((a, b) => a.y - b.y || a.x - b.x);

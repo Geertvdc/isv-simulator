@@ -8,15 +8,15 @@
  * (its fix bar is an overlay, like a pipeline repair), and the mop robot is a squat disc with a
  * blinking light.
  *
- * Lifts: cabin floors are plates, lit (blue local, amber express) while the
- * lift stands open at that floor, orange a second before it leaves, red while
- * broken down (blinking before). Pips over a cabin count its floor. Mail
- * chute hatches carry a down arrow that blinks while a ticket slides down.
+ * Lifts are cars with doors (`liftCars.ts`). The shuttle's stops are plates,
+ * lit yellow while it stands there, orange a second before it leaves; pips
+ * over a stop count it. Mail chute hatches carry a down arrow that blinks
+ * while a ticket slides down.
  */
 
 import * as THREE from 'three';
 import type { LevelMap } from '../../sim/level';
-import { breakdownWarns, chuteShare, liftBroken, liftChimes } from '../../sim/lifts';
+import { breakdownWarns, chuteShare, hasDoors, liftBroken, liftChimes } from '../../sim/lifts';
 import { beltsStopped, travelatorDir } from '../../sim/campus';
 import { meetingDoors } from '../../sim/meetings';
 import { reorgTiles, reorgWarning } from '../../sim/reorgs';
@@ -25,6 +25,7 @@ import type { GameState } from '../../sim/state';
 import { gridToWorld } from '../projection';
 import type { RoundView } from '../roundView';
 import { STATION_HEIGHT, blockHeight } from './layout';
+import { LiftCars } from './liftCars';
 import { disposeTree } from './stage';
 
 const WET_COLOR = 0x3d8bff;
@@ -83,12 +84,14 @@ export class Mechanics {
   private readonly puddles = new Map<number, THREE.Mesh>();
   private readonly taps = new Map<string, TapLook>();
   private readonly robots = new Map<number, RobotLook>();
+  private readonly cars: LiftCars;
 
   constructor(
     private readonly world: THREE.Scene,
     private readonly map: LevelMap,
   ) {
     world.add(this.root);
+    this.cars = new LiftCars(this.root, map);
     for (const mark of map.marks) {
       if (!WET_KINDS.has(mark.kind)) continue;
       const mesh = new THREE.Mesh(this.puddle, this.zoneMaterial);
@@ -106,6 +109,7 @@ export class Mechanics {
     this.syncTaps(state, timeMs);
     this.syncRobots(view, timeMs);
     this.syncLifts(state, timeMs);
+    this.cars.sync(state, timeMs);
     this.syncChutes(state, timeMs);
     this.syncReorg(state, timeMs);
     this.syncGates(state);
@@ -188,6 +192,7 @@ export class Mechanics {
 
   private syncLifts(state: GameState, timeMs: number): void {
     state.lifts.forEach((lift, li) => {
+      if (hasDoors(lift)) return;
       const blink = Math.floor(timeMs / 200) % 2 === 0;
       lift.stops.forEach((cabin, floor) => {
         const key = `${li}:${floor}`;
