@@ -1,12 +1,12 @@
 # Hypergrowth environment pass
 
-**Status:** two rounds done (build, critic review, fixes). Level 3-2 (`hypergrowth`, "Hypergrowth"), the second level of the Scale-Up chapter, gets a hand-built world after [Middle Management](middle-management-environment.md) (3-1), in the same building.
+**Status:** two rounds done (build, critic review, fixes), then a lift redesign that changed the map and the lift mechanic (below). Level 3-2 (`hypergrowth`, "Hypergrowth"), the second level of the Scale-Up chapter, gets a hand-built world after [Middle Management](middle-management-environment.md) (3-1), in the same building.
 
 | Before                                          | After                                          |
 | ----------------------------------------------- | ---------------------------------------------- |
 | ![](images/hypergrowth-environment/before.webp) | ![](images/hypergrowth-environment/after.webp) |
 
-**Goal:** the world around the level tells one story, the way Overcooked 2 levels do. Render only (`src/render/`); the sim, maps and balance don't change.
+**Goal:** the world around the level tells one story, the way Overcooked 2 levels do. Render only (`src/render/`); the sim, maps and balance don't change. (The lift redesign after round 2 is the exception: see [Lift redesign](#lift-redesign).)
 
 ## The story in two sentences
 
@@ -32,10 +32,10 @@ The map (`maps/level-08-hypergrowth.txt`, 22×12) is two islands. Top of screen 
             ##KK#KK###      rows 0-8, x 12-21: FIRST FLOOR (engineering): keyboards back, tests right
             #........#
             #.....3..T
-##II#BB##   H........T      H (12,3): the chute's top hatch
-#.1...LL#   #LL......#      L: the lift cabins, ground (6-7,4-5) and first (13-14,4-5), facing across the shaft
-#.....LL#   #LL..M...#      M: Derek starts upstairs
-X.......#   #.....4..#      X (0,6): the bin
+#IIBB####   ###......T      (the map after the lift redesign; the brief below was written for the map before it)
+#.1..#LL#   #LL#.....#      L: the lift cars, ground (6-7,4-5) and first (13-14,4-5), walled in, doors at the front
+#....#LL#   #LL#.M...#      M: Derek starts upstairs
+X.......#   H.....4..#      H (12,6): the chute's top hatch; X (0,6): the bin
 #.......H   #........#      H (8,7): the chute's bottom hatch
 S.......#   ######.###      S (0,8-9): ship = the loading bay, on the LEFT wall
 S.2.....##########.#        (18,8): the first floor's front door, top of the stairs
@@ -144,6 +144,17 @@ Left for later:
 - **The ship station's mint** is darker than the warm rubber floor round it; it separates by hue, not brightness.
 - **The first-floor carpet is about as bright as the yellow test bench** (157 vs 155); the bench stands out by saturation.
 - The critic did not re-score round 2. Not checked on a real GPU.
+
+## Lift redesign
+
+After round 2 the lift still felt like teleporting: its cabins were 2×2 patches of open floor with blue plates, open on two or three sides, and the sim moved riders to the other floor the moment the lift left. Now the lift is a place you walk into:
+
+- **Sim (every lift, not the shuttle):** a car only lets people in while the lift stands open at that floor, and not in its last second (the chime, while the doors close). Riders wait in the shut car for the ride and step out when its doors open on the next floor. Paths ride cars but never walk through one; managers wait at shut doors.
+- **Map:** both cars walled in on three sides with their doors at the front, toward the camera. The inbox and bug queue moved one tile left for the ground car's left wall; the chute's top hatch moved from (12,3) to (12,6), on the shaft wall by the upstairs lift lobby.
+- **Render (`liftCars.ts`, every level with lifts):** a steel car floor with a sill in the lift's colour; jambs, a header with a light over the doors (green open, amber leaving, red broken) and the floor's pips; two steel leaves per doorway that slide shut over the chime second and open with a short slide on arrival; a roof once the doors are shut, with the riders and what they carry hidden inside. On 3-2 the walls round each car are its steel shell (handrail inside, panel seams); the painted doors and wall-top floor indicators of round 2 are gone.
+- **Balance:** the ride now really takes its 2 s. Recalibrated bots: Hypergrowth [15, 120, 165, 235] (was [30, 110, 180, 205]), Hot Desking [15, 55, 55, 120] (was [25, 55, 85, 140]), Hackathon [105, 200, 300, 365] (was [120, 220, 325, 360]).
+
+Left for later: Hot Desking's and Hackathon's cabins are still open on several sides, so their cars stand as free blocks with doors on more than one side (and Hot Desking's stacked express and local cabins touch). They need the same walling-in.
 
 ## Done when
 
