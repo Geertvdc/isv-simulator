@@ -16,6 +16,7 @@ Score history to beat: the garage went from **3/10 to 5.5/10** after round 1 and
 - Ask the user for reference images if they didn't give any (Overcooked 2 shots work well). Copy them to the scratchpad (`sips -s format png` also converts `.avif`) so agents can read them.
 - Take a **before** shot (step 2 shows how) and keep it for the plan doc.
 - Check the level's entry in `docs/plan/phase-23-level-redesign.md`: the maps were redrawn there (sizes, rooms, and mechanics like spills, lifts, reorgs and the campus). Reorg levels have a map per phase (`maps/level-NN-<id>.phaseN.txt`): the scene must fit every phase. Levels 1-1 to 3-1 had their pass before the redesign and still carry code for the old layouts (tested against `src/render/three/fixtures/`); leave that alone unless the pass is for that level.
+- **Lifts:** a lift cabin is a car with doors, and a dead end: walls on every side but one door side, facing the camera where possible. 3-2 Hypergrowth is the model (`docs/plan/hypergrowth-environment.md`, "Lift redesign"). Levels whose cabins are still open on several sides (3-3 Hot Desking, 5-4 Hackathon) get walled in as part of their pass, reusing 3-2's map approach, its one-door-side test, `liftCars.ts` and the steel car shell (`carShell`, `liftFrameModel`); that is a map change, so recalibrate the level.
 
 ## 1. Write the brief (`docs/plan/<level>-environment.md`)
 

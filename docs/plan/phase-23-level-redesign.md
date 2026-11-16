@@ -459,6 +459,8 @@ The company outgrows one room: 3-1 is one big corporate floor with a real corner
 
 #### 3-3 Hot Desking (`hot-desking`)
 
+> **Lift cars still to wall in.** This level's lift cabins are open on several sides. When this level is redesigned or gets its environment pass, wall in every car the way 3-2 Hypergrowth was done ([the brief's lift redesign](hypergrowth-environment.md#lift-redesign)) and reuse what was built there rather than starting over: one door side per car, facing the camera where possible (move the cabin, stations, hatches or passages to make room; keep every station reachable and the chute's top hatch first in reading order); the `Hypergrowth lift cars` one-door-side test in `src/sim/lifts.test.ts`; the cars themselves (`src/render/three/liftCars.ts`, any level); the steel shell for the walls round a car (`carShell` in `rooms/lowerFloorsRoom.ts`, `liftFrameModel` in `roomModels/lowerFloors.ts`); then recalibrate with `npm run sim -- --calibrate --level=<id>`.
+
 **Concept:** 22×12 large. Three floors: an express lift that skips a floor and a local lift that stops at every floor. The express breaks down for a stretch, a mail chute runs from the top floor to the ground, and the reviews happen in a meeting room. Two managers. Gimmick: **three floors, express lift, lift breakdown**. 1p / 4p: Local lift and stairs always work; the express takes the team.
 
 - **Draft:** `maps/drafts/hot-desking.txt`
@@ -778,6 +780,8 @@ Each level from 5-2 on adds one element no earlier level has. None of them is bu
 - **Review:** approved at gate 1 (2026-11-01, iteration 2)
 
 #### 5-4 Hackathon (`hackathon`)
+
+> **Lift cars still to wall in.** This level's lift cabins are open on several sides. When this level is redesigned or gets its environment pass, wall in every car the way 3-2 Hypergrowth was done ([the brief's lift redesign](hypergrowth-environment.md#lift-redesign)) and reuse what was built there rather than starting over: one door side per car, facing the camera where possible (move the cabin, stations, hatches or passages to make room; keep every station reachable and the chute's top hatch first in reading order); the `Hypergrowth lift cars` one-door-side test in `src/sim/lifts.test.ts`; the cars themselves (`src/render/three/liftCars.ts`, any level); the steel shell for the walls round a car (`carShell` in `rooms/lowerFloorsRoom.ts`, `liftFrameModel` in `roomModels/lowerFloors.ts`); then recalibrate with `npm run sim -- --calibrate --level=<id>`.
 
 **Concept:** 22×12 large. Big hall with a U belt round a pit (with an exit), a design room and a server room; one callback per earlier chapter. Gimmick: everything, **belt outage**. 1p / 4p: Many routes.
 
