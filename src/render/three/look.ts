@@ -9,6 +9,7 @@ import {
   accentSpots,
   lampColor,
   lampSpots,
+  poolPlacements,
   sideLightSpots,
   sunPlacement,
   washPlacement,
@@ -142,7 +143,7 @@ export const FLOOR_COLORS: Readonly<Record<FloorTheme, readonly [number, number]
   // A rented floor's new carpet tiles, cool blue-grey; the second is the tiles laid the other way.
   corporateCarpet: [0x7f8ea3, 0x7a899c],
   // A rubber ground floor, grey-green; the second is the seams.
-  mixedFloors: [0x7d8a84, 0x6f7b75],
+  mixedFloors: [0x828a80, 0x747b72],
 };
 
 /** Wall colors per theme: face and top. Caps stay darker than stations, so the eye goes to the stations. */
@@ -228,6 +229,19 @@ export function createLights(
     put(spot, washed.position);
     put(spot.target, washed.target);
     wash.push(spot, spot.target);
+  }
+
+  // The office's own lights per floor (`pools`): soft spots, no shadows, kept on `low` like the wash.
+  if (atmosphere.pools) {
+    for (const pool of poolPlacements(atmosphere, map)) {
+      const spot = new THREE.SpotLight(atmosphere.pools.color, pool.intensity);
+      spot.angle = pool.angle;
+      spot.penumbra = 0.7;
+      spot.decay = 0;
+      put(spot, pool.position);
+      put(spot.target, pool.target);
+      wash.push(spot, spot.target);
+    }
   }
 
   // Bare bulbs: cheap point lights with a short reach and no shadows.

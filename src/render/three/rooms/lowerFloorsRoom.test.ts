@@ -119,6 +119,28 @@ describe('lowerFloorsRoom', () => {
     );
     expect(plan.rails.filter((r) => r.low).length).toBeGreaterThan(5);
     expect(plan.rails.filter((r) => !r.low).length).toBeGreaterThan(3);
+    // A post on every second tile, the rail continuous.
+    const posts = plan.rails.filter((r) => r.post).length;
+    expect(posts).toBeGreaterThan(plan.rails.length / 3);
+    expect(posts).toBeLessThan(plan.rails.length);
+    // The first floor's front wall over the stairs is a glass balustrade, without a head track.
+    const bal = Object.entries(plan.swaps).filter(([, s]) => s.startsWith('balustrade'));
+    expect(bal.length).toBeGreaterThanOrEqual(4);
+    for (const [k] of bal) {
+      const [x = 0, y = 0] = k.split(',').map(Number);
+      expect(plan.zones[key(x, y - 1)]).toBe('first');
+      expect(plan.headTracks.some((h) => h.x === x && h.y === y)).toBe(false);
+    }
+    // The floor numbers: 0 at the stairs' foot, 1 at the top, on stairs.
+    expect(plan.floorNumbers.map((f) => f.n)).toEqual([0, 1]);
+    for (const f of plan.floorNumbers) expect(plan.zones[key(f.x, f.y)]).toBe('stairs');
+    // The flight ramps: the foot's step below the top's.
+    const [foot, top] = plan.floorNumbers;
+    if (foot && top)
+      expect(plan.floorWear[key(foot.x, foot.y)] ?? 0).toBeLessThan(
+        plan.floorWear[key(top.x, top.y)] ?? 0,
+      );
+    expect(plan.slabEdges.length).toBeGreaterThan(8);
   });
 
   it('hangs the story on the walls: the checklist, NEW STARTERS, the note, the directories', () => {
@@ -153,8 +175,18 @@ describe('lowerFloorsRoom', () => {
       expect(getTile(map, t.x, t.y)).toBe('wall');
       const behind = getTile(map, t.x, t.y - 1);
       expect(behind === null || behind === 'wall' || behind === 'void').toBe(true);
-      expect(plan.swaps[key(t.x, t.y)] ?? '').not.toMatch(/^(lift|block)/);
+      // Only the kit at the top of the stairs stands on block: in front of the glass balustrade.
+      if (t.kind === 'kitLow' || t.kind === 'laptopsLow')
+        expect(plan.swaps[key(t.x, t.y - 1)]).toMatch(/^balustrade/);
+      else expect(plan.swaps[key(t.x, t.y)] ?? '').not.toMatch(/^(lift|block)/);
     }
+    expect(
+      plan.tops.filter((t) => t.kind === 'kitLow' || t.kind === 'laptopsLow').length,
+    ).toBeGreaterThanOrEqual(2);
+    // The ground floor's low walls: three clusters on the front wall, one with a balloon on the left.
+    expect(plan.fronts.filter((f) => f.y === map.height - 1).length).toBeGreaterThanOrEqual(3);
+    expect(plan.fronts.some((f) => f.x === 0 && f.kind === 'lowBalloon')).toBe(true);
+    expect(plan.tops.filter((t) => t.x === 0).length + 1).toBeGreaterThanOrEqual(2);
     for (const f of plan.fronts) expect(getTile(map, f.x, f.y)).toBe('wall');
   });
 
