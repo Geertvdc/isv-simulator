@@ -11,14 +11,15 @@
  * Incident hotfixes come first in the bug queue, so bots take them first.
  * Tickets whose order expired go straight in the bin.
  * Bots plan their walks around managers, and an invited bot drops
- * everything (but keeps carrying) and stands in the meeting room.
+ * everything (but keeps carrying) and stands in the meeting room. Bots only
+ * get in a lift car going the way their walk needs (`liftGate`).
  */
 
-import { type GridPoint, type LevelMap } from './level';
-import { isLiftHop } from './lifts';
+import { type GridPoint, type LevelMap, getTile, isSolid } from './level';
+import { type Lift, hasDoors, isLiftHop } from './lifts';
 import { managerTiles } from './manager';
 import { shutDoors } from './meetings';
-import { pathTo } from './path';
+import { NEIGHBOURS, pathTo } from './path';
 import { wetTiles } from './spills';
 import { type GameState, type InputCommand, type PlayerId, getPlayer, targetTile } from './state';
 import { chooseGoal } from './botGoals';
@@ -93,8 +94,10 @@ export function botInput(state: GameState, bot: Bot, bots: readonly Bot[]): Inpu
       pathTo(state.level, from, goal.tile, blocked, state.gates) ??
         pathTo(state.level, from, goal.tile, [], state.gates),
     );
+    const gate = walk ? liftGate(state, from, walk) : null;
     const next = walk?.[0];
-    if (next) input.move = stepToward(state.level, player.pos, next);
+    if (gate) input.move = gate;
+    else if (next) input.move = stepToward(state.level, player.pos, next);
     bot.interactWas = false;
     return input;
   }
@@ -109,7 +112,10 @@ export function botInput(state: GameState, bot: Bot, bots: readonly Bot[]): Inpu
       findPath(state.level, from, goal.tile, others, [], state.gates),
   );
   let wantsInteract = false;
-  if (path && path.length > 0) {
+  const gate = path && path.length > 0 ? liftGate(state, from, path) : null;
+  if (gate) {
+    input.move = gate;
+  } else if (path && path.length > 0) {
     const next = path[0];
     if (next) input.move = stepToward(state.level, player.pos, next);
   } else if (path) {
@@ -154,4 +160,72 @@ function stepToward(
     return off > 0.1 ? unit(here.x - pos.x, here.y - pos.y) : { x: 0, y: 0 };
   }
   return unit(next.x - pos.x, next.y - pos.y);
+}
+
+/** Which way a lift goes when it next leaves `floor`, or `null` when it isn't at or on its way to it. */
+function nextLeaves(lift: Lift, floor: number): 1 | -1 | null {
+  if (lift.at !== floor) return null;
+  const next = lift.at + lift.dir;
+  return next < 0 || next >= lift.stops.length ? (lift.dir === 1 ? -1 : 1) : lift.dir;
+}
+
+/** The lift (with doors), floor and floor index of a cabin tile, if `tile` is one. */
+function cabinFloor(state: GameState, tile: GridPoint): { lift: Lift; floor: number } | null {
+  for (const lift of state.lifts) {
+    if (!hasDoors(lift)) continue;
+    const floor = lift.stops.findIndex((cabin) =>
+      cabin.some((t) => t.x === tile.x && t.y === tile.y),
+    );
+    if (floor >= 0) return { lift, floor };
+  }
+  return null;
+}
+
+/**
+ * Lift manners for a bot whose walk rides a lift (with doors): it only gets
+ * in when the lift's next stop from this floor is the one its walk needs.
+ * Otherwise it waits a step back from the doors (so riders can get out) and
+ * gets out of a car that goes the wrong way. Returns the move to make
+ * instead of following the walk, or `null` to follow it.
+ */
+export function liftGate(
+  state: GameState,
+  from: GridPoint,
+  path: readonly GridPoint[],
+): { x: number; y: number } | null {
+  if (!state.lifts.some(hasDoors)) return null;
+  // The first ride on the walk, while it's at most two steps away.
+  const stops = [from, ...path];
+  let hop = -1;
+  for (let i = 0; i + 1 < stops.length && i <= 2; i++) {
+    const a = stops[i];
+    const b = stops[i + 1];
+    if (a && b && isLiftHop(state.level, a, b)) {
+      hop = i;
+      break;
+    }
+  }
+  const origin = stops[hop];
+  const dest = stops[hop + 1];
+  if (hop < 0 || !origin || !dest) return null;
+  const at = cabinFloor(state, origin);
+  const to = cabinFloor(state, dest);
+  if (!at || !to || at.lift !== to.lift) return null;
+  const wanted = to.floor > at.floor ? 1 : -1;
+  if (nextLeaves(at.lift, at.floor) === wanted) return null;
+  const inside = cabinFloor(state, from);
+  if (inside && inside.lift === at.lift && inside.floor === at.floor) {
+    // Wrong way, or the car is elsewhere: step out onto the floor in front of it.
+    // (A rider can't move until the doors open on the next floor, so mid-ride this does nothing.)
+    const cabin = at.lift.stops[at.floor] ?? [];
+    for (const d of NEIGHBOURS) {
+      const out = { x: from.x + d.x, y: from.y + d.y };
+      if (cabin.some((t) => t.x === out.x && t.y === out.y)) continue;
+      if (isSolid(getTile(state.level, out.x, out.y))) continue;
+      return d;
+    }
+    return { x: 0, y: 0 };
+  }
+  // Outside: wait a step back from the doors, or where it is when that's the door step.
+  return { x: 0, y: 0 };
 }
