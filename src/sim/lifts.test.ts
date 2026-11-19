@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import hotDeskingDraft from '../../maps/level-09-hot-desking.txt?raw';
 import hypergrowthDraft from '../../maps/level-08-hypergrowth.txt?raw';
+import labLiftsMap from '../../maps/lab-lifts.txt?raw';
 import {
   CHUTE_TICKS,
   EXPRESS_OPEN_TICKS,
@@ -9,7 +10,7 @@ import {
   LIFT_RIDE_TICKS,
   TICKS_PER_SECOND,
 } from './balance';
-import { botInput, createBot } from './bot';
+import { botInput, createBot, liftGate } from './bot';
 import { parseLevelMap } from './level';
 import { HOT_DESKING, HYPERGROWTH, levelWithMap } from './levels';
 import {
@@ -88,14 +89,21 @@ describe('lift layout', () => {
     expect(path?.some((p) => p.y === 1 && p.x >= 11)).toBe(true);
   });
 
-  it('reads the Scale-Up drafts: one lift on Hypergrowth, local and express on Hot Desking', () => {
+  it('reads the Scale-Up maps: one lift on Hypergrowth, one lift with three stops on Hot Desking', () => {
     expect(createLifts(parseLevelMap(hypergrowthDraft)).map((l) => l.stops.length)).toEqual([2]);
     const hot = createLifts(parseLevelMap(hotDeskingDraft));
-    expect(hot.map((l) => [l.kind, l.stops.length])).toEqual([
+    expect(hot.map((l) => [l.kind, l.stops.length])).toEqual([['local', 3]]);
+    expect(hot[0]?.stops.map((cabin) => cabin.length)).toEqual([3, 3, 3]);
+    expect(createChutes(parseLevelMap(hotDeskingDraft))).toEqual([]);
+  });
+
+  it('reads the lifts lab: local, express and a mail chute', () => {
+    const lab = parseLevelMap(labLiftsMap);
+    expect(createLifts(lab).map((l) => [l.kind, l.stops.length])).toEqual([
       ['local', 3],
       ['express', 2],
     ]);
-    expect(createChutes(parseLevelMap(hotDeskingDraft))).toHaveLength(1);
+    expect(createChutes(lab)).toHaveLength(1);
   });
 });
 
@@ -265,9 +273,12 @@ describe('lift doors', () => {
   });
 });
 
-describe('Hypergrowth lift cars', () => {
-  it('have one door side each: the cabins are dead ends', () => {
-    const map = parseLevelMap(hypergrowthDraft);
+describe('lift cars on Hypergrowth and Hot Desking', () => {
+  it.each([
+    ['Hypergrowth', hypergrowthDraft],
+    ['Hot Desking', hotDeskingDraft],
+  ])('%s: one door side each, facing the camera: the cabins are dead ends', (_, text) => {
+    const map = parseLevelMap(text);
     const lift = createLifts(map)[0];
     if (!lift) throw new Error('no lift');
     for (const cabin of lift.stops) {
@@ -309,6 +320,83 @@ describe('mail chute', () => {
     const ticket = addTicket(state, 9);
     idle(state, CHUTE_TICKS + 10);
     expect(ticket.location).toEqual({ kind: 'tile', x: 9, y: 1 });
+  });
+});
+
+describe('bots take the lift the right way', () => {
+  /** Three floors, one car each, doors facing down; the middle floor has player 1. */
+  const THREE_FLOORS = parseLevelMap(
+    [
+      '#######',
+      '#.LLL.#',
+      '#.....#',
+      '#######',
+      '#.LLL.#',
+      '#.1...#',
+      '#######',
+      '#.LLL.#',
+      '#.234.#',
+      '#######',
+    ].join('\n'),
+  );
+
+  /** The lift standing open at the middle floor, next going `dir` (+1 down, -1 up). */
+  function openAtMiddle(dir: 1 | -1): GameState {
+    const state = game([1], THREE_FLOORS);
+    const lift = state.lifts[0];
+    if (!lift) throw new Error('no lift');
+    Object.assign(lift, { at: 1, dir, phase: 'open', until: state.tick + LIFT_OPEN_TICKS });
+    return state;
+  }
+
+  const down = (from: { x: number; y: number }) => pathTo(THREE_FLOORS, from, { x: 3, y: 8 }) ?? [];
+  const up = (from: { x: number; y: number }) => pathTo(THREE_FLOORS, from, { x: 3, y: 2 }) ?? [];
+
+  it('gets in when the next stop is the floor its walk needs', () => {
+    const state = openAtMiddle(1);
+    expect(liftGate(state, { x: 3, y: 5 }, down({ x: 3, y: 5 }))).toBeNull();
+    expect(liftGate(state, { x: 3, y: 4 }, down({ x: 3, y: 4 }))).toBeNull();
+  });
+
+  it('waits outside a car that goes the other way, and gets out of one', () => {
+    const state = openAtMiddle(-1);
+    expect(liftGate(state, { x: 3, y: 5 }, down({ x: 3, y: 5 }))).toEqual({ x: 0, y: 0 });
+    expect(liftGate(state, { x: 3, y: 4 }, down({ x: 3, y: 4 }))).toEqual({ x: 0, y: 1 });
+    // Going up is fine.
+    expect(liftGate(state, { x: 3, y: 5 }, up({ x: 3, y: 5 }))).toBeNull();
+  });
+
+  it('turns round at the end floors', () => {
+    const state = game([1], THREE_FLOORS);
+    const lift = state.lifts[0];
+    if (!lift) throw new Error('no lift');
+    Object.assign(lift, { at: 2, dir: 1, phase: 'open' });
+    // From the bottom floor the car only goes up, whatever way it came.
+    const from = { x: 3, y: 8 };
+    expect(liftGate(state, from, up(from))).toBeNull();
+  });
+
+  it('on Hot Desking a bot in the test lab lets the car go up and rides the next one down', () => {
+    const state = createGame({ ...HOT_DESKING, map: parseLevelMap(hotDeskingDraft) }, 3, [1]);
+    state.nextOrderTick = Number.MAX_SAFE_INTEGER;
+    const lift = state.lifts[0];
+    if (!lift) throw new Error('no lift');
+    // Open at the test lab (floor 1), next going up to the meeting room.
+    Object.assign(lift, { at: 1, dir: -1, phase: 'open', until: LIFT_OPEN_TICKS });
+    standIn(state, 1, 13, 1);
+    const ticket = addTicket(state, 1);
+    give(1, ticket);
+    const bots = [createBot(1)];
+    let wentUp = false;
+    let reachedDesks = false;
+    for (let i = 0; i < 30 * SECOND && !reachedDesks; i++) {
+      tick(state, [botInput(state, bots[0] ?? createBot(1), bots)]);
+      const pos = state.players[0]?.pos ?? { x: 0, y: 0 };
+      if (pos.x < 8 && pos.y < 5) wentUp = true;
+      if (pos.y >= 7) reachedDesks = true;
+    }
+    expect(wentUp).toBe(false);
+    expect(reachedDesks).toBe(true);
   });
 });
 
