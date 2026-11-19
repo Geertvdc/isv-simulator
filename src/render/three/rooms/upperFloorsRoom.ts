@@ -65,9 +65,13 @@ export const FLOOR_WEAR = {
   /** The meeting room's quieter carpet, plain or worn by the lift. */
   meeting: 25,
   meetingWorn: 26,
+  /** The meeting carpet's violet border: `meetingEdge + edges` (sides where the room ends, as `PLUSH_EDGES` counts them). */
+  meetingEdge: 27,
+  /** The meeting carpet where the game's meeting-rug tint doesn't reach (under a station): its tinted look, bare. */
+  meetingBare: 43,
 } as const;
 /** How many wear kinds there are. */
-export const FLOOR_WEAR_KINDS = 27;
+export const FLOOR_WEAR_KINDS = 44;
 
 /** What hangs on a wall face (each on one face of a wall tile, facing the room). */
 export type UpperArt =
@@ -89,7 +93,7 @@ export const UPPER_ART_HALF: Readonly<Record<UpperArt, number>> = {
   directory2: 0.3,
   stairsClosed: 0.42,
   plan: 0.44,
-  kiosk: 0.3,
+  kiosk: 0.34,
   clock: 0.15,
   reproBoard: 0.46,
   meetingScreen: 0.44,
@@ -141,8 +145,9 @@ export interface TopProp {
   yaw: number;
 }
 
-/** What lies on the hot-desk floor's low front wall: a hand high at most. */
-export type FrontKind = 'gymBag' | 'coatPile' | 'mugTray' | 'laptopBag';
+/** What lies on the hot-desk floor's low walls (front, and back where nothing tall stands): a hand high at most. */
+export type FrontKind =
+  'gymBag' | 'coatPile' | 'mugTray' | 'laptopBag' | 'laptopStack' | 'headsetBox';
 
 /** One floor's lift: its cabin's tiles and the side of the room the cabin is on. */
 export interface LiftStop {
@@ -246,7 +251,18 @@ export function upperFloorsRoom(map: LevelMap): UpperFloorsRoom {
     core,
     wallArt,
     tops,
-    fronts: frontProps(map, zones, doors),
+    fronts: frontProps(
+      map,
+      zones,
+      doors,
+      cabins,
+      new Set([
+        ...coreSet,
+        ...standing,
+        ...tops.map((t) => key(t.x, t.y)),
+        ...wallArt.map((a) => key(a.x, a.y)),
+      ]),
+    ),
     headTracks: headTracks(map),
     lifts,
     frontDesk,
@@ -454,6 +470,34 @@ function floorWearOf(
       const k = key(p.x, p.y);
       if (out[k] === base[stop.zone] && !spawns.has(k)) out[k] = worn[stop.zone];
     }
+  // The meeting carpet's violet border round the room's edge.
+  const meeting = new Set(Object.keys(zones).filter((k) => zones[k] === 'meeting'));
+  for (const k of meeting) {
+    if (out[k] !== FLOOR_WEAR.meeting) continue;
+    const [x = 0, y = 0] = k.split(',').map(Number);
+    const edges = edgesOf(meeting, x, y);
+    if (edges) out[k] = FLOOR_WEAR.meetingEdge + edges;
+  }
+  // Under the meeting room's stations the rug's tint doesn't fall: the carpet's tinted look, bare.
+  const rug = new Set(map.meetingTiles.map((t) => key(t.x, t.y)));
+  for (const k of meeting) if (!rug.has(k) && !cabins.has(k)) out[k] = FLOOR_WEAR.meetingBare;
+  // Heel and trolley scuffs on the lab's vinyl in front of its stations.
+  for (const [k, zone] of Object.entries(zones)) {
+    if (zone !== 'lab' || out[k] !== FLOOR_WEAR.vinyl) continue;
+    const [x = 0, y = 0] = k.split(',').map(Number);
+    if (getTile(map, x, y) !== 'floor' || spawns.has(k)) continue;
+    const byStation = STEPS.some(([dx, dy]) => {
+      const t = getTile(map, x + dx, y + dy);
+      return (
+        t !== null &&
+        t !== 'wall' &&
+        t !== 'void' &&
+        t !== 'floor' &&
+        !cabins.has(key(x + dx, y + dy))
+      );
+    });
+    if (byStation) out[k] = FLOOR_WEAR.vinylScuff;
+  }
   // The entrance mat just inside the revolving door.
   const mat = new Set(
     (door?.tiles ?? [])
@@ -863,21 +907,45 @@ function topProps(
             low: wallPiece(map, q.x, q.y) === 'wall-front',
             kind,
             toward: { dx: 0, dy: 0 },
-            yaw: facing(map, zones, q) + turn(q),
+            // Locker banks always show their doors to the camera, side walls too.
+            yaw: (kind.startsWith('lockers') ? 0 : facing(map, zones, q)) + turn(q),
           });
         });
       });
   }
-  // Segfault's locker: one bank, at the edge of the frame (the plain bank furthest from the
-  // map's middle, on a full wall if there is one), stands open; every other bank is shut.
+  // Segfault's locker: one bank on the hot-desk floor's low back wall, facing the camera, the
+  // one nearest halfway from the front desk to the lift, stands open; every other bank is shut.
   const banks = out.filter((t) => t.kind.startsWith('lockers'));
   for (const t of banks) if (t.kind === 'lockersOpen') t.kind = 'lockers';
-  const edge = (t: TopProp) => Math.abs(t.x - (map.width - 1) / 2) + (t.low ? 0 : 100);
-  const cat = [...banks]
-    .filter((t) => t.kind === 'lockers')
-    .sort((a, b) => edge(b) - edge(a) || a.y - b.y)[0];
+  const deskX = doors[0]?.mid.x;
+  const back = banks.filter(
+    (t) =>
+      t.kind === 'lockers' &&
+      t.low &&
+      lowBack(map, t.x, t.y) &&
+      zones[key(t.x, t.y + 1)] === 'hotDesk',
+  );
+  const aim = segfaultAim(map, zones, cabins, deskX);
+  const cat =
+    [...back].sort((a, b) => Math.abs(a.x - aim) - Math.abs(b.x - aim) || a.x - b.x)[0] ??
+    [...banks].filter((t) => t.kind === 'lockers').sort((a, b) => a.y - b.y || a.x - b.x)[0];
   if (cat) cat.kind = 'lockersOpen';
   return out;
+}
+
+/** Halfway from the front desk to the hot-desk floor's lift, along x: where Segfault's locker goes. */
+function segfaultAim(
+  map: LevelMap,
+  zones: Readonly<Record<string, Zone>>,
+  cabins: ReadonlySet<string>,
+  deskX: number | undefined,
+): number {
+  const xs = [...cabins]
+    .map((k) => k.split(',').map(Number))
+    .filter(([x = 0, y = 0]) => zones[key(x, y)] === 'hotDesk')
+    .map(([x = 0]) => x);
+  const liftX = xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : map.width / 2;
+  return deskX === undefined ? liftX : (deskX + liftX) / 2;
 }
 
 /** How far a piece on a side wall turns toward the room (from facing the camera). */
@@ -899,43 +967,83 @@ function facing(map: LevelMap, zones: Readonly<Record<string, Zone>>, p: GridPoi
   return 0;
 }
 
+/** What each of a low wall's clusters piles up, front wall and back wall. */
+const FRONT_CLUSTERS: readonly (readonly FrontKind[])[] = [
+  ['coatPile', 'gymBag'],
+  ['laptopStack', 'mugTray'],
+  ['headsetBox', 'laptopBag'],
+];
+const BACK_CLUSTERS: readonly (readonly FrontKind[])[] = [
+  ['laptopStack', 'mugTray'],
+  ['headsetBox', 'coatPile'],
+  ['gymBag', 'laptopBag'],
+];
+/** Low-wall clusters per long wall at most. */
+export const LOW_WALL_CLUSTERS = 3;
+
 /**
- * The hot-desk floor's low front wall: low walls with the outside in front
- * and the floor behind, clear of the doors by a tile, a gym bag, a pile of
- * coats, a tray of mugs and a laptop bag spread along it.
+ * Piles of a hand high on the hot-desk floor's low walls, in up to three
+ * clusters per wall: on the front wall (outside in front, the floor behind)
+ * and on the back wall's tiles that nothing taller stands on. Clear of the
+ * doors and lift cabins by a tile and of any station beside them.
  */
 function frontProps(
   map: LevelMap,
   zones: Readonly<Record<string, Zone>>,
   doors: readonly (Doorway | null)[],
+  cabins: ReadonlySet<string>,
+  taken: ReadonlySet<string>,
 ): UpperFloorsRoom['fronts'] {
-  const kinds: FrontKind[] = ['gymBag', 'coatPile', 'mugTray', 'laptopBag'];
-  const free: GridPoint[] = [];
+  const clear = (x: number, y: number) =>
+    getTile(map, x, y) === 'wall' &&
+    wallPiece(map, x, y) === 'wall-front' &&
+    !taken.has(key(x, y)) &&
+    !doors.some((d) => d?.tiles.some((t) => cheb(t, { x, y }) <= 1)) &&
+    ![...cabins].some((k) => {
+      const [cx = 0, cy = 0] = k.split(',').map(Number);
+      return cheb({ x: cx, y: cy }, { x, y }) <= 1;
+    }) &&
+    [-1, 0, 1].every((dx) => getTile(map, x + dx, y) === 'wall');
+  const front: GridPoint[] = [];
+  const back: GridPoint[] = [];
   for (let y = 0; y < map.height; y++)
-    for (let x = 1; x < map.width - 1; x++)
+    for (let x = 1; x < map.width - 1; x++) {
+      if (!clear(x, y)) continue;
       if (
-        getTile(map, x, y) === 'wall' &&
-        wallPiece(map, x, y) === 'wall-front' &&
         getTile(map, x, y - 1) === 'floor' &&
         zones[key(x, y - 1)] === 'hotDesk' &&
-        outside(map, x, y + 1) &&
-        !doors.some((d) => d?.tiles.some((t) => cheb(t, { x, y }) <= 1)) &&
-        [-1, 0, 1].every((dx) => getTile(map, x + dx, y) === 'wall')
+        outside(map, x, y + 1)
       )
-        free.push({ x, y });
-  const n = Math.min(kinds.length, free.length);
+        front.push({ x, y });
+      else if (lowBack(map, x, y) && zones[key(x, y + 1)] === 'hotDesk') back.push({ x, y });
+    }
   const out: UpperFloorsRoom['fronts'] = [];
-  for (let i = 0; i < n; i++) {
-    const p = free[Math.round(((i + 0.5) * free.length) / n - 0.5)];
-    if (!p || out.some((q) => q.x === p.x && q.y === p.y)) continue;
-    out.push({
-      x: p.x,
-      y: p.y,
-      kind: kinds[i] ?? 'gymBag',
-      yaw: ((tileHash(p.x, p.y) % 5) - 2) * 0.08,
-    });
+  for (const [line, clusters] of [
+    [front, FRONT_CLUSTERS],
+    [back, BACK_CLUSTERS],
+  ] as const) {
+    const has = (x: number, y: number) => line.some((p) => p.x === x && p.y === y);
+    const used = new Set<string>();
+    const n = Math.min(LOW_WALL_CLUSTERS, line.length);
+    for (let i = 0; i < n; i++) {
+      const mark = ((i + 0.5) * line.length) / n - 0.5;
+      // The free tile nearest the mark, a tile clear of the clusters before it.
+      const start = [...line.entries()]
+        .filter(([, p]) => ![-1, 0, 1].some((dx) => used.has(key(p.x + dx, p.y))))
+        .sort(([a], [b]) => Math.abs(a - mark) - Math.abs(b - mark) || a - b)[0]?.[1];
+      if (!start) break;
+      const kinds = clusters[i % clusters.length] ?? [];
+      // On along the wall for its partner, or back if the wall ends.
+      const dir = has(start.x + 1, start.y) && !used.has(key(start.x + 1, start.y)) ? 1 : -1;
+      kinds.forEach((kind, j) => {
+        const p = { x: start.x + dir * j, y: start.y };
+        if (!has(p.x, p.y) || used.has(key(p.x, p.y))) return;
+        used.add(key(p.x, p.y));
+        out.push({ ...p, kind, yaw: ((tileHash(p.x, p.y) % 5) - 2) * 0.08 });
+      });
+    }
   }
-  return out;
+  return out.sort((a, b) => a.y - b.y || a.x - b.x);
 }
 
 // ---- The pendants ----

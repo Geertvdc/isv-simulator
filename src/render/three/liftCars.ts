@@ -11,12 +11,13 @@
  *
  * A car set flush into a room's outer wall (`flushDoorway`: one tile deep,
  * its one doorway on the room, the outside behind it, as on Hot Desking)
- * is built as a lift lobby in the wall line instead: a brushed-steel frame
- * no higher than the wall, a lit floor indicator over the doors (a digit per
- * floor, the lift's floor lit; up and down arrows for where it goes next), a
- * call button on the jamb, the car's steel back wall, and over a shut car a
- * cap in the wall top's colour (never a grey roof standing out). Its leaves
- * go dark while the lift is on another floor: "lift not here".
+ * is built as a person-height lift core in the wall line instead: a slim
+ * brushed-steel portal flush in the wall plane rising over the partitions,
+ * doors a head taller than a developer, a lit floor indicator over them (a
+ * digit per floor, the lift's floor lit; up and down arrows for where it
+ * goes next), a call button on the jamb, the car's warm lit back wall, and
+ * the core's top in the partitions' coping. Its brushed-steel leaves go a
+ * shade darker while the lift is on another floor: "lift not here".
  */
 
 import * as THREE from 'three';
@@ -33,6 +34,7 @@ import type { GameState } from '../../sim/state';
 import { gridToWorld } from '../projection';
 import { ModelBuilder } from './kit';
 import { WALL_HEIGHT } from './layout';
+import { WALL_COLORS } from './look';
 import { text } from './roomModels/basement';
 
 /** The leaves' height; the header fills the rest up to the wall tops. */
@@ -60,21 +62,38 @@ const LOCAL_ACCENT = 0x5bc0eb;
 const EXPRESS_ACCENT = 0xf2b134;
 
 // The flush cars' lobby (`flushDoorway`).
-/** The brushed-steel frame, and the leaves while the car is here and while it's away. */
-const FLUSH_FRAME = 0xb3bbc2;
-/** The flush doors' height: lower than a free-standing car's, for a taller header with the indicator. */
-const FLUSH_DOOR_H = 0.8;
+/** The brushed-steel portal (jambs and header), slim in the wall plane. */
+const FLUSH_FRAME = 0xc2c7cc;
+const FLUSH_JAMB_W = 0.06;
+/**
+ * The flush doors' opening: person height with headroom (a developer stands
+ * `DEVELOPER_TOP` 1.54 tall, this is 1.3 times that), and the core's top
+ * over it, above the partitions' wall line, with the indicator between.
+ */
+export const FLUSH_DOOR_H = 2.0;
+export const FLUSH_TOP = 2.4;
+/** The leaves: brushed steel while the lift is away, bright steel while it's here. */
+export const FLUSH_LEAF_AWAY = 0x52585f;
 const FLUSH_LEAF_HERE = 0xb9c1c8;
-const FLUSH_LEAF_AWAY = 0x3f454c;
-/** The car's back wall inside, and the cap over a shut car (the partitions' top). */
-const FLUSH_BACK = 0x6a7178;
-const FLUSH_CAP = 0x80888f;
+/** Inside the car: a warm lit back wall under a strip light, light sides, a light floor. */
+export const FLUSH_BACK = 0xe9dcc0;
+const FLUSH_SIDE = 0xd9d2c2;
+const FLUSH_FLOOR = 0xb4b2aa;
+const FLUSH_STRIP = 0xfff1d6;
+/** The core's coping: the partitions' cool concrete (`WALL_COLORS.upperFloors.top`), a lighter lip. */
+const FLUSH_CAP = WALL_COLORS.upperFloors.top;
+const FLUSH_CAP_LIP = 0xb6b8b5;
 const FLUSH_CAP_T = 0.045;
-/** The indicator: its dark glass, a digit lit amber or dim, an arrow lit green or dim. */
-const INDICATOR = 0x15181c;
-const DIGIT_ON = 0xffb347;
+/** The indicator over the doors: its size, the digits' and arrows' height. */
+export const INDICATOR_W = 0.8;
+const INDICATOR_H = 0.27;
+export const DIGIT_H = 0.2;
+const ARROW_H = 0.14;
+/** Its dark glass, a digit lit amber or dim, an arrow lit green or dim. */
+const INDICATOR = 0x1f2328;
+export const DIGIT_ON = 0xffb020;
 const DIGIT_OFF = 0x3a3128;
-const ARROW_ON = 0x5be37a;
+export const ARROW_ON = 0x5be37a;
 const ARROW_OFF = 0x26332a;
 const CALL_ON = 0xffb347;
 const CALL_OFF = 0x4a4e54;
@@ -164,8 +183,10 @@ interface CarLook {
   light: THREE.MeshBasicMaterial;
   /** How far the doors show open, 0 to 1 (eases open, follows the sim shut). */
   shown: number;
-  /** The leaves' height (the flush cars' are lower). */
+  /** The leaves' height (the flush cars' are taller). */
   doorH: number;
+  /** The roof stays shown with the doors open (a flush car's core top). */
+  roofAlways?: boolean;
   lobby?: LobbyLook;
 }
 
@@ -347,19 +368,31 @@ export class LiftCars {
   }
 
   /**
-   * A car flush in the wall line (see `flushDoorway`): the car floor, its
-   * steel back wall, the brushed-steel frame (jambs and a header up to the
-   * wall top, never past it), the indicator and the light over the doors,
-   * the call button on the right jamb, two leaves, and the cap over it.
+   * A car flush in the wall line (see `flushDoorway`), a person-height lift
+   * core set into the partition: the car floor, its lit back wall and sides
+   * up to the portal top, the brushed-steel portal in the wall plane (slim
+   * jambs, a header with the indicator and the light over the doors, the
+   * call button on the right jamb), two leaves, and the core's coping on top.
    */
   private buildFlush(lift: Lift, cabin: readonly GridPoint[], w: Doorway): CarLook {
-    const frame = lit(FLUSH_FRAME, 0.35, 0.55);
-    const back = lit(FLUSH_BACK, 0.5, 0.4);
-    const leafMaterial = lit(FLUSH_LEAF_AWAY, 0.35, 0.5);
+    const frame = lit(FLUSH_FRAME, 0.4, 0.15);
+    // The back wall glows a little of its own under the strip light, so an open car pops.
+    const back = new THREE.MeshStandardMaterial({
+      color: FLUSH_BACK,
+      roughness: 0.75,
+      metalness: 0.05,
+      emissive: FLUSH_BACK,
+      emissiveIntensity: 0.35,
+    });
+    const sides = lit(FLUSH_SIDE, 0.75, 0.05);
+    const carFloor = lit(FLUSH_FLOOR, 0.6, 0.3);
+    // Little metalness: on `low` (no environment map) a metallic leaf would go black.
+    const leafMaterial = lit(FLUSH_LEAF_AWAY, 0.5, 0.12);
+    const seam = lit(SEAM, 0.7, 0.2);
     const accent = lit(lift.kind === 'express' ? EXPRESS_ACCENT : LOCAL_ACCENT, 0.5, 0.2);
     for (const t of cabin) {
       const at = gridToWorld(t.x, t.y, 0.006);
-      this.box(this.floor, [0.98, 0.012, 0.98], [at.x, at.y, at.z]);
+      this.box(carFloor, [0.98, 0.012, 0.98], [at.x, at.y, at.z]);
       for (const k of [-0.3, 0, 0.3])
         this.box(this.seam, [0.9, 0.003, 0.02], [at.x, 0.0135, at.z + k]);
     }
@@ -372,54 +405,64 @@ export class LiftCars {
       alongX ? [l, h, t] : [t, h, l];
     const mid = new THREE.Vector3((w.from.x + w.to.x) / 2, 0, (w.from.y + w.to.y) / 2);
     const line = mid.clone().addScaledVector(across, -INSET);
-    // The car's back wall, a tile behind the doors, with its handrail and a mirror band.
+    const wallTop = FLUSH_TOP - FLUSH_CAP_T;
+    // The car's back wall, a tile behind the doors: warm and lit, a handrail, a mirror band,
+    // and the strip light along its top, so an open car pops.
     const rear = mid.clone().addScaledVector(across, -1 + 0.04);
-    this.box(back, sized(length, WALL_HEIGHT - FLUSH_CAP_T, 0.08), [
-      rear.x,
-      (WALL_HEIGHT - FLUSH_CAP_T) / 2,
-      rear.z,
-    ]);
+    this.box(back, sized(length, wallTop, 0.08), [rear.x, wallTop / 2, rear.z]);
     const railAt = rear.clone().addScaledVector(across, 0.06);
-    this.box(this.steelDark, sized(length - 0.2, 0.035, 0.035), [railAt.x, 0.46, railAt.z]);
+    this.box(this.steelDark, sized(length - 0.2, 0.035, 0.035), [railAt.x, 0.62, railAt.z]);
     const mirror = rear.clone().addScaledVector(across, 0.042);
-    this.box(lit(0x8d969e, 0.15, 0.7), sized(length - 0.5, 0.36, 0.004), [
-      mirror.x,
-      0.72,
-      mirror.z,
-    ]);
+    this.box(lit(0xc9ccc8, 0.15, 0.5), sized(length - 0.6, 0.6, 0.004), [mirror.x, 1.15, mirror.z]);
+    const glowAt = rear.clone().addScaledVector(across, 0.05);
+    const glow = new THREE.Mesh(
+      this.unit,
+      new THREE.MeshBasicMaterial({ color: FLUSH_STRIP, toneMapped: false }),
+    );
+    glow.scale.set(...sized(length - 0.3, 0.06, 0.02));
+    glow.position.set(glowAt.x, wallTop - 0.12, glowAt.z);
+    this.root.add(glow);
+    // The core's sides, from the floor up to the portal top (over the partitions either side).
+    for (const s of [-1, 1]) {
+      const at = mid
+        .clone()
+        .addScaledVector(along, s * (length / 2 - 0.025))
+        .addScaledVector(across, -0.5);
+      this.box(sides, sized(0.05, wallTop, 0.92), [at.x, wallTop / 2, at.z]);
+    }
     // The sill, in the lift's colour.
     this.box(accent, sized(length, 0.014, 0.1), [line.x, 0.007, line.z]);
-    // The jambs and the header, up to the wall top and no higher.
-    const inner = length - 2 * JAMB_W;
+    // The portal in the wall plane: slim jambs and the header, up to the core's top.
+    const inner = length - 2 * FLUSH_JAMB_W;
     for (const s of [-1, 1]) {
-      const at = line.clone().addScaledVector(along, (s * (length - JAMB_W)) / 2);
-      this.box(frame, sized(JAMB_W, WALL_HEIGHT, 0.14), [at.x, WALL_HEIGHT / 2, at.z], true);
+      const at = line.clone().addScaledVector(along, (s * (length - FLUSH_JAMB_W)) / 2);
+      this.box(frame, sized(FLUSH_JAMB_W, wallTop, 0.14), [at.x, wallTop / 2, at.z], true);
     }
-    const headH = WALL_HEIGHT - FLUSH_DOOR_H;
+    const headH = wallTop - FLUSH_DOOR_H;
     this.box(frame, sized(length, headH, 0.14), [line.x, FLUSH_DOOR_H + headH / 2, line.z], true);
     const face = line.clone().addScaledVector(across, 0.071);
     // The light over the doors: a slim strip along the header's foot.
     const light = new THREE.MeshBasicMaterial({ color: LIGHT_OFF, toneMapped: false });
     const strip = new THREE.Mesh(this.unit, light);
-    strip.scale.set(...sized(inner * 0.8, 0.026, 0.01));
-    strip.position.set(face.x, FLUSH_DOOR_H + 0.03, face.z);
+    strip.scale.set(...sized(inner * 0.8, 0.03, 0.008));
+    strip.position.set(face.x, FLUSH_DOOR_H + 0.035, face.z);
     this.root.add(strip);
-    const top = new THREE.Mesh(this.unit, light);
-    top.scale.set(...sized(Math.min(0.5, inner * 0.6), 0.012, 0.05));
-    top.position.set(line.x, WALL_HEIGHT + 0.006, line.z);
-    this.root.add(top);
     // The indicator: a dark glass panel, a digit per floor (ground first), the arrows beside.
     const floors = lift.stops.length;
-    const panelW = 0.22 + floors * 0.13;
-    const panelY = FLUSH_DOOR_H + 0.19;
-    this.box(lit(INDICATOR, 0.2, 0.3), sized(panelW, 0.19, 0.012), [face.x, panelY, face.z]);
-    const glass = face.clone().addScaledVector(across, 0.007);
+    const panelY = FLUSH_DOOR_H + 0.06 + INDICATOR_H / 2;
+    this.box(lit(INDICATOR, 0.25, 0.2), sized(INDICATOR_W, INDICATOR_H, 0.008), [
+      face.x,
+      panelY,
+      face.z,
+    ]);
+    const glass = face.clone().addScaledVector(across, 0.004);
     const yaw = Math.atan2(across.x, across.z);
     const digits: THREE.MeshBasicMaterial[] = [];
+    const pitch = Math.min(0.15, 0.48 / floors);
     for (let n = 0; n < floors; n++) {
       const material = new THREE.MeshBasicMaterial({ color: DIGIT_OFF, toneMapped: false });
-      const mesh = new THREE.Mesh(digitGeometry(n, 0.026), material);
-      const at = glass.clone().addScaledVector(along, -panelW / 2 + 0.08 + n * 0.13);
+      const mesh = new THREE.Mesh(digitGeometry(n, DIGIT_H / 5), material);
+      const at = glass.clone().addScaledVector(along, -INDICATOR_W / 2 + 0.1 + n * pitch);
       mesh.position.set(at.x, panelY, at.z);
       mesh.rotation.y = yaw;
       this.root.add(mesh);
@@ -427,26 +470,29 @@ export class LiftCars {
     }
     const arrow = (up: boolean): THREE.MeshBasicMaterial => {
       const material = new THREE.MeshBasicMaterial({ color: ARROW_OFF, toneMapped: false });
-      const mesh = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.06, 3), material);
-      const at = glass.clone().addScaledVector(along, panelW / 2 - 0.07);
-      mesh.position.set(at.x, panelY + (up ? 0.042 : -0.042), at.z);
+      const mesh = new THREE.Mesh(new THREE.ConeGeometry(0.07, ARROW_H, 3), material);
+      const at = glass
+        .clone()
+        .addScaledVector(along, INDICATOR_W / 2 - (up ? 0.23 : 0.09))
+        .addScaledVector(across, 0.004);
+      mesh.position.set(at.x, panelY, at.z);
       mesh.rotation.set(0, yaw, up ? 0 : Math.PI);
-      mesh.scale.set(1, 1, 0.15);
+      mesh.scale.set(1, 1, 0.08);
       this.root.add(mesh);
       return material;
     };
     const up = arrow(true);
     const down = arrow(false);
     // The call button on the right jamb's face: a steel plate, the button.
-    const jamb = face.clone().addScaledVector(along, (length - JAMB_W) / 2);
-    this.box(lit(0x6c747b, 0.35, 0.55), sized(0.05, 0.12, 0.008), [jamb.x, 0.5, jamb.z]);
+    const jamb = face.clone().addScaledVector(along, (length - FLUSH_JAMB_W) / 2);
+    this.box(lit(0x6c747b, 0.35, 0.55), sized(0.045, 0.14, 0.006), [jamb.x, 0.62, jamb.z]);
     const call = new THREE.MeshBasicMaterial({ color: CALL_OFF, toneMapped: false });
     const button = new THREE.Mesh(this.unit, call);
-    const press = jamb.clone().addScaledVector(across, 0.006);
-    button.scale.set(...sized(0.026, 0.026, 0.008));
-    button.position.set(press.x, 0.5, press.z);
+    const press = jamb.clone().addScaledVector(across, 0.005);
+    button.scale.set(...sized(0.026, 0.026, 0.006));
+    button.position.set(press.x, 0.62, press.z);
     this.root.add(button);
-    // The leaves: one from each jamb, meeting in the middle, dark while the lift is away.
+    // The leaves: brushed steel, one from each jamb, a dark seam where they meet.
     const half = inner / 2;
     const ends: [THREE.Vector3, THREE.Vector3] = [
       line.clone().addScaledVector(along, -inner / 2),
@@ -458,20 +504,21 @@ export class LiftCars {
       mesh.receiveShadow = true;
       this.root.add(mesh);
       const kick = new THREE.Mesh(this.unit, this.seam);
-      kick.scale.set(1, 0.1, 1.04);
-      kick.position.set(0, -0.42, 0);
+      kick.scale.set(1, 0.05, 1.04);
+      kick.position.set(0, -0.47, 0);
       mesh.add(kick);
-      // A bright edge where the leaves meet, so shut doors read as doors, not a hole.
-      const edge = new THREE.Mesh(this.unit, frame);
-      if (alongX) edge.scale.set(0.05, 0.98, 1.1);
-      else edge.scale.set(1.1, 0.98, 0.05);
-      if (alongX) edge.position.set(side * 0.475, 0, 0);
-      else edge.position.set(0, 0, side * 0.475);
+      // The meeting edge: 0.01 of each leaf, so shut doors show one 0.02 seam down the middle.
+      const edge = new THREE.Mesh(this.unit, seam);
+      const share = 0.01 / half;
+      if (alongX) edge.scale.set(share, 1, 1.1);
+      else edge.scale.set(1.1, 1, share);
+      if (alongX) edge.position.set(side * (0.5 - share / 2), 0, 0);
+      else edge.position.set(0, 0, side * (0.5 - share / 2));
       mesh.add(edge);
       return mesh;
     };
     const doors: DoorLook[] = [{ leaves: [leaf(1), leaf(-1)], ends, along, half }];
-    // The cap over a shut car: the wall top's colour, flush with the wall line.
+    // The core's coping, over the whole car, always there: the partitions' cool concrete, a lighter lip.
     const xs = cabin.map((t) => t.x);
     const ys = cabin.map((t) => t.y);
     const x0 = Math.min(...xs) - 0.5;
@@ -479,13 +526,20 @@ export class LiftCars {
     const y0 = Math.min(...ys) - 0.5;
     const y1 = Math.max(...ys) + 0.5;
     const roof = this.box(
-      lit(FLUSH_CAP, 0.8, 0.05),
-      [x1 - x0 - 0.02, FLUSH_CAP_T, y1 - y0 - 0.02],
-      [(x0 + x1) / 2, WALL_HEIGHT - FLUSH_CAP_T / 2, (y0 + y1) / 2],
+      lit(FLUSH_CAP, 0.85, 0.02),
+      [x1 - x0, FLUSH_CAP_T, y1 - y0],
+      [(x0 + x1) / 2, FLUSH_TOP - FLUSH_CAP_T / 2, (y0 + y1) / 2],
     );
+    const lipAt = mid.clone().addScaledVector(across, -0.02);
+    this.box(lit(FLUSH_CAP_LIP, 0.8, 0.02), sized(length, 0.012, 0.06), [
+      lipAt.x,
+      FLUSH_TOP - 0.006,
+      lipAt.z,
+    ]);
     return {
       doors,
       roof,
+      roofAlways: true,
       light,
       shown: 1,
       doorH: FLUSH_DOOR_H,
@@ -553,6 +607,6 @@ export class LiftCars {
         leaf.scale.set(alongX ? width : LEAF_T, car.doorH, alongX ? LEAF_T : width);
       });
     }
-    car.roof.visible = open < 0.02;
+    car.roof.visible = car.roofAlways === true || open < 0.02;
   }
 }

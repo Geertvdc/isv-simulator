@@ -6,8 +6,19 @@ import { HACKATHON, HOT_DESKING, HYPERGROWTH, type Level } from '../../sim/level
 import { createLifts } from '../../sim/lifts';
 import { createGame } from '../../sim/state';
 import { tick } from '../../sim/tick';
+import { DEVELOPER_TOP } from './DeveloperRig';
 import { WALL_HEIGHT } from './layout';
-import { LiftCars, doorways, flushDoorway } from './liftCars';
+import {
+  DIGIT_H,
+  DIGIT_ON,
+  FLUSH_DOOR_H,
+  FLUSH_LEAF_AWAY,
+  FLUSH_TOP,
+  INDICATOR_W,
+  LiftCars,
+  doorways,
+  flushDoorway,
+} from './liftCars';
 
 describe('lift car doorways', () => {
   it('gives each Hypergrowth car one doorway across its front', () => {
@@ -83,6 +94,27 @@ describe('lift cars on the levels that had them first', () => {
   it("builds Hackathon's cars as before", () => {
     expect(hash(carsOf(HACKATHON))).toBe('5103081c');
   });
+  it('gives their cars the same materials as before (colour, roughness, metalness)', () => {
+    const got: string[] = [];
+    for (const level of [HYPERGROWTH, HACKATHON]) {
+      const root = new THREE.Group();
+      new LiftCars(root, level.map).sync(createGame(level, 7, [1, 2]), 0);
+      const rows = new Set<string>();
+      root.traverse((o) => {
+        if (!(o instanceof THREE.Mesh)) return;
+        const m = o.material as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial;
+        const pbr = m instanceof THREE.MeshStandardMaterial;
+        rows.add(
+          [m.type, m.color.getHexString(), pbr ? m.roughness : '-', pbr ? m.metalness : '-'].join(
+            '|',
+          ),
+        );
+      });
+      got.push(hash([...rows].sort().join('\n')));
+    }
+    // Taken before the flush cars' second round: the free-standing cars' materials must not move.
+    expect(got).toEqual(['c3b889df', 'c3b889df']);
+  });
 });
 
 describe('flush lift cars (Hot Desking)', () => {
@@ -96,7 +128,21 @@ describe('flush lift cars (Hot Desking)', () => {
         expect(flushDoorway(level.map, cabin) !== null).toBe(flush);
   });
 
-  it('builds nothing over the wall top and nothing in front of the wall line', () => {
+  it('opens doors a head taller than a developer, under a portal of capped height', () => {
+    expect(FLUSH_DOOR_H).toBeGreaterThanOrEqual(1.25 * DEVELOPER_TOP);
+    expect(FLUSH_TOP).toBeGreaterThan(FLUSH_DOOR_H + 0.3);
+    // Big enough to read from the couch: a 0.8 panel, digits 0.16 high or more.
+    expect(INDICATOR_W).toBeGreaterThanOrEqual(0.8);
+    expect(DIGIT_H).toBeGreaterThanOrEqual(0.16);
+  });
+
+  it('keeps shut doors brushed steel, never a black hole', () => {
+    const c = new THREE.Color(FLUSH_LEAF_AWAY);
+    const l = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+    expect(l).toBeGreaterThan(0.08);
+  });
+
+  it('builds nothing over the portal top and nothing in front of the wall line', () => {
     const root = new THREE.Group();
     const cars = new LiftCars(root, HOT_DESKING.map);
     const state = createGame(HOT_DESKING, 7, [1, 2]);
@@ -107,8 +153,9 @@ describe('flush lift cars (Hot Desking)', () => {
       root.traverse((o) => {
         if (o instanceof THREE.Mesh && o.visible) box.union(new THREE.Box3().setFromObject(o));
       });
-      // The indicator light strip on the header top may lie flush on it.
-      expect(box.max.y).toBeLessThanOrEqual(WALL_HEIGHT + 0.013);
+      // The core rises over the partitions to the portal top, and no higher.
+      expect(box.max.y).toBeGreaterThan(WALL_HEIGHT);
+      expect(box.max.y).toBeLessThanOrEqual(FLUSH_TOP + 0.001);
       // Each cabin's doors are at its front edge: nothing past it toward the room.
       const fronts = (createLifts(HOT_DESKING.map)[0]?.stops ?? []).map(
         (c) => Math.max(...c.map((t) => t.y)) + 0.5,
@@ -135,7 +182,7 @@ describe('flush lift cars (Hot Desking)', () => {
         lit.add(o.material.color.getHex());
     });
     // Amber digit for the floor, green arrow for the way.
-    expect(lit.has(0xffb347)).toBe(true);
+    expect(lit.has(DIGIT_ON)).toBe(true);
     expect(lit.has(0x5be37a)).toBe(true);
   });
 });

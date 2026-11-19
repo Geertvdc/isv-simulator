@@ -6,6 +6,7 @@ import { wallPiece } from '../../mapShape';
 import {
   COFFEE_RINGS,
   FLOOR_WEAR,
+  LOW_WALL_CLUSTERS,
   UPPER_CAP_CLUSTERS,
   type Zone,
   upperFloorsRoom,
@@ -36,9 +37,11 @@ describe('Hot Desking room plan', () => {
     for (const [k, zone] of Object.entries(plan.zones)) {
       const w = plan.floorWear[k];
       if (zone === 'lab') expect([FLOOR_WEAR.vinyl, FLOOR_WEAR.vinylScuff]).toContain(w);
-      else if (zone === 'meeting')
-        expect([FLOOR_WEAR.meeting, FLOOR_WEAR.meetingWorn]).toContain(w);
-      else expect(w).toBeLessThan(FLOOR_WEAR.vinyl);
+      else if (zone === 'meeting') {
+        const plain = [FLOOR_WEAR.meeting, FLOOR_WEAR.meetingWorn, FLOOR_WEAR.meetingBare];
+        const edge = (w ?? 0) >= FLOOR_WEAR.meetingEdge && (w ?? 0) < FLOOR_WEAR.meetingEdge + 16;
+        expect(plain.includes(w as never) || edge).toBe(true);
+      } else expect(w).toBeLessThan(FLOOR_WEAR.vinyl);
     }
   });
 
@@ -123,13 +126,52 @@ describe('Hot Desking room plan', () => {
     }
     expect(plan.tops.filter((t) => t.kind === 'lockersOpen')).toHaveLength(1);
     expect(plan.segfault?.kind).toBe('lockersOpen');
-    // The cat sleeps at the frame's edge, on a full wall.
-    expect(plan.segfault && wallPiece(map, plan.segfault.x, plan.segfault.y)).not.toBe(
-      'wall-front',
-    );
+    // The cat sleeps on the hot-desk floor's low back wall, facing the camera, between the
+    // front desk and the lift.
+    const cat = plan.segfault;
+    if (!cat) throw new Error('no Segfault');
+    expect(wallPiece(map, cat.x, cat.y)).toBe('wall-front');
+    expect(plan.zones[key(cat.x, cat.y + 1)]).toBe('hotDesk');
+    expect(Math.abs(cat.yaw)).toBeLessThan(0.15);
+    const lift = plan.lifts.find((l) => l.zone === 'hotDesk')?.tiles.map((t) => t.x) ?? [];
+    expect(cat.x).toBeGreaterThan(plan.frontDesk?.mid.x ?? 0);
+    expect(cat.x).toBeLessThan(Math.min(...lift));
+    // Every locker bank shows its doors to the camera.
+    for (const t of plan.tops)
+      if (t.kind.startsWith('lockers')) expect(Math.abs(t.yaw)).toBeLessThan(0.15);
   });
 
-  it('keeps the front-wall props on the low front wall, clear of the doors', () => {
+  it('piles the low walls in clusters: up to three per wall, front and back', () => {
+    const lines = new Map<number, number[]>();
+    for (const f of plan.fronts) lines.set(f.y, [...(lines.get(f.y) ?? []), f.x]);
+    expect(lines.size).toBe(2);
+    for (const xs of lines.values()) {
+      const runs = [...xs]
+        .sort((a, b) => a - b)
+        .filter((x, i, all) => i === 0 || x - (all[i - 1] ?? 0) > 1).length;
+      expect(runs).toBeGreaterThanOrEqual(2);
+      expect(runs).toBeLessThanOrEqual(LOW_WALL_CLUSTERS);
+      // Clusters, not singles: more props than runs.
+      expect(xs.length).toBeGreaterThan(runs);
+    }
+    // Nothing on a tile something else uses.
+    const used = new Set([
+      ...plan.tops.map((t) => key(t.x, t.y)),
+      ...plan.wallArt.map((a) => key(a.x, a.y)),
+      ...plan.core.map((p) => key(p.x, p.y)),
+    ]);
+    for (const f of plan.fronts) expect(used.has(key(f.x, f.y))).toBe(false);
+  });
+
+  it('scuffs the lab vinyl in front of its stations and borders the meeting carpet', () => {
+    expect(Object.values(plan.floorWear)).toContain(FLOOR_WEAR.vinylScuff);
+    const edges = Object.values(plan.floorWear).filter(
+      (w) => w >= FLOOR_WEAR.meetingEdge && w < FLOOR_WEAR.meetingEdge + 16,
+    );
+    expect(edges.length).toBeGreaterThan(4);
+  });
+
+  it('keeps the low-wall props on low walls, clear of the doors', () => {
     expect(plan.fronts.length).toBeGreaterThan(0);
     for (const f of plan.fronts) {
       expect(wallPiece(map, f.x, f.y)).toBe('wall-front');
