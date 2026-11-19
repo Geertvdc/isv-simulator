@@ -10,7 +10,8 @@ import type { BlockTile } from '../sim/level';
  * block basement under the loft building (On Call), `midRise` a rented floor
  * of a mid-rise office building: plasterboard and glass partitions (Middle
  * Management), `lowerFloors` the same building's ground and first floor
- * mid-move-in, with a lift, a stairwell and a loading bay (Hypergrowth). A theme's room dressing, if it has one, is
+ * mid-move-in, with a lift, a stairwell and a loading bay (Hypergrowth), `upperFloors` three
+ * floors of it shown as a cutaway round one lift, full of lockers (Hot Desking). A theme's room dressing, if it has one, is
  * in `src/render/three/rooms/`.
  */
 export const WALL_THEMES = [
@@ -25,6 +26,7 @@ export const WALL_THEMES = [
   'basement',
   'midRise',
   'lowerFloors',
+  'upperFloors',
 ] as const;
 export type WallTheme = (typeof WALL_THEMES)[number];
 
@@ -35,7 +37,8 @@ export type WallTheme = (typeof WALL_THEMES)[number];
  * painted black-grey stage decks, `raisedFloor` a server room's grey
  * anti-static raised-floor tiles, `corporateCarpet` a rented office floor's
  * new two-tone carpet tiles, `mixedFloors` a rubber ground floor, carpet
- * upstairs and concrete stair treads between them.
+ * upstairs and concrete stair treads between them, `threeFloors` worn carpet on
+ * the hot-desk floor, vinyl in the test lab and carpet in the meeting room.
  */
 export const FLOOR_THEMES = [
   'concrete',
@@ -49,6 +52,7 @@ export const FLOOR_THEMES = [
   'raisedFloor',
   'corporateCarpet',
   'mixedFloors',
+  'threeFloors',
 ] as const;
 export type FloorTheme = (typeof FLOOR_THEMES)[number];
 
@@ -83,7 +87,8 @@ export const LEVEL_LOOKS: Readonly<Record<string, MapLook>> = {
   // Scale-Up: glass walls go in.
   // Hypergrowth: two floors of the same building on a rainy day, more hires than desks.
   hypergrowth: { walls: 'lowerFloors', floor: 'mixedFloors', scene: 'hypergrowth' },
-  'hot-desking': { walls: 'plaster', floor: 'carpet' },
+  // Hot Desking: three floors of the same building as a cutaway round one lift, Friday afternoon.
+  'hot-desking': { walls: 'upperFloors', floor: 'threeFloors', scene: 'hot-desking' },
   // Enterprise: carpet and glass as far as the eye can see.
   'back-to-back': { walls: 'glass', floor: 'carpet' },
   synergy: { walls: 'plaster', floor: 'concrete' },
