@@ -50,12 +50,10 @@ function bar(b: ModelBuilder, a: V3, c: V3, t: number, color: number): void {
 // ---- Colors ----
 
 /** Cut concrete: the dark fill of a cut slab and the pale hatching across it. */
-export const CUT = 0x7a7e84;
-const HATCH = 0xa8adb2;
+export const CUT = 0x6c7076;
+const HATCH = 0xc4c8cc;
 /** Uncut concrete (slab soffits, the shaft, the motor room). */
 const CONCRETE = 0x8c8a84;
-const SHAFT = 0x9a9ea2;
-const RAIL = 0xc4cad0;
 const ROPE = 0xb4bac0;
 const HAZARD = 0xd2a832;
 /** The services in the ceiling void: galvanised duct, the yellow cable tray, the red sprinkler main. */
@@ -73,7 +71,6 @@ const TOWER_GLASS = 0x5a8aac;
 const TOWER_EDGE = 0xd8dcd8;
 const BANNER_RED = 0xc23a30;
 const PICKER = 0xe0a030;
-const LEAF = 0x5f8a4a;
 
 // ---- Lettering ----
 
@@ -349,52 +346,128 @@ export function cutGlass(len: number, h: number): SetPiece {
 
 // ---- The lift shaft ----
 
+/** The shaft's walls in shadow: lighter at the back (the top), darker toward the front (deeper down). */
+const SHAFT_BACK = 0x3c4046;
+const SHAFT_FRONT = 0x2a2d31;
+/** The car roof: galvanised steel with a yellow-black hazard edge. */
+const CAR_STEEL = 0x8a9096;
+const HAZARD_Y = 0xd8b02a;
+const HAZARD_K = 0x2a2a2a;
+
+/** Mixes two colors, `t` of the way from `a` to `b`. */
+function mix(a: number, b: number, t: number): number {
+  const ch = (c: number, s: number) => (c >> s) & 0xff;
+  const m = (s: number) => Math.round(ch(a, s) + (ch(b, s) - ch(a, s)) * t) << s;
+  return m(16) | m(8) | m(0);
+}
+
 /**
  * The lift shaft between the upper floors, seen from above as the cutaway
  * cuts it: `w` wide (centred on x = 0) and `len` long back from its front at
- * z = 0. Its dark concrete back wall as the floor, with formwork lines; the
- * two steel guide rails on their brackets and the hoist ropes running its
- * length; the counterweight on its own rails at `cw` back; at each landing
- * in `sills` (back from the front) a steel sill across it with a yellow
- * toe-guard edge. The cars come and go at the landings.
+ * z = 0. Its concrete back wall as the floor, dark and darker toward the
+ * front, so it reads as a drop; the two guide rails held by brackets every
+ * 0.6; the roof of the car (which is somewhere between floors) right across
+ * it at `roofAt` back from the front: galvanised steel with a hazard edge, the
+ * escape hatch, the crosshead and the sheave the hoist ropes come down to from
+ * the motor room at the back. At each landing in `sills` (back from the
+ * front) a steel sill across it with a yellow toe guard.
  */
-export function liftShaft(w: number, len: number, cw: number, sills: readonly number[]): SetPiece {
+export function liftShaft(
+  w: number,
+  len: number,
+  roofAt: number,
+  sills: readonly number[],
+): SetPiece {
   return once(
-    `liftShaft:${w}:${len.toFixed(2)}:${cw.toFixed(2)}:${sills.map((s) => s.toFixed(2)).join(',')}`,
+    `liftShaft:${w}:${len.toFixed(2)}:${roofAt.toFixed(2)}:${sills.map((s) => s.toFixed(2)).join(',')}`,
     () =>
       looks([w, len], 1, (b) => {
-        flat(b, w, 0.06, len, SHAFT, [0, 0.03, -len / 2]);
-        const line = tint(SHAFT, -0.2);
-        for (let z = -0.6; z > -len; z -= 0.6) flat(b, w, 0.004, 0.012, line, [0, 0.062, z]);
-        for (const x of [-w / 4, w / 4]) flat(b, 0.012, 0.004, len, line, [x, 0.062, -len / 2]);
-        for (let z = -0.3; z > -len; z -= 0.6)
-          for (const x of [-w * 0.38, -w * 0.12, w * 0.12, w * 0.38])
-            b.cylinder(0.02, 0.02, 0.006, tint(SHAFT, -0.3), { at: [x, 0.063, z] }, 6);
-        // The walls of the shaft where no room stands beside it: low concrete, hatched on top.
-        // The car rails: T-section steel on brackets, the length of the shaft.
-        const r = w * 0.36;
-        for (const s of [-1, 1]) {
-          flat(b, 0.07, 0.07, len, RAIL, [s * r, 0.2, -len / 2]);
-          flat(b, 0.025, 0.06, len, tint(RAIL, 0.25), [s * (r - 0.04), 0.26, -len / 2]);
-          for (let z = -0.25; z > -len; z -= 0.7)
-            flat(b, 0.16, 0.16, 0.05, 0x2e3034, [s * (r + 0.03), 0.12, z]);
+        // The wall in bands, darkening toward the front, a formwork joint between each.
+        const bands = Math.max(4, Math.round(len / 0.6));
+        const bl = len / bands;
+        for (let k = 0; k < bands; k++) {
+          const c = mix(SHAFT_BACK, SHAFT_FRONT, (k + 0.5) / bands);
+          flat(b, w, 0.06, bl - 0.012, c, [0, 0.03, -len + (k + 0.5) * bl]);
         }
-        // The counterweight's rails, its weights in a frame.
-        const cx = w * 0.18;
-        for (const s of [-1, 1]) flat(b, 0.04, 0.04, len, RAIL, [cx + s * 0.2, 0.15, -len / 2]);
-        flat(b, 0.46, 0.22, 0.9, 0x34373c, [cx, 0.2, -cw]);
-        for (let k = 0; k < 7; k++)
-          flat(b, 0.4, 0.04, 0.1, nth([0x6a6e72, 0x5a5e62], k), [cx, 0.32, -cw - 0.36 + k * 0.12]);
-        // The hoist ropes, down the middle.
-        for (const dx of [-0.12, -0.06, 0, 0.06])
-          bar(b, [dx - 0.1, 0.42, -len + 0.02], [dx - 0.1, 0.38, -0.02], 0.016, ROPE);
-        for (const dx of [-0.03, 0.03])
-          bar(b, [cx + dx, 0.42, -len + 0.02], [cx + dx, 0.34, -cw - 0.4], 0.014, ROPE);
+        // The guide rails: thin steel, and a bracket every 0.6 that reads as bolted on.
+        const r = w * 0.4;
+        for (const s of [-1, 1]) {
+          flat(b, 0.035, 0.05, len, 0x6a7076, [s * r, 0.1, -len / 2]);
+          for (let z = -0.3; z > -len; z -= 0.6) {
+            flat(b, 0.14, 0.05, 0.07, 0x9aa0a6, [s * (r + 0.02), 0.1, z]);
+            b.cylinder(0.014, 0.014, 0.01, 0xc8ccd0, { at: [s * (r + 0.06), 0.13, z] }, 6);
+          }
+        }
+        // The car roof, right across the shaft.
+        const rd = Math.min(1.3, len * 0.3);
+        const rz = -roofAt;
+        const rw = w - 0.12;
+        const top = 0.34;
+        flat(b, rw, top, rd, CAR_STEEL, [0, top / 2, rz]);
+        for (let x = -rw / 2 + 0.25; x < rw / 2 - 0.1; x += 0.35)
+          flat(b, 0.012, 0.004, rd - 0.1, tint(CAR_STEEL, -0.15), [x, top + 0.002, rz]);
+        // The hazard edge round it: yellow and black blocks.
+        const blocks = (along: 'x' | 'z', n: number, l: number, at: (u: number) => V3) => {
+          for (let k = 0; k < n; k++) {
+            const c = k % 2 ? HAZARD_K : HAZARD_Y;
+            const u = -l / 2 + (k + 0.5) * (l / n);
+            if (along === 'x') flat(b, l / n, 0.03, 0.07, c, at(u));
+            else flat(b, 0.07, 0.03, l / n, c, at(u));
+          }
+        };
+        const nx = Math.max(4, Math.round(rw / 0.14));
+        const nz = Math.max(4, Math.round(rd / 0.14));
+        blocks('x', nx, rw, (u) => [u, top + 0.015, rz + rd / 2 - 0.035]);
+        blocks('x', nx, rw, (u) => [u, top + 0.015, rz - rd / 2 + 0.035]);
+        blocks('z', nz, rd, (u) => [-rw / 2 + 0.035, top + 0.015, rz + u]);
+        blocks('z', nz, rd, (u) => [rw / 2 - 0.035, top + 0.015, rz + u]);
+        // The escape hatch, with its hinge and handle.
+        const hx = -rw * 0.25;
+        flat(b, 0.34, 0.03, 0.34, tint(CAR_STEEL, -0.1), [hx, top + 0.015, rz + rd * 0.15]);
+        flat(b, 0.3, 0.008, 0.3, tint(CAR_STEEL, 0.12), [hx, top + 0.034, rz + rd * 0.15]);
+        flat(b, 0.32, 0.02, 0.03, 0x4a4e54, [hx, top + 0.04, rz + rd * 0.15 - 0.16]);
+        flat(b, 0.08, 0.02, 0.02, HAZARD_K, [hx, top + 0.045, rz + rd * 0.15 + 0.12]);
+        // The crosshead beam and the sheave on it.
+        flat(b, rw, 0.08, 0.1, 0x5a5e64, [0, top + 0.04, rz - rd * 0.2]);
+        const sx = rw * 0.18;
+        b.cylinder(
+          0.15,
+          0.15,
+          0.06,
+          0x3a3e44,
+          {
+            at: [sx, top + 0.2, rz - rd * 0.2],
+            rot: [0, 0, Math.PI / 2],
+          },
+          18,
+        );
+        b.cylinder(
+          0.05,
+          0.05,
+          0.08,
+          0xc8ccd0,
+          {
+            at: [sx, top + 0.2, rz - rd * 0.2],
+            rot: [0, 0, Math.PI / 2],
+          },
+          10,
+        );
+        for (const s of [-1, 1])
+          flat(b, 0.03, 0.2, 0.06, 0x5a5e64, [sx + s * 0.06, top + 0.1, rz - rd * 0.2]);
+        // The hoist ropes, from the motor room at the back down to the sheave.
+        for (const dz of [-0.04, 0, 0.04])
+          bar(
+            b,
+            [sx + dz, 0.42, -len + 0.02],
+            [sx + dz, top + 0.34, rz - rd * 0.2 - 0.1],
+            0.016,
+            ROPE,
+          );
         // A sill at each landing: steel across, a yellow-black toe guard.
         for (const z of sills) {
           flat(b, w - 0.04, 0.08, 0.1, 0x8a9096, [0, 0.1, -z]);
           for (let x = -w / 2 + 0.1; x < w / 2 - 0.05; x += 0.2)
-            flat(b, 0.1, 0.004, 0.06, HAZARD, [x, 0.142, -z + 0.06], [0, 0.6, 0]);
+            flat(b, 0.1, 0.004, 0.06, HAZARD_Y, [x, 0.142, -z + 0.06], [0, 0.6, 0]);
         }
       }),
   );
@@ -644,10 +717,18 @@ export const commuter = looks([0.3, 0.3], 4, (b, v) => {
   bar(b, [0.1, 0.38, 0], [-0.05, 0.46, 0], 0.014, INK);
 });
 
+/** Prod's pot (as in 3-2) and his leaves. */
+const PROD_POT = 0x5a6e80;
+const PROD_LEAF = 0x4f8a4a;
+/** The reserved card: white, a red band. */
+const CARD = 0xf3f1ea;
+const CARD_RED = 0xc23a3a;
+
 /**
- * The only desk nobody can book: a small desk with a "RESERVED" tent card on
- * it and Prod, in his little pot, sitting at it. About 0.9 × 0.5, 0.95 high
- * with Prod's leaves. Faces +z.
+ * The only desk nobody can book: a small desk, Prod in his own pot sitting at
+ * it, and standing up in front of him, tilted back toward the camera, a card:
+ * RESERVED in white on a red band, PROD big under it. About 0.9 × 0.5,
+ * Prod's leaves 1.1 high. Faces +z.
  */
 export const reservedDesk = looks([0.9, 0.5], 1, (b) => {
   const top = 0.42;
@@ -655,33 +736,62 @@ export const reservedDesk = looks([0.9, 0.5], 1, (b) => {
   for (const x of [-0.4, 0.4])
     for (const z of [-0.2, 0.2]) flat(b, 0.03, top, 0.03, 0x4a4e54, [x, top / 2, z]);
   flat(b, 0.8, 0.12, 0.02, 0x4a4e54, [0, top - 0.1, -0.22]);
-  // The tent card: white, RESERVED in red on the side toward us.
-  b.box(0.28, 0.1, 0.004, 0xf4f2ec, { at: [0.18, top + 0.06, 0.07], rot: [-0.35, 0, 0] }, 0);
-  b.box(0.28, 0.1, 0.004, 0xf4f2ec, { at: [0.18, top + 0.06, 0.03], rot: [0.35, 0, 0] }, 0);
-  glyphs('RESERVED', (u, r, w) => {
-    flat(
-      b,
-      w * 0.008,
-      0.008,
-      0.004,
-      BANNER_RED,
-      [0.18 + u * 0.008, top + 0.1 - r * 0.009, 0.09 + r * 0.003],
-      [-0.35, 0, 0],
-    );
-  });
-  flat(b, 0.24, 0.012, 0.004, 0x3a3e44, [0.18, top + 0.035, 0.1], [-0.35, 0, 0]);
-  // Prod in his pot.
-  b.cylinder(0.1, 0.075, 0.14, 0x86a296, { at: [-0.18, top + 0.09, -0.02] }, 14);
-  b.cylinder(0.09, 0.09, 0.01, 0x3e3428, { at: [-0.18, top + 0.16, -0.02] }, 12);
-  for (const [x, y, z, r, c] of [
-    [0, 0.3, 0, 0.11, LEAF],
-    [0.08, 0.25, 0.05, 0.08, 0x6c9652],
-    [-0.07, 0.26, -0.03, 0.08, 0x527e3e],
-    [0.02, 0.38, -0.02, 0.07, 0x6c9652],
+  // Prod in his pot, at the back left of the desk.
+  const px = -0.2;
+  const pz = -0.08;
+  const pot = 0.35;
+  b.cylinder(0.14, 0.1, pot, PROD_POT, { at: [px, top + pot / 2, pz] }, 16);
+  b.cylinder(0.15, 0.15, 0.03, 0xd8d4c8, { at: [px, top + pot, pz] }, 16);
+  b.cylinder(0.13, 0.13, 0.01, 0x3e3428, { at: [px, top + pot + 0.016, pz] }, 14);
+  for (const [x, z, r] of [
+    [0.02, 0, 0.1],
+    [-0.04, 0.03, -0.18],
+    [0.03, -0.03, 0.06],
   ] as const)
-    b.sphere(r, c, { at: [-0.18 + x, top + y, -0.02 + z] }, [1, 0.85, 1]);
+    b.cylinder(
+      0.012,
+      0.016,
+      0.3,
+      0x8a8478,
+      {
+        at: [px + x, top + pot + 0.15, pz + z],
+        rot: [r, 0, r * 1.5],
+      },
+      6,
+    );
+  for (const [x, y, z, r, c] of [
+    [0, 0.36, 0, 0.17, PROD_LEAF],
+    [0.12, 0.28, 0.06, 0.12, tint(PROD_LEAF, 0.12)],
+    [-0.11, 0.3, -0.03, 0.12, tint(PROD_LEAF, -0.1)],
+    [0.03, 0.47, -0.03, 0.11, tint(PROD_LEAF, 0.12)],
+  ] as const)
+    b.sphere(r, c, { at: [px + x, top + pot + y, pz + z] }, [1, 0.85, 1]);
+  // The card, on a little foot, tilted back to face the camera.
+  const cw = 0.44;
+  const ch = 0.27;
+  const tilt = 0.75;
+  const cx = 0.17;
+  const cz = 0.12;
+  const at = (u: number, v: number, off: number): V3 => [
+    cx + u,
+    top + 0.02 + v * Math.cos(tilt) + off * Math.sin(tilt),
+    cz - v * Math.sin(tilt) + off * Math.cos(tilt),
+  ];
+  const rot: V3 = [-tilt, 0, 0];
+  flat(b, 0.2, 0.02, 0.12, 0x4a4e54, [cx, top + 0.02, cz - 0.04]);
+  flat(b, cw, ch, 0.008, CARD, at(0, ch / 2, 0), rot);
+  const band = 0.095;
+  flat(b, cw, band, 0.004, CARD_RED, at(0, ch - band / 2, 0.006), rot);
+  const sp = (cw - 0.04) / textWidth('RESERVED');
+  glyphs('RESERVED', (u, r, w) => {
+    flat(b, w * sp, sp, 0.003, CARD, at(u * sp, ch - band / 2 + (2 - r) * sp, 0.009), rot);
+  });
+  const pp = Math.min((cw - 0.08) / textWidth('PROD'), (ch - band - 0.04) / 5);
+  glyphs('PROD', (u, r, w) => {
+    flat(b, w * pp, pp, 0.003, 0x2a2d31, at(u * pp, (ch - band) / 2 + (2 - r) * pp, 0.006), rot);
+  });
   // A mug nobody's allowed to move.
-  b.cylinder(0.03, 0.03, 0.07, 0xe8e4dc, { at: [0.36, top + 0.05, -0.12] }, 8);
+  b.cylinder(0.03, 0.03, 0.07, 0xe8e4dc, { at: [0.36, top + 0.05, -0.14] }, 8);
 });
 
 /** A steel bollard with a reflective band, 0.5 high. */
@@ -690,7 +800,7 @@ export const streetBollard = looks([0.2, 0.2], 1, (b) => {
   b.cylinder(0.065, 0.065, 0.04, 0xd8d6d0, { at: [0, 0.42, 0] }, 10);
 });
 
-/** A low concrete planter along x, `len` long, with spring bulbs and a clipped box hedge. */
+/** A low concrete planter along x, `len` long, with a clipped box hedge in it: green only. */
 export function lowPlanter(len: number): SetPiece {
   return once(`lowPlanter:${len.toFixed(2)}`, () =>
     looks([len, 0.4], 1, (b) => {
@@ -699,13 +809,10 @@ export function lowPlanter(len: number): SetPiece {
       for (let x = -len / 2 + 0.15; x < len / 2 - 0.1; x += 0.22) {
         b.sphere(
           0.1,
-          tint(0x4e7a44, (hash01(x * 10, 1, 3) - 0.5) * 0.15),
-          { at: [x, 0.36, -0.05] },
+          tint(0x5b7d4f, (hash01(x * 10, 1, 3) - 0.5) * 0.12),
+          { at: [x, 0.36, 0] },
           [1, 0.8, 1],
         );
-        b.sphere(0.035, nth([0xe8d070, 0xe8e4dc, 0xd88a9a], Math.round(x * 10)), {
-          at: [x + 0.08, 0.38, 0.09],
-        });
       }
     }),
   );
@@ -741,6 +848,160 @@ export function terraceTop(w: number, d: number): SetPiece {
             [(x + xb) / 2, FLOOR - 0.005, (z + zb) / 2],
           );
         }
+    }),
+  );
+}
+
+// ---- Floor numbers on the cut faces ----
+
+/** The patch the floor numbers are painted on, and their paint. */
+const NUMBER_PATCH = 0xb8b2a6;
+const NUMBER_PAINT = 0xece8df;
+
+/**
+ * A floor number stencilled on a cut slab's face, the way contractors mark
+ * the levels: `text` near-white on a pale concrete patch, a dark shadow under
+ * each stroke so it reads in the sun, `h` high (letters about 0.35). Faces
+ * +z; origin at the bottom middle, on the face.
+ */
+export function slabNumber(text: string, h: number): SetPiece {
+  return once(`slabNumber:${text}:${h.toFixed(3)}`, () =>
+    looks([textWidth(text) * 0.07, 0.04], 1, (b) => {
+      const px = Math.min(0.07, (h - 0.1) / 5);
+      flat(b, (textWidth(text) + 2.4) * px, h - 0.05, 0.008, NUMBER_PATCH, [0, h / 2, 0.004]);
+      const off = px * 0.3;
+      glyphs(text, (u, r, w) => {
+        flat(b, w * px, px, 0.004, 0x3e4248, [u * px + off, h / 2 + (2 - r) * px - off, 0.01]);
+        flat(b, w * px, px, 0.004, NUMBER_PAINT, [u * px, h / 2 + (2 - r) * px, 0.014]);
+      });
+    }),
+  );
+}
+
+// ---- Down below: the building's own facade and the neighbours' roofs ----
+
+/** The building's curtain wall, a storey after storey down. */
+const MULLION = 0x6f7780;
+const FACADE_GLASS = 0x8fa3b4;
+const SPANDREL = 0xe4e6e2;
+const FOG = 0x9ea8b2;
+/** The neighbours' roofs: gravel, parapets, plant. */
+const GRAVEL = 0x8b8781;
+const PARAPET = 0xa8a49c;
+const NEIGHBOUR_WALLS = [0xa49c90, 0x9a9690, 0xb0a696, 0x8e9298] as const;
+
+/**
+ * The building's own facade under the upper floors, dropping `drop` down to
+ * the street: `len` along +x from 0, its top at the origin and its foot
+ * `out` toward +z (the facade, leaned a little toward the camera so it shows
+ * past the floors' glass): glass in slate mullions, a spandrel at each
+ * storey, fading into the haze further down. Build it facing out.
+ */
+export function facadeDrop(len: number, out: number, drop: number): SetPiece {
+  return once(`facadeDrop:${len.toFixed(2)}:${out.toFixed(2)}:${drop.toFixed(2)}`, () =>
+    looks([len, out], 1, (b) => {
+      const slope = Math.atan2(out, drop);
+      const run = Math.hypot(out, drop);
+      const storey = 0.5;
+      const floors = Math.ceil(drop / storey);
+      const at = (x: number, d: number, off = 0): V3 => [
+        x,
+        -d + off * Math.sin(slope),
+        (d / drop) * out + off * Math.cos(slope),
+      ];
+      const rot: V3 = [-slope, 0, 0];
+      // Glass and spandrel, storey by storey, greying into the haze.
+      for (let k = 0; k < floors; k++) {
+        const d0 = k * storey;
+        const d1 = Math.min(drop, d0 + storey);
+        const fade = (k + 0.5) / floors;
+        const hl = ((d1 - d0) * run) / drop;
+        flat(
+          b,
+          len,
+          hl - 0.07,
+          0.02,
+          mix(FACADE_GLASS, FOG, fade * 0.25),
+          at(len / 2, (d0 + d1) / 2 + 0.03),
+          rot,
+        );
+        // The spandrel at each floor: a pale concrete band, so the storeys count down.
+        flat(b, len, 0.14, 0.03, SPANDREL, at(len / 2, d0 + 0.07, 0.01), rot);
+      }
+      // The mullions, all the way down.
+      for (let x = 0.02; x < len; x += 0.36)
+        flat(b, 0.035, run, 0.03, MULLION, at(x, drop / 2, 0.012), rot);
+      // A reflection across the upper panes.
+      flat(b, 0.12, run * 0.4, 0.004, 0xc8d6e0, at(len * 0.3, drop * 0.25, 0.02), [-slope, 0, 0.5]);
+    }),
+  );
+}
+
+/**
+ * A neighbouring building, seen from storeys above: `w` wide (centred on
+ * x), `d` deep back from its front at z = 0 and `h` high. Plain walls with
+ * rows of windows on the front and sides, a pale parapet, a gravel roof and
+ * on it, at about 0.7 the size of the play area's things, air-conditioning
+ * units with their fans, skylights, a roof hatch and vent pipes. `look`
+ * picks the walls and what's on the roof.
+ */
+export function neighbourRoof(w: number, d: number, h: number, look: number): SetPiece {
+  return once(`neighbour:${w.toFixed(2)}:${d.toFixed(2)}:${h.toFixed(2)}:${look}`, () =>
+    looks([w, d], 1, (b) => {
+      const wall = nth(NEIGHBOUR_WALLS, look);
+      flat(b, w, h, d, wall, [0, h / 2, -d / 2]);
+      // Window rows on the front and the sides.
+      const win = tint(0x4a5866, (hash01(look, 1, 3) - 0.5) * 0.2);
+      for (let y = h - 0.32; y > 0.15; y -= 0.5) {
+        for (let x = -w / 2 + 0.22; x < w / 2 - 0.15; x += 0.34)
+          flat(b, 0.2, 0.2, 0.01, win, [x, y, 0.005]);
+        for (const s of [-1, 1])
+          for (let z = -0.22; z > -d + 0.15; z -= 0.34)
+            flat(b, 0.01, 0.2, 0.2, win, [s * (w / 2 + 0.005), y, z]);
+      }
+      // The parapet, its coping, the gravel roof.
+      const p = 0.05;
+      const ph = 0.09;
+      for (const z of [-p / 2, -d + p / 2]) flat(b, w, ph, p, PARAPET, [0, h + ph / 2, z]);
+      for (const s of [-1, 1])
+        flat(b, p, ph, d, PARAPET, [s * (w / 2 - p / 2), h + ph / 2, -d / 2]);
+      flat(b, w - 2 * p, 0.01, d - 2 * p, GRAVEL, [0, h + 0.005, -d / 2]);
+      for (let k = 0; k < Math.floor(w * d * 3); k++)
+        flat(b, 0.12, 0.004, 0.08, tint(GRAVEL, (hash01(k, look, 5) - 0.5) * 0.18), [
+          -w / 2 + p + hash01(k, look, 7) * (w - 2 * p - 0.12) + 0.06,
+          h + 0.012,
+          -p - hash01(k, look, 9) * (d - 2 * p - 0.08) - 0.04,
+        ]);
+      // Plant on the roof: AC units with their fans.
+      const units = 1 + (look % 3);
+      for (let k = 0; k < units; k++) {
+        const ux = -w / 2 + ((k + 0.5) * w) / units + (hash01(k, look, 11) - 0.5) * 0.2;
+        const uz = -d * (0.3 + hash01(k, look, 13) * 0.35);
+        b.box(0.32, 0.16, 0.24, 0xc4c6c4, { at: [ux, h + 0.08, uz] }, 0.015);
+        b.cylinder(0.08, 0.08, 0.012, 0x3a3d42, { at: [ux - 0.06, h + 0.165, uz] }, 12);
+        flat(b, 0.02, 0.004, 0.14, 0x8a9096, [ux - 0.06, h + 0.172, uz]);
+      }
+      // Skylights: framed glass, a pale sheen.
+      const lights = look % 2 ? 2 : 1;
+      for (let k = 0; k < lights; k++) {
+        const sx = (k - (lights - 1) / 2) * 0.6 + (hash01(look, k, 17) - 0.5) * 0.3;
+        const sz = -d * 0.72;
+        flat(b, 0.34, 0.06, 0.26, 0x6e757c, [sx, h + 0.03, sz]);
+        flat(b, 0.3, 0.01, 0.22, 0x8fb4c8, [sx, h + 0.065, sz], [0.18, 0, 0]);
+      }
+      // A roof hatch and two vent pipes.
+      flat(b, 0.2, 0.06, 0.2, 0x7a7e84, [w / 2 - 0.3, h + 0.03, -d + 0.3]);
+      for (const k of [0, 1])
+        b.cylinder(
+          0.025,
+          0.025,
+          0.14,
+          0x9aa0a6,
+          {
+            at: [-w / 2 + 0.25 + k * 0.12, h + 0.07, -0.25 - k * 0.08],
+          },
+          6,
+        );
     }),
   );
 }
