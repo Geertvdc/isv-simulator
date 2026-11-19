@@ -31,24 +31,24 @@ Checked per map, partly by `npm run level-report`.
 
 The sketches below turn these into ASCII maps; the concepts may still change in review.
 
-| #   | Level (id)                              | Size (approx) | Shape and rooms                                                                                                                                     | Gimmick in play                | 1p / 4p notes                            |
-| --- | --------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ---------------------------------------- |
-| 1-1 | The Garage (`garage`)                   | 10×7 small    | One single-car garage, roll-up door is the ship hatch, workbench counters                                                                           | none (tutorial)                | Short solo loop; 4p crowding is the joke |
-| 1-2 | Open Plan Office (`open-plan`)          | 16×9 medium   | First rented office: open room split by a desk-row divider with one gap and a review island; throw over it                                          | rooms, throwing                | Walk-around exists for solo              |
-| 1-3 | Down the Hall (`scale-up`)              | 20×9 large    | Two rooms joined by a long hallway (2 wide, 1-wide doors at both ends); review room at the far end                                                  | hallway bumping                | Spawns 3/4 in far room                   |
-| 2-1 | Seed Round (`seed-round`)               | 15×10 medium  | Coworking loft, L-shaped, desk island in the middle, incidents                                                                                      | none new                       | Two pipelines                            |
-| 2-2 | Demo Day (`demo-day`)                   | 18×10 large   | Coworking floor + stage hall; a spilled-kombucha lane between them; counter wall with a gap                                                         | **Spills intro**               | Dry detour exists                        |
-| 2-3 | On Call (`on-call`)                     | 18×11 large   | Night shift: ring corridor round a server room, freshly mopped (wet) corridor sections; two ways round                                              | Spills + long walks            | Ring gives 4p two directions             |
-| 3-1 | Middle Management (`middle-management`) | 18×11 large   | Biggest single open floor so far, wide aisles, one manager                                                                                          | none new                       | Room for 4                               |
-| 3-2 | Hypergrowth (`hypergrowth`)             | 21×10 large   | Two floors side by side (islands): ground (inbox, ship, pipelines) and first (keyboards, tests), one lift + a long 1-wide stairwell; manager rides  | **Lifts intro**                | Solo waits for the lift or takes stairs  |
-| 3-3 | Hot Desking (`hot-desking`)             | 22×11 large   | Two floors of desk rows, two lifts (express + local), two managers, reviews                                                                         | Lifts + managers               | Second lift relieves 4p queue            |
-| 4-1 | Back to Back (`back-to-back`)           | 21×12 large   | HQ: a corridor with two offices and two glass meeting rooms off it (walls and doors); back-to-back meetings alternate rooms                         | meeting doors, named rooms     | Corridor 2 wide, every door has a twin   |
-| 4-2 | Synergy (`synergy`)                     | 20×10 large   | Boardroom between dev and ops, up a back corridor; its walls fold away on a schedule into one big hall, then close again                            | **Reorg intro** (folding room) | Always one open route                    |
-| 4-3 | The Reorg (`the-reorg`)                 | 22×12 large   | Three floor plans round a fixed boardroom (Silos, Open Plan, Matrix): walls, doors and desks move; a turnstile lobby flips direction; everything on | Reorgs, turnstiles, finale     | Telegraphed 3 s ahead                    |
-| 5-1 | The Atrium (`the-atrium`)               | 20×11 large   | Two buildings across an atrium, a 1-wide skybridge, belt bridges                                                                                    | gaps, belts                    | Skybridge + walk-round for solo          |
-| 5-2 | Design Sprint (`design-sprint`)         | 18×10 medium  | Small cosy design studio (whiteboards) joined by a hallway to a big engineering hall built for pairing                                              | design, pairing                | Studio fits 2                            |
-| 5-3 | Monorepo (`monorepo`)                   | 22×10 large   | FE building and BE building with the merge "integration room" between them, reached by two corridors; belt across                                   | merge, gaps, belts             | Teams split FE/BE                        |
-| 5-4 | Hackathon (`hackathon`)                 | 22×12 large   | Big hall with a belt loop + side rooms; everything at once (optionally one partition shift as a callback)                                           | everything                     | Many routes                              |
+| #   | Level (id)                              | Size (approx) | Shape and rooms                                                                                                                                     | Gimmick in play                | 1p / 4p notes                             |
+| --- | --------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ----------------------------------------- |
+| 1-1 | The Garage (`garage`)                   | 10×7 small    | One single-car garage, roll-up door is the ship hatch, workbench counters                                                                           | none (tutorial)                | Short solo loop; 4p crowding is the joke  |
+| 1-2 | Open Plan Office (`open-plan`)          | 16×9 medium   | First rented office: open room split by a desk-row divider with one gap and a review island; throw over it                                          | rooms, throwing                | Walk-around exists for solo               |
+| 1-3 | Down the Hall (`scale-up`)              | 20×9 large    | Two rooms joined by a long hallway (2 wide, 1-wide doors at both ends); review room at the far end                                                  | hallway bumping                | Spawns 3/4 in far room                    |
+| 2-1 | Seed Round (`seed-round`)               | 15×10 medium  | Coworking loft, L-shaped, desk island in the middle, incidents                                                                                      | none new                       | Two pipelines                             |
+| 2-2 | Demo Day (`demo-day`)                   | 18×10 large   | Coworking floor + stage hall; a spilled-kombucha lane between them; counter wall with a gap                                                         | **Spills intro**               | Dry detour exists                         |
+| 2-3 | On Call (`on-call`)                     | 18×11 large   | Night shift: ring corridor round a server room, freshly mopped (wet) corridor sections; two ways round                                              | Spills + long walks            | Ring gives 4p two directions              |
+| 3-1 | Middle Management (`middle-management`) | 18×11 large   | Biggest single open floor so far, wide aisles, one manager                                                                                          | none new                       | Room for 4                                |
+| 3-2 | Hypergrowth (`hypergrowth`)             | 21×10 large   | Two floors side by side (islands): ground (inbox, ship, pipelines) and first (keyboards, tests), one lift + a long 1-wide stairwell; manager rides  | **Lifts intro**                | Solo waits for the lift or takes stairs   |
+| 3-3 | Hot Desking (`hot-desking`)             | 22×12 large   | Three floors (meeting room, test lab, hot desks), one lift with three stops and no stairs, two managers, reviews                                    | Lifts + managers               | Lift holds 3; test lab stop in the middle |
+| 4-1 | Back to Back (`back-to-back`)           | 21×12 large   | HQ: a corridor with two offices and two glass meeting rooms off it (walls and doors); back-to-back meetings alternate rooms                         | meeting doors, named rooms     | Corridor 2 wide, every door has a twin    |
+| 4-2 | Synergy (`synergy`)                     | 20×10 large   | Boardroom between dev and ops, up a back corridor; its walls fold away on a schedule into one big hall, then close again                            | **Reorg intro** (folding room) | Always one open route                     |
+| 4-3 | The Reorg (`the-reorg`)                 | 22×12 large   | Three floor plans round a fixed boardroom (Silos, Open Plan, Matrix): walls, doors and desks move; a turnstile lobby flips direction; everything on | Reorgs, turnstiles, finale     | Telegraphed 3 s ahead                     |
+| 5-1 | The Atrium (`the-atrium`)               | 20×11 large   | Two buildings across an atrium, a 1-wide skybridge, belt bridges                                                                                    | gaps, belts                    | Skybridge + walk-round for solo           |
+| 5-2 | Design Sprint (`design-sprint`)         | 18×10 medium  | Small cosy design studio (whiteboards) joined by a hallway to a big engineering hall built for pairing                                              | design, pairing                | Studio fits 2                             |
+| 5-3 | Monorepo (`monorepo`)                   | 22×10 large   | FE building and BE building with the merge "integration room" between them, reached by two corridors; belt across                                   | merge, gaps, belts             | Teams split FE/BE                         |
+| 5-4 | Hackathon (`hackathon`)                 | 22×12 large   | Big hall with a belt loop + side rooms; everything at once (optionally one partition shift as a callback)                                           | everything                     | Many routes                               |
 
 ## Gimmick specs
 
@@ -467,51 +467,49 @@ The company outgrows one room: 3-1 is one big corporate floor with a real corner
 
 #### 3-3 Hot Desking (`hot-desking`)
 
-> **Lift cars still to wall in.** This level's lift cabins are open on several sides. When this level is redesigned or gets its environment pass, wall in every car the way 3-2 Hypergrowth was done ([the brief's lift redesign](hypergrowth-environment.md#lift-redesign)) and reuse what was built there rather than starting over: one door side per car, facing the camera where possible (move the cabin, stations, hatches or passages to make room; keep every station reachable and the chute's top hatch first in reading order); the `Hypergrowth lift cars` one-door-side test in `src/sim/lifts.test.ts`; the cars themselves (`src/render/three/liftCars.ts`, any level); the steel shell for the walls round a car (`carShell` in `rooms/lowerFloorsRoom.ts`, `liftFrameModel` in `roomModels/lowerFloors.ts`); then recalibrate with `npm run sim -- --calibrate --level=<id>`.
+> **Lift cars walled in (done).** The redesign below walls in every car the way 3-2 Hypergrowth was done: three 3×1 cars set into the back walls, one door side each, facing the camera; the one-door-side test in `src/sim/lifts.test.ts` (`lift cars on Hypergrowth and Hot Desking`) covers both levels. The render side (cars, steel shell) comes with the level's environment pass.
 
-**Concept:** 22×12 large. Three floors: an express lift that skips a floor and a local lift that stops at every floor. The express breaks down for a stretch, a mail chute runs from the top floor to the ground, and the reviews happen in a meeting room. Two managers. Gimmick: **three floors, express lift, lift breakdown**. 1p / 4p: Local lift and stairs always work; the express takes the team.
+**Concept:** 22×12 large. Three floors and one local lift, no stairs: the stairwell is closed for the hot-desk refit. The lift stops at every floor in turn, meeting room → test lab → hot desks → test lab → meeting room, so the test lab in the middle sees it twice a loop and everyone else has to time it. Two managers, reviews in the meeting room. Gimmick: **three floors, one lift, time it**. 1p / 4p: the lift holds three and stands open at each end every 20 s, in the test lab every 10 s.
 
-- **Map** (drafted here, now shipped): [`maps/level-09-hot-desking.txt`](../../maps/level-09-hot-desking.txt)
+- **Map** (redesigned after gate 2b, shipped): [`maps/level-09-hot-desking.txt`](../../maps/level-09-hot-desking.txt)
 
   ```text
-  ########   ###TT######
-  #.mmmm.#   #ll.......P
-  #.mRRm.#   #ll..4....P
-  #......#   #LL.......#
-  #.####.#   ###H####.##
-  #....ll#          #.#
-  I.1..ll#   ########.##
-  I......H   #L........#
-  B.....L#   #L..KK..3.#
-  B..2..L#####...KK..M.#
-  #..M.................#
-  ##SS#X################
+  ####LLL#   #LLL##TT###
+  #mmmmmm#   #.........B
+  #mRRmmm#   #....M....B
+  #mmmmmm#   #.........#
+  ########   ####CC#####
+
+  #II#####LLL#######PP##
+  #.1................3.#
+  #....KK......KK......#
+  X..2.............4...#
+  #.........M..........#
+  ######CC########SS####
   ```
 
-- **Floors:** ground (left, 1–6,5–10) with the review meeting room behind it (1–6,1–3); first floor (front right, 12–20,7–10); second floor (back right, 12–20,1–3).
-- **Lift pairing:** **express** (`l`, 2×2): ground (5–6,5–6) ↔ second floor (12–13,1–2), skipping the first. **Local** (`L`, holds 2): ground (6,8–9) ↔ first floor (12,7–8) ↔ second floor (12–13,3), one floor per ride.
-- **Mail chute:** the second-floor hatch (14,4, used from 14,3) → the ground hatch (7,7, used from 6,7), past the first floor.
-- **Breakdown:** the express is out of order for 20 s at about 1:00 and again at about 2:15, telegraphed 5 s ahead.
-- **Shipped:** ![3-3 Hot Desking as shipped, in the game](../game/images/levels/hot-desking.webp)
+- **Floors:** meeting room (top left, 1–6,1–3), test lab (top right, 12–20,1–3), hot-desk floor (the ground, front, 1–20,7–10). The floors are islands drawn side by side; the empty row 5 is the gap between the upper floors and the ground.
+- **Lift pairing:** one **local** lift (`L`), three 3×1 cars in the back walls, doors facing the camera, holding three: meeting room (4–6,0) ↔ test lab (12–14,0) ↔ hot desks (8–10,6), one floor per ride. Its floors are the cars in reading order, so it runs up and down meeting room → test lab → hot desks and back. No express, no breakdown, no mail chute.
+- **Shipped (before this redesign):** ![3-3 Hot Desking as shipped, in the game](../game/images/levels/hot-desking.webp)
 - **Sketch:** ![3-3 Hot Desking, current left, draft right](images/level-redesign/hot-desking.svg)
 - **Draft render** (greybox at gate 1, before the mechanics and art were built): ![3-3 Hot Desking draft in the game](images/level-redesign/hot-desking-3d.webp)
-- **Report:** (stand-in: no lifts, so the stairs are the only way up)
+- **Report** (gate-1 draft, before this redesign; stand-in: no lifts, so the stairs are the only way up)
 
   | Level                     | Size  | Floor | Stations                | Solo run | Loop | Chokepoints                           | Reachable |
   | ------------------------- | ----- | ----- | ----------------------- | -------- | ---- | ------------------------------------- | --------- |
   | 3-3 Hot Desking (current) | 14×10 | 76    | I2 B2 K4 T2 R2 P2 S2 X1 | 23       | 34   | none                                  | all       |
   | 3-3 Hot Desking (draft)   | 22×12 | 121   | I2 B2 K4 T2 R2 P2 S2 X1 | 67       | 70   | cut 19,4–19,6 (3); cut 7,10–11,10 (5) | all       |
 
-- **Intent:** the company now fills three floors.
-  - **Ground floor:** a lobby with the inbox, bug queue, ship and bin. Behind it is the meeting room where reviews happen: walls, a door at each end (1,4) and (6,4), and a review table in the middle.
-  - **First floor:** the hot desks, one 2×2 keyboard island in the middle of the room: whoever is nearest codes.
-  - **Second floor:** test benches and pipelines.
-  - **The route:** a feature goes inbox → down the lobby to the first floor (local lift or the short bridge along the front, 7–11,10) → code → up one floor (local lift or the 1-wide stairs at 19,4–19,6) → test → deploy → down the chute to the lobby → ship. Reviews pull the ticket from the desks back to the ground-floor meeting room.
-  - **The lifts:** the express runs straight from the lobby to the second floor. It is the fast way back up after shipping, and it takes the whole team. The local lift stops everywhere, holds two and is the short hop between floors.
-  - **Breakdown and managers:** twice a round the express breaks down, so everyone crowds the local lift and the stairs. Two managers, one in the lobby and one at the desks, ride the lifts too.
-- **Solo:** spawn 1 by the inbox: take the ticket, cross the bridge to the desks and code, go up the stairs or the local lift, test and deploy. Drop the ticket down the chute, ride the express from the second floor straight down to the lobby, and ship. By the stairs that is the report's 70 a loop; the lifts and the chute shorten it. Solo gets no reviews (they need two players), so the meeting room is only a quiet room with a table. A breakdown takes away only one of the ways down; the local lift and the stairs still work.
-- **4 players:** spawns 1 and 2 in the lobby, 3 at the desks, 4 on the second floor: one or two per floor. The ground pair takes, ships and runs reviews in the meeting room. The desk player codes, and the top player tests, deploys and drops tickets down the chute. Chokepoints: the local lift (holds two, on every short route) and the narrow stairs up to the second floor. Bypasses: the express (only the whole way) and the chute for tickets. The breakdown moves the whole team onto the local lift and the stairs for 20 s, which is when the managers in the cabins hurt most.
-- **Review:** approved at gate 1 (2026-11-01, iteration 2)
+- **Intent:** the company fills three floors and nobody has a desk.
+  - **Hot-desk floor (ground):** the inbox, four keyboards on two islands, both pipelines, the ship, the bin, two counters in the front wall and the first manager. Everything but testing and reviews happens here.
+  - **Test lab (middle):** the bug queue, the test benches, two counters in the front wall and the second manager.
+  - **Meeting room (top):** the review table (reviews 15%: two floors up at the end of the line, so fewer of them), a long way up.
+  - **The route:** a feature goes inbox → code → lift up one floor → test → lift down → deploy → ship. A bug starts in the test lab: take it down to code, back up to test, down again to deploy. A review takes two players all the way up to the meeting room.
+  - **The lift:** a full loop is 20 s (3 s open, 2 s ride per stop). From the test lab the next car may go up to the meeting room first; waiting for the one going down is no slower, so stand clear and let it go.
+  - **Incidents:** off on this level. A hotfix in the test lab with a 30 s timer behind a 20 s lift loop blocked shipping for most of the round.
+- **Solo:** spawn 1 on the hot-desk floor: take a ticket, code it, ride up, test, ride down, deploy and ship. Solo gets no reviews (they need two players), so the meeting room stays empty; the bug queue is the only reason to stay upstairs.
+- **4 players:** all four spawn on the hot-desk floor. One or two move up to the test lab and stay there to test and take bugs; the others code, deploy and ship, and hand tickets over in the lift. Reviews pull two players up to the meeting room. Chokepoint: the lift itself (three places, a manager can take one).
+- **Review:** approved at gate 1 (2026-11-01, iteration 2); redesigned with one lift and three stops after gate 2b (2026-11-19)
 
 ### Chapter 4: Enterprise
 
@@ -796,7 +794,7 @@ Each level from 5-2 on adds one element no earlier level has. None of them is bu
 
 #### 5-4 Hackathon (`hackathon`)
 
-> **Lift cars still to wall in.** This level's lift cabins are open on several sides. When this level is redesigned or gets its environment pass, wall in every car the way 3-2 Hypergrowth was done ([the brief's lift redesign](hypergrowth-environment.md#lift-redesign)) and reuse what was built there rather than starting over: one door side per car, facing the camera where possible (move the cabin, stations, hatches or passages to make room; keep every station reachable and the chute's top hatch first in reading order); the `Hypergrowth lift cars` one-door-side test in `src/sim/lifts.test.ts`; the cars themselves (`src/render/three/liftCars.ts`, any level); the steel shell for the walls round a car (`carShell` in `rooms/lowerFloorsRoom.ts`, `liftFrameModel` in `roomModels/lowerFloors.ts`); then recalibrate with `npm run sim -- --calibrate --level=<id>`.
+> **Lift cars still to wall in.** This level's lift cabins are open on several sides. When this level is redesigned or gets its environment pass, wall in every car the way 3-2 Hypergrowth was done ([the brief's lift redesign](hypergrowth-environment.md#lift-redesign)) and reuse what was built there rather than starting over: one door side per car, facing the camera where possible (move the cabin, stations, hatches or passages to make room; keep every station reachable and the chute's top hatch first in reading order); the one-door-side test in `src/sim/lifts.test.ts` (`lift cars on Hypergrowth and Hot Desking`); the cars themselves (`src/render/three/liftCars.ts`, any level); the steel shell for the walls round a car (`carShell` in `rooms/lowerFloorsRoom.ts`, `liftFrameModel` in `roomModels/lowerFloors.ts`); then recalibrate with `npm run sim -- --calibrate --level=<id>`.
 
 **Concept:** 22×12 large. Big hall with a U belt round a pit (with an exit), a design room and a server room; one callback per earlier chapter. Gimmick: everything, **belt outage**. 1p / 4p: Many routes.
 

@@ -54,7 +54,7 @@ About 14x10 like the Garage levels, each with its own wall/floor look (`LEVEL_LO
 |            | `on-call`                         | On Call                                     | incidents + reviews + long walks                                   |
 | Scale-Up   | `middle-management`               | Middle Management                           | teaches the manager, calm layout                                   |
 |            | `hypergrowth`                     | Hypergrowth                                 | manager + incidents                                                |
-|            | `hot-desking`                     | Hot Desking                                 | two managers + incidents + reviews                                 |
+|            | `hot-desking`                     | Hot Desking                                 | two managers + reviews (phase 23: three floors, one lift)          |
 | Enterprise | `back-to-back`                    | Back to Back                                | teaches meetings, calm layout                                      |
 |            | `synergy`                         | Synergy                                     | meetings + manager + incidents                                     |
 |            | `the-reorg`                       | The Reorg                                   | everything                                                         |

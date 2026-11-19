@@ -18,7 +18,7 @@ Where a level already has an environment brief, that brief is the detailed versi
 | 2-3 On Call           | the loft building's basement server room                 | winter, 3 AM, snowing       | Demo Day went viral and the servers didn't                   | the night cleaner's mop robot keeps its route, come what may |
 | 3-1 Middle Management | a whole floor of a mid-rise                              | spring, morning             | investors demanded "adult supervision": meet Derek           | the manager walks around                                     |
 | 3-2 Hypergrowth       | two floors and one tiny lift                             | spring, rainy day           | they hire faster than the desks arrive                       | lifts and a mail chute                                       |
-| 3-3 Hot Desking       | three floors, nobody has a desk                          | spring, Friday afternoon    | the desk-booking app is down and the express lift too        | two managers, three floors, a lift breakdown                 |
+| 3-3 Hot Desking       | three floors, nobody has a desk                          | spring, Friday afternoon    | the desk-booking app is down and the stairwell is closed     | two managers, three floors, one lift                         |
 | 4-1 Back to Back      | YOTTA Tower, their own HQ                                | summer heatwave, morning    | meeting rooms named after the places they came from          | calendar invites                                             |
 | 4-2 Synergy           | the boardroom floor                                      | summer, afternoon           | MONOLITH's executives come round to "explore synergies"      | the boardroom's walls fold away                              |
 | 4-3 The Reorg         | the same floor, reorganised twice before lunch           | summer, all day             | consultants move every wall; the logo goes lowercase         | reorgs and turnstiles                                        |
@@ -162,13 +162,13 @@ _New: the wandering manager._ YOTTA has money, headcount and a manager. It doesn
 
 ### 3-3 Hot Desking (`hot-desking`)
 
-- **Where and when:** three floors, an express lift and a local one. Spring, Friday afternoon.
-- **The joke:** nobody has a desk, the desk-booking app is down, and the express lift breaks in the middle of the round. Two managers now, so two status updates.
-- **Mechanic in the story:** the express lift skips a floor until it breaks down; the local lift and the stairs always work. Reviews happen in a meeting room because there's nowhere else.
-- **Inbox and ship:** the inbox is the top-floor post room with its chute down; the ship hatch is the ground-floor exit.
+- **Where and when:** three floors and one lift. Spring, Friday afternoon.
+- **The joke:** nobody has a desk, the desk-booking app is down, and the stairwell is closed for the hot-desk refit, so the whole company shares one lift. Two managers now, so two status updates.
+- **Mechanic in the story:** one lift, three floors, no stairs: the hot desks on the ground, the test lab in the middle, the meeting room on top. The lift stops at every floor in turn, so you time it, and from the test lab you let the car going the wrong way leave without you. Reviews happen in the meeting room because there's nowhere else.
+- **Inbox and ship:** the inbox is the post room hatch on the ground floor, by the hot desks; the ship hatch is the ground-floor exit.
 - **Outside:** the crane comes down: the glass tower across the street is finished and an estate agent is putting up a "TO LET" banner.
 - **Running gags:** YOTTA on the lockers, Prod on the only desk nobody can book, Segfault in an empty locker, the plan as a desk-booking spreadsheet.
-- **Level design hooks:** three floors; the lift breakdown is telegraphed.
+- **Level design hooks:** three floors, one lift with three stops; the test lab is the middle stop.
 - **How it ends:** YOTTA rents the whole glass tower across the street. It's going to be YOTTA Tower.
 
 ## Chapter 4: Enterprise
