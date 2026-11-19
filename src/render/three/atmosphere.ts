@@ -6,7 +6,7 @@
  * it can be tested; `look.ts` and `stage.ts` turn it into lights and effects.
  */
 
-import { type LevelMap, getTile } from '../../sim/level';
+import { type LevelMap, type Tile, getTile } from '../../sim/level';
 import { type CameraPose, type Vec3, gridToWorld, projectPoint } from '../projection';
 
 /**
@@ -130,6 +130,26 @@ export interface Atmosphere {
     saturate?: number;
     /** More glows like `glow`, drawn over it in order: a second edge, a haze under the top. */
     glows?: { color: number; opacity: number; x: number; y: number; reach: number }[];
+    /**
+     * The tone mapping exposure for this level instead of the stage's usual
+     * 0.95: part of the grade, so every quality gets it.
+     */
+    exposure?: number;
+  };
+  /**
+   * A little warm light on stations the room's own light misses (a back-row
+   * station in its wall's shadow, one facing away from the sun): one point
+   * light per run of neighbouring station tiles of one of `kinds`, `forward`
+   * grid units out from the run's middle toward the open floor in front of
+   * it and `height` world units up, reaching `distance`. No shadows, off on `low`.
+   */
+  stationFill?: {
+    color: number;
+    intensity: number;
+    distance: number;
+    height: number;
+    forward: number;
+    kinds: Tile[];
   };
   /**
    * Warm point lights in a row just inside the back wall (and the front wall
@@ -834,9 +854,11 @@ const SPRING_RAIN: Atmosphere = {
  */
 const FRIDAY_AFTERNOON: Atmosphere = {
   sun: {
-    color: 0xffdcae,
+    color: 0xffd9a8,
     intensity: 2.5,
-    from: { x: 8.5, y: 0.8, height: 7.2, perMapSize: false },
+    // About 40° up, from the right and a little in front, so the slab and
+    // terrace cut faces catch it and the street's shadows fall long to the left.
+    from: { x: 6.55, y: 5.5, height: 7.2, perMapSize: false },
     reach: 0.95,
     softness: 6,
   },
@@ -851,15 +873,19 @@ const FRIDAY_AFTERNOON: Atmosphere = {
     perRoom: true,
   },
   sky: { sky: 0xd8e0ec, ground: 0x8c8274, intensity: 0.75 },
+  // Low hides the lamps and the station fill: the sky makes up for them there.
+  lowSky: 0.9,
   fill: { color: 0xeceff5, intensity: 0.6 },
   environment: 0.12,
   backdrop: { inner: 0xd6dce4, outer: 0x9aa6b4 },
-  fog: { color: 0xc8d0da, start: 0.35, span: 9 },
+  // Cool haze: the rooftops a storey down beside the floors sit in it.
+  fog: { color: 0x9aa6b2, start: 0.35, span: 9 },
   vignette: {
     color: 0x2e3346,
     opacity: 0.35,
     inner: 0.7,
-    saturate: 1.45,
+    saturate: 1.55,
+    exposure: 0.98,
     // The low sun on the right edge of the frame, under the mute button.
     glow: { color: 0xffd9a6, opacity: 0.2, x: 1, y: 0.4, reach: 0.28 },
   },
@@ -873,6 +899,15 @@ const FRIDAY_AFTERNOON: Atmosphere = {
     // Back walls only: a pendant by the front wall would hang over the players' heads on screen.
     frontFrom: 99,
     perRoom: true,
+  },
+  // The bug queue faces away from the sun and the pipelines sit in their wall's shadow.
+  stationFill: {
+    color: 0xffe2b8,
+    intensity: 7,
+    distance: 3,
+    height: 1.3,
+    forward: 0.85,
+    kinds: ['bugQueue', 'pipeline'],
   },
   // Dust in the sun outside the building's west side, never over the room.
   motes: {
@@ -981,6 +1016,58 @@ export function poolPlacements(
     const radius = Math.max(pools.radius, (run.x1 - run.x0 + 1) / 2);
     return [{ position, target, angle: Math.atan2(radius, distance), intensity }];
   });
+}
+
+/**
+ * Where the station fill lights hang (`Atmosphere.stationFill`): per run of
+ * 4-neighbouring tiles of one of its kinds, `forward` grid units out from
+ * the run's middle toward the side with the most floor beside it. None
+ * without tiles or for a run with no floor beside it.
+ */
+export function stationFillSpots(
+  atmosphere: Atmosphere,
+  map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles'>>,
+): Vec3[] {
+  const fill = atmosphere.stationFill;
+  if (!fill || !map.tiles) return [];
+  const full = map as LevelMap;
+  const kinds = new Set<Tile>(fill.kinds);
+  const seen = new Set<number>();
+  const sides = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ] as const;
+  const spots: Vec3[] = [];
+  for (const start of tilesOf(full, (tile) => kinds.has(tile as Tile))) {
+    if (seen.has(start.y * map.width + start.x)) continue;
+    const kind = getTile(full, start.x, start.y);
+    seen.add(start.y * map.width + start.x);
+    const run = [start];
+    for (let i = 0; i < run.length; i++) {
+      const at = run[i];
+      if (!at) break;
+      for (const [dx, dy] of sides) {
+        const x = at.x + dx;
+        const y = at.y + dy;
+        if (seen.has(y * map.width + x) || getTile(full, x, y) !== kind) continue;
+        seen.add(y * map.width + x);
+        run.push({ x, y });
+      }
+    }
+    // The side most of the run's tiles open onto.
+    let best: { dx: number; dy: number; n: number } | null = null;
+    for (const [dx, dy] of sides) {
+      const n = run.filter((t) => getTile(full, t.x + dx, t.y + dy) === 'floor').length;
+      if (n > 0 && (best === null || n > best.n)) best = { dx, dy, n };
+    }
+    if (!best) continue;
+    const mx = run.reduce((sum, t) => sum + t.x, 0) / run.length;
+    const my = run.reduce((sum, t) => sum + t.y, 0) / run.length;
+    spots.push(gridToWorld(mx + best.dx * fill.forward, my + best.dy * fill.forward, fill.height));
+  }
+  return spots;
 }
 
 /** Where the side working lights stand (`Atmosphere.sides`), each with its color. */

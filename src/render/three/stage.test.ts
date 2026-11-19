@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { type Box3, type Vec3, fitCamera3d, projectPoint } from '../projection';
 import { ATMOSPHERES } from './atmosphere';
-import { applyPose, gradeFilter, vignetteCss } from './stage';
+import { EXPOSURE, applyPose, exposureFor, gradeFilter, vignetteCss } from './stage';
 
 describe('applyPose', () => {
   const box: Box3 = { min: { x: -0.5, y: -0.45, z: -0.5 }, max: { x: 13.5, y: 1.4, z: 9.5 } };
@@ -103,5 +103,16 @@ describe('gradeFilter', () => {
     );
     for (const id of ['garage', 'open-plan', 'scale-up', 'seed-round', 'demo-day', 'on-call'])
       expect(gradeFilter(ATMOSPHERES[id]?.vignette), id).toBe('');
+  });
+});
+
+describe('exposureFor', () => {
+  it("keeps the stage's exposure for every level that doesn't set its own", () => {
+    expect(exposureFor(undefined)).toBe(EXPOSURE);
+    expect(exposureFor({ color: 0, opacity: 0.3, inner: 0.7, exposure: 1.1 })).toBe(1.1);
+    for (const [id, a] of Object.entries(ATMOSPHERES))
+      if (id !== 'hot-desking') expect(exposureFor(a.vignette), id).toBe(EXPOSURE);
+    // The Friday afternoon is lifted a little, on every quality.
+    expect(exposureFor(ATMOSPHERES['hot-desking']?.vignette)).toBeGreaterThan(EXPOSURE);
   });
 });

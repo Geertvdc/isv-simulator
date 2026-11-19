@@ -46,6 +46,7 @@ import {
   roomRows,
   sideLightSpots,
   snowSeeds,
+  stationFillSpots,
   stutterIndex,
   stutterLevel,
   sunPlacement,
@@ -302,9 +303,10 @@ describe('the stage wash and the side lights', () => {
     expect(DEFAULT_ATMOSPHERE.occlusion).toBeUndefined();
   });
 
-  it('gives only the stage a brighter sky on low, where its working lights are off', () => {
+  it('gives only the stage (and the few sets lit by lamps) a brighter sky on low, where its working lights are off', () => {
+    const lit = ['demo-day', 'on-call', 'hot-desking'];
     for (const [id, other] of Object.entries(ATMOSPHERES))
-      expect(other.lowSky !== undefined, id).toBe(id === 'demo-day' || id === 'on-call');
+      expect(other.lowSky !== undefined, id).toBe(lit.includes(id));
     expect(DEFAULT_ATMOSPHERE.lowSky).toBeUndefined();
     expect(a.lowSky).toBeGreaterThan(a.sky.intensity);
   });
@@ -753,8 +755,11 @@ describe('the Friday afternoon (hot-desking)', () => {
     const elevation = Math.atan2(s.y - t.y, Math.hypot(s.x - t.x, s.z - t.z)) * (180 / Math.PI);
     expect(elevation).toBeGreaterThan(37);
     expect(elevation).toBeLessThan(43);
-    // Mostly from the side: far more right than back or front.
-    expect(s.x - t.x).toBeGreaterThan(3 * Math.abs(s.z - t.z));
+    // About 40° round from the right toward the camera: the cut faces facing
+    // the camera and the right catch it, and the shadows still fall to the left.
+    const round = Math.atan2(s.z - t.z, s.x - t.x) * (180 / Math.PI);
+    expect(round).toBeGreaterThan(32);
+    expect(round).toBeLessThan(48);
     const [sr, , sb] = rgb(a.sun.color);
     expect(sr - sb).toBeGreaterThan(50);
   });
@@ -773,8 +778,45 @@ describe('the Friday afternoon (hot-desking)', () => {
     }
     expect(a.vignette?.opacity).toBeCloseTo(0.35);
     expect(a.vignette?.inner).toBeCloseTo(0.7);
-    expect(a.vignette?.saturate).toBeGreaterThan(1);
-    expect(a.vignette?.saturate).toBeLessThan(1.6);
+    expect(a.vignette?.saturate).toBeGreaterThan(1.4);
+    expect(a.vignette?.saturate).toBeLessThanOrEqual(1.6);
+    // Lifted a touch over the stage's 0.95, and the sky makes up for the hidden lamps on low.
+    expect(a.vignette?.exposure).toBeGreaterThan(0.95);
+    expect(a.vignette?.exposure).toBeLessThan(1.05);
+    expect(a.lowSky).toBeGreaterThan(a.sky.intensity);
+  });
+
+  it('puts a warm fill in front of the bug queue and over the pipelines, from the map', () => {
+    const spots = stationFillSpots(a, map);
+    const kinds = a.stationFill?.kinds ?? [];
+    expect(kinds).toEqual(expect.arrayContaining(['bugQueue', 'pipeline']));
+    // One per run of station tiles: the bug queue's pair, the pipelines' pair.
+    const runs = (kind: string) => {
+      const xs: { x: number; y: number }[] = [];
+      for (let y = 0; y < map.height; y++)
+        for (let x = 0; x < map.width; x++) if (getTile(map, x, y) === kind) xs.push({ x, y });
+      return xs;
+    };
+    expect(spots).toHaveLength(2);
+    for (const kind of ['bugQueue', 'pipeline']) {
+      const tiles = runs(kind);
+      expect(tiles.length).toBeGreaterThan(0);
+      const near = spots.filter((p) =>
+        tiles.some((t) => Math.hypot(p.x - t.x, p.z - t.y) <= (a.stationFill?.forward ?? 0) + 0.6),
+      );
+      expect(near, kind).toHaveLength(1);
+      const [p] = near;
+      if (!p) continue;
+      // Over open floor in front of the station, not inside it or its wall.
+      expect(getTile(map, Math.round(p.x), Math.round(p.z)), kind).toBe('floor');
+      expect(p.y).toBe(a.stationFill?.height);
+    }
+    const [r, , b] = rgb(a.stationFill?.color ?? 0);
+    expect(r - b).toBeGreaterThan(40);
+    // Without tiles, or for the other presets, none.
+    expect(stationFillSpots(a, SHIPPED)).toEqual([]);
+    for (const [id, other] of Object.entries(ATMOSPHERES))
+      if (other !== a) expect(stationFillSpots(other, map), id).toEqual([]);
   });
 
   it('finds the three rooms: top floor, test lab, hot-desk floor', () => {
