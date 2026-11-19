@@ -25,6 +25,7 @@ import hackathonPhase2 from '../../maps/level-16-hackathon.phase2.txt?raw';
 import labShapesMap from '../../maps/lab-shapes.txt?raw';
 import labDevMap from '../../maps/lab-dev.txt?raw';
 import labSpillsMap from '../../maps/lab-spills.txt?raw';
+import labLiftsMap from '../../maps/lab-lifts.txt?raw';
 import {
   CHAPTER_STAR_GATES,
   MAX_OPEN_ORDERS,
@@ -289,13 +290,18 @@ export const HYPERGROWTH: Level = level('hypergrowth', hypergrowthMap, {
   incidents: INCIDENTS,
 });
 
-/** Rows of desks, two managers in the aisles, reviews and incidents. */
+/**
+ * Three floors and one lift with three stops, no stairs: hot desks on the
+ * ground, the test lab in the middle, reviews in the meeting room on top. Two
+ * managers. No incidents: a hotfix upstairs behind a 20 s lift loop blocked
+ * shipping for most of the round.
+ */
 export const HOT_DESKING: Level = level('hot-desking', hotDeskingMap, {
   ...GARAGE_SETTINGS,
   // Perfect bots with 1 to 4 players (`npm run sim -- --calibrate`).
-  ...calibrated([15, 55, 55, 120]),
-  reviewShare: 0.3,
-  incidents: INCIDENTS,
+  ...calibrated([40, 85, 45, 75]),
+  // Reviews are two floors up at an end stop of the lift: 15%, so a team still scales.
+  reviewShare: 0.15,
 });
 
 // ---- Enterprise: meetings ----
@@ -499,8 +505,9 @@ export const LAB_LEVELS: readonly Level[] = [
     spills: { firstLeakTick: 10 * SECOND, everyTicks: 20 * SECOND },
     mopRobot: { clockwise: true },
   }),
-  // Lifts: three floors, a local lift, an express that breaks down, a mail chute.
-  level('lab-lifts', hotDeskingMap, {
+  // Lifts: three floors, a local lift, an express that breaks down, a mail chute
+  // (Hot Desking's map before its redesign, so the express, breakdown and chute stay covered).
+  level('lab-lifts', labLiftsMap, {
     ...GARAGE_SETTINGS,
     liftBreakdowns: [{ lift: 'express', atTick: 20 * SECOND, ticks: 20 * SECOND }],
   }),
