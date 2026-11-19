@@ -56,6 +56,14 @@ export interface Atmosphere {
     forward: number;
     depth: number;
     radius: number;
+    /**
+     * One pool per room of the map instead of per floor run (see `roomRows`:
+     * each connected floor area, top to bottom, then left to right), so a
+     * room low on the map gets its own; a room wider than two `radius` is
+     * lit by a row of pools side by side, each its share of the room wide,
+     * so no cone spills over the floors above it.
+     */
+    perRoom?: boolean;
   };
   /**
    * Working light in the world beside the room, never on it: `perSide` point
@@ -144,6 +152,12 @@ export interface Atmosphere {
      * depth, whatever the stations in front of it.
      */
     everyFloor?: boolean;
+    /**
+     * One row along the back of each room (see `roomRows`) instead: also
+     * for a room whose back wall is lower than half the map's depth (the
+     * street-level floor under a cutaway's upper ones).
+     */
+    perRoom?: boolean;
     /** Colors cycled along the lamps (`lampSpots` order) instead of `color`: a stage's gelled par cans. */
     colors?: number[];
     /**
@@ -204,8 +218,30 @@ export interface Atmosphere {
      */
     side?: { count: number; out: number };
   };
-  /** Dust drifting in the room's light: `perTile` motes per floor tile, faint and below bloom. */
-  motes?: { color: number; opacity: number; perTile: number };
+  /**
+   * Dust drifting in the room's light: `perTile` motes per floor tile, faint and below bloom.
+   * With `outside`, the motes hang in the sunlit air outside the building
+   * instead (see `moteSeeds`), never over the room, and are off on `low`:
+   * `perSide` beside the outline on the sun's side (`side` 1: right, -1:
+   * left), `near` to `far` grid units out, `low` to `high` world units up,
+   * and `perBack` per column behind the back of each column whose first row
+   * is room; `size` world units across instead of the usual.
+   */
+  motes?: {
+    color: number;
+    opacity: number;
+    perTile: number;
+    outside?: {
+      side: 1 | -1;
+      perSide: number;
+      perBack: number;
+      near: number;
+      far: number;
+      low: number;
+      high: number;
+      size: number;
+    };
+  };
   /**
    * Blossom petals drifting down in the air outside the building, never over
    * the room (see `petalSeeds`): `perSide` petals down each side of the
@@ -784,6 +820,78 @@ const SPRING_RAIN: Atmosphere = {
   },
 };
 
+/**
+ * A bright spring Friday afternoon, higher up the same mid-rise: a low warm
+ * sun from the right (west, about 40° up) throwing long soft shadows to the
+ * left and catching the cutaway's slab edges and right-hand walls, a sky and
+ * fill only a touch cooler than white (bluer turns the yellow and orange
+ * stations olive), slightly cooler hazy air over the street and the city
+ * outside, and the office's warm-white lights in a pool per room, the top
+ * floor's meeting room brightest. The voids between the rooms (the shaft,
+ * the slab gap) get none of it, so the three floors separate. Dust motes
+ * hang in the sun outside only, and a light saturation grade keeps the
+ * grey-and-glass office from greying the stations.
+ */
+const FRIDAY_AFTERNOON: Atmosphere = {
+  sun: {
+    color: 0xffdcae,
+    intensity: 2.5,
+    from: { x: 8.5, y: 0.8, height: 7.2, perMapSize: false },
+    reach: 0.95,
+    softness: 6,
+  },
+  // The office's lights, room by room: the meeting room up top, the test lab, the hot-desk floor.
+  pools: {
+    color: 0xffd8a8,
+    intensity: [2.6, 0.7, 1.6],
+    height: 9,
+    forward: 2,
+    depth: 1.5,
+    radius: 3,
+    perRoom: true,
+  },
+  sky: { sky: 0xd8e0ec, ground: 0x8c8274, intensity: 0.75 },
+  fill: { color: 0xeceff5, intensity: 0.6 },
+  environment: 0.12,
+  backdrop: { inner: 0xd6dce4, outer: 0x9aa6b4 },
+  fog: { color: 0xc8d0da, start: 0.35, span: 9 },
+  vignette: {
+    color: 0x2e3346,
+    opacity: 0.35,
+    inner: 0.7,
+    saturate: 1.45,
+    // The low sun on the right edge of the frame, under the mute button.
+    glow: { color: 0xffd9a6, opacity: 0.2, x: 1, y: 0.4, reach: 0.28 },
+  },
+  lamps: {
+    color: 0xffe2bc,
+    intensity: 9,
+    distance: 3.6,
+    height: 2.1,
+    spacing: 3.5,
+    inset: 0.45,
+    // Back walls only: a pendant by the front wall would hang over the players' heads on screen.
+    frontFrom: 99,
+    perRoom: true,
+  },
+  // Dust in the sun outside the building's west side, never over the room.
+  motes: {
+    color: 0xffe6c0,
+    opacity: 0.55,
+    perTile: 0,
+    outside: {
+      side: 1,
+      perSide: 40,
+      perBack: 1,
+      near: 0.6,
+      far: 3.2,
+      low: 0.4,
+      high: 3,
+      size: 0.07,
+    },
+  },
+};
+
 /** Presets per `MapLook.scene` id. */
 export const ATMOSPHERES: Readonly<Record<string, Atmosphere>> = {
   garage: GOLDEN_HOUR,
@@ -794,6 +902,7 @@ export const ATMOSPHERES: Readonly<Record<string, Atmosphere>> = {
   'on-call': NIGHT_SHIFT,
   'middle-management': SPRING_MORNING,
   hypergrowth: SPRING_RAIN,
+  'hot-desking': FRIDAY_AFTERNOON,
 };
 
 /** The light and air for a scene id; the default for none or an unknown one. */
@@ -835,6 +944,28 @@ export function poolPlacements(
 ): { position: Vec3; target: Vec3; angle: number; intensity: number }[] {
   const pools = atmosphere.pools;
   if (!pools) return [];
+  if (pools.perRoom) {
+    return roomRows(map).flatMap((room, i) => {
+      const intensity = pools.intensity[i];
+      if (intensity === undefined || intensity <= 0) return [];
+      const width = room.x1 - room.x0 + 1;
+      const count = Math.max(1, Math.round(width / (2 * pools.radius)));
+      const share = width / count;
+      return Array.from({ length: count }, (_, k) => {
+        const cx = room.x0 - 0.5 + share * (k + 0.5);
+        const cy = room.inside + pools.depth;
+        const position = gridToWorld(cx, cy + pools.forward, pools.height);
+        const target = gridToWorld(cx, cy);
+        const distance = Math.hypot(
+          position.x - target.x,
+          position.y - target.y,
+          position.z - target.z,
+        );
+        const radius = Math.max(pools.radius, share / 2);
+        return { position, target, angle: Math.atan2(radius, distance), intensity };
+      });
+    });
+  }
   return floorRows(map).flatMap((run, i) => {
     const intensity = pools.intensity[i];
     if (intensity === undefined || intensity <= 0) return [];
@@ -903,7 +1034,7 @@ export function lampSpots(
   const lamps = atmosphere.lamps;
   if (!lamps) return [];
   // The wall's inner face is half a tile in from its row's center.
-  const runs = lamps.everyFloor ? floorRows(map) : backRows(map);
+  const runs = lamps.perRoom ? roomRows(map) : lamps.everyFloor ? floorRows(map) : backRows(map);
   const rows = runs.map((r) => ({ ...r, y: r.inside - 0.5 + lamps.inset }));
   if (map.height >= lamps.frontFrom) {
     const [x0, x1] = insideSpan(map, map.height - 2);
@@ -995,6 +1126,64 @@ function floorRows(
   return runs.filter((r) => r.x1 - r.x0 >= 2);
 }
 
+/**
+ * The back of each room (`perRoom` pools and lamps): every connected area of
+ * floor tiles (4-neighbours) at least three tiles wide, with the row most of
+ * its columns start at (the deeper one on a tie, so lift cabins poking into
+ * the back wall don't pull it up) and its first and last column, top to
+ * bottom, then left to right. Without tiles, the whole width along row 1.
+ */
+export function roomRows(
+  map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles'>>,
+): { inside: number; x0: number; x1: number }[] {
+  if (!map.tiles) return [{ inside: 1, x0: 1, x1: Math.max(1, map.width - 2) }];
+  const full = map as LevelMap;
+  const { width, height } = map;
+  const seen = new Array<boolean>(width * height).fill(false);
+  const rooms: { inside: number; x0: number; x1: number }[] = [];
+  for (let y0 = 0; y0 < height; y0++)
+    for (let x0 = 0; x0 < width; x0++) {
+      if (seen[y0 * width + x0] || getTile(full, x0, y0) !== 'floor') continue;
+      seen[y0 * width + x0] = true;
+      const stack = [[x0, y0] as const];
+      const tops = new Map<number, number>();
+      while (stack.length > 0) {
+        const next = stack.pop();
+        if (!next) break;
+        const [x, y] = next;
+        tops.set(x, Math.min(tops.get(x) ?? y, y));
+        for (const [dx, dy] of [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ] as const) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+          if (seen[ny * width + nx] || getTile(full, nx, ny) !== 'floor') continue;
+          seen[ny * width + nx] = true;
+          stack.push([nx, ny]);
+        }
+      }
+      const columns = [...tops.keys()];
+      const lo = Math.min(...columns);
+      const hi = Math.max(...columns);
+      if (hi - lo < 2) continue;
+      const counts = new Map<number, number>();
+      for (const top of tops.values()) counts.set(top, (counts.get(top) ?? 0) + 1);
+      let inside = -1;
+      let most = 0;
+      for (const [top, n] of counts)
+        if (n > most || (n === most && top > inside)) {
+          inside = top;
+          most = n;
+        }
+      rooms.push({ inside, x0: lo, x1: hi });
+    }
+  return rooms.sort((a, b) => a.inside - b.inside || a.x0 - b.x0);
+}
+
 /** The first and last column of a row inside the room: not wall or void (all but the edges without tiles). */
 function insideSpan(
   map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles'>>,
@@ -1059,6 +1248,7 @@ export function moteSeeds(
 ): MoteSeed[] {
   const motes = atmosphere.motes;
   if (!motes) return [];
+  if (motes.outside) return outsideMotes(motes.outside, map);
   const w = Math.max(1, map.width - 2);
   const h = Math.max(1, map.height - 2);
   const count = Math.round(w * h * motes.perTile);
@@ -1069,6 +1259,36 @@ export function moteSeeds(
       phase: r(4),
     };
   });
+}
+
+/**
+ * The motes in the sunlit air outside (`motes.outside`): down the sun's side
+ * of the outline, and behind the back of each column whose first row is room
+ * (behind void lies more building). Never over the room.
+ */
+function outsideMotes(
+  spec: NonNullable<NonNullable<Atmosphere['motes']>['outside']>,
+  map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles'>>,
+): MoteSeed[] {
+  const out = (i: number) => spec.near + unit(i, 41) * (spec.far - spec.near);
+  const up = (i: number) => spec.low + unit(i, 42) * (spec.high - spec.low);
+  const side = Array.from({ length: spec.perSide }, (_, i) => {
+    const x = spec.side < 0 ? -0.5 - out(i) : map.width - 0.5 + out(i);
+    const z = -1.5 + unit(i, 43) * map.height;
+    return { at: { x, y: up(i), z }, phase: unit(i, 44) };
+  });
+  const columns = Array.from({ length: map.width }, (_, x) => x).filter((x) => {
+    if (!map.tiles) return true;
+    const tile = getTile(map as LevelMap, x, 0);
+    return tile !== null && tile !== 'void';
+  });
+  const back = columns.flatMap((x) =>
+    Array.from({ length: spec.perBack }, (_, k) => {
+      const i = 3000 + x * 16 + k;
+      return { at: { x: x - 0.5 + unit(i, 45), y: up(i), z: -0.5 - out(i) }, phase: unit(i, 46) };
+    }),
+  );
+  return [...side, ...back];
 }
 
 /** A number in [0, 1) from an index and a salt, like `tileHash`. */
