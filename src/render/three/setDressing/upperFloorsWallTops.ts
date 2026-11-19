@@ -19,7 +19,9 @@ import { segfaultCat } from './onCall';
 /** The lockers' muted steel, their dusty violet doors, the dark inside. */
 export const LOCKER_STEEL = 0x7d848b;
 export const LOCKER_VIOLET = 0x77699a;
-const LOCKER_INSIDE = 0x4a4f56;
+const LOCKER_INSIDE = 0x6a6458;
+/** The warm strip light inside Segfault's open locker. */
+const LOCKER_GLOW = 0xffd9a0;
 const PAPER = 0xeeeee8;
 const INK = 0x2a2d33;
 /** Coats and bags in muted colours: navy, charcoal, camel, olive, burgundy. */
@@ -40,6 +42,8 @@ function prop(build: (b: ModelBuilder) => void, scale = 1): () => Model {
 /** The lockers' size: a bank of three columns on a plinth. */
 export const LOCKER_W = 0.3;
 export const LOCKER_H = 0.68;
+/** A bank on a full-height wall: two short tiers, so it never towers over the room. */
+export const LOCKER_H_SHORT = 0.46;
 const LOCKER_D = 0.42;
 const PLINTH = 0.04;
 
@@ -57,26 +61,26 @@ interface BankLook {
  * one), on a dark plinth: vent slots, a number plate and a lock on each
  * door, a violet door here and there, YOTTA's logo on one, names on tape.
  */
-function lockerBank(b: ModelBuilder, look: BankLook): void {
+function lockerBank(b: ModelBuilder, look: BankLook, H = LOCKER_H): void {
   const w = LOCKER_W * 3;
-  const top = PLINTH + LOCKER_H;
+  const top = PLINTH + H;
   b.box(w + 0.02, PLINTH, LOCKER_D - 0.04, 0x33373d, { at: [0, PLINTH / 2, 0] }, 0);
   // The body, a column at a time: the open one hollow (back, floor, roof, its outer side).
   for (let c = 0; c < 3; c++) {
     const x = -w / 2 + (c + 0.5) * LOCKER_W;
-    const cy = PLINTH + LOCKER_H / 2;
+    const cy = PLINTH + H / 2;
     if (c !== look.open) {
-      b.box(LOCKER_W, LOCKER_H, LOCKER_D, LOCKER_STEEL, { at: [x, cy, 0] }, 0.006);
+      b.box(LOCKER_W, H, LOCKER_D, LOCKER_STEEL, { at: [x, cy, 0] }, 0.006);
       continue;
     }
-    b.box(LOCKER_W, LOCKER_H, 0.02, LOCKER_STEEL, { at: [x, cy, -LOCKER_D / 2 + 0.01] }, 0);
+    b.box(LOCKER_W, H, 0.02, LOCKER_STEEL, { at: [x, cy, -LOCKER_D / 2 + 0.01] }, 0);
     b.box(LOCKER_W, 0.02, LOCKER_D, LOCKER_STEEL, { at: [x, PLINTH + 0.01, 0] }, 0);
-    b.box(LOCKER_W, 0.02, LOCKER_D, LOCKER_STEEL, { at: [x, PLINTH + LOCKER_H - 0.01, 0] }, 0);
+    b.box(LOCKER_W, 0.02, LOCKER_D, LOCKER_STEEL, { at: [x, PLINTH + H - 0.01, 0] }, 0);
     for (const s of [-1, 1])
       if ((s < 0 && c === 0) || (s > 0 && c === 2))
-        b.box(0.02, LOCKER_H, LOCKER_D, LOCKER_STEEL, { at: [x + (s * LOCKER_W) / 2, cy, 0] }, 0);
+        b.box(0.02, H, LOCKER_D, LOCKER_STEEL, { at: [x + (s * LOCKER_W) / 2, cy, 0] }, 0);
   }
-  b.box(w + 0.01, 0.012, LOCKER_D + 0.01, tint(LOCKER_STEEL, 0.12), { at: [0, top, 0] }, 0);
+  b.box(w + 0.01, 0.012, LOCKER_D + 0.01, tint(LOCKER_STEEL, -0.06), { at: [0, top, 0] }, 0);
   const f = LOCKER_D / 2;
   for (let c = 0; c < 3; c++) {
     const x = -w / 2 + (c + 0.5) * LOCKER_W;
@@ -86,11 +90,11 @@ function lockerBank(b: ModelBuilder, look: BankLook): void {
       // The open one: dark and empty inside, its door swung out toward the next bank.
       b.box(
         LOCKER_W - 0.03,
-        LOCKER_H - 0.03,
+        H - 0.03,
         0.01,
         LOCKER_INSIDE,
         {
-          at: [x, PLINTH + LOCKER_H / 2, -LOCKER_D / 2 + 0.025],
+          at: [x, PLINTH + H / 2, -LOCKER_D / 2 + 0.025],
         },
         0,
       );
@@ -109,19 +113,17 @@ function lockerBank(b: ModelBuilder, look: BankLook): void {
         0.012,
         0.02,
         tint(LOCKER_INSIDE, 0.25),
-        { at: [x, PLINTH + LOCKER_H - 0.07, f - 0.04] },
+        { at: [x, PLINTH + H - 0.07, f - 0.04] },
         0,
       );
+      // A small warm strip under its roof, so the sleeper inside reads.
+      b.screen(LOCKER_W - 0.08, 0.025, LOCKER_GLOW, {
+        at: [x, PLINTH + H - 0.025, f - 0.06],
+        rot: [Math.PI / 2, 0, 0],
+      });
       const hx = x + LOCKER_W / 2 - 0.01;
-      const d = framed(b, [hx, PLINTH + LOCKER_H / 2, f + 0.004], [0, -1.9, 0]);
-      d.box(
-        LOCKER_W - 0.03,
-        LOCKER_H - 0.03,
-        0.014,
-        door,
-        { at: [-(LOCKER_W - 0.03) / 2, 0, 0] },
-        0.004,
-      );
+      const d = framed(b, [hx, PLINTH + H / 2, f + 0.004], [0, -1.75, 0]);
+      d.box(LOCKER_W - 0.03, H - 0.03, 0.014, door, { at: [-(LOCKER_W - 0.03) / 2, 0, 0] }, 0.004);
       for (let k = 0; k < 4; k++)
         d.box(
           0.12,
@@ -129,15 +131,15 @@ function lockerBank(b: ModelBuilder, look: BankLook): void {
           0.004,
           tint(door, -0.25),
           {
-            at: [-(LOCKER_W - 0.03) / 2, LOCKER_H / 2 - 0.08 - k * 0.02, -0.009],
+            at: [-(LOCKER_W - 0.03) / 2, H / 2 - 0.08 - k * 0.02, -0.009],
           },
           0,
         );
       continue;
     }
     for (let t = 0; t < 2; t++) {
-      const h = LOCKER_H / 2 - 0.02;
-      const y = PLINTH + LOCKER_H / 4 + t * (LOCKER_H / 2);
+      const h = H / 2 - 0.02;
+      const y = PLINTH + H / 4 + t * (H / 2);
       b.box(LOCKER_W - 0.024, h, 0.008, door, { at: [x, y, f + 0.004] }, 0);
       // Vent slots, the number plate, the lock.
       for (let k = 0; k < 3; k++)
@@ -166,17 +168,18 @@ function lockerBank(b: ModelBuilder, look: BankLook): void {
         0.034,
         0.003,
         PAPER,
-        { at: [x - 0.01, PLINTH + LOCKER_H * 0.62, f + 0.011], rot: [0, 0, 0.04] },
+        { at: [x - 0.01, PLINTH + H * 0.62, f + 0.011], rot: [0, 0, 0.04] },
         0,
       );
-      text(b, name, x - 0.01, PLINTH + LOCKER_H * 0.62, f + 0.013, 0.0055, INK);
+      text(b, name, x - 0.01, PLINTH + H * 0.62, f + 0.013, 0.0055, INK);
     }
     if (c === look.logo) {
       // YOTTA's logo: a white Y in a ring, the name under it.
-      const y = PLINTH + LOCKER_H * 0.3;
-      b.torus(0.04, 0.008, 0xf2f0fa, { at: [x, y + 0.02, f + 0.011] });
-      text(b, 'Y', x, y + 0.02, f + 0.011, 0.009, 0xf2f0fa);
-      text(b, 'YOTTA', x, y - 0.045, f + 0.011, 0.0055, 0xf2f0fa);
+      const y = PLINTH + H * 0.3;
+      // YOTTA's logo decal, 0.2 wide: a white ring with the Y, the name under it.
+      b.torus(0.07, 0.011, 0xf2f0fa, { at: [x, y + 0.03, f + 0.011] });
+      text(b, 'Y', x, y + 0.03, f + 0.011, 0.014, 0xf2f0fa);
+      text(b, 'YOTTA', x, y - 0.065, f + 0.011, 0.0095, 0xf2f0fa);
     }
   }
 }
@@ -400,9 +403,15 @@ function meetingPlant(b: ModelBuilder): void {
 
 /** What stands on the wall tops, by kind. */
 export const UPPER_TOPS: Readonly<Record<TopKind, () => Model>> = {
-  lockers: prop((b) => { lockerBank(b, BANKS.lockers); }),
-  lockersLogo: prop((b) => { lockerBank(b, BANKS.lockersLogo); }),
-  lockersOpen: prop((b) => { lockerBank(b, BANKS.lockersOpen); }),
+  lockers: prop((b) => {
+    lockerBank(b, BANKS.lockers);
+  }),
+  lockersLogo: prop((b) => {
+    lockerBank(b, BANKS.lockersLogo);
+  }),
+  lockersOpen: prop((b) => {
+    lockerBank(b, BANKS.lockersOpen);
+  }),
   coatStand: prop(coatStand, 0.9),
   bags: prop(bags),
   phoneShelf: prop(phoneShelf),
@@ -410,6 +419,21 @@ export const UPPER_TOPS: Readonly<Record<TopKind, () => Model>> = {
   deviceBin: prop(deviceBin),
   cakeTable: prop(cakeTable),
   meetingPlant: prop(meetingPlant),
+};
+
+/** The locker banks on full-height walls: two short tiers. */
+export const UPPER_SHORT_LOCKERS: Readonly<
+  Record<'lockers' | 'lockersLogo' | 'lockersOpen', () => Model>
+> = {
+  lockers: prop((b) => {
+    lockerBank(b, BANKS.lockers, LOCKER_H_SHORT);
+  }),
+  lockersLogo: prop((b) => {
+    lockerBank(b, BANKS.lockersLogo, LOCKER_H_SHORT);
+  }),
+  lockersOpen: prop((b) => {
+    lockerBank(b, BANKS.lockersOpen, LOCKER_H_SHORT);
+  }),
 };
 
 /** The tallest a front-wall prop gets (over the wall's top). */
@@ -437,6 +461,51 @@ export const UPPER_FRONTS: Readonly<Record<FrontKind, () => Model>> = {
       b.cylinder(0.045, 0.04, 0.1, c, { at: [x + (k >= 3 ? 0.07 : 0), 0.07, z] }, 14);
       b.cylinder(0.038, 0.038, 0.004, 0x3a2418, { at: [x + (k >= 3 ? 0.07 : 0), 0.11, z] }, 12);
     });
+  }),
+  laptopStack: prop((b) => {
+    // Three laptop bags dumped one on another, each turned a little.
+    for (let k = 0; k < 3; k++) {
+      const c = nth(k + 1);
+      const y = 0.035 + k * 0.07;
+      b.box(
+        0.42 - k * 0.03,
+        0.065,
+        0.3 - k * 0.02,
+        c,
+        { at: [0.01 * k, y, 0], rot: [0, (k - 1) * 0.18, 0] },
+        0.02,
+      );
+      b.box(
+        0.2,
+        0.01,
+        0.012,
+        0x2a2d33,
+        { at: [0.01 * k, y + 0.036, 0.1 - k * 0.01], rot: [0, (k - 1) * 0.18, 0] },
+        0,
+      );
+    }
+  }),
+  headsetBox: prop((b) => {
+    // A grey tub of spare headsets, HEADSETS on a label, two spilling over the rim.
+    b.box(0.4, 0.14, 0.28, 0x7e858c, { at: [0, 0.07, 0] }, 0.015);
+    b.box(0.36, 0.01, 0.24, 0x3a3e44, { at: [0, 0.135, 0] }, 0);
+    for (const [x, z, a] of [
+      [-0.08, -0.02, 0.3],
+      [0.1, 0.04, -0.5],
+      [0.02, 0.0, 1.2],
+    ] as const) {
+      b.torus(0.06, 0.012, 0x2a2d33, { at: [x, 0.16, z], rot: [Math.PI / 2 - 0.4, a, 0] }, Math.PI);
+      b.cylinder(
+        0.03,
+        0.03,
+        0.02,
+        0x3a3e44,
+        { at: [x - 0.06, 0.15, z], rot: [0, 0, Math.PI / 2] },
+        10,
+      );
+    }
+    b.box(0.18, 0.04, 0.003, PAPER, { at: [0, 0.07, 0.141] }, 0);
+    text(b, 'HEADSETS', 0, 0.07, 0.143, 0.004, INK);
   }),
   laptopBag: prop((b) => {
     b.box(0.42, 0.06, 0.3, nth(1), { at: [0, 0.03, 0], rot: [0, -0.2, 0] }, 0.02);

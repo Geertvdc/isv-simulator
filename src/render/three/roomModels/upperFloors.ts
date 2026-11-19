@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { tileHash } from '../../mapShape';
 import { type Model, ModelBuilder, tint } from '../kit';
 import { FRONT_WALL_HEIGHT, STATION_HEIGHT, WALL_HEIGHT } from '../layout';
-import { FLOOR_COLORS } from '../look';
+import { FLOOR_COLORS, WALL_COLORS } from '../look';
 import type { CounterRun } from '../rooms/counterRun';
 import { SOLID_LOOKS, solidSwap } from '../rooms/midRiseRoom';
 import {
@@ -14,7 +14,7 @@ import {
 } from '../rooms/upperFloorsRoom';
 import type { StationModel } from '../stationModels';
 import { framed, text } from './basement';
-import { ALU, YOTTA_VIOLET, solidPanelModel } from './midRise';
+import { ALU, YOTTA_VIOLET, midRiseWallModel, solidPanelModel } from './midRise';
 
 /**
  * Hot Desking's three floors of the mid-rise (wall theme `upperFloors`,
@@ -49,7 +49,6 @@ const STEEL = 0xa3abb2;
 const STEEL_DARK = 0x5f676f;
 const TAPE_RED = 0xc8332e;
 const TAPE_WHITE = 0xeeeeea;
-const SIGN_GREEN = 0x2a9a5a;
 const SCREEN_DARK = 0x16202c;
 
 // ---- The floors ----
@@ -72,9 +71,16 @@ export function threeTone(x: number, y: number, salt: number): number {
 }
 
 /** The walkway's grey carpet tiles, the lab's pale vinyl, the meeting room's dusky carpet. */
-export const WALKWAY_GREY = 0xa2a7ab;
-export const VINYL = 0x8e9593;
-export const MEETING_CARPET = 0x8a849c;
+export const VINYL = 0x6c7270;
+/**
+ * The meeting carpet: a sage green that, under the game's always-on
+ * violet meeting-rug tint (`WorldFx`, 0.35 of 0x8e6bd8), shows as a muted
+ * blue-grey, so the room stays quiet next to the review station.
+ */
+export const MEETING_CARPET = 0x6c8a52;
+const MEETING_BORDER = 0x6b5a8a;
+/** The meeting carpet as it shows under the rug's tint, for the tiles the tint doesn't reach. */
+const MEETING_BARE = 0x7d7a8e;
 const MAT = 0x4d5258;
 
 /** The quarter tiles of a tile: back-left, back-right, front-left, front-right. */
@@ -127,6 +133,9 @@ function carpetTiles(b: ModelBuilder, base: number, alt: number, variant: number
   }
 }
 
+/** How much paler the walkway's tiles are than the carpet. */
+export const WALKWAY_LIFT = 0.05;
+
 /** A faint coffee ring in quarter `corner`: a ring, a fainter fill, one drip. */
 function coffeeRing(b: ModelBuilder, corner: number, base: number): void {
   const [qx, qz] = QUARTERS[corner] ?? [0, 0];
@@ -150,10 +159,10 @@ function coffeeRing(b: ModelBuilder, corner: number, base: number): void {
 function wornPatch(b: ModelBuilder, base: number): void {
   const g = new THREE.CylinderGeometry(0.4, 0.4, 0.002, 24);
   g.scale(1.15, 1, 0.8);
-  b.add(g, mix(base, 0xb4b8bc, 0.18), { at: [0, 0.0023, 0] });
+  b.add(g, mix(base, 0xb4b8bc, 0.08), { at: [0, 0.0023, 0] });
   const h = new THREE.CylinderGeometry(0.24, 0.24, 0.002, 20);
   h.scale(1.2, 1, 0.7);
-  b.add(h, mix(base, 0xb4b8bc, 0.28), { at: [0.04, 0.0025, -0.02] });
+  b.add(h, mix(base, 0xb4b8bc, 0.14), { at: [0.04, 0.0025, -0.02] });
 }
 
 /** The entrance mat: dark ribbed coir-look rubber, a border along `edges` (back 1, front 2, left 4, right 8). */
@@ -210,15 +219,44 @@ function vinyl(b: ModelBuilder, variant: number, scuffed: boolean): void {
     mark(b, w, 0.012, tint(VINYL, -0.32), x, z, 0.0022, a);
 }
 
-/** The meeting room's quieter carpet: one dusky broadloom, a small square pattern, its sheen. */
-function meetingCarpet(b: ModelBuilder, variant: number, worn: boolean): void {
-  b.box(1, 0.012, 1, MEETING_CARPET, { at: [0, -0.006, 0] }, 0);
-  const dot = tint(MEETING_CARPET, -0.08);
+/**
+ * The meeting room's quieter carpet: one muted blue-grey broadloom, a small
+ * square pattern, its sheen, a 0.15 violet border along `edges` (back 1,
+ * front 2, left 4, right 8).
+ */
+function meetingCarpet(
+  b: ModelBuilder,
+  variant: number,
+  worn: boolean,
+  edges = 0,
+  carpet = MEETING_CARPET,
+): void {
+  b.box(1, 0.012, 1, carpet, { at: [0, -0.006, 0] }, 0);
+  const dot = tint(carpet, -0.08);
   for (let i = 0; i < 4; i++)
     for (let j = 0; j < 4; j++)
       mark(b, 0.04, 0.04, dot, -0.375 + i * 0.25, -0.375 + j * 0.25, 0.0016, 0.785);
-  mark(b, 0.9, 0.06, tint(MEETING_CARPET, 0.03), 0, -0.3 + variant * 0.25, 0.0014, 0.05);
-  if (worn) wornPatch(b, MEETING_CARPET);
+  mark(b, 0.9, 0.06, tint(carpet, 0.03), 0, -0.3 + variant * 0.25, 0.0014, 0.05);
+  if (worn) wornPatch(b, carpet);
+  const bw = 0.15;
+  for (const [bit, dx, dz] of [
+    [1, 0, -1],
+    [2, 0, 1],
+    [4, -1, 0],
+    [8, 1, 0],
+  ] as const) {
+    if (!(edges & bit)) continue;
+    const along = dz !== 0;
+    mark(
+      b,
+      along ? 1 : bw,
+      along ? bw : 1,
+      MEETING_BORDER,
+      dx * (0.5 - bw / 2),
+      dz * (0.5 - bw / 2),
+      0.0022,
+    );
+  }
 }
 
 /**
@@ -239,19 +277,28 @@ export function threeFloorModel(look: number): Model {
     meetingCarpet(b, variant, wear === FLOOR_WEAR.meetingWorn);
     return b.build();
   }
+  if (wear === FLOOR_WEAR.meetingBare) {
+    meetingCarpet(b, variant, false, 0, MEETING_BARE);
+    return b.build();
+  }
+  if (wear >= FLOOR_WEAR.meetingEdge && wear < FLOOR_WEAR.meetingEdge + 16) {
+    meetingCarpet(b, variant, false, wear - FLOOR_WEAR.meetingEdge);
+    return b.build();
+  }
   if (wear >= FLOOR_WEAR.mat && wear < FLOOR_WEAR.mat + 16) {
     entranceMat(b, wear - FLOOR_WEAR.mat);
     return b.build();
   }
   if (wear === FLOOR_WEAR.worn) {
-    // Where everyone waits for the lift: the walkway's grey, worn a shade paler, no path down it.
-    carpetTiles(b, tint(WALKWAY_GREY, 0.03), tint(WALKWAY_GREY, -0.01), variant);
+    // Where everyone waits for the lift: the carpet, its pile worn flat in a faint oval.
+    carpetTiles(b, base, alt, variant);
+    wornPatch(b, base);
     return b.build();
   }
   if (wear === FLOOR_WEAR.walkway) {
-    carpetTiles(b, WALKWAY_GREY, tint(WALKWAY_GREY, -0.04), variant);
-    // Trodden darker down the middle of the path.
-    mark(b, 0.5, 0.5, mix(WALKWAY_GREY, 0x6c7178, 0.12), 0, 0, 0.0024, 0.785);
+    // The path from the lift to the door: the same tiles a shade paler, trodden down the middle.
+    carpetTiles(b, tint(base, WALKWAY_LIFT), tint(alt, WALKWAY_LIFT), variant);
+    mark(b, 0.42, 0.42, tint(base, WALKWAY_LIFT + 0.03), 0, 0, 0.0024, 0.785);
     return b.build();
   }
   carpetTiles(b, base, alt, variant);
@@ -262,17 +309,65 @@ export function threeFloorModel(look: number): Model {
   return b.build();
 }
 
-// ---- The walls: the core's full-height panels ----
+// ---- The walls: 3-1's partitions under cool concrete coping ----
+
+/** The partitions' coping: cool light concrete, and the lighter lip round it. */
+export const COPING = WALL_COLORS.upperFloors.top;
+export const COPING_LIP = 0xb6b8b5;
+
+/**
+ * A mid-rise partition model `h` tall re-capped for Hot Desking: the head
+ * track's glass-grey top becomes cool concrete coping and its aluminium lip
+ * band (the top 0.045) a lighter lip, so the wall tops read as 3-1's coping,
+ * not a wide flat grey. Recoloured in place, so 3-1's own models are untouched.
+ */
+function coped(m: Model, h: number): Model {
+  const from = new THREE.Color(WALL_COLORS.midRise.top);
+  const glint = new THREE.Color(tint(WALL_COLORS.midRise.top, 0.05));
+  const alu = new THREE.Color(ALU);
+  const top = new THREE.Color(COPING);
+  const shine = new THREE.Color(tint(COPING, 0.05));
+  const lip = new THREE.Color(COPING_LIP);
+  const same = (
+    c: THREE.BufferAttribute | THREE.InterleavedBufferAttribute,
+    i: number,
+    k: THREE.Color,
+  ) =>
+    Math.abs(c.getX(i) - k.r) < 1e-3 &&
+    Math.abs(c.getY(i) - k.g) < 1e-3 &&
+    Math.abs(c.getZ(i) - k.b) < 1e-3;
+  const colors = m.body.getAttribute('color');
+  const pos = m.body.getAttribute('position');
+  for (let i = 0; i < colors.count; i++) {
+    if (same(colors, i, from)) colors.setXYZ(i, top.r, top.g, top.b);
+    else if (same(colors, i, glint)) colors.setXYZ(i, shine.r, shine.g, shine.b);
+    else if (pos.getY(i) >= h - 0.045 && same(colors, i, alu))
+      colors.setXYZ(i, lip.r, lip.g, lip.b);
+  }
+  colors.needsUpdate = true;
+  return m;
+}
+
+/** A partition (see `midRiseWallModel`) under Hot Desking's coping. */
+export function upperWallModel(piece: Parameters<typeof midRiseWallModel>[0], look: number): Model {
+  return coped(
+    midRiseWallModel(piece, look),
+    piece === 'wall-front' ? FRONT_WALL_HEIGHT : WALL_HEIGHT,
+  );
+}
 
 /** Every full-height panel swap: the core's, and the solid panels behind art. */
 export const CORE_MODELS: Readonly<Record<string, () => Model>> = {
   ...Object.fromEntries(
-    Array.from({ length: CORE_LOOKS }, (_, look) => [coreSwap(look), () => solidPanelModel(look)]),
+    Array.from({ length: CORE_LOOKS }, (_, look) => [
+      coreSwap(look),
+      () => coped(solidPanelModel(look), WALL_HEIGHT),
+    ]),
   ),
   ...Object.fromEntries(
     Array.from({ length: SOLID_LOOKS }, (_, look) => [
       solidSwap(look),
-      () => solidPanelModel(look),
+      () => coped(solidPanelModel(look), WALL_HEIGHT),
     ]),
   ),
 };
@@ -315,17 +410,24 @@ function directory(here: number): Model {
   return b.build();
 }
 
+/** The stairs plaque's green and the traffic cones' orange. */
+const STAIRS_GREEN = 0x2a7a4a;
+const CONE = 0xe06a2a;
+/** How tall the cones on the wall top are. */
+export const CONE_H = 0.25;
+
 /**
- * The stairwell door, taped off: a grey steel fire door with its vision
- * panel and push bar in a steel frame, red-and-white tape across it in an
- * X and a band, the A4 sign STAIRS CLOSED - HOT DESK REFIT, and the green
- * fire-exit sign over the frame.
+ * The stairwell door, taped off, read without words: a grey steel fire door
+ * with its vision panel and push bar in a steel frame, three diagonals of
+ * red-and-white tape across it, a square green plaque over it with a white
+ * stairs pictogram (steps and a figure climbing them), and a traffic cone on
+ * the wall top either side.
  */
 function stairsClosed(): Model {
   const b = new ModelBuilder();
   const z = 0.506;
-  const doorW = 0.62;
-  const doorH = 0.86;
+  const doorW = 0.6;
+  const doorH = 0.72;
   const door = 0x7d868f;
   // The frame and the door.
   b.box(
@@ -339,19 +441,19 @@ function stairsClosed(): Model {
   b.box(doorW, doorH, 0.02, door, { at: [0, doorH / 2, z + 0.02] }, 0.006);
   const f = z + 0.031;
   // The vision panel (wired glass, dark), the push bar, the kick plate.
-  b.box(0.12, 0.3, 0.004, 0x37414b, { at: [0.16, 0.6, f] }, 0);
-  for (const k of [-0.06, 0, 0.06])
-    b.box(0.12, 0.003, 0.002, 0x56616c, { at: [0.16, 0.6 + k, f + 0.002] }, 0);
-  b.box(0.5, 0.03, 0.03, STEEL, { at: [0, 0.42, f + 0.02] }, 0.008);
-  b.box(doorW - 0.04, 0.1, 0.003, tint(door, 0.12), { at: [0, 0.07, f] }, 0);
-  // The tape: an X corner to corner and a band across, red and white stripes.
-  const tape = (cx: number, cy: number, len: number, a: number) => {
-    const g = framed(b, [cx, cy, f + 0.012], [0, 0, a]);
-    const n = 12;
+  b.box(0.12, 0.24, 0.004, 0x37414b, { at: [0.16, 0.5, f] }, 0);
+  b.box(0.48, 0.03, 0.03, STEEL, { at: [0, 0.36, f + 0.02] }, 0.008);
+  b.box(doorW - 0.04, 0.09, 0.003, tint(door, 0.12), { at: [0, 0.06, f] }, 0);
+  // The tape: three parallel diagonals across the door, red and white stripes.
+  const len = Math.hypot(doorW, doorW * 0.9);
+  const a = Math.atan2(doorW * 0.9, doorW);
+  for (const cy of [0.18, 0.38, 0.58]) {
+    const g = framed(b, [0, cy, f + 0.03], [0, 0, a]);
+    const n = 10;
     for (let i = 0; i < n; i++)
       g.box(
         len / n + 0.002,
-        0.05,
+        0.06,
         0.004,
         i % 2 ? TAPE_WHITE : TAPE_RED,
         {
@@ -359,33 +461,48 @@ function stairsClosed(): Model {
         },
         0,
       );
-  };
-  const diag = Math.hypot(doorW + 0.1, doorH - 0.1);
-  const a = Math.atan2(doorH - 0.1, doorW + 0.1);
-  tape(0, doorH / 2, diag, a);
-  tape(0, doorH / 2, diag, -a);
-  // The sign, taped over the X.
-  const s = framed(b, [0, 0.66, f + 0.022], [0, 0, 0.04]);
-  s.box(0.36, 0.2, 0.003, PAPER, {}, 0);
-  s.box(0.34, 0.05, 0.002, TAPE_RED, { at: [0, 0.065, 0.002] }, 0);
-  text(s, 'STAIRS CLOSED', 0, 0.065, 0.004, 0.0068, 0xffffff);
-  text(s, 'HOT DESK', 0, 0.005, 0.003, 0.0085, INK);
-  text(s, 'REFIT', 0, -0.055, 0.003, 0.0085, INK);
-  s.box(0.06, 0.025, 0.002, 0xe8e2c8, { at: [-0.15, 0.1, 0.003], rot: [0, 0, 0.5] }, 0);
-  s.box(0.06, 0.025, 0.002, 0xe8e2c8, { at: [0.15, 0.1, 0.003], rot: [0, 0, -0.5] }, 0);
-  // The fire-exit sign over the frame.
-  const cy = doorH + 0.15;
-  b.box(0.36, 0.12, 0.016, SIGN_GREEN, { at: [0, cy, z + 0.008] }, 0.006);
+  }
+  // The stairs plaque over the door: 0.35 square, green, white steps and a figure climbing.
+  const py = doorH + 0.04 + 0.2;
+  const side = 0.35;
+  b.box(side, side, 0.016, STAIRS_GREEN, { at: [0, py, z + 0.008] }, 0.008);
   const g = z + 0.017;
-  b.box(0.04, 0.08, 0.002, 0xf2f4f0, { at: [-0.12, cy, g] }, 0);
-  b.box(0.026, 0.066, 0.002, SIGN_GREEN, { at: [-0.12, cy, g + 0.001] }, 0);
-  b.sphere(0.011, 0xf2f4f0, { at: [-0.05, cy + 0.03, g] });
-  b.box(0.018, 0.04, 0.002, 0xf2f4f0, { at: [-0.055, cy, g], rot: [0, 0, 0.4] }, 0);
-  b.box(0.1, 0.018, 0.002, 0xf2f4f0, { at: [0.07, cy, g] }, 0);
-  b.add(new THREE.ConeGeometry(0.026, 0.04, 3), 0xf2f4f0, {
-    at: [0.13, cy, g],
-    rot: [0, 0, -Math.PI / 2],
-  });
+  const step = 0.055;
+  for (let k = 0; k < 4; k++)
+    b.box(
+      step,
+      step * (k + 1),
+      0.003,
+      0xf4f6f2,
+      {
+        at: [-0.1 + k * step, py - 0.14 + (step * (k + 1)) / 2, g],
+      },
+      0,
+    );
+  b.sphere(0.022, 0xf4f6f2, { at: [-0.02, py + 0.12, g] });
+  b.box(0.028, 0.08, 0.003, 0xf4f6f2, { at: [-0.03, py + 0.06, g], rot: [0, 0, 0.3] }, 0);
+  b.box(0.022, 0.06, 0.003, 0xf4f6f2, { at: [-0.06, py + 0.0, g], rot: [0, 0, -0.5] }, 0);
+  b.box(0.022, 0.06, 0.003, 0xf4f6f2, { at: [0.0, py - 0.0, g], rot: [0, 0, 0.6] }, 0);
+  // The traffic cones on the wall top either side, a white band on each.
+  for (const x of [-0.3, 0.3]) {
+    b.box(0.2, 0.025, 0.2, 0x2a2d33, { at: [x, WALL_HEIGHT + 0.0125, 0.1] }, 0.004);
+    b.cylinder(
+      0.018,
+      0.085,
+      CONE_H - 0.025,
+      CONE,
+      { at: [x, WALL_HEIGHT + 0.025 + (CONE_H - 0.025) / 2, 0.1] },
+      14,
+    );
+    b.cylinder(
+      0.05,
+      0.062,
+      0.05,
+      0xf2f2ee,
+      { at: [x, WALL_HEIGHT + 0.025 + (CONE_H - 0.025) * 0.5, 0.1] },
+      14,
+    );
+  }
   return b.build();
 }
 
@@ -440,26 +557,28 @@ function planBoard(): Model {
   return root.build();
 }
 
+/** The kiosk's error red. */
+const KIOSK_RED = 0xc23a3a;
+
 /**
- * The desk-booking kiosk on the front desk's end panel: a slim kiosk screen
- * on the wall showing DESK BOOKING over a red SYSTEM DOWN error, and under
- * it the paper sign-up sheet taped on, names scrawled down it.
+ * The desk-booking kiosk on the front desk's end panel, read without words:
+ * a 0.6 × 0.4 screen gone red with a big white "!" (DESK BOOKING small over
+ * it), and under it the paper sign-up sheet taped on, names scrawled down it.
  */
 function kiosk(): Model {
   const b = new ModelBuilder();
   const z = 0.506;
-  const cy = 0.62;
-  b.box(0.36, 0.28, 0.03, 0x2a2e34, { at: [0, cy, z + 0.015] }, 0.01);
+  const cy = 0.6;
+  b.box(0.66, 0.46, 0.03, 0x2a2e34, { at: [0, cy, z + 0.015] }, 0.012);
   const f = z + 0.031;
-  b.screen(0.32, 0.24, 0x24364a, { at: [0, cy, f] });
-  b.box(0.3, 0.05, 0.002, 0x3a5070, { at: [0, cy + 0.085, f + 0.0015] }, 0);
-  text(b, 'DESK BOOKING', 0, cy + 0.085, f + 0.003, 0.0058, 0xe8eef6);
-  b.screen(0.28, 0.09, 0xd8342c, { at: [0, cy - 0.01, f + 0.002] });
-  text(b, 'SYSTEM', 0, cy + 0.01, f + 0.004, 0.0085, 0xffffff);
-  text(b, 'DOWN', 0, cy - 0.032, f + 0.004, 0.0085, 0xffffff);
-  b.box(0.03, 0.03, 0.002, 0xd8d8d8, { at: [0, cy - 0.095, f + 0.002] }, 0);
+  b.screen(0.6, 0.4, KIOSK_RED, { at: [0, cy, f] });
+  b.screen(0.58, 0.06, 0x8e2626, { at: [0, cy + 0.16, f + 0.001] });
+  text(b, 'DESK BOOKING', 0, cy + 0.16, f + 0.002, 0.0075, 0xf6dede);
+  // The "!": a bar and its dot, big and white.
+  b.screen(0.07, 0.17, 0xffffff, { at: [0, cy + 0.02, f + 0.002] });
+  b.screen(0.07, 0.06, 0xffffff, { at: [0, cy - 0.12, f + 0.002] });
   // The paper sign-up sheet under it, taped on crooked.
-  const s = framed(b, [0.02, cy - 0.27, z + 0.004], [0, 0, -0.06]);
+  const s = framed(b, [0.04, 0.24, z + 0.004], [0, 0, -0.06]);
   s.box(0.24, 0.2, 0.003, PAPER, {}, 0);
   text(s, 'SIGN UP', 0, 0.075, 0.003, 0.0065, INK);
   for (let k = 0; k < 4; k++) {
@@ -751,8 +870,10 @@ export function bugRackModel(span: number): Model {
 // ---- Counters ----
 
 /** The returns shelves' laminate top: grey, darker than every station top. */
-export const COUNTER_TOP = 0x8e939a;
+export const COUNTER_TOP = 0x868b90;
 const COUNTER_BODY = 0x6e747c;
+/** The laminate's edge banding round the top. */
+const COUNTER_EDGE = 0x8e8a82;
 
 /**
  * A counter as a grey laminate returns shelf, from where it sits in its
@@ -765,7 +886,9 @@ export function upperCounter(run: CounterRun): StationModel {
   const h = STATION_HEIGHT;
   b.box(0.98, h - 0.05, 0.9, COUNTER_BODY, { at: [0, (h - 0.05) / 2, 0] }, 0.01);
   b.box(1.0, 0.05, 0.98, COUNTER_TOP, { at: [0, h - 0.025, 0] }, 0.01);
-  b.box(1.0, 0.012, 0.02, tint(COUNTER_TOP, -0.2), { at: [0, h - 0.04, 0.49] }, 0);
+  // The laminate's edge banding along the front, a darker shadow line under it.
+  b.box(1.0, 0.04, 0.012, COUNTER_EDGE, { at: [0, h - 0.025, 0.496] }, 0);
+  b.box(1.0, 0.006, 0.014, tint(COUNTER_EDGE, -0.35), { at: [0, h - 0.048, 0.496] }, 0);
   // Door gaps and handles on the front.
   b.box(0.006, h - 0.12, 0.004, tint(COUNTER_BODY, -0.3), { at: [0, (h - 0.05) / 2, 0.451] }, 0);
   for (const s of [-1, 1])
@@ -777,6 +900,22 @@ export function upperCounter(run: CounterRun): StationModel {
   if (run.plusEnd && !run.minusEnd) {
     b.cylinder(0.04, 0.036, 0.09, 0xe4e4de, { at: [0.32, h + 0.045, -0.28] }, 14);
     b.torus(0.025, 0.008, 0xe4e4de, { at: [0.36, h + 0.05, -0.28], rot: [0, 0, Math.PI / 2] });
+  }
+  // A few things left on the shelf, at its back corners clear of where a ticket lies:
+  // a returned laptop (closed, a sticky note on it), a sticky pad and a pen.
+  if (run.minusEnd) {
+    b.box(0.26, 0.018, 0.18, 0x5a6068, { at: [-0.27, h + 0.009, -0.3], rot: [0, 0.12, 0] }, 0.006);
+    b.box(0.06, 0.003, 0.06, 0xf2e27a, { at: [-0.22, h + 0.02, -0.3], rot: [0, 0.3, 0] }, 0);
+  } else {
+    b.box(0.08, 0.012, 0.08, 0xf2e27a, { at: [-0.34, h + 0.006, -0.32], rot: [0, -0.2, 0] }, 0);
+    b.cylinder(
+      0.006,
+      0.006,
+      0.13,
+      0x2f5aa8,
+      { at: [-0.22, h + 0.006, -0.3], rot: [0, 0.5, Math.PI / 2] },
+      6,
+    );
   }
   return { base: b.build(), hero: null, heroAt: [0, 0] };
 }

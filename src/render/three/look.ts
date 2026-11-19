@@ -11,6 +11,7 @@ import {
   lampSpots,
   poolPlacements,
   sideLightSpots,
+  stationFillSpots,
   sunPlacement,
   washPlacement,
 } from './atmosphere';
@@ -169,8 +170,8 @@ export const WALL_COLORS: Readonly<Record<WallTheme, { face: number; top: number
   midRise: { face: 0xc9ccce, top: 0x80888f },
   // The same building's partitions, lower down; the stairwell is painted block.
   lowerFloors: { face: 0xc0c3bd, top: 0x868d93 },
-  // The same building's partitions, higher up and lived in.
-  upperFloors: { face: 0xc9ccce, top: 0x80888f },
+  // The same building's partitions, higher up and lived in, capped with cool concrete coping (3-1's lip).
+  upperFloors: { face: 0xc9ccce, top: 0x9a9d9a },
 };
 
 /** Marks the room's warm lamps, which only `medium` and `high` quality light (see `Stage`). */
@@ -275,7 +276,26 @@ export function createLights(
     light.userData[ACCENT_INDEX_KEY] = index;
     return light;
   });
-  return [sky, sun, sun.target, fill, fill.target, ...wash, ...lamps, ...sides, ...accents];
+  // A little warm light on the stations the room's light misses: hidden on `low` too.
+  const stations = stationFillSpots(atmosphere, map).map((at) => {
+    const spec = atmosphere.stationFill;
+    const light = new THREE.PointLight(spec?.color, spec?.intensity, spec?.distance, 2);
+    put(light, at);
+    light.userData[LAMP_KEY] = true;
+    return light;
+  });
+  return [
+    sky,
+    sun,
+    sun.target,
+    fill,
+    fill.target,
+    ...wash,
+    ...lamps,
+    ...sides,
+    ...accents,
+    ...stations,
+  ];
 }
 
 let environment: THREE.Texture | null = null;

@@ -5,7 +5,6 @@ import {
   MID_RISE_WALL_LOOKS,
   headRidgeModel,
   midRiseFoundationModel,
-  midRiseWallModel,
   pendantModel,
   pendantWireModel,
 } from '../roomModels/midRise';
@@ -20,8 +19,14 @@ import {
   threeLook,
   threeTone,
   upperCounter,
+  upperWallModel,
 } from '../roomModels/upperFloors';
-import { UPPER_FRONTS, UPPER_TOPS, segfaultInLocker } from '../setDressing/upperFloorsWallTops';
+import {
+  UPPER_FRONTS,
+  UPPER_SHORT_LOCKERS,
+  UPPER_TOPS,
+  segfaultInLocker,
+} from '../setDressing/upperFloorsWallTops';
 import { PENDANT_WIRE } from './midRiseRoom';
 import type { RoomDressing } from './types';
 import {
@@ -68,7 +73,7 @@ const FLAT = new Set(
  */
 export const UPPER_FLOORS_ROOM: RoomDressing<UpperFloorsRoom> = {
   plan: upperFloorsRoom,
-  wall: { model: midRiseWallModel, looks: MID_RISE_WALL_LOOKS },
+  wall: { model: upperWallModel, looks: MID_RISE_WALL_LOOKS },
   floor: { theme: 'threeFloors', model: threeFloorModel, look: threeLook, tone: threeTone },
   foundation: { model: midRiseFoundationModel, looks: MID_RISE_FOUNDATION_LOOKS },
   counter: upperCounter,
@@ -90,11 +95,19 @@ export const UPPER_FLOORS_ROOM: RoomDressing<UpperFloorsRoom> = {
       const model = UPPER_WALL_ART[art];
       if (model) place(`art:${art}`, model, { at: gridToWorld(x, y), yaw });
     }
-    for (const t of plan.tops)
-      place(`top:${t.kind}`, UPPER_TOPS[t.kind], {
-        at: gridToWorld(t.x, t.y, (t.low ? FRONT_WALL_HEIGHT : WALL_HEIGHT) + TOP_LIFT),
-        yaw: t.yaw,
-      });
+    for (const t of plan.tops) {
+      // A bank on a full-height wall is the short one, so it never towers over the room.
+      const short =
+        !t.low && (t.kind === 'lockers' || t.kind === 'lockersLogo' || t.kind === 'lockersOpen');
+      place(
+        short ? `top:${t.kind}:short` : `top:${t.kind}`,
+        short ? UPPER_SHORT_LOCKERS[t.kind as 'lockers'] : UPPER_TOPS[t.kind],
+        {
+          at: gridToWorld(t.x, t.y, (t.low ? FRONT_WALL_HEIGHT : WALL_HEIGHT) + TOP_LIFT),
+          yaw: t.yaw,
+        },
+      );
+    }
     const cat = plan.segfault;
     if (cat)
       place('segfault', segfaultInLocker, {

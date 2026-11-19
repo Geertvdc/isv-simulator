@@ -7,6 +7,8 @@ import { tint } from '../kit';
 import { STATION_HEIGHT, WALL_HEIGHT } from '../layout';
 import { PALETTE, WALL_COLORS } from '../look';
 import {
+  CONE_H,
+  COPING,
   COUNTER_TOP,
   THREE_FLOOR_LOOKS,
   UPPER_WALL_ART,
@@ -71,6 +73,12 @@ describe('Hot Desking room dressing', () => {
       const box = bounds(model());
       expect(box.min.x).toBeGreaterThanOrEqual(-half - 0.02);
       expect(box.max.x).toBeLessThanOrEqual(half + 0.02);
+      if (art === 'stairsClosed') {
+        // Its traffic cones stand on its own wall top, a cone high.
+        expect(box.min.z).toBeGreaterThanOrEqual(-0.5);
+        expect(box.max.y).toBeLessThanOrEqual(WALL_HEIGHT + CONE_H + 0.001);
+        continue;
+      }
       expect(box.min.z).toBeGreaterThanOrEqual(0.49);
       expect(box.max.y).toBeLessThanOrEqual(WALL_HEIGHT);
     }
@@ -104,6 +112,27 @@ describe('Hot Desking room dressing', () => {
         expect(box.max.z).toBeLessThanOrEqual(-0.25);
       }
     }
+  });
+
+  it('makes the kiosk a big red screen, at least 0.6 wide', () => {
+    const kiosk = UPPER_WALL_ART.kiosk;
+    if (!kiosk) throw new Error('no kiosk');
+    const box = bounds(kiosk());
+    expect(box.max.x - box.min.x).toBeGreaterThanOrEqual(0.6);
+  });
+
+  it('caps the partitions with cool concrete coping, lighter than 3-1 and darker than stations', () => {
+    expect(COPING).toBe(WALL_COLORS.upperFloors.top);
+    expect(luminance(COPING)).toBeGreaterThan(luminance(WALL_COLORS.midRise.top));
+    const wall = UPPER_FLOORS_ROOM.wall?.model('wall', 0);
+    if (!wall) throw new Error('no wall model');
+    const c = new THREE.Color(COPING);
+    const colors = wall.body.getAttribute('color');
+    let found = false;
+    for (let i = 0; i < colors.count; i++)
+      if (Math.abs(colors.getX(i) - c.r) < 1e-3 && Math.abs(colors.getZ(i) - c.b) < 1e-3)
+        found = true;
+    expect(found).toBe(true);
   });
 
   it('fits Segfault inside the open locker', () => {
