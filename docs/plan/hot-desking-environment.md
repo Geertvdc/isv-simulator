@@ -1,10 +1,10 @@
 # Hot Desking environment pass
 
-**Status:** in progress. Level 3-3 (`hot-desking`, "Hot Desking"), the last level of the Scale-Up chapter, gets a hand-built world after [Hypergrowth](hypergrowth-environment.md) (3-2), in the same building.
+**Status:** two rounds done (build, critic review, fixes), with the user's own review folded into round 2. Level 3-3 (`hot-desking`, "Hot Desking"), the last level of the Scale-Up chapter, gets a hand-built world after [Hypergrowth](hypergrowth-environment.md) (3-2), in the same building.
 
-| Before                                          |
-| ----------------------------------------------- |
-| ![](images/hot-desking-environment/before.webp) |
+| Before                                          | After                                          |
+| ----------------------------------------------- | ---------------------------------------------- |
+| ![](images/hot-desking-environment/before.webp) | ![](images/hot-desking-environment/after.webp) |
 
 **Goal:** the world around the level tells one story, the way Overcooked 2 levels do. Mostly render-only (`src/render/`). The map was redrawn just before this pass (three rooms, one lift, no stairs: see the [phase 23 entry](phase-23-level-redesign.md#3-3-hot-desking-hot-desking)). Small map changes are allowed when they make the design read better, as long as gameplay, the tests and the calibration move with them.
 
@@ -108,11 +108,53 @@ Three agents in one worktree at once, with strict file ownership. The shared plu
 
 ## Done when
 
-- [ ] The shot reads as "three floors of the same office building on a Friday afternoon, where nobody owns a desk" without explanation, and nothing in it reads as food or a kitchen.
-- [ ] The storyline beat reads with no explanation: the cutaway of three floors round one lift, lockers and the broken booking kiosk, the taped-off stairs, the TO LET tower across the street.
-- [ ] The lift cars are flush in the back walls: no boxes or walls sticking out, the doors and floor indicator read at a glance.
-- [ ] The outside connects to the play: tickets come in at the front desk, leave by the revolving door; the lift is the only way between floors and looks it.
-- [ ] The running gags are in place: logo lockers, Prod's reserved desk, Segfault in a locker, the TO LET tower, the desk-booking spreadsheet.
-- [ ] No flat empty ground and no void in the 1440×810 frame.
-- [ ] Stations, players, the managers and the lift cars read at a glance; nothing hides them.
-- [ ] `npm run check` passes; other levels look as before.
+- [x] The shot reads as "three floors of the same office building on a Friday afternoon, where nobody owns a desk" without explanation, and nothing in it reads as food or a kitchen.
+- [x] The storyline beat reads with no explanation: the cutaway of three floors round one lift, lockers and the broken booking kiosk, the taped-off stairs, the TO LET tower across the street.
+- [x] The lift cars are flush in the back walls: no boxes or walls sticking out, the doors and floor indicator read at a glance.
+- [x] The outside connects to the play: tickets come in at the front desk, leave by the revolving door; the lift is the only way between floors and looks it.
+- [x] The running gags are in place: logo lockers, Prod's reserved desk, Segfault in a locker, the TO LET tower, the desk-booking spreadsheet.
+- [x] No flat empty ground and no void in the 1440×810 frame.
+- [x] Stations, players, the managers and the lift cars read at a glance; nothing hides them.
+- [x] `npm run check` passes; other levels look as before.
+
+## Rounds
+
+Round 1 ran three agents at once (Room, World, Light), with our finished 3-2 and 3-1 frames as the bar (no Overcooked shots were supplied). The critic scored it **6/10** (before: 3/10; 3-2 about 7). The frame was full, the TO LET tower read instantly, and the flush lift layout (nothing sticking out of the walls) was what was asked for. What held it back:
+
+- "Three stacked floors" didn't read: the upper rooms stood on the same street, at the same scale, as the hot-desk floor, and the floor numbers were hidden under wall tops.
+- The flush lift doors read as black holes or monitors (luminance 20–30); "the car is here" was invisible.
+- The floors outshone the stations (lab vinyl 134, a pale walkway block 135), and the meeting carpet was the same violet as the review station.
+- The gags were too small to find: the taped stairs read as "a closed door", the SYSTEM DOWN kiosk as a red sticker, Segfault's locker faced the street, a tall locker bank read as a fridge.
+- The bug queue and pipelines were dark (83, 87); the warm afternoon sun barely showed.
+
+The user's own review of round 1 added three points: bikes parked next to what reads as a high floor make no sense, roads on the left and right stopped in nowhere, and the lifts looked too low for a person, so give them a higher ceiling.
+
+Round 2, in three chunks:
+
+- **Room:** person-height lift doors (2.0, 1.3× a player) in a slim flush portal that rises above the wall in the wall plane, brushed-steel leaves that read shut (about 75), a lit open car (157), a big amber floor indicator with direction arrows; the lab vinyl and walkway darker than the stations, a muted meeting carpet under the meeting-tile overlay; a stair pictogram, three tapes and two cones; a 0.6-wide kiosk with a big "!"; short camera-facing locker banks with Segfault in an open one on the back wall; three clusters per low wall; counters with a laminate edge and a few returned items.
+- **World:** the surroundings beside the upper floors dropped three storeys (`horizonY` −3) to neighbouring rooftops with gravel, parapets and roof plant, and the building's own façade leaning out into the haze; one pavement and street across the whole front, running off both edges; no bikes, no side roads, no people; floor numbers 0, 1, 2 on the visible cut faces; the shaft with a car roof (hazard edge, hatch, sheave) and a floor that darkens with depth; a bigger Prod with a legible card; green-only planters.
+- **Light:** warm fill lights on the bug queue and pipelines placed from the map's stations (hidden on low), the sun swung toward the camera so the cut faces catch a warm rim, exposure 0.98 for this level only, saturation 1.55, a cool haze on the rooftops below.
+
+Measured on the final shots:
+
+| Measure                        | Before  | Round 1 | Final     |
+| ------------------------------ | ------- | ------- | --------- |
+| Frame mean luminance           | 85.3    | 100.8   | 105.8     |
+| Frame mean luminance, low      |         | 97.4    | 103.3     |
+| Frame saturation               | 0.38    | 0.244   | 0.281     |
+| Shut lift doors (hot-desk/lab) |         | 20 / 30 | 78 / 74   |
+| Open car interior              |         | 84      | 157       |
+| Lab floor                      |         | 134     | 109       |
+| Bug queue / pipelines          | 93 / 75 | 83 / 87 | 116 / 116 |
+
+3-2's and Hackathon's lift cars are unchanged (mesh and material fingerprints). Open Plan's frame differs from its docs shot by 1.2 per channel (animation): unchanged. Middle Management by 1.5: unchanged.
+
+Left for later:
+
+- **The critic did not re-score round 2.** Not checked on a real GPU.
+- **The lift core's top** shows as a pale coping strip above each taller portal; a critic may read it as a box.
+- **The façade drop is a cheat:** a truly vertical outer wall can't be seen from this camera, so it leans out into a light well.
+- **On low quality** the station fill lights are off, so the bug queue and pipelines stay darker (94, 76), and the shut lift doors read darker (about 44).
+- **The meeting carpet is tuned under the game's meeting-tile overlay** (`WorldFx.ts`); if the overlay changes, retune it.
+- **Small text:** the floor directory, RESERVED on Prod's card and the indicator digits are only just legible at 1440×810.
+- **No people outside** any more: the strips beside the hot-desk floor are too narrow for a person a tile from the room and clear of the frame edge.

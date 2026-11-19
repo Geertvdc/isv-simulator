@@ -4,7 +4,7 @@ The campaign tells one story: **YOTTA**, a startup founded by two people in Mom'
 
 This page is canon for level design and environment passes. A level's map, its world, its props and its light should all tell this level's beat. The players never read this page, so **the story has to show in the world**: in the backdrop, the props, the people outside and the signs on the walls.
 
-Where a level already has an environment brief, that brief is the detailed version and wins on details: [garage](../plan/garage-environment.md), [open plan](../plan/open-plan-environment.md), [down the hall](../plan/down-the-hall-environment.md), [seed round](../plan/seed-round-environment.md), [demo day](../plan/demo-day-environment.md), [on call](../plan/on-call-environment.md), [middle management](../plan/middle-management-environment.md), [hypergrowth](../plan/hypergrowth-environment.md). Everything else here is a starting point: change it when a pass finds something funnier, and update this page when you do.
+Where a level already has an environment brief, that brief is the detailed version and wins on details: [garage](../plan/garage-environment.md), [open plan](../plan/open-plan-environment.md), [down the hall](../plan/down-the-hall-environment.md), [seed round](../plan/seed-round-environment.md), [demo day](../plan/demo-day-environment.md), [on call](../plan/on-call-environment.md), [middle management](../plan/middle-management-environment.md), [hypergrowth](../plan/hypergrowth-environment.md), [hot desking](../plan/hot-desking-environment.md). Everything else here is a starting point: change it when a pass finds something funnier, and update this page when you do.
 
 ## The arc in one table
 
@@ -162,12 +162,12 @@ _New: the wandering manager._ YOTTA has money, headcount and a manager. It doesn
 
 ### 3-3 Hot Desking (`hot-desking`)
 
-- **Where and when:** three floors and one lift. Spring, Friday afternoon.
+- **Where and when:** three floors of the mid-rise from 3-1 and 3-2, shown as a cutaway round one lift: the hot-desk floor at street level, the test lab above it, the meeting room on top, over the rooftops. Spring, Friday afternoon.
 - **The joke:** nobody has a desk, the desk-booking app is down, and the stairwell is closed for the hot-desk refit, so the whole company shares one lift. Two managers now, so two status updates.
 - **Mechanic in the story:** one lift, three floors, no stairs: the hot desks on the ground, the test lab in the middle, the meeting room on top. The lift stops at every floor in turn, so you time it, and from the test lab you let the car going the wrong way leave without you. Reviews happen in the meeting room because there's nowhere else.
-- **Inbox and ship:** the inbox is the post room hatch on the ground floor, by the hot desks; the ship hatch is the ground-floor exit.
-- **Outside:** the crane comes down: the glass tower across the street is finished and an estate agent is putting up a "TO LET" banner.
-- **Running gags:** YOTTA on the lockers, Prod on the only desk nobody can book, Segfault in an empty locker, the plan as a desk-booking spreadsheet.
+- **Inbox and ship:** the inbox is the hot-desk floor's front desk (pigeonholes, and a DESK BOOKING kiosk showing a big red "!"); the ship hatch is the revolving front door onto the street, where a courier's cargo bike waits.
+- **Outside:** the upper floors stand over neighbouring rooftops a few storeys down, the building's glass façade dropping into the haze; at street level, one pavement and street across the front. The crane comes down: the glass tower across the street is finished and an estate agent's cherry picker is putting up a "TO LET" banner.
+- **Running gags:** YOTTA on the violet locker doors, Prod on the only desk nobody can book (a RESERVED: PROD card, on the left terrace by the meeting room), Segfault asleep in an open locker on the hot-desk floor's back wall, the plan as a desk-booking spreadsheet, the stairs taped off with cones and a stair sign by the lift.
 - **Level design hooks:** three floors, one lift with three stops; the test lab is the middle stop.
 - **How it ends:** YOTTA rents the whole glass tower across the street. It's going to be YOTTA Tower.
 
@@ -260,21 +260,21 @@ _New: belts, design, merges._ YOTTA is on MONOLITH's old campus. It is now the t
 
 A quick lookup for set dressing. "—" means it's not in that level.
 
-| Level | Logo                       | Prod                | Segfault             | Mom / the wagon             | MONOLITH                | Crane tower       |
-| ----- | -------------------------- | ------------------- | -------------------- | --------------------------- | ----------------------- | ----------------- |
-| 1-1   | cardboard, marker pen      | cutting in a mug    | on the wagon's roof  | kitchen door; wagon evicted | —                       | —                 |
-| 1-2   | vinyl over ghost lettering | windowsill          | in a moving box      | wagon dropping off boxes    | —                       | —                 |
-| 1-3   | A4 printout on each door   | filing cabinet      | radiator in the hall | —                           | —                       | —                 |
-| 2-1   | lit letters on the roof    | huge planter        | terrace bean bag     | —                           | glowing on the skyline  | crane, red light  |
-| 2-2   | LED pitch slide            | on a stage monitor  | reserved seat        | front row, RESERVED         | scout taking notes      | —                 |
-| 2-3   | sticker on a cage rack     | by the storage cage | warmest server       | —                           | —                       | —                 |
-| 3-1   | vinyl beside reception     | reception           | Derek's chair        | —                           | Derek's old lanyard     | half-clad         |
-| 3-2   | banner over the lift shaft | stair landing       | on the lift car roof | —                           | —                       | almost done       |
-| 3-3   | on the lockers             | unbookable desk     | empty locker         | —                           | —                       | finished, TO LET  |
-| 4-1   | steel letters in the lobby | corridor planter    | boardroom table      | meeting room; visitor bay   | level with them         | they're inside it |
-| 4-2   | side by side with MONOLITH | sticky-note parking | flip chart           | —                           | executives visiting     | —                 |
-| 4-3   | rebrand to `yotta.`        | on a trolley        | box marked "Matrix"  | —                           | crowd outside its tower | —                 |
-| 5-1   | cherry-picker logo swap    | tree in the atrium  | skybridge rail       | wagon on a plinth           | its old belts and logo  | —                 |
-| 5-2   | cardboard, framed          | cutting on a desk   | swatch basket        | —                           | —                       | —                 |
-| 5-3   | two fonts, two towers      | tree through glass  | on the carpet line   | —                           | —                       | —                 |
-| 5-4   | every logo on the booths   | tree through glass  | on the trophy        | judging                     | —                       | —                 |
+| Level | Logo                       | Prod                  | Segfault             | Mom / the wagon             | MONOLITH                | Crane tower       |
+| ----- | -------------------------- | --------------------- | -------------------- | --------------------------- | ----------------------- | ----------------- |
+| 1-1   | cardboard, marker pen      | cutting in a mug      | on the wagon's roof  | kitchen door; wagon evicted | —                       | —                 |
+| 1-2   | vinyl over ghost lettering | windowsill            | in a moving box      | wagon dropping off boxes    | —                       | —                 |
+| 1-3   | A4 printout on each door   | filing cabinet        | radiator in the hall | —                           | —                       | —                 |
+| 2-1   | lit letters on the roof    | huge planter          | terrace bean bag     | —                           | glowing on the skyline  | crane, red light  |
+| 2-2   | LED pitch slide            | on a stage monitor    | reserved seat        | front row, RESERVED         | scout taking notes      | —                 |
+| 2-3   | sticker on a cage rack     | by the storage cage   | warmest server       | —                           | —                       | —                 |
+| 3-1   | vinyl beside reception     | reception             | Derek's chair        | —                           | Derek's old lanyard     | half-clad         |
+| 3-2   | banner over the lift shaft | stair landing         | on the lift car roof | —                           | —                       | almost done       |
+| 3-3   | on the locker doors        | reserved terrace desk | open locker          | —                           | —                       | finished, TO LET  |
+| 4-1   | steel letters in the lobby | corridor planter      | boardroom table      | meeting room; visitor bay   | level with them         | they're inside it |
+| 4-2   | side by side with MONOLITH | sticky-note parking   | flip chart           | —                           | executives visiting     | —                 |
+| 4-3   | rebrand to `yotta.`        | on a trolley          | box marked "Matrix"  | —                           | crowd outside its tower | —                 |
+| 5-1   | cherry-picker logo swap    | tree in the atrium    | skybridge rail       | wagon on a plinth           | its old belts and logo  | —                 |
+| 5-2   | cardboard, framed          | cutting on a desk     | swatch basket        | —                           | —                       | —                 |
+| 5-3   | two fonts, two towers      | tree through glass    | on the carpet line   | —                           | —                       | —                 |
+| 5-4   | every logo on the booths   | tree through glass    | on the trophy        | judging                     | —                       | —                 |
