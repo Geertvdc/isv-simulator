@@ -292,7 +292,7 @@ export class WorldFx {
         geometry,
         new THREE.PointsMaterial({
           color: atmosphere.motes.color,
-          size: MOTE_SIZE,
+          size: atmosphere.motes.outside?.size ?? MOTE_SIZE,
           transparent: true,
           opacity: atmosphere.motes.opacity,
           blending: THREE.AdditiveBlending,
@@ -301,6 +301,8 @@ export class WorldFx {
         }),
       );
       points.frustumCulled = false;
+      // Dust in the sunlit air outside is a nicety: `Stage` hides it on `low` like the ambient motion.
+      if (atmosphere.motes.outside) points.userData[AMBIENT_KEY] = true;
       this.root.add(points);
       this.motes = { points, seeds };
       this.driftMotes(0);

@@ -6,6 +6,7 @@ import {
   DEMO_DAY,
   DOWN_THE_HALL,
   GARAGE,
+  HOT_DESKING,
   HYPERGROWTH,
   LEVELS,
   MIDDLE_MANAGEMENT,
@@ -42,6 +43,7 @@ import {
   petalSeeds,
   poolPlacements,
   rainSeeds,
+  roomRows,
   sideLightSpots,
   snowSeeds,
   stutterIndex,
@@ -94,6 +96,7 @@ describe('atmosphereFor', () => {
       ON_CALL.id,
       MIDDLE_MANAGEMENT.id,
       HYPERGROWTH.id,
+      HOT_DESKING.id,
     ]);
     for (const level of LEVELS) {
       if (lit.has(level.id)) continue;
@@ -551,7 +554,8 @@ describe('the spring morning (middle-management)', () => {
     expect(a.vignette?.saturate).toBeLessThan(1.6);
     // No other preset is graded but 3-2's rain: their pictures stay exactly as they were.
     for (const [id, other] of Object.entries(ATMOSPHERES))
-      if (other !== a && id !== 'hypergrowth') expect(other.vignette?.saturate, id).toBeUndefined();
+      if (other !== a && id !== 'hypergrowth' && id !== 'hot-desking')
+        expect(other.vignette?.saturate, id).toBeUndefined();
   });
 
   it('slants faint sunbeams in on the floor beside the room, never over it', () => {
@@ -681,7 +685,7 @@ describe('the spring rain (hypergrowth)', () => {
     expect(r - b).toBeGreaterThan(15);
     // The other presets get none.
     for (const [id, other] of Object.entries(ATMOSPHERES))
-      if (other !== a) expect(poolPlacements(other, map), id).toEqual([]);
+      if (other !== a && id !== 'hot-desking') expect(poolPlacements(other, map), id).toEqual([]);
     expect(poolPlacements(DEFAULT_ATMOSPHERE, SHIPPED)).toEqual([]);
   });
 
@@ -730,6 +734,121 @@ describe('the spring rain (hypergrowth)', () => {
     expect(rainSeeds(DEFAULT_ATMOSPHERE, SHIPPED)).toEqual([]);
     for (const [id, other] of Object.entries(ATMOSPHERES))
       if (other !== a) expect(rainSeeds(other, map), id).toEqual([]);
+  });
+});
+
+describe('the Friday afternoon (hot-desking)', () => {
+  const a = atmosphereFor('hot-desking');
+  const map = HOT_DESKING.map;
+  const rgb = (c: number) => [(c >> 16) & 255, (c >> 8) & 255, c & 255] as const;
+  const rooms = roomRows(map);
+
+  it('gives hot-desking its own light', () => {
+    expect(atmosphereFor(LEVEL_LOOKS[HOT_DESKING.id]?.scene)).toBe(ATMOSPHERES['hot-desking']);
+    for (const id of ['middle-management', 'hypergrowth']) expect(a).not.toBe(ATMOSPHERES[id]);
+  });
+
+  it('keys it low and warm from the right (west), about 40° up, so shadows run long to the left', () => {
+    const { position: s, target: t } = sunPlacement(a, map);
+    const elevation = Math.atan2(s.y - t.y, Math.hypot(s.x - t.x, s.z - t.z)) * (180 / Math.PI);
+    expect(elevation).toBeGreaterThan(37);
+    expect(elevation).toBeLessThan(43);
+    // Mostly from the side: far more right than back or front.
+    expect(s.x - t.x).toBeGreaterThan(3 * Math.abs(s.z - t.z));
+    const [sr, , sb] = rgb(a.sun.color);
+    expect(sr - sb).toBeGreaterThan(50);
+  });
+
+  it('keeps the fill and sky only a touch blue, so yellow stations stay yellow', () => {
+    for (const c of [a.fill.color, a.sky.sky]) {
+      const [r, g, b] = rgb(c);
+      expect(b).toBeGreaterThanOrEqual(r);
+      expect(b - r).toBeLessThan(25);
+      expect(Math.min(r, g, b)).toBeGreaterThan(200);
+    }
+    // The haze outside a little cooler than the room's warm light.
+    for (const c of [a.fog?.color ?? 0, a.backdrop?.inner ?? 0]) {
+      const [r, , b] = rgb(c);
+      expect(b).toBeGreaterThan(r);
+    }
+    expect(a.vignette?.opacity).toBeCloseTo(0.35);
+    expect(a.vignette?.inner).toBeCloseTo(0.7);
+    expect(a.vignette?.saturate).toBeGreaterThan(1);
+    expect(a.vignette?.saturate).toBeLessThan(1.6);
+  });
+
+  it('finds the three rooms: top floor, test lab, hot-desk floor', () => {
+    expect(rooms).toHaveLength(3);
+    const [meeting, lab, hotDesk] = rooms;
+    if (!meeting || !lab || !hotDesk) return;
+    // The lift cabins in the upper rooms' back walls don't pull their back row up.
+    expect(meeting.inside).toBe(1);
+    expect(lab.inside).toBe(1);
+    expect(meeting.x1).toBeLessThan(lab.x0);
+    expect(hotDesk.inside).toBeGreaterThan(map.height / 2);
+    expect(hotDesk.x1 - hotDesk.x0).toBeGreaterThan(lab.x1 - lab.x0);
+    expect(roomRows(SHIPPED)).toEqual([{ inside: 1, x0: 1, x1: 12 }]);
+  });
+
+  it('lights each room with its own warm pools, the top floor brightest, never the voids between', () => {
+    const pools = poolPlacements(a, map);
+    const [meeting, lab, hotDesk] = rooms;
+    if (!meeting || !lab || !hotDesk) return;
+    const inRoom = (p: (typeof pools)[number], r: typeof meeting) =>
+      p.target.x > r.x0 - 0.5 && p.target.x < r.x1 + 0.5 && Math.abs(p.target.z - r.inside) < 3;
+    const top = pools.filter((p) => inRoom(p, meeting));
+    const middle = pools.filter((p) => inRoom(p, lab));
+    const street = pools.filter((p) => inRoom(p, hotDesk));
+    expect(top.length).toBeGreaterThan(0);
+    expect(middle.length).toBeGreaterThan(0);
+    // The wide hot-desk floor gets a row of pools, so none spills over the floors above.
+    expect(street.length).toBeGreaterThan(1);
+    expect(top.length + middle.length + street.length).toBe(pools.length);
+    const level = (ps: typeof pools) => Math.max(...ps.map((p) => p.intensity));
+    expect(level(top)).toBeGreaterThan(level(middle));
+    expect(level(top)).toBeGreaterThan(level(street));
+    for (const p of pools) {
+      expect(getTile(map, Math.round(p.target.x), Math.round(p.target.z))).toBe('floor');
+      expect(p.position.y).toBeGreaterThan(WALL_HEIGHT * 2);
+      expect(p.angle).toBeLessThan(Math.PI / 4);
+    }
+    const [r, , b] = rgb(a.pools?.color ?? 0);
+    expect(r - b).toBeGreaterThan(15);
+  });
+
+  it('hangs a row of pendants along the back of each room, and only there', () => {
+    const spots = lampSpots(a, map);
+    for (const room of rooms) {
+      const row = spots.filter(
+        (p) => p.x > room.x0 - 0.5 && p.x < room.x1 + 0.5 && Math.abs(p.z - room.inside) < 0.5,
+      );
+      expect(row.length).toBeGreaterThan(0);
+    }
+    for (const p of spots) {
+      expect(getTile(map, Math.round(p.x), Math.round(p.z))).toBe('floor');
+      expect(p.y).toBe(a.lamps?.height);
+    }
+    // The other presets keep their own rows.
+    for (const [id, other] of Object.entries(ATMOSPHERES))
+      if (other !== a) expect(other.lamps?.perRoom, id).toBeUndefined();
+  });
+
+  it('hangs the same dust in the sun outside every time, never over the room', () => {
+    const seeds = moteSeeds(a, map);
+    expect(seeds.length).toBeGreaterThan(20);
+    expect(moteSeeds(a, map)).toEqual(seeds);
+    for (const { at, phase } of seeds) {
+      const beside = at.x > map.width - 0.5;
+      // Behind the back only where the first row is room: behind void is the lift shaft.
+      const behind = at.z < -0.5 && getTile(map, Math.round(at.x), 0) !== 'void';
+      expect(beside || behind).toBe(true);
+      expect(at.z).toBeLessThan(map.height - 0.5);
+      expect(phase).toBeGreaterThanOrEqual(0);
+      expect(phase).toBeLessThan(1);
+    }
+    // The other presets' motes (if any) stay in their rooms.
+    for (const [id, other] of Object.entries(ATMOSPHERES))
+      if (other !== a) expect(other.motes?.outside, id).toBeUndefined();
   });
 });
 
