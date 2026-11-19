@@ -91,6 +91,8 @@ export const WALL_DECOS: Readonly<Record<WallTheme, readonly string[]>> = {
   midRise: ['whiteboard', 'officeClock', 'dashboard', 'fireExit'],
   // Hypergrowth's floors hang their own pieces (see `rooms/lowerFloorsRoom.ts`); this is the fallback.
   lowerFloors: ['whiteboard', 'officeClock', 'fireExit'],
+  // Hot Desking's floors hang their own pieces (see `rooms/upperFloorsRoom.ts`); this is the fallback.
+  upperFloors: ['whiteboard', 'officeClock', 'fireExit'],
 };
 /** No two decorations this close along a wall are the same. */
 export const WALL_DECO_SPREAD = 4;
