@@ -12,6 +12,7 @@ import type { ScenePiece } from './types';
 import * as hd from '../setDressing/hotDesking';
 import { pigeon } from '../setDressing/businessPark';
 import { bike } from '../setDressing/onCall';
+import { cherryTree, dayCar } from '../setDressing/midRise';
 import * as canal from '../setDressing/canal';
 import * as suburb from '../setDressing/suburb';
 
@@ -202,15 +203,22 @@ describe('hotDeskingScene', () => {
   });
 
   it('builds the cutaway: the cut slab with its floor numbers, the shaft, the cut glass', () => {
-    const numbers = scene.pieces.filter((p) =>
-      ['1', '2'].some((t) => p.piece === hd.floorNumber(t, 0.09)),
-    );
-    expect(numbers.length).toBe(2);
-    for (const p of numbers) {
-      expect(p.at.z).toBeGreaterThan(plan.slab.z0);
-      expect(p.at.z).toBeLessThan(plan.slab.z1);
+    // The floor numbers stand on the cut faces, facing the camera, on screen and clear of the HUD.
+    for (const t of ['0', '1', '2']) {
+      const num = find(hd.slabNumber(t, hd.FLOOR));
+      expect(num.length, t).toBe(1);
+      for (const v of worldPoints(num[0] as ScenePiece)) {
+        const s = projectPoint(pose, v);
+        expect(s.x, t).toBeGreaterThan(0);
+        expect(s.x, t).toBeLessThan(1440);
+      }
     }
-    expect(scene.pieces.filter(isShaft).length).toBeGreaterThanOrEqual(3);
+    for (const t of ['1', '2']) {
+      const p = find(hd.slabNumber(t, hd.FLOOR))[0] as ScenePiece;
+      expect(p.at.z).toBeGreaterThan(plan.slab.z1 - 0.1);
+      expect(p.at.x < -0.5 || p.at.x > map.width - 0.5).toBe(true);
+    }
+    expect(scene.pieces.filter(isShaft).length).toBeGreaterThanOrEqual(1);
     // The motor room behind the shaft, on the core up from the street.
     const motor = scene.pieces.find(
       (p) => p.at.z < -0.5 && p.at.x > plan.shaft.x0 && p.at.x < plan.shaft.x1,
@@ -242,11 +250,29 @@ describe('hotDeskingScene', () => {
     expect(at.some((p) => p.x > map.width + 0.5)).toBe(true);
     expect(at.some((p) => p.z < -3)).toBe(true);
     expect(at.some((p) => p.z > front)).toBe(true);
-    expect(find(bike).length).toBeGreaterThanOrEqual(6);
     expect(has(hd.coffeeCart)).toBe(true);
     expect(has(canal.cargoBike)).toBe(true);
-    expect(find(hd.commuter).length).toBeGreaterThanOrEqual(3);
     for (const g of scene.ground) expect(scene.painters?.[g.kind], g.kind).toBeDefined();
+  });
+
+  it('drops the city under the upper floors: rooftops each side, no street up there', () => {
+    const drop = scene.horizonY ?? 0;
+    expect(drop).toBeLessThanOrEqual(-2.5);
+    const roofs = scene.pieces.filter(
+      (p) => p.at.z < plan.slab.z0 && Math.abs(p.at.y - (GROUND + drop)) < 1e-6 && p.row === 'far',
+    );
+    expect(roofs.some((p) => p.at.x < -2)).toBe(true);
+    expect(roofs.some((p) => p.at.x > map.width + 1)).toBe(true);
+    // No cars, trees or bikes beside the upper floors, and no cycle rack anywhere.
+    for (const p of scene.pieces)
+      if ([dayCar, cherryTree].includes(p.piece)) expect(p.at.z).toBeGreaterThan(plan.slab.z1);
+    expect(find(bike).length).toBe(0);
+    // Every street-level patch is in front of the slab and runs off both edges of the frame.
+    for (const g of scene.ground.filter((q) => (q.y ?? 0) === 0 && q.kind !== 'pit')) {
+      expect(g.z0, g.kind).toBeGreaterThanOrEqual(plan.slab.z0);
+      expect(g.x0, g.kind).toBeLessThan(-8);
+      expect(g.x1, g.kind).toBeGreaterThan(map.width + 8);
+    }
   });
 
   it('gives every living piece a body, a tile from the room', () => {

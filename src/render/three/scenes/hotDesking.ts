@@ -9,25 +9,24 @@ import {
   balustrade,
   cherryPicker,
   coffeeCart,
-  commuter,
   cutFace,
   cutGlass,
   cutSlab,
+  facadeDrop,
   finishedTower,
   FLOOR,
-  floorNumber,
-  laptopBag,
   liftShaft,
   lowPlanter,
   motorRoom,
+  neighbourRoof,
   reservedDesk,
+  slabNumber,
   terraceTop,
   streetBollard,
   toLetBanner,
 } from '../setDressing/hotDesking';
 import { wheelieBin } from '../setDressing/hypergrowth';
-import { bus, cherryTree, dayCar } from '../setDressing/midRise';
-import { bike, bikeStand, steamWisp } from '../setDressing/onCall';
+import { steamWisp } from '../setDressing/onCall';
 import { bottleCage, pigeon } from '../setDressing/businessPark';
 import { cityBlock } from '../setDressing/rooftop';
 import type { SetPiece } from '../setDressing/shared';
@@ -41,7 +40,6 @@ import {
   type Scene,
   type ScenePerson,
   type ScenePiece,
-  type ScenePose,
 } from './types';
 
 /**
@@ -76,16 +74,19 @@ import {
  * frame's edges fall at 1440×810. Pure data.
  */
 
-/** The street out to the horizon, storeys down: pale spring pavement. */
-const HORIZON = 0x8a8a84;
-/** How far down the street lies round the upper floors (under the slab's foot). */
-const DROP = -1.3;
-/** Street pieces storeys down are this much smaller: they're further off. */
-const LOW = 0.65;
-/** The street's widths: pavement, road, the far pavement. */
-const WALK = 1.0;
-const ROAD = 1.6;
-const FAR_WALK = 0.8;
+/** The alleys between the neighbours, far down in their shade. */
+const HORIZON = 0x5c5f63;
+/** How far down the city lies round the upper floors (under the slab's foot). */
+const DEEP = -3;
+/** The neighbours' roofs, a storey or two under the upper floors: lowest and highest. */
+const ROOF_LOW = -1.9;
+const ROOF_HIGH = -1.05;
+/** The building's facade under the upper floors: how far it leans out on its way down to show. */
+const FACADE_OUT = 2.8;
+/** The light well between the building's facade and the neighbours. */
+const WELL = 0.5;
+/** How far behind the building the street across stands (where the tower is). */
+const ACROSS = 3.65;
 /** How far the building's glass stands off the rooms' outer walls. */
 const SKIN = 0.1;
 /** Where the cutaway cuts the building's glass: a little over the rooms' walls, so it shows. */
@@ -95,7 +96,9 @@ const PAVE = 1.15;
 /** The terrace where the slab runs out past the building, each side. */
 const TERRACE = 2.6;
 /** The finished tower: width, depth, storeys, storey height. */
-const TOWER = { w: 3.4, d: 1.6, floors: 18, storey: 0.24 } as const;
+const TOWER = { w: 3.4, d: 1.6, floors: 25, storey: 0.24 } as const;
+/** The far skyline's blocks keep the heights they had over a street a storey down. */
+const SKYLINE_LIFT = 1.7;
 /** The screen the scene is composed for. */
 const VIEW = { width: 1440, height: 810 };
 /** Screen rectangles the HUD covers at 1440×810: story props stay out of them. */
@@ -114,8 +117,6 @@ const HUD_LEGEND_RIGHT = 218;
 /** The living props. */
 const ALIVE: ReadonlyMap<SetPiece, AliveKind> = new Map<SetPiece, AliveKind>([
   [pigeon, 'peck'],
-  [cherryTree, 'sway'],
-  [commuter, 'bob'],
   [steamWisp, 'wisp'],
 ]);
 
@@ -263,12 +264,6 @@ export function hotDeskingScene(map: LevelMap): Scene {
     const pad: Box = [s[0] - 2, s[1] - 2, s[2] + 2, s[3] + 2];
     return HUD.every((q) => !hits(pad, q));
   };
-  /** Whether (x, z), `lift` up, is on screen with `margin` to spare. */
-  const onScreen = (x: number, z: number, lift = 0, margin = 0) => {
-    const p = projectPoint(pose, { x, y: GROUND + lift, z });
-    return p.x > margin && p.x < VIEW.width - margin && p.y > margin && p.y < VIEW.height - margin;
-  };
-
   const tilesOf = (kind: string): Tile[] =>
     map.tiles.flatMap((t, i) => (t === kind ? [{ x: i % width, z: Math.floor(i / width) }] : []));
   const ship = tilesOf('ship');
@@ -334,22 +329,6 @@ export function hotDeskingScene(map: LevelMap): Scene {
     if (x1 - x0 > 0.01 && z1 - z0 > 0.01)
       ground.push({ kind, x0, x1, z0, z1, ...(y !== 0 ? { y } : {}) });
   };
-  const person = (x: number, z: number, yaw: number, p: ScenePose) =>
-    people.push({ at: gridToWorld(x, z, GROUND), yaw, pose: p });
-  /** A laptop bag hanging at the side of someone standing at (x, z) facing `yaw`. */
-  const bagAt = (x: number, z: number, yaw: number, side: number, v: number) => {
-    const a = yaw + (side * Math.PI) / 2;
-    put(
-      laptopBag,
-      x + Math.sin(a) * 0.3,
-      z + Math.cos(a) * 0.3,
-      yaw + (side * Math.PI) / 2,
-      v,
-      'near',
-      0.42,
-    );
-  };
-
   // Where the frame's edges fall, a little past them.
   const topZ = -12;
   const frontZ = F + 2.5;
@@ -364,32 +343,16 @@ export function hotDeskingScene(map: LevelMap): Scene {
   const midZ = (slab.z0 + slab.z1) / 2;
 
   // ---- Ground ----
-  // Storeys down round the upper floors (the horizon's level), at the slab's foot round the hot-desk floor.
-  const backWalk = backLine - WALK;
-  const backRoad = backWalk - ROAD;
-  const backFar = backRoad - FAR_WALK;
-  patch('walk', edgeL - far, edgeR + far, backWalk, backLine + 0.3, DROP);
-  patch('road:x', edgeL - far, edgeR + far, backRoad, backWalk, DROP);
-  patch('walk', edgeL - far, edgeR + far, backFar, backRoad, DROP);
-  patch('plaza', edgeL - far, edgeR + far, topZ - far, backFar, DROP);
-  // Down the sides of the upper floors, storeys down.
-  patch('walk', leftLine - WALK, leftLine + 0.3, backLine, midZ, DROP);
-  patch('road:z', leftLine - WALK - ROAD, leftLine - WALK, backWalk, midZ, DROP);
-  patch('walk', edgeL - far, leftLine - WALK - ROAD, backWalk, midZ, DROP);
-  patch('walk', rightLine - 0.3, rightLine + WALK, backLine, midZ, DROP);
-  patch('road:z', rightLine + WALK, rightLine + WALK + ROAD, backWalk, midZ, DROP);
-  patch('walk', rightLine + WALK + ROAD, edgeR + far, backWalk, midZ, DROP);
-  // Street level round the hot-desk floor: the pavement to the kerb, the road past it.
-  const kerbL = lower.x0 - PAVE;
-  const kerbR = lower.x1 + PAVE;
+  // Far down round the upper floors: the alleys between the neighbours (the horizon plane), and
+  // across the back the square in front of the finished tower.
+  const siteZ = backLine - ACROSS;
+  patch('plaza', edgeL - far, edgeR + far, topZ - far, siteZ + 0.6, DEEP);
+  // Street level round the hot-desk floor: a wide pavement right across the frame, the kerb and
+  // the street in front, both running off the frame's edges.
   const kerbF = lower.z1 + PAVE;
-  patch('pave', kerbL, kerbR, midZ, kerbF);
-  patch('kerb:x', kerbL - 0.12, kerbR + 0.12, kerbF, kerbF + 0.12);
-  patch('kerb:z', kerbL - 0.12, kerbL, midZ, kerbF);
-  patch('kerb:z', kerbR, kerbR + 0.12, midZ, kerbF);
+  patch('pave', edgeL - far, edgeR + far, midZ, kerbF);
+  patch('kerb:x', edgeL - far, edgeR + far, kerbF, kerbF + 0.12);
   patch('road:x', edgeL - far, edgeR + far, kerbF + 0.12, frontZ + far);
-  patch('road:z', edgeL - far, kerbL - 0.12, midZ, kerbF + 0.12);
-  patch('road:z', kerbR + 0.12, edgeR + far, midZ, kerbF + 0.12);
   // The shaft's floor (its back wall, as the cutaway shows it) is the shaft piece's own.
   patch('pit', shaft.x0, shaft.x1, backLine, slab.z1);
 
@@ -403,22 +366,23 @@ export function hotDeskingScene(map: LevelMap): Scene {
       [shaft.x1 + 0.25, R],
     ] as const)
       if (x1 - x0 > 0.2) put(cutSlab(x1 - x0 - 0.04, d), x0 + 0.02, z);
-    // A big floor number on the slab under each upper floor, toward its outer end.
-    const [top, mid] = plan.upper;
-    const px = 0.09;
-    if (top) put(floorNumber('2', px), top.x1 - 2.2, slab.z0 + 0.36, 0, 0, 'near', FLOOR);
-    if (mid) put(floorNumber('1', px), mid.x1 - 1.4, slab.z0 + 0.36, 0, 0, 'near', FLOOR);
-    // The terrace where the slab runs out past the building, each side: a cut face toward the street.
-    const tl = leftLine - TERRACE;
-    const tr = rightLine + TERRACE;
+    // The slab runs on past the building as a terrace each side, out past the frame's edges, so
+    // its cut face is one section line right across: the upper floors over it, the street under.
+    const tl = Math.min(leftLine - TERRACE, xAt(-30, z, FLOOR) - 0.5);
+    const tr = Math.max(rightLine + TERRACE, xAt(VIEW.width + 30, z, FLOOR) + 0.5);
     put(cutFace(L - 0.02 - tl, FLOOR, '', 0), tl, z);
     put(cutFace(tr - (R + 0.02), FLOOR, '', 0), R + 0.02, z);
     put(terraceTop(L - 0.02 - tl, d), (tl + L - 0.02) / 2, z - d / 2);
     put(terraceTop(tr - R - 0.02, d), (R + 0.02 + tr) / 2, z - d / 2);
     put(balustrade(L - 0.02 - tl), tl, slab.z0 + 0.06, 0, 0, 'near', FLOOR);
     put(balustrade(tr - R - 0.02), R + 0.02, slab.z0 + 0.06, 0, 0, 'near', FLOOR);
+    // The upper floors' numbers on the terraces' cut faces, where the street sees them: the top
+    // floor (2) on the left, the middle floor (1) on the right.
+    const [top, mid] = plan.upper;
+    if (top) put(slabNumber('2', FLOOR), xAt(70, z + 0.03, FLOOR / 2), z + 0.03);
+    if (mid) put(slabNumber('1', FLOOR), xAt(1360, z + 0.03, FLOOR / 2), z + 0.03);
     // The only desk nobody can book, out on the left terrace; a pigeon on the right one's edge.
-    put(reservedDesk, L - 1.15, slab.z0 + 0.5, 0.12, 0, 'near', FLOOR);
+    put(reservedDesk, L - 1.2, slab.z0 + 0.42, 0.1, 0, 'near', FLOOR, 1.2);
     put(pigeon, R + 1.4, slab.z1 - 0.12, -0.6, 0, 'near', FLOOR);
     put(pigeon, R + 1.9, slab.z0 + 0.25, 2.2, 1, 'near', FLOOR + 0.52);
   }
@@ -426,7 +390,8 @@ export function hotDeskingScene(map: LevelMap): Scene {
   {
     // From where it clears the player legend, at the bottom left.
     const x0 = Math.max(lower.x0, xAt(HUD_LEGEND_RIGHT + 4, lower.z1 + 0.05, FLOOR));
-    put(cutFace(lower.x1 - x0, FLOOR, '0', 0.9), x0, lower.z1 + 0.025);
+    put(cutFace(lower.x1 - x0, FLOOR, '', 0), x0, lower.z1 + 0.025);
+    put(slabNumber('0', FLOOR), x0 + 0.9, lower.z1 + 0.055);
   }
   // The building's glass round the upper floors, cut at the walls' line.
   for (const u of plan.upper) {
@@ -438,6 +403,14 @@ export function hotDeskingScene(map: LevelMap): Scene {
     if (u.x1 === R)
       put(cutGlass(slab.z0 - backLine, GLASS_CUT), rightLine, backLine, -Math.PI / 2, 0, 'far');
   }
+  // Under the upper floors' outer walls, the building's own facade dropping to the city.
+  {
+    const len = slab.z0 - backLine;
+    if (plan.upper.some((u) => u.x0 === L))
+      put(facadeDrop(len, FACADE_OUT, -DEEP), leftLine, backLine, -Math.PI / 2, 0, 'far');
+    if (plan.upper.some((u) => u.x1 === R))
+      put(facadeDrop(len, FACADE_OUT, -DEEP), rightLine, slab.z0, Math.PI / 2, 0, 'far');
+  }
 
   // ---- The lift shaft and its motor room on the roof ----
   {
@@ -446,36 +419,32 @@ export function hotDeskingScene(map: LevelMap): Scene {
     const front = slab.z1 - 0.6;
     const len = front - backLine;
     const cabins = map.marks.filter((m) => m.kind === 'lift');
-    // A landing at each upper car's front edge and at the hot-desk floor's car.
+    // A landing at each upper car's front edge and at the hot-desk floor's car; the car itself
+    // somewhere between, its roof across the shaft.
     const upperZ = Math.max(...cabins.filter((c) => c.y < slab.z0).map((c) => c.y + 0.5), 0.5);
-    put(liftShaft(w, len, len * 0.55, [front - upperZ, 0.08]), cx, front);
-    put(floorNumber('2', 0.07), shaft.x0 + 0.42, upperZ + 0.5, 0, 0, 'near', 0.07);
-    put(floorNumber('1', 0.07), shaft.x1 - 0.42, upperZ + 0.5, 0, 0, 'near', 0.07);
-    put(floorNumber('0', 0.07), shaft.x0 + 0.42, front - 0.55, 0, 0, 'near', 0.07);
-    // The core behind the building, up from the street, with the motor room on top.
-    put(motorRoom(w + 0.06, 1.3, FLOOR - DROP), cx, backLine - 0.02, 0, 0, 'far', FLOOR);
+    put(liftShaft(w, len, (front - upperZ) * 0.6, [front - upperZ, 0.08]), cx, front);
+    // The core behind the building, up from the city, with the motor room on top.
+    put(motorRoom(w + 0.06, 1.3, FLOOR - DEEP), cx, backLine - 0.02, 0, 0, 'far', FLOOR);
   }
 
   // ---- Across the street: the finished tower with the TO LET banner going up ----
-  const siteZ = backFar - 0.25;
   {
     const { w, d, floors, storey } = TOWER;
     const tz = siteZ;
     // As far right as keeps it off the mute button; never under the order cards.
-    let tx = xAt(1330, tz, DROP + floors * storey) - w / 2;
-    tx = Math.max(tx, xAt(CARDS_RIGHT + 40, tz, DROP) + w / 2);
-    put(finishedTower(w, d, floors, storey), tx, tz, 0, 0, 'far', DROP);
-    // The banner on the lower floors, the cherry picker in the road below reaching up to its corner.
+    let tx = xAt(1330, tz, DEEP + floors * storey) - w / 2;
+    tx = Math.max(tx, xAt(CARDS_RIGHT + 40, tz, DEEP) + w / 2);
+    put(finishedTower(w, d, floors, storey), tx, tz, 0, 0, 'far', DEEP);
+    // The banner on the lower floors, the cherry picker on the square below reaching up to its corner.
     const bh = 1.0;
-    const btop = 6 * storey;
+    const btop = 13 * storey;
     const bw = w * 0.62;
     const bx = tx - w * 0.14;
-    put(toLetBanner(bw, bh), bx, tz + 0.03, 0, 0, 'far', DROP + btop);
+    put(toLetBanner(bw, bh), bx, tz + 0.03, 0, 0, 'far', DEEP + btop);
     alive('sway');
-    // The picker on the far pavement right of the tower, its basket up at the banner's corner.
     const ps = 1.25;
     const px = tx + w / 2 + 0.55;
-    const pz = backFar + FAR_WALK * 0.55;
+    const pz = tz + 0.45;
     put(
       cherryPicker((bx + bw / 2 + 0.2 - px) / ps, (btop - 0.25) / ps, (tz + 0.3 - pz) / ps),
       px,
@@ -483,113 +452,62 @@ export function hotDeskingScene(map: LevelMap): Scene {
       0,
       0,
       'far',
-      DROP,
+      DEEP,
       ps,
     );
     // The rest of the far side: lower blocks, offices with their lights on, out past both edges.
     let k = 0;
     for (let x = tx - w / 2 - 0.3; x > edgeL - 3; k++) {
       const bw = 2.2 + unit(k, 1, 21) * 1.4;
-      const bh2 = 1.4 + unit(k, 2, 21) * 1.6;
-      put(cityBlock(bw, 1.6, bh2, k + 1, 0), x - bw / 2, tz - 0.1, 0, 0, 'far', DROP);
+      const bh2 = 1.4 + unit(k, 2, 21) * 1.6 + SKYLINE_LIFT;
+      put(cityBlock(bw, 1.6, bh2, k + 1, 0), x - bw / 2, tz - 0.1, 0, 0, 'far', DEEP);
       x -= bw + 0.25;
     }
-    for (let x = tx + w / 2 + 0.3; x < edgeR + 3; k++) {
+    for (let x = tx + w / 2 + 1.4; x < edgeR + 3; k++) {
       const bw = 2.0 + unit(k, 3, 21) * 1.2;
-      put(
-        cityBlock(bw, 1.6, 1.2 + unit(k, 4, 21) * 0.8, k + 2, 0),
-        x + bw / 2,
-        tz - 0.1,
-        0,
-        0,
-        'far',
-        DROP,
-      );
+      const bh2 = 1.2 + unit(k, 4, 21) * 0.8 + SKYLINE_LIFT;
+      put(cityBlock(bw, 1.6, bh2, k + 2, 0), x + bw / 2, tz - 0.1, 0, 0, 'far', DEEP);
       x += bw + 0.25;
     }
   }
 
-  // ---- The street storeys down: trees, cars, a bus, people heading home ----
+  // ---- The neighbours' roofs, a storey or two under the upper floors, each side ----
   {
-    /** Whether a street prop storeys down at (x, z), `r` round, keeps off the building. */
-    const downStreet = (x: number, z: number, r: number) =>
-      z < midZ - r && !(x > leftLine - r && x < rightLine + r && z > backLine - r);
-    /** Whether something `h` tall storeys down at (x, z) shows over the building's glass. */
-    const seen = (x: number, z: number, h: number) => {
-      if (x < leftLine - 0.3 || x > rightLine + 0.3 || z > backLine) return true;
-      const top = projectPoint(pose, { x, y: GROUND + DROP + h, z });
-      const head = projectPoint(pose, { x, y: GROUND + FLOOR + GLASS_CUT, z: backLine });
-      return top.y < head.y;
-    };
-    const size = 2.2 * LOW;
-    // Along the far pavement, and down the far side of each side road.
-    for (let k = 0, x = edgeL + 0.6; x < edgeR; k++, x += 2.0 + unit(k, 5, 23) * 0.8) {
-      const fz = backFar + FAR_WALK * 0.5;
-      if (downStreet(x, fz, 0.4) && (x < leftLine - 0.5 || x > rightLine + 0.5))
-        put(cherryTree, x, fz, k, k + 1, 'far', DROP, size);
-    }
-    for (const x of [leftLine - WALK - ROAD - 0.45, rightLine + WALK + ROAD + 0.45])
-      for (let k = 0, z = backLine + 1.4; z < midZ - 0.8; k++, z += 2.2)
-        if (downStreet(x, z, 0.4)) put(cherryTree, x, z, k * 2, k + 2, 'far', DROP, size);
-    // Cars along the back road and down the sides; the bus.
-    for (let k = 0, x = edgeL + 1; x < edgeR; k++, x += 2.4 + unit(k, 7, 23) * 1.4) {
-      const lane = k % 2;
-      const z = backRoad + ROAD * (lane ? 0.3 : 0.7);
-      if (onScreen(x, z, DROP, 5) && seen(x, z, 0.3))
-        put(dayCar, x, z, lane ? Math.PI : 0, k, 'far', DROP, 1.9 * LOW);
-    }
-    if (seen((L + R) / 2 + 1.5, backRoad + ROAD * 0.3, 0.5))
-      put(bus, (L + R) / 2 + 1.5, backRoad + ROAD * 0.3, Math.PI, 0, 'far', DROP, 2.0 * LOW);
-    for (const [x, s] of [
-      [leftLine - WALK - ROAD * 0.3, 1],
-      [rightLine + WALK + ROAD * 0.7, -1],
-    ] as const)
-      for (let k = 0, z = backLine + 1.2; z < midZ - 0.8; k++, z += 2.6)
-        if (onScreen(x, z, DROP, 5))
-          put(dayCar, x, z, (s * Math.PI) / 2, k + 3, 'far', DROP, 1.9 * LOW);
-    // People heading home, laptop bags on their shoulders.
-    let v = 0;
-    for (const [x, z, yaw] of [
-      [leftLine - WALK * 0.35, backLine + 1.1, 0.2],
-      [leftLine - WALK * 0.65, backLine + 3.3, Math.PI],
-      [rightLine + WALK * 0.35, backLine + 1.6, 0.1],
-      [rightLine + WALK * 0.65, backLine + 3.7, Math.PI - 0.2],
-      [leftLine - 2.6, backFar + FAR_WALK * 0.5, Math.PI / 2],
-      [rightLine + 2.4, backFar + FAR_WALK * 0.5, -Math.PI / 2],
-    ] as const)
-      if (downStreet(x, z, 0.2) && seen(x, z, 0.5))
-        put(commuter, x, z, yaw, v++, 'far', DROP, LOW * 1.1);
-  }
-
-  // ---- Street level, left of the hot-desk floor: the coffee cart, the bins ----
-  {
-    const x = leftLine - 0.85;
-    const cz = midZ + 1.35;
-    putClear(coffeeCart, x, cz, 0.6, 1.5, 0, 0, 0, 1, 0.35);
-    put(steamWisp, x - 0.2, cz - 0.05, 0, 0, 'near', 0.9, 0.6);
-    // Someone leaving with a coffee for the train, their laptop bag at their side.
-    const px = x - 0.5;
-    const pz = cz + 1.15;
-    if (clearOfRoom(px, pz) && clear(px, pz, 0.35, 1.5)) {
-      person(px, pz, Math.PI / 2 - 0.4, 'sipping');
-      bagAt(px, pz, Math.PI / 2 - 0.4, -1, 0);
-    }
-    if (binTile) {
-      const bz = binTile.z;
-      putClear(wheelieBin, leftLine - 0.4, bz - 0.1, 0.32, 0.95, Math.PI / 2 + 0.1);
-      if (!putClear(bottleCage, leftLine - 0.45, bz - 1.0, 0.5, 0.9, Math.PI / 2 - 0.05))
-        putClear(bottleCage, leftLine - 0.45, bz + 1.0, 0.5, 0.9, Math.PI / 2);
+    const front = midZ - 0.15;
+    const back = siteZ + 0.75;
+    let look = 0;
+    for (const side of [-1, 1] as const) {
+      const inner = side < 0 ? leftLine - FACADE_OUT - WELL : rightLine + FACADE_OUT + WELL;
+      const outer = side < 0 ? edgeL - 4 : edgeR + 4;
+      for (let i = 0, x = inner; side < 0 ? x > outer : x < outer; i++) {
+        const bw = 2.1 + unit(i, side, 41) * 1.0;
+        for (let j = 0, z = front; z > back + 0.6; j++) {
+          const bd = Math.min(z - back, 2.2 + unit(i, j * side, 43) * 1.0);
+          const roof = ROOF_LOW + unit(i * 3 + j, side, 47) * (ROOF_HIGH - ROOF_LOW);
+          const cx = x + (side * bw) / 2;
+          put(neighbourRoof(bw, bd, roof - DEEP, look++), cx, z, 0, 0, 'far', DEEP);
+          z -= bd + 0.4;
+        }
+        x += side * (bw + 0.4);
+      }
     }
   }
 
-  // ---- Street level, right: the cycle rack, full on a Friday ----
+  // ---- Street level, left of the hot-desk floor: the bins by the bin hatch ----
+  if (binTile) {
+    const bz = binTile.z;
+    putClear(wheelieBin, leftLine - 0.4, bz - 0.1, 0.32, 0.95, Math.PI / 2 + 0.1);
+    if (!putClear(bottleCage, leftLine - 0.45, bz - 1.0, 0.5, 0.9, Math.PI / 2 - 0.05))
+      putClear(bottleCage, leftLine - 0.45, bz + 1.0, 0.5, 0.9, Math.PI / 2);
+  }
+
+  // ---- Street level, right: the coffee cart on the wide pavement, low enough down the frame
+  // that its awning leaves the slab's cut face (and its floor number) in view ----
   {
-    const x = rightLine + 0.55;
-    const z0 = midZ + 0.9;
-    let k = 0;
-    for (let z = z0; z < lower.z1 - 0.6; z += 0.42, k++)
-      if (clear(x, z, 0.5, 0.65, 0.1) && k % 5 !== 3) put(bike, x, z, 0, k * 3 + 1, 'near');
-    put(bikeStand(Math.max(1, k)), x + 0.36, z0, 0);
+    const x = rightLine + 0.9;
+    const cz = midZ + 3;
+    if (putClear(coffeeCart, x, cz, 0.6, 1.5, 0, 0, 0, 1, 0.35))
+      put(steamWisp, x - 0.2, cz - 0.05, 0, 0, 'near', 0.9, 0.6);
   }
 
   // ---- In front: the pavement, thin and low ----
@@ -609,7 +527,7 @@ export function hotDeskingScene(map: LevelMap): Scene {
 
   return {
     horizon: HORIZON,
-    horizonY: DROP,
+    horizonY: DEEP,
     ground,
     painters: PAINTERS,
     pieces,
@@ -672,27 +590,7 @@ function road(along: 'x' | 'z'): GroundPainter {
   };
 }
 
-/** Pale spring pavement storeys down, fallen blossom by the trees. */
-const walk: GroundPainter = (b, g, salt) => {
-  flags(b, g, 0.02, 0xb2aea4, 0.5, salt);
-  const w = g.x1 - g.x0;
-  const d = g.z1 - g.z0;
-  const count = Math.min(240, Math.floor(w * d * 5));
-  for (let k = 0; k < count; k++)
-    b.box(
-      0.04,
-      0.002,
-      0.03,
-      shade(k, 55, salt) > 0.5 ? 0xe4b8c6 : 0xd8a8b8,
-      {
-        at: [g.x0 + shade(k, 51, salt) * w, 0.024, g.z0 + shade(k, 53, salt) * d],
-        rot: [0, shade(k, 57, salt) * 3, 0],
-      },
-      0,
-    );
-};
-
-/** The plaza across the road, round the towers: big pale flags. */
+/** The square far down across the street, round the towers: big pale flags. */
 const plaza: GroundPainter = (b, g, salt) => {
   flags(b, g, 0.02, 0xa8a49a, 1.0, salt + 11);
 };
@@ -728,18 +626,15 @@ function kerb(along: 'x' | 'z'): GroundPainter {
   };
 }
 
-/** Under the shaft: dark. */
+/** Under the shaft: dark, it's a long way down. */
 const pit: GroundPainter = (b, g) => {
-  fill(b, g, 0.004, 0x8a8e92);
+  fill(b, g, 0.004, 0x2a2d31);
 };
 
 const PAINTERS: Readonly<Record<string, GroundPainter>> = {
   'road:x': road('x'),
-  'road:z': road('z'),
-  walk,
   plaza,
   pave,
   'kerb:x': kerb('x'),
-  'kerb:z': kerb('z'),
   pit,
 };
