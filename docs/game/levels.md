@@ -271,34 +271,34 @@ S.2.....##########.#
 
 ### 3-3 Hot Desking
 
-> Three floors, an express lift that breaks down and two managers.
+> Three floors, one lift, no stairs and two managers.
 
 ![Hot Desking](images/levels/hot-desking.webp)
 
-Three floors: a lobby, the desks and the test floor. The local lift stops everywhere and holds two; the express skips the middle floor and takes the whole team, but it breaks down for 20 s twice a round. A mail chute runs from the top floor to the lobby, and two managers ride the lifts.
+Three floors and one lift: the hot desks on the ground (inbox, keyboards, pipelines, ship), the test lab in the middle (bug queue, test benches) and the meeting room on top, where reviews happen. The stairwell is closed for the hot-desk refit. The lift holds three and stops at every floor in turn, so it is in the test lab twice a loop and at either end once: time it, and from the test lab check which way it goes before you get in. Two managers ride it too.
 
-- **New here:** The express lift and breakdowns.
-- **Extras:** Reviews 30%, incidents, 2 managers
+- **New here:** One lift with three stops and no stairs.
+- **Extras:** Reviews 15%, 2 managers
 - **Map:** [`maps/level-09-hot-desking.txt`](../../maps/level-09-hot-desking.txt) (22 × 12)
 
 ```text
-########   ###TT######
-#.mmmm.#   #ll.......P
-#.mRRm.#   #ll..4....P
-#......#   #LL.......#
-#.####.#   ###H####.##
-#....ll#          #.#
-I.1..ll#   ########.##
-I......H   #L........#
-B.....L#   #L..KK..3.#
-B..2..L#####...KK..M.#
-#..M.................#
-##SS#X################
+####LLL#   #LLL##TT###
+#mmmmmm#   #.........B
+#mRRmmm#   #....M....B
+#mmmmmm#   #.........#
+########   ####CC#####
+
+#II#####LLL#######PP##
+#.1................3.#
+#....KK......KK......#
+X..2.............4...#
+#.........M..........#
+######CC########SS####
 ```
 
-| Players      | 1       | 2        | 3        | 4         |
-| ------------ | ------- | -------- | -------- | --------- |
-| ★ / ★★ / ★★★ | 5/10/10 | 20/35/50 | 20/35/50 | 40/80/110 |
+| Players      | 1        | 2       | 3     | 4        |
+| ------------ | -------- | ------- | ----- | -------- |
+| ★ / ★★ / ★★★ | 15/25/35 | 30/55/75 | 15/30/40 | 25/50/70 |
 
 ## Chapter: Enterprise
 
