@@ -2,6 +2,7 @@ import type { LevelMap } from '../../../sim/level';
 import { demoDayScene } from './demoDay';
 import { downTheHallScene } from './downTheHall';
 import { garageScene } from './garage';
+import { hotDeskingScene } from './hotDesking';
 import { hypergrowthScene } from './hypergrowth';
 import { middleManagementScene } from './middleManagement';
 import { onCallScene } from './onCall';
@@ -24,4 +25,5 @@ export const SCENES: Readonly<Record<string, (map: LevelMap) => Scene>> = {
   'on-call': onCallScene,
   'middle-management': middleManagementScene,
   hypergrowth: hypergrowthScene,
+  'hot-desking': hotDeskingScene,
 };
