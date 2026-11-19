@@ -27,7 +27,7 @@ import {
 
 /** Behind the diorama: the same dark blue as the menus. */
 export const BACKGROUND = 0x14161c;
-const EXPOSURE = 0.95;
+export const EXPOSURE = 0.95;
 
 /** Ambient occlusion: soft dark in corners, under counters and around feet, in world units. */
 const AO = { radius: 0.8, falloff: 0.5, intensity: 3.5 };
@@ -221,6 +221,8 @@ export class Stage {
     style.display = vignette ? 'block' : 'none';
     if (vignette) style.background = vignetteCss(vignette);
     this.renderer.domElement.style.filter = gradeFilter(vignette);
+    // The level's exposure (`vignette.exposure`); the stage's own for every other level.
+    this.renderer.toneMappingExposure = exposureFor(vignette);
   }
 
   private applyPixelRatio(): void {
@@ -337,6 +339,11 @@ export function vignetteCss(vignette: NonNullable<Atmosphere['vignette']>): stri
 export function gradeFilter(vignette: Atmosphere['vignette']): string {
   const saturate = vignette?.saturate;
   return saturate !== undefined && saturate !== 1 ? `saturate(${saturate})` : '';
+}
+
+/** The tone mapping exposure for a level: its grade's own (`vignette.exposure`), or the stage's. */
+export function exposureFor(vignette: Atmosphere['vignette']): number {
+  return vignette?.exposure ?? EXPOSURE;
 }
 
 /** One glow: a wide soft ellipse, strongest at its centre. */
