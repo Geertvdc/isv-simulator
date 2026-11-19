@@ -292,7 +292,7 @@ export const LEVEL_BLURBS: Readonly<Record<string, string>> = {
   'on-call': 'Night shift. The mop robot never stops, and it leaves the floor wet.',
   'middle-management': 'Meet your new manager. Mind the walking status update.',
   hypergrowth: 'Two floors, one lift and a mail chute. The stairs are a long way round.',
-  'hot-desking': 'Three floors, an express lift that breaks down and two managers.',
+  'hot-desking': 'Three floors, one lift, no stairs and two managers.',
   'back-to-back': 'Calendar invites, two meeting rooms, doors that shut while you meet.',
   synergy: 'The boardroom walls fold away on a schedule. Reorg!',
   'the-reorg': 'Three floor plans in one round, and turnstiles that flip.',
@@ -524,7 +524,7 @@ export const LEVEL_INTRO_TIPS: Readonly<Record<string, { text: string; picture: 
   },
   'hot-desking': {
     picture: 'lift',
-    text: 'Three floors. The express skips the middle one but breaks down now and then: then it is the local lift or the stairs.',
+    text: 'Three floors, one lift, and the stairwell is closed for the refit. The lift stops at every floor in turn: from the middle floor, check which way it goes before you get in.',
   },
   synergy: {
     picture: 'reorg',
