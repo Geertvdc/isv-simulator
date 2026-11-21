@@ -54,9 +54,12 @@ export type GroundPainter = (b: ModelBuilder, g: GroundPatch, salt: number) => v
  * - `wisp`: rises, swells and twists (smoke, steam); build it as a small
  *   column of pale puffs.
  * - `bob`: floats up and down a hair (a bird on a roof, a buoy, a float).
+ * - `spin`: turns steadily about its upright axis (a fan in a condenser's
+ *   top grille); build it round its hub.
  * Living props stay a tile from the room and keep still on low quality.
  */
-export type AliveKind = 'breathe' | 'purr' | 'spray' | 'sway' | 'blink' | 'peck' | 'wisp' | 'bob';
+export type AliveKind =
+  'breathe' | 'purr' | 'spray' | 'sway' | 'blink' | 'peck' | 'wisp' | 'bob' | 'spin';
 
 /** One prop in the scene. Near props cast shadows; far ones (the houses, the trees) don't. */
 export interface ScenePiece {
