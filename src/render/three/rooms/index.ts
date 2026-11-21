@@ -6,6 +6,7 @@ import { LOWER_FLOORS_ROOM } from './lowerFloors';
 import { MID_RISE_ROOM } from './midRise';
 import { OFFICE_PARK_ROOM } from './officePark';
 import { STAGE_SET_ROOM } from './stageSet';
+import { TOWER_ROOM } from './tower';
 import { UPPER_FLOORS_ROOM } from './upperFloors';
 import type { FloorDressing, RoomDressing } from './types';
 import { WAREHOUSE_ROOM } from './warehouse';
@@ -24,6 +25,7 @@ export const ROOMS: Partial<Record<WallTheme, RoomDressing>> = {
   midRise: MID_RISE_ROOM,
   lowerFloors: LOWER_FLOORS_ROOM,
   upperFloors: UPPER_FLOORS_ROOM,
+  tower: TOWER_ROOM,
 };
 
 /**

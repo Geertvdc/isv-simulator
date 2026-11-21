@@ -1,4 +1,5 @@
 import type { LevelMap } from '../../../sim/level';
+import { backToBackScene } from './backToBack';
 import { demoDayScene } from './demoDay';
 import { downTheHallScene } from './downTheHall';
 import { garageScene } from './garage';
@@ -26,4 +27,5 @@ export const SCENES: Readonly<Record<string, (map: LevelMap) => Scene>> = {
   'middle-management': middleManagementScene,
   hypergrowth: hypergrowthScene,
   'hot-desking': hotDeskingScene,
+  'back-to-back': backToBackScene,
 };

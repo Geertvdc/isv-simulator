@@ -310,7 +310,7 @@ _New: meetings_
 
 ![Back to Back](images/levels/back-to-back.webp)
 
-HQ: two offices off a corridor and two glass meeting rooms, the Fishbowl between the offices and the Aquarium off the corridor. Invites take turns between the rooms, and a room's doors shut on everyone but the invited player while the meeting runs, so the shortcut through the Fishbowl comes and goes.
+HQ: two offices off a corridor and two glass meeting rooms named after where YOTTA came from, The Garage between the offices and Mom off the corridor. Invites take turns between the rooms, and a room's doors shut on everyone but the invited player while the meeting runs, so the shortcut through The Garage comes and goes.
 
 - **New here:** Calendar invites, named rooms, meeting doors.
 - **Extras:** meetings

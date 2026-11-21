@@ -116,7 +116,7 @@ A calendar invite pops up for one of the players (each has at most one open): "S
 
 ## Meeting rooms and doors (from Back to Back)
 
-Meeting rooms have names (the Fishbowl, the Aquarium, the Boardroom) and the invite says which one: only that room counts, and on Back to Back the invites take turns between the two rooms. A **meeting door** (`d`) has a light: green when the room is free, amber when an invite for it is open, red while the meeting is on. While it's red the door is shut to everyone but the invited player; anyone inside can always walk out.
+Meeting rooms have names (The Garage and Mom at HQ, the Boardroom) and the invite says which one: only that room counts, and on Back to Back the invites take turns between the two rooms. A **meeting door** (`d`) has a light: green when the room is free, amber when an invite for it is open, red while the meeting is on. While it's red the door is shut to everyone but the invited player; anyone inside can always walk out.
 
 ## Reorgs and turnstiles (from Synergy)
 
