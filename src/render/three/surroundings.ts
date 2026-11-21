@@ -656,6 +656,10 @@ function moveLiving(a: Alive, t: number): void {
       m.position.y = a.y + Math.sin((t + own) * 1.6) * 0.012;
       m.rotation.y = a.yaw + Math.sin((t + own) * 0.3) * 0.15;
       return;
+    case 'spin':
+      // About two turns a second, each fan from its own angle.
+      m.rotation.y = a.yaw + (t * 2 + own) * Math.PI * 2;
+      return;
   }
 }
 
