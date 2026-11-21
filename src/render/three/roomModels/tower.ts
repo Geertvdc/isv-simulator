@@ -181,7 +181,7 @@ function partitionModel(look: number, along: 'x' | 'z' | null): Model {
   const inner = faces(0.484);
   outer.forEach((on, f) => {
     b.box(0.04, GLASS1 - GLASS0, 0.016, MULLION, on(-0.48, (GLASS0 + GLASS1) / 2), 0);
-    manifestation(b, inner[f] ?? on, MANIFEST_Y);
+    manifestation(b, on, MANIFEST_Y);
     if (look === 2) {
       const g = (inner[f] ?? on)(0.16 * (f % 2 ? -1 : 1), 0.78);
       b.box(
@@ -676,10 +676,10 @@ export function towerFloorModel(look: number): Model {
 // ---- Counters ----
 
 /** The counters' smoked oak top (darker than every station top), its edge, the charcoal plinth body. */
-export const COUNTER_TOP = 0x575550;
-const COUNTER_EDGE = 0x42403c;
-const COUNTER_BODY = 0x4a4e57;
-const COUNTER_KICK = 0x3a3e45;
+export const COUNTER_TOP = 0x605b55;
+const COUNTER_EDGE = 0x524d47;
+const COUNTER_BODY = 0x7a7e86;
+const COUNTER_KICK = 0x5c6068;
 
 /**
  * A counter as an HQ credenza (the hatch counters in the partitions, the
@@ -1044,7 +1044,7 @@ export function vinylModel(name: string, width: number): Model {
 /** How high the door portal's head sits: the door light (`Mechanics`, 0.12 round at 1.25) rests on it. */
 export const PORTAL_HEAD = 1.12;
 /** The portal's brushed aluminium. */
-const PORTAL_ALU = 0xaab2ba;
+const PORTAL_ALU = 0x8e959c;
 
 /**
  * A slim aluminium door portal round a meeting door, built for a wall line
