@@ -205,7 +205,7 @@ const LETTER_TOP = 0xe8ecef;
 const WASH = 0xffd7a0;
 const SOFFIT = 0x2a2b2e;
 /** The runner from the lifts to the bench: dark blue-grey wool, a darker border. */
-const RUNNER = 0x3e4152;
+const RUNNER = 0x4a4658;
 const STEEL_DARK = 0x8a9096;
 const BLACK_STEEL = 0x2a2c30;
 const LEATHER = 0x4a4048;
@@ -260,16 +260,19 @@ export function stoneFloor(w: number, d: number): SetPiece {
 }
 
 /**
- * The lobby's runner, `len` along x and `w` across, centred: dark blue-grey
- * wool with a darker border and a worn, paler track down the middle where
- * everyone walks from the lifts. Flush on the stone.
+ * The lobby's rug, `w` across x and `len` along z, centred: a flat dusky
+ * violet-grey wool rug with a darker border and a paler worn track down its
+ * middle, from the lifts. Flat planes only (no side faces), so it lies on the
+ * stone instead of standing up off it.
  */
 export function runner(len: number, w: number): SetPiece {
   return once(`runner:${len.toFixed(2)}:${w.toFixed(2)}`, () =>
-    looks([len, w], 1, (b) => {
-      flat(b, len, 0.008, w, tint(RUNNER, -0.25), [0, 0.004, 0]);
-      flat(b, len - 0.08, 0.009, w - 0.08, RUNNER, [0, 0.0045, 0]);
-      flat(b, len - 0.3, 0.0095, w * 0.35, tint(RUNNER, 0.06), [0, 0.0048, 0]);
+    looks([w, len], 1, (b) => {
+      const lay = (pw: number, pd: number, c: number, y: number) =>
+        b.add(new THREE.PlaneGeometry(pw, pd), c, { at: [0, y, 0], rot: [-Math.PI / 2, 0, 0] });
+      lay(w, len, tint(RUNNER, -0.22), 0.006);
+      lay(w - 0.1, len - 0.1, RUNNER, 0.008);
+      lay(w * 0.34, len - 0.3, tint(RUNNER, 0.07), 0.01);
     }),
   );
 }
@@ -431,15 +434,34 @@ export const liftDoor = looks([LIFT.w, 0.12], 1, (b) => {
   flat(b, 0.08, 0.16, 0.02, STEEL_DARK, [w / 2 + 0.16, 0.5, 0.01]);
 });
 
+/** The lift indicator's digits, 4 wide and 5 high. */
+const LIFT_FONT: Readonly<Record<string, string>> = {
+  '3': '11100001011000011110',
+  '8': '01101001011010010110',
+};
+
 /** A lift's indicator: the floor number in big amber digits and, clear of it, an up arrow. */
 export function liftDigits(text: string): SetPiece {
   return once(`liftDigits:${text}`, () =>
     looks([0.6, 0.05], 1, (b) => {
-      const px = 0.044;
+      const px = 0.034;
       const z = 0.047;
-      glowLetters(b, text, -0.08, PANEL.y, z, px, AMBER);
+      // The digits in a wider, rounder 4 × 5 face than the signs' (so 38 never reads 3B), clear
+      // of the arrow.
+      const x0 = -0.27;
+      Array.from(text).forEach((ch, k) => {
+        const glyph = LIFT_FONT[ch] ?? '';
+        for (let r = 0; r < 5; r++)
+          for (let col = 0; col < 4; col++)
+            if (glyph[r * 4 + col] === '1')
+              glowBox(b, px, px, 0.004, AMBER, [
+                x0 + (k * 5 + col + 0.5) * px,
+                PANEL.y + (2 - r) * px,
+                z,
+              ]);
+      });
       // An up arrow at the panel's right: a triangle on a stem.
-      const ax = 0.2;
+      const ax = 0.21;
       const ap = 0.026;
       b.add(
         new THREE.CircleGeometry(ap * 3, 3),
@@ -600,16 +622,13 @@ export function paverDeck(w: number, d: number): SetPiece {
             (z + zb) / 2,
           ]);
         }
-      // Where pots stood all spring: pale sun-bleached squares with a dark ring of grime round
-      // them, and a few rust-brown drip stains.
+      // Where pots stood all spring: pale sun-bleached squares with a faint ring round them.
       for (let k = 0; k < Math.floor((w * d) / 2.2); k++) {
         const x = -w / 2 + 0.3 + hash01(k, 1, 63) * (w - 0.6);
         const z = -d / 2 + 0.3 + hash01(k, 2, 63) * (d - 0.6);
         const r = 0.16 + hash01(k, 3, 63) * 0.1;
-        if (hash01(k, 4, 63) > 0.35) {
-          flat(b, r * 2 + 0.05, 0.002, r * 2 + 0.05, tint(PAVER, -0.16), [x, top + 0.009, z]);
-          flat(b, r * 2, 0.0025, r * 2, tint(PAVER, 0.2), [x, top + 0.0095, z]);
-        } else b.cylinder(r * 0.8, r * 0.8, 0.002, 0x9a8a72, { at: [x, top + 0.009, z] }, 14);
+        flat(b, r * 2 + 0.04, 0.002, r * 2 + 0.04, tint(PAVER, -0.07), [x, top + 0.009, z]);
+        flat(b, r * 2, 0.0025, r * 2, tint(PAVER, 0.18), [x, top + 0.0095, z]);
       }
     }),
   );
@@ -857,6 +876,54 @@ export const foldedParasol = looks([1.7, 0.4], 1, (b) => {
 });
 
 /**
+ * Sun loungers folded flat and stacked on the pavers, `0.95` along x: three
+ * teak-slatted frames in white aluminium, a rolled cushion on top, strapped.
+ * 0.3 high.
+ */
+export const loungerStack = looks([1.0, 0.5], 1, (b) => {
+  for (let k = 0; k < 3; k++) {
+    const y = 0.02 + k * 0.085;
+    const dx = (k - 1) * 0.03;
+    flat(b, 0.95, 0.03, 0.46, 0xd8dad6, [dx, y + 0.015, 0]);
+    for (let x = -0.4; x <= 0.41; x += 0.1)
+      flat(b, 0.07, 0.012, 0.4, 0xa88a68, [dx + x, y + 0.036, 0]);
+    flat(b, 0.95, 0.04, 0.02, 0xb8bab6, [dx, y + 0.05, 0.22]);
+  }
+  b.cylinder(0.06, 0.06, 0.42, 0xd8cfb8, { at: [0.2, 0.33, 0], rot: [Math.PI / 2, 0, 0] }, 10);
+  for (const x of [-0.25, 0.25]) flat(b, 0.03, 0.3, 0.48, 0x3a3c40, [x, 0.15, 0]);
+});
+
+/** A square floor drain set in the pavers, `0.34` across: a steel frame and slotted grate. Flush. */
+export const drainGrate = looks([0.34, 0.34], 1, (b) => {
+  flat(b, 0.34, 0.006, 0.34, ALU_DARK, [0, 0.003, 0]);
+  flat(b, 0.3, 0.007, 0.3, 0x24262a, [0, 0.0035, 0]);
+  for (let x = -0.12; x <= 0.121; x += 0.04) flat(b, 0.016, 0.009, 0.28, 0x8a9096, [x, 0.0045, 0]);
+});
+
+/**
+ * Mom's visitor bay far below, `len` along z and `w` across: a violet painted
+ * outline, a pale fill and a "V" in the middle. Flat on the asphalt.
+ */
+export function visitorBay(len: number, w: number): SetPiece {
+  return once(`visitorBay:${len.toFixed(2)}:${w.toFixed(2)}`, () =>
+    looks([w, len], 1, (b) => {
+      flat(b, w, 0.003, len, 0xa48ce0, [0, 0.0015, 0]);
+      flat(b, w - 0.04, 0.004, len - 0.04, 0xc4c0cc, [0, 0.002, 0]);
+      for (const s of [-1, 1])
+        flat(
+          b,
+          0.02,
+          0.005,
+          len * 0.3,
+          0xe8e4f0,
+          [s * 0.04, 0.0025, -len * 0.35],
+          [0, s * 0.35, 0],
+        );
+    }),
+  );
+}
+
+/**
  * A garden hose reel cart, facing +z: a steel frame on two wheels, the drum
  * wound with faded green hose, the crank. About 0.4 high. The hose run is
  * `hoseRun`.
@@ -1063,8 +1130,8 @@ export const beacon = looks([0.1, 0.1], 1, (b) => {
 // ---- The city far below ----
 
 /** Walls of the city's blocks, sun-bleached: stone, render, brick, grey. */
-const CITY_WALLS = [0xc8bca8, 0xb8ae9e, 0xb07a62, 0xa8a8a4, 0xd0c4b0, 0x988e82] as const;
-const ROOF = [0x9a968e, 0x8a8782, 0xa6a098, 0x7e7a74] as const;
+const CITY_WALLS = [0xbab2a4, 0xaea89c, 0xa88e80, 0xa6a6a2, 0xc0b8aa, 0x948e86] as const;
+const ROOF = [0xa39d8e, 0x9a958a, 0xa8a396, 0x928d84] as const;
 
 /**
  * A city block far below seen from high up: `w` × `d`, `h` high (centred on x,
@@ -1077,19 +1144,15 @@ export function cityRoof(w: number, d: number, h: number, look: number, glass = 
     looks([w, d], 1, (b) => {
       const wall = glass ? nth([0x6a8494, 0x7a9298, 0x5e7488], look) : nth(CITY_WALLS, look);
       flat(b, w, h, d, wall, [0, h / 2, -d / 2]);
-      const win = glass ? 0xdfe4e2 : tint(0x4a5866, (hash01(look, 1, 101) - 0.5) * 0.3);
+      // Windows on the south face only (toward the camera), at half contrast: from this high up
+      // the city is texture, not detail.
+      const win = mix(glass ? 0xdfe4e2 : 0x4a5866, wall, 0.5);
       if (glass)
-        for (let y = h - 0.2; y > 0.05; y -= 0.28) {
-          flat(b, w + 0.01, 0.05, 0.01, win, [0, y, 0.005]);
-          for (const s of [-1, 1]) flat(b, 0.01, 0.05, d, win, [s * (w / 2 + 0.005), y, -d / 2]);
-        }
-      for (let y = h - 0.22; !glass && y > 0.1; y -= 0.3) {
-        for (let x = -w / 2 + 0.14; x < w / 2 - 0.1; x += 0.24)
-          flat(b, 0.13, 0.12, 0.01, win, [x, y, 0.005]);
-        for (const s of [-1, 1])
-          for (let z = -0.14; z > -d + 0.1; z -= 0.24)
-            flat(b, 0.01, 0.12, 0.13, win, [s * (w / 2 + 0.005), y, z]);
-      }
+        for (let y = h - 0.2; y > 0.05; y -= 0.36)
+          flat(b, w + 0.01, 0.06, 0.01, win, [0, y, 0.005]);
+      for (let y = h - 0.22; !glass && y > 0.1; y -= 0.34)
+        for (let x = -w / 2 + 0.16; x < w / 2 - 0.1; x += 0.3)
+          flat(b, 0.15, 0.12, 0.01, win, [x, y, 0.005]);
       const roof = nth(ROOF, look * 3 + 1);
       const p = 0.04;
       for (const z of [-p / 2, -d + p / 2]) flat(b, w, 0.06, p, tint(wall, 0.15), [0, h + 0.03, z]);
@@ -1109,7 +1172,7 @@ export function cityRoof(w: number, d: number, h: number, look: number, glass = 
           b.sphere(0.07, 0x5a7a44, { at: [dx * w, h + 0.07, -d / 2 + dz * d] });
         return;
       }
-      const units = 1 + (look % 3);
+      const units = 1 + (look % 2);
       for (let k = 0; k < units; k++) {
         const ux = -w / 2 + ((k + 0.5) * w) / units;
         const uz = -d * (0.3 + hash01(k, look, 103) * 0.4);
@@ -1161,7 +1224,7 @@ export function loftLetters(px: number): SetPiece {
 
 /** Mom's beige station wagon far below, tiny: a long roof with rails, wood trim, along x. */
 export const tinyWagon = looks([0.62, 0.26], 1, (b) => {
-  const paint = 0xdccaa0;
+  const paint = 0xcbb994;
   b.box(0.6, 0.08, 0.24, paint, { at: [0, 0.07, 0] }, 0.02);
   b.box(0.42, 0.07, 0.21, tint(paint, -0.05), { at: [-0.06, 0.145, 0] }, 0.02);
   flat(b, 0.4, 0.03, 0.2, 0x34404e, [-0.06, 0.15, 0]);
@@ -1232,11 +1295,10 @@ export function neighbourTower(w: number, d: number, h: number): SetPiece {
   return once(`neighbourTower:${w.toFixed(2)}:${d.toFixed(2)}:${h.toFixed(2)}`, () =>
     looks([w, d], 1, (b) => {
       flat(b, w, h, d, 0x7a8e96, [0, h / 2, -d / 2]);
-      for (let y = h - 0.2; y > 0; y -= 0.38) {
-        flat(b, w + 0.01, 0.08, d + 0.01, 0xd8dcd8, [0, y, -d / 2]);
-      }
-      for (let x = -w / 2 + 0.2; x < w / 2; x += 0.32)
-        flat(b, 0.02, h, 0.03, 0x5a6870, [x, h / 2, 0.01]);
+      for (let y = h - 0.2; y > 0; y -= 0.5)
+        flat(b, w + 0.01, 0.08, d + 0.01, 0xb0b8b8, [0, y, -d / 2]);
+      for (let x = -w / 2 + 0.3; x < w / 2; x += 0.64)
+        flat(b, 0.02, h, 0.03, 0x6a7a82, [x, h / 2, 0.01]);
       flat(b, w + 0.04, 0.08, d + 0.04, 0xc8ccc8, [0, h + 0.04, -d / 2]);
       flat(b, w - 0.1, 0.01, d - 0.1, 0x8a8782, [0, h + 0.085, -d / 2]);
       // The gondola's track round the roof's edge, the machine and its yellow jib reaching out
