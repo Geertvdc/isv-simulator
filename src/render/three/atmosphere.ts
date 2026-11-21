@@ -135,6 +135,11 @@ export interface Atmosphere {
      * gets the same picture. The HUD (DOM and Phaser) stays ungraded.
      */
     saturate?: number;
+    /**
+     * CSS `contrast()` on the canvas after `saturate`, 1 for none: a hard
+     * midday sun's deeper darks and brighter whites, on every quality.
+     */
+    contrast?: number;
     /** More glows like `glow`, drawn over it in order: a second edge, a haze under the top. */
     glows?: { color: number; opacity: number; x: number; y: number; reach: number }[];
     /**
@@ -358,7 +363,17 @@ export interface Atmosphere {
    * opacity, idle and while an invite pulses it, instead of the usual
    * violet: for a carpet the usual one sinks into. On every quality.
    */
-  rug?: { color: number; opacity: number; invited: number };
+  rug?: {
+    color: number;
+    opacity: number;
+    invited: number;
+    /**
+     * Each meeting room's own rug color instead (`meetingRooms` order), for
+     * rooms on carpets of different tones: a tint per room so every rug
+     * shows the same violet. `color` for a room past its end.
+     */
+    perRoom?: number[];
+  };
   /**
    * A faint glint of each lamp (`lampSpots`) on a polished floor: a soft
    * round patch `size` world units across, `forward` grid units in front of
@@ -963,17 +978,18 @@ const FRIDAY_AFTERNOON: Atmosphere = {
  * sun from the front left (about 55° up), so the walls throw short crisp
  * shadows back into the rooms and the back row stays in the light; a pale hot
  * sky going white at the horizon; a warm (never brown) haze over the city far
- * below; inside, a cool-bright room with a warm-white bounce off the floors
- * and a fill only a touch blue, so the yellow test benches keep their yellow.
- * Hot by lifting the whites, not the yellows. Slim pendants along the back
- * of each office and one over each meeting room's table, with a soft pool on
- * each glass box; heat shimmer hangs over the terrace and the city below,
- * never over the room.
+ * below; inside, a hot pale-straw key against a cool blue fill, a touch more
+ * contrast and saturation in the grade, so it reads hot by its light and its
+ * shadows, not by brown. Slim pendants along the back of each office and one
+ * over each meeting room's table, with a soft pool on each glass box; a tint
+ * per meeting rug so both show the same violet; faint heat shimmer in the air
+ * over the city below only, never over the room or the terrace.
  */
 const HEATWAVE_MORNING: Atmosphere = {
   sun: {
-    color: 0xfff3e2,
-    intensity: 2.7,
+    // A hot pale-straw key, strong and crisp, against a cool fill: heat by contrast, not by brown.
+    color: 0xffecd2,
+    intensity: 3.3,
     // About 55° up, from the left and in front: hypot(5, 4) × tan 55° ≈ 9.1.
     from: { x: -5, y: 4, height: 9.1, perMapSize: false },
     reach: 0.95,
@@ -989,24 +1005,27 @@ const HEATWAVE_MORNING: Atmosphere = {
     radius: 2.2,
     meetings: true,
   },
-  sky: { sky: 0xe4ecf4, ground: 0xb8a98f, intensity: 0.9 },
+  sky: { sky: 0xdce8f4, ground: 0xc4b8a2, intensity: 0.7 },
   // Low hides the pendants and the station fill: the sky makes up for them there.
-  lowSky: 1.05,
-  fill: { color: 0xeef2f8, intensity: 0.65 },
+  lowSky: 0.74,
+  fill: { color: 0xdce8f8, intensity: 0.45 },
   environment: 0.16,
   backdrop: { inner: 0xf8f5ee, outer: 0xbccddf },
-  // Heat haze: the roofs far below sink into warm white air, not brown.
-  fog: { color: 0xeee9df, start: 3.5, span: 20 },
+  // Heat haze: the roofs far below sink into warm pale air, late enough that the city keeps its contrast.
+  fog: { color: 0xf4e8d4, start: 8, span: 34 },
   vignette: {
     color: 0x34384a,
     opacity: 0.35,
     inner: 0.7,
-    saturate: 1.45,
+    saturate: 1.5,
+    // A hard midday sun: deeper darks, brighter whites.
+    contrast: 1.1,
+    exposure: 1.07,
     glows: [
       // The bleached horizon behind the city, under the order cards.
-      { color: 0xfff6e6, opacity: 0.24, x: 0.5, y: 0, reach: 0.55 },
+      { color: 0xffe6bc, opacity: 0.18, x: 0.5, y: 0, reach: 0.55 },
       // The sun's glare off the terrace, low on the left.
-      { color: 0xfff2dc, opacity: 0.16, x: 0, y: 0.85, reach: 0.3 },
+      { color: 0xffe0aa, opacity: 0.22, x: 0, y: 0.85, reach: 0.35 },
     ],
   },
   lamps: {
@@ -1029,10 +1048,13 @@ const HEATWAVE_MORNING: Atmosphere = {
     forward: 0.85,
     kinds: ['bugQueue', 'pipeline'],
   },
-  // Heat shimmer: slow pale motes over the terrace and in the air over the city far below.
+  // The usual violet rug, a tint per room so The Garage's sage carpet and Mom's warm taupe show the same violet.
+  rug: { color: 0x8e6bd8, opacity: 0.48, invited: 0.7, perRoom: [0x8a70c8, 0x6c78bc] },
+  // Heat shimmer: a few faint motes in the air over the city far below only; over the
+  // terrace they read as snow in a still (the condensers' shimmer panes carry the heat there).
   motes: {
     color: 0xfff4e0,
-    opacity: 0.4,
+    opacity: 0.12,
     perTile: 0,
     outside: {
       side: -1,
@@ -1042,11 +1064,7 @@ const HEATWAVE_MORNING: Atmosphere = {
       far: 4,
       low: -2.6,
       high: -0.4,
-      size: 0.09,
-      perVoid: 2,
-      voidLow: 0.25,
-      voidHigh: 0.9,
-      margin: 0.3,
+      size: 0.05,
     },
   },
 };
@@ -1412,6 +1430,24 @@ export function meetingRooms(
     rooms.push(room);
   }
   return rooms.sort((a, b) => a.inside - b.inside || a.x0 - b.x0);
+}
+
+/**
+ * The rug's color on each of the map's meeting tiles (`meetingTiles` order):
+ * its room's own (`rug.perRoom`), else the level's `rug.color`, else `fallback`.
+ */
+export function rugColors(
+  atmosphere: Atmosphere,
+  map: Pick<LevelMap, 'width' | 'height' | 'meetingTiles'>,
+  fallback: number,
+): number[] {
+  const color = atmosphere.rug?.color ?? fallback;
+  const perRoom = atmosphere.rug?.perRoom ?? [];
+  const rooms = meetingRooms(map);
+  return map.meetingTiles.map((t) => {
+    const i = rooms.findIndex((r) => t.x >= r.x0 && t.x <= r.x1 && t.y >= r.inside && t.y <= r.y1);
+    return perRoom[i] ?? color;
+  });
 }
 
 /**

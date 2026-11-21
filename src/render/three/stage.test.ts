@@ -50,6 +50,10 @@ describe('vignetteCss', () => {
     expect(vignetteCss({ color: 0x2a2238, opacity: 0.35, inner: 0.7 })).toBe(
       'radial-gradient(ellipse farthest-corner at 50% 48%, transparent 70%, rgba(42, 34, 56, 0.12249999999999998) 85%, rgba(42, 34, 56, 0.35) 100%)',
     );
+    expect(gradeFilter({ color: 0, opacity: 0.3, inner: 0.7, contrast: 1 })).toBe('');
+    expect(gradeFilter({ color: 0, opacity: 0.3, inner: 0.7, saturate: 1.4, contrast: 1.1 })).toBe(
+      'saturate(1.4) contrast(1.1)',
+    );
     for (const id of ['garage', 'open-plan', 'scale-up']) {
       const v = ATMOSPHERES[id]?.vignette;
       expect(v?.band, id).toBeUndefined();
@@ -111,8 +115,10 @@ describe('exposureFor', () => {
     expect(exposureFor(undefined)).toBe(EXPOSURE);
     expect(exposureFor({ color: 0, opacity: 0.3, inner: 0.7, exposure: 1.1 })).toBe(1.1);
     for (const [id, a] of Object.entries(ATMOSPHERES))
-      if (id !== 'hot-desking') expect(exposureFor(a.vignette), id).toBe(EXPOSURE);
-    // The Friday afternoon is lifted a little, on every quality.
+      if (id !== 'hot-desking' && id !== 'back-to-back')
+        expect(exposureFor(a.vignette), id).toBe(EXPOSURE);
+    // The Friday afternoon and the heatwave are lifted a little, on every quality.
     expect(exposureFor(ATMOSPHERES['hot-desking']?.vignette)).toBeGreaterThan(EXPOSURE);
+    expect(exposureFor(ATMOSPHERES['back-to-back']?.vignette)).toBeGreaterThan(EXPOSURE);
   });
 });

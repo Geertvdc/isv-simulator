@@ -45,6 +45,7 @@ import {
   petalSeeds,
   poolPlacements,
   rainSeeds,
+  rugColors,
   roomRows,
   sideLightSpots,
   snowSeeds,
@@ -919,30 +920,60 @@ describe('the heatwave morning (back-to-back)', () => {
     // the rooms, and the back row's faces are in the sun.
     expect(s.x).toBeLessThan(t.x);
     expect(s.z).toBeGreaterThan(t.z);
-    // Crisp shadows, and a near-white sun: hot by its whites, not by yellow.
+    // Crisp shadows, and a hot pale-straw sun: warm, but never orange.
     expect(a.sun.softness ?? 4).toBeLessThan(4);
     const [r, g, b] = rgb(a.sun.color);
-    expect(Math.min(r, g, b)).toBeGreaterThan(215);
-    expect(r - b).toBeLessThan(40);
+    expect(Math.min(r, g, b)).toBeGreaterThan(185);
+    expect(r - b).toBeGreaterThan(30);
+    expect(r - b).toBeLessThan(70);
   });
 
-  it('keeps the fill and sky only a touch blue, the haze warm but pale, the horizon near white', () => {
+  it('keeps the fill and sky a touch blue against the hot key, the haze warm but pale, the horizon near white', () => {
     for (const c of [a.fill.color, a.sky.sky]) {
       const [r, g, b] = rgb(c);
-      expect(b).toBeGreaterThanOrEqual(r);
-      expect(b - r).toBeLessThan(25);
+      expect(b).toBeGreaterThan(r);
+      expect(b - r).toBeLessThan(35);
       expect(Math.min(r, g, b)).toBeGreaterThan(210);
     }
     // Warm heat haze, never brown: warmer than blue, but pale.
     const [fr, fg, fb] = rgb(a.fog?.color ?? 0);
     expect(fr).toBeGreaterThan(fb);
-    expect(Math.min(fr, fg, fb)).toBeGreaterThan(200);
+    expect(Math.min(fr, fg, fb)).toBeGreaterThanOrEqual(190);
     expect(Math.min(...rgb(a.backdrop?.inner ?? 0))).toBeGreaterThan(225);
     expect(a.vignette?.opacity).toBeCloseTo(0.35);
     expect(a.vignette?.inner).toBeCloseTo(0.7);
     expect(a.vignette?.saturate).toBeGreaterThan(1.3);
     expect(a.vignette?.saturate).toBeLessThanOrEqual(1.6);
+    // A hard midday sun: a touch more contrast, nowhere near a crushed look.
+    expect(a.vignette?.contrast).toBeGreaterThan(1);
+    expect(a.vignette?.contrast).toBeLessThanOrEqual(1.15);
     expect(a.lowSky).toBeGreaterThan(a.sky.intensity);
+    for (const [id, other] of Object.entries(ATMOSPHERES))
+      if (other !== a) expect(other.vignette?.contrast, id).toBeUndefined();
+  });
+
+  it('tints each meeting rug for its own carpet, so both show the same violet', () => {
+    const colors = rugColors(a, map, 0);
+    expect(colors).toHaveLength(map.meetingTiles.length);
+    const perRoom = a.rug?.perRoom ?? [];
+    expect(perRoom).toHaveLength(rooms.length);
+    map.meetingTiles.forEach((t, i) => {
+      const room = rooms.findIndex(
+        (r) => t.x >= r.x0 && t.x <= r.x1 && t.y >= r.inside && t.y <= r.y1,
+      );
+      expect(colors[i]).toBe(perRoom[room]);
+    });
+    // Blue-violet tints, Mom's the bluer (her carpet is the warmer): never pink on screen.
+    for (const c of perRoom) {
+      const [r, g, b] = rgb(c);
+      expect(b).toBeGreaterThan(Math.max(r, g) + 50);
+    }
+    const [garage, mom] = perRoom.map(rgb);
+    if (garage && mom) expect(mom[0] - mom[2]).toBeLessThan(garage[0] - garage[2]);
+    // Every other level keeps its one rug colour.
+    for (const [id, other] of Object.entries(ATMOSPHERES))
+      if (other !== a) expect(other.rug?.perRoom, id).toBeUndefined();
+    expect(new Set(rugColors(DEFAULT_ATMOSPHERE, map, 0x123456))).toEqual(new Set([0x123456]));
   });
 
   it('finds the two meeting rooms: The Garage between the offices, Mom off the corridor', () => {
@@ -1007,13 +1038,12 @@ describe('the heatwave morning (back-to-back)', () => {
       if (other !== a) expect(other.pools?.meetings, id).toBeUndefined();
   });
 
-  it('hangs heat shimmer over the terrace and the city below only, never over the room', () => {
+  it('hangs faint heat shimmer in the air over the city below only: never over the room or the terrace', () => {
     const seeds = moteSeeds(a, map);
     expect(seeds.length).toBeGreaterThan(40);
     expect(moteSeeds(a, map)).toEqual(seeds);
     // A mote drifts at most MOTE_DRIFT (0.18) from its seed.
     const drift = 0.2;
-    let overTerrace = 0;
     let below = 0;
     for (const { at, phase } of seeds) {
       expect(phase).toBeGreaterThanOrEqual(0);
@@ -1023,23 +1053,16 @@ describe('the heatwave morning (back-to-back)', () => {
         at.x < map.width - 0.5 + drift &&
         at.z > -0.5 - drift &&
         at.z < map.height - 0.5 + drift;
-      if (inMap) {
-        // Over a void tile in front, and inside it with room to drift.
-        const x = Math.round(at.x);
-        const z = Math.round(at.z);
-        expect(getTile(map, x, z)).toBe('void');
-        expect(z).toBeGreaterThanOrEqual(map.height / 2);
-        expect(Math.abs(at.x - x) + drift).toBeLessThan(0.5);
-        expect(Math.abs(at.z - z) + drift).toBeLessThan(0.5);
-        overTerrace++;
-      } else {
-        // Out beside or behind the building: in the air over the city, below this floor.
-        expect(at.y).toBeLessThan(0);
-        below++;
-      }
+      // Out beside or behind the building, in the air over the city, below this floor:
+      // a still frame shows no pale specks on the terrace (they read as snow).
+      expect(inMap, `${at.x},${at.z}`).toBe(false);
+      expect(at.y).toBeLessThan(0);
+      below++;
     }
-    expect(overTerrace).toBeGreaterThan(10);
     expect(below).toBeGreaterThan(10);
+    // Faint and small.
+    expect(a.motes?.opacity).toBeLessThanOrEqual(0.15);
+    expect(a.motes?.outside?.size).toBeLessThanOrEqual(0.06);
   });
 });
 

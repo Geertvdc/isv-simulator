@@ -333,12 +333,19 @@ export function vignetteCss(vignette: NonNullable<Atmosphere['vignette']>): stri
 }
 
 /**
- * The CSS filter that grades the 3D canvas (`vignette.saturate`): empty for
- * a preset without one, so the other levels keep their exact picture.
+ * The CSS filter that grades the 3D canvas (`vignette.saturate`, then
+ * `vignette.contrast`): empty for a preset without either, so the other
+ * levels keep their exact picture.
  */
 export function gradeFilter(vignette: Atmosphere['vignette']): string {
   const saturate = vignette?.saturate;
-  return saturate !== undefined && saturate !== 1 ? `saturate(${saturate})` : '';
+  const contrast = vignette?.contrast;
+  return [
+    saturate !== undefined && saturate !== 1 ? `saturate(${saturate})` : '',
+    contrast !== undefined && contrast !== 1 ? `contrast(${contrast})` : '',
+  ]
+    .filter((f) => f !== '')
+    .join(' ');
 }
 
 /** The tone mapping exposure for a level: its grade's own (`vignette.exposure`), or the stage's. */
