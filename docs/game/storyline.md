@@ -4,7 +4,7 @@ The campaign tells one story: **YOTTA**, a startup founded by two people in Mom'
 
 This page is canon for level design and environment passes. A level's map, its world, its props and its light should all tell this level's beat. The players never read this page, so **the story has to show in the world**: in the backdrop, the props, the people outside and the signs on the walls.
 
-Where a level already has an environment brief, that brief is the detailed version and wins on details: [garage](../plan/garage-environment.md), [open plan](../plan/open-plan-environment.md), [down the hall](../plan/down-the-hall-environment.md), [seed round](../plan/seed-round-environment.md), [demo day](../plan/demo-day-environment.md), [on call](../plan/on-call-environment.md), [middle management](../plan/middle-management-environment.md), [hypergrowth](../plan/hypergrowth-environment.md), [hot desking](../plan/hot-desking-environment.md). Everything else here is a starting point: change it when a pass finds something funnier, and update this page when you do.
+Where a level already has an environment brief, that brief is the detailed version and wins on details: [garage](../plan/garage-environment.md), [open plan](../plan/open-plan-environment.md), [down the hall](../plan/down-the-hall-environment.md), [seed round](../plan/seed-round-environment.md), [demo day](../plan/demo-day-environment.md), [on call](../plan/on-call-environment.md), [middle management](../plan/middle-management-environment.md), [hypergrowth](../plan/hypergrowth-environment.md), [hot desking](../plan/hot-desking-environment.md), [back to back](../plan/back-to-back-environment.md). Everything else here is a starting point: change it when a pass finds something funnier, and update this page when you do.
 
 ## The arc in one table
 
@@ -177,12 +177,12 @@ _New: meetings._ YOTTA has an HQ, a board, a brand book and a calendar. Shipping
 
 ### 4-1 Back to Back (`back-to-back`)
 
-- **Where and when:** a high floor of YOTTA Tower, the HQ. A summer heatwave; the glass tower is a greenhouse and the air conditioning can't keep up.
-- **The joke:** every meeting room is named after a place they've been: "The Garage", "Unit 4", "The Biscuit", "Mom". The meetings are back to back and someone has always been invited.
-- **Mechanic in the story:** calendar invites: the invited player must go and sit in the meeting room or lose points.
-- **Inbox and ship:** the inbox is the stakeholder request portal (a screen by the lifts); the ship hatch is the release room with a big red button.
-- **Outside:** the city from high up, heat haze over the roofs, the old loft's rooftop YOTTA sign far below, MONOLITH's tower level with them across the river. Mom's station wagon in the visitor bay.
-- **Running gags:** brushed steel YOTTA letters in the lobby, Prod in a planter in the corridor (bigger than the founders now), Segfault asleep on the boardroom table, the plan framed on the wall like a piece of art.
+- **Where and when:** floor 38 of YOTTA Tower, the HQ: the glass tower that was a crane across the street from the loft. A summer heatwave morning; the glass tower is a greenhouse and the air conditioning can't keep up.
+- **The joke:** every room is named after a place they've been: the meeting rooms are "The Garage" (with a roll-up door printed on its glass and a traffic cone in a HERITAGE case) and "Mom" (her portrait and her first angel cheque, framed), the offices "Unit 4" and "The Biscuit". The meetings are back to back and someone has always been invited: the invite says "P2: to Mom!".
+- **Mechanic in the story:** calendar invites: the invited player must go and sit in the named meeting room or lose points; a room's doors shut on everyone else while its meeting runs.
+- **Inbox and ship:** the inbox is the stakeholder REQUESTS portal, a screen by the lift lobby; the ship hatch is the release hatch with the big red button, out on the terrace.
+- **Outside:** the tower's stone lift lobby behind the offices (floor 38 on the indicators), the city far below in a straw heat haze, a river with a bridge, and across it MONOLITH's black tower with its helipad, level with them. In front, the sky terrace is closed for the heat ("TERRACE CLOSED – HEAT!", a thermometer at 38°, empty bistro sets, folded loungers) while a row of AC condensers roars. Below it, the tower's façade drops away. Far down, the old loft's lit YOTTA letters and Mom's beige station wagon in a violet visitor bay.
+- **Running gags:** brushed-steel YOTTA letters in the lift lobby, Prod as a small tree in a "PROD" planter on the terrace by Mom's glass, Segfault stretched out on the cool stone under the lobby's AC grille (it's a heatwave), the plan framed like art with a picture light, the meeting rooms named The Garage and Mom.
 - **Level design hooks:** a corridor with glass offices and glass meeting rooms off it; every door has a twin.
 - **How it ends:** MONOLITH calls. They'd like to explore synergies.
 
@@ -260,21 +260,21 @@ _New: belts, design, merges._ YOTTA is on MONOLITH's old campus. It is now the t
 
 A quick lookup for set dressing. "—" means it's not in that level.
 
-| Level | Logo                       | Prod                  | Segfault             | Mom / the wagon             | MONOLITH                | Crane tower       |
-| ----- | -------------------------- | --------------------- | -------------------- | --------------------------- | ----------------------- | ----------------- |
-| 1-1   | cardboard, marker pen      | cutting in a mug      | on the wagon's roof  | kitchen door; wagon evicted | —                       | —                 |
-| 1-2   | vinyl over ghost lettering | windowsill            | in a moving box      | wagon dropping off boxes    | —                       | —                 |
-| 1-3   | A4 printout on each door   | filing cabinet        | radiator in the hall | —                           | —                       | —                 |
-| 2-1   | lit letters on the roof    | huge planter          | terrace bean bag     | —                           | glowing on the skyline  | crane, red light  |
-| 2-2   | LED pitch slide            | on a stage monitor    | reserved seat        | front row, RESERVED         | scout taking notes      | —                 |
-| 2-3   | sticker on a cage rack     | by the storage cage   | warmest server       | —                           | —                       | —                 |
-| 3-1   | vinyl beside reception     | reception             | Derek's chair        | —                           | Derek's old lanyard     | half-clad         |
-| 3-2   | banner over the lift shaft | stair landing         | on the lift car roof | —                           | —                       | almost done       |
-| 3-3   | on the locker doors        | reserved terrace desk | open locker          | —                           | —                       | finished, TO LET  |
-| 4-1   | steel letters in the lobby | corridor planter      | boardroom table      | meeting room; visitor bay   | level with them         | they're inside it |
-| 4-2   | side by side with MONOLITH | sticky-note parking   | flip chart           | —                           | executives visiting     | —                 |
-| 4-3   | rebrand to `yotta.`        | on a trolley          | box marked "Matrix"  | —                           | crowd outside its tower | —                 |
-| 5-1   | cherry-picker logo swap    | tree in the atrium    | skybridge rail       | wagon on a plinth           | its old belts and logo  | —                 |
-| 5-2   | cardboard, framed          | cutting on a desk     | swatch basket        | —                           | —                       | —                 |
-| 5-3   | two fonts, two towers      | tree through glass    | on the carpet line   | —                           | —                       | —                 |
-| 5-4   | every logo on the booths   | tree through glass    | on the trophy        | judging                     | —                       | —                 |
+| Level | Logo                       | Prod                    | Segfault             | Mom / the wagon             | MONOLITH                | Crane tower       |
+| ----- | -------------------------- | ----------------------- | -------------------- | --------------------------- | ----------------------- | ----------------- |
+| 1-1   | cardboard, marker pen      | cutting in a mug        | on the wagon's roof  | kitchen door; wagon evicted | —                       | —                 |
+| 1-2   | vinyl over ghost lettering | windowsill              | in a moving box      | wagon dropping off boxes    | —                       | —                 |
+| 1-3   | A4 printout on each door   | filing cabinet          | radiator in the hall | —                           | —                       | —                 |
+| 2-1   | lit letters on the roof    | huge planter            | terrace bean bag     | —                           | glowing on the skyline  | crane, red light  |
+| 2-2   | LED pitch slide            | on a stage monitor      | reserved seat        | front row, RESERVED         | scout taking notes      | —                 |
+| 2-3   | sticker on a cage rack     | by the storage cage     | warmest server       | —                           | —                       | —                 |
+| 3-1   | vinyl beside reception     | reception               | Derek's chair        | —                           | Derek's old lanyard     | half-clad         |
+| 3-2   | banner over the lift shaft | stair landing           | on the lift car roof | —                           | —                       | almost done       |
+| 3-3   | on the locker doors        | reserved terrace desk   | open locker          | —                           | —                       | finished, TO LET  |
+| 4-1   | steel letters in the lobby | terrace planter, a tree | cool lobby floor     | meeting room; visitor bay   | across the river, level | they're inside it |
+| 4-2   | side by side with MONOLITH | sticky-note parking     | flip chart           | —                           | executives visiting     | —                 |
+| 4-3   | rebrand to `yotta.`        | on a trolley            | box marked "Matrix"  | —                           | crowd outside its tower | —                 |
+| 5-1   | cherry-picker logo swap    | tree in the atrium      | skybridge rail       | wagon on a plinth           | its old belts and logo  | —                 |
+| 5-2   | cardboard, framed          | cutting on a desk       | swatch basket        | —                           | —                       | —                 |
+| 5-3   | two fonts, two towers      | tree through glass      | on the carpet line   | —                           | —                       | —                 |
+| 5-4   | every logo on the booths   | tree through glass      | on the trophy        | judging                     | —                       | —                 |
