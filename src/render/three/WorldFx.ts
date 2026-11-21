@@ -19,6 +19,7 @@ import {
   mullionShade,
   petalSeeds,
   rainSeeds,
+  rugColors,
   sceneOf,
   snowSeeds,
   stutterIndex,
@@ -200,7 +201,8 @@ interface Ripple {
 export class WorldFx {
   private readonly root = new THREE.Group();
   private readonly pipelines = new Map<string, PipelineFx>();
-  private readonly rug: THREE.MeshBasicMaterial;
+  /** The meeting rug, one material per color (`rugColors`). */
+  private readonly rugs: THREE.MeshBasicMaterial[] = [];
   private readonly rugOpacity: { idle: number; invited: number };
   private readonly puffs: Puff[] = [];
   private readonly puffGeometry = new THREE.SphereGeometry(1, 10, 8);
@@ -320,18 +322,26 @@ export class WorldFx {
       idle: atmosphere.rug?.opacity ?? RUG_OPACITY,
       invited: atmosphere.rug?.invited ?? RUG_OPACITY_INVITED,
     };
-    this.rug = new THREE.MeshBasicMaterial({
-      color: atmosphere.rug?.color ?? RUG_COLOR,
-      transparent: true,
-      opacity: this.rugOpacity.idle,
-      depthWrite: false,
-    });
     const tile = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
-    for (const t of map.meetingTiles) {
-      const mesh = new THREE.Mesh(tile, this.rug);
+    const colors = rugColors(atmosphere, map, RUG_COLOR);
+    const byColor = new Map<number, THREE.MeshBasicMaterial>();
+    map.meetingTiles.forEach((t, i) => {
+      const color = colors[i] ?? RUG_COLOR;
+      let rug = byColor.get(color);
+      if (!rug) {
+        rug = new THREE.MeshBasicMaterial({
+          color,
+          transparent: true,
+          opacity: this.rugOpacity.idle,
+          depthWrite: false,
+        });
+        byColor.set(color, rug);
+        this.rugs.push(rug);
+      }
+      const mesh = new THREE.Mesh(tile, rug);
       putAt(mesh, gridToWorld(t.x, t.y, 0.004));
       this.root.add(mesh);
-    }
+    });
   }
 
   sync(state: GameState, timeMs: number): void {
@@ -339,7 +349,7 @@ export class WorldFx {
     const invited = state.invites.length > 0;
     const pulse = invited ? 0.5 + 0.5 * Math.sin(timeMs / RUG_PULSE_MS) : 0;
     const { idle, invited: lit } = this.rugOpacity;
-    this.rug.opacity = idle + (lit - idle) * pulse;
+    for (const rug of this.rugs) rug.opacity = idle + (lit - idle) * pulse;
   }
 
   /** Little clouds where a dash starts, drifting backwards. */
