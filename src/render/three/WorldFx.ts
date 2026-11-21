@@ -201,6 +201,7 @@ export class WorldFx {
   private readonly root = new THREE.Group();
   private readonly pipelines = new Map<string, PipelineFx>();
   private readonly rug: THREE.MeshBasicMaterial;
+  private readonly rugOpacity: { idle: number; invited: number };
   private readonly puffs: Puff[] = [];
   private readonly puffGeometry = new THREE.SphereGeometry(1, 10, 8);
   /** Dust drifting in the room's light, if the atmosphere has it. */
@@ -314,10 +315,15 @@ export class WorldFx {
     this.buildNight(world, atmosphere);
     this.buildSpring(atmosphere);
     this.buildRain(atmosphere);
+    // The level's own meeting rug (`Atmosphere.rug`), for a carpet the usual violet sinks into.
+    this.rugOpacity = {
+      idle: atmosphere.rug?.opacity ?? RUG_OPACITY,
+      invited: atmosphere.rug?.invited ?? RUG_OPACITY_INVITED,
+    };
     this.rug = new THREE.MeshBasicMaterial({
-      color: RUG_COLOR,
+      color: atmosphere.rug?.color ?? RUG_COLOR,
       transparent: true,
-      opacity: RUG_OPACITY,
+      opacity: this.rugOpacity.idle,
       depthWrite: false,
     });
     const tile = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
@@ -332,7 +338,8 @@ export class WorldFx {
     for (const pipeline of state.pipelines) this.syncPipeline(pipeline, timeMs);
     const invited = state.invites.length > 0;
     const pulse = invited ? 0.5 + 0.5 * Math.sin(timeMs / RUG_PULSE_MS) : 0;
-    this.rug.opacity = RUG_OPACITY + (RUG_OPACITY_INVITED - RUG_OPACITY) * pulse;
+    const { idle, invited: lit } = this.rugOpacity;
+    this.rug.opacity = idle + (lit - idle) * pulse;
   }
 
   /** Little clouds where a dash starts, drifting backwards. */

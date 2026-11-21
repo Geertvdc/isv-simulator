@@ -64,6 +64,13 @@ export interface Atmosphere {
      * so no cone spills over the floors above it.
      */
     perRoom?: boolean;
+    /**
+     * One pool per meeting room instead (see `meetingRooms`: each connected
+     * area of `meetingTiles`, top to bottom, then left to right), standing
+     * over the room's middle and aimed straight down at it (`depth` unused):
+     * a soft lit table in each glass box.
+     */
+    meetings?: boolean;
   };
   /**
    * Working light in the world beside the room, never on it: `perSide` point
@@ -178,6 +185,14 @@ export interface Atmosphere {
      * street-level floor under a cutaway's upper ones).
      */
     perRoom?: boolean;
+    /**
+     * Every room its own row, with the meeting rooms (`meetingRooms`) apart
+     * from the floor round them: a row along the back of each floor run
+     * (see `floorRows`) whose columns don't start in a meeting room, and a
+     * single pendant at the back of each meeting room, over its middle.
+     * Nothing along a hallway behind a meeting room's front wall.
+     */
+    meetingRooms?: boolean;
     /** Colors cycled along the lamps (`lampSpots` order) instead of `color`: a stage's gelled par cans. */
     colors?: number[];
     /**
@@ -260,6 +275,16 @@ export interface Atmosphere {
       low: number;
       high: number;
       size: number;
+      /**
+       * Also `perVoid` over each void tile in the front half of the map (a
+       * terrace or yard in front of the room, not a notch in its back wall),
+       * `voidLow` to `voidHigh` world units up, kept `margin` grid units
+       * inside the tile so their drift never crosses onto the room.
+       */
+      perVoid?: number;
+      voidLow?: number;
+      voidHigh?: number;
+      margin?: number;
     };
   };
   /**
@@ -328,6 +353,12 @@ export interface Atmosphere {
    * core and flaring each time it faces the camera. Off on `low`.
    */
   beacon?: { color: number; turns: number; reach: number };
+  /**
+   * The meeting tiles' rug (see `WorldFx`) in this level's own color and
+   * opacity, idle and while an invite pulses it, instead of the usual
+   * violet: for a carpet the usual one sinks into. On every quality.
+   */
+  rug?: { color: number; opacity: number; invited: number };
   /**
    * A faint glint of each lamp (`lampSpots`) on a polished floor: a soft
    * round patch `size` world units across, `forward` grid units in front of
@@ -927,6 +958,99 @@ const FRIDAY_AFTERNOON: Atmosphere = {
   },
 };
 
+/**
+ * A summer heatwave morning high up in a glass tower: a high, hard, bleached
+ * sun from the front left (about 55° up), so the walls throw short crisp
+ * shadows back into the rooms and the back row stays in the light; a pale hot
+ * sky going white at the horizon; a warm (never brown) haze over the city far
+ * below; inside, a cool-bright room with a warm-white bounce off the floors
+ * and a fill only a touch blue, so the yellow test benches keep their yellow.
+ * Hot by lifting the whites, not the yellows. Slim pendants along the back
+ * of each office and one over each meeting room's table, with a soft pool on
+ * each glass box; heat shimmer hangs over the terrace and the city below,
+ * never over the room.
+ */
+const HEATWAVE_MORNING: Atmosphere = {
+  sun: {
+    color: 0xfff3e2,
+    intensity: 2.7,
+    // About 55° up, from the left and in front: hypot(5, 4) × tan 55° ≈ 9.1.
+    from: { x: -5, y: 4, height: 9.1, perMapSize: false },
+    reach: 0.95,
+    softness: 2.5,
+  },
+  // The meeting rooms' own lights: a soft pool on each table, The Garage, then Mom.
+  pools: {
+    color: 0xfff0dc,
+    intensity: [1.2, 1.2],
+    height: 7,
+    forward: 1.5,
+    depth: 0,
+    radius: 2.2,
+    meetings: true,
+  },
+  sky: { sky: 0xe4ecf4, ground: 0xb8a98f, intensity: 0.9 },
+  // Low hides the pendants and the station fill: the sky makes up for them there.
+  lowSky: 1.05,
+  fill: { color: 0xeef2f8, intensity: 0.65 },
+  environment: 0.16,
+  backdrop: { inner: 0xf8f5ee, outer: 0xbccddf },
+  // Heat haze: the roofs far below sink into warm white air, not brown.
+  fog: { color: 0xeee9df, start: 3.5, span: 20 },
+  vignette: {
+    color: 0x34384a,
+    opacity: 0.35,
+    inner: 0.7,
+    saturate: 1.45,
+    glows: [
+      // The bleached horizon behind the city, under the order cards.
+      { color: 0xfff6e6, opacity: 0.24, x: 0.5, y: 0, reach: 0.55 },
+      // The sun's glare off the terrace, low on the left.
+      { color: 0xfff2dc, opacity: 0.16, x: 0, y: 0.85, reach: 0.3 },
+    ],
+  },
+  lamps: {
+    color: 0xfff4e4,
+    intensity: 7,
+    distance: 3.4,
+    height: 2.1,
+    spacing: 3,
+    inset: 0.45,
+    // Back walls only: a pendant by the front wall would hang over the players' heads on screen.
+    frontFrom: 99,
+    meetingRooms: true,
+  },
+  // The bug queues face the sun's far side and the pipelines' belts sit low on the front wall.
+  stationFill: {
+    color: 0xfff0dc,
+    intensity: 5,
+    distance: 2.6,
+    height: 1.3,
+    forward: 0.85,
+    kinds: ['bugQueue', 'pipeline'],
+  },
+  // Heat shimmer: slow pale motes over the terrace and in the air over the city far below.
+  motes: {
+    color: 0xfff4e0,
+    opacity: 0.4,
+    perTile: 0,
+    outside: {
+      side: -1,
+      perSide: 36,
+      perBack: 1,
+      near: 0.8,
+      far: 4,
+      low: -2.6,
+      high: -0.4,
+      size: 0.09,
+      perVoid: 2,
+      voidLow: 0.25,
+      voidHigh: 0.9,
+      margin: 0.3,
+    },
+  },
+};
+
 /** Presets per `MapLook.scene` id. */
 export const ATMOSPHERES: Readonly<Record<string, Atmosphere>> = {
   garage: GOLDEN_HOUR,
@@ -938,6 +1062,7 @@ export const ATMOSPHERES: Readonly<Record<string, Atmosphere>> = {
   'middle-management': SPRING_MORNING,
   hypergrowth: SPRING_RAIN,
   'hot-desking': FRIDAY_AFTERNOON,
+  'back-to-back': HEATWAVE_MORNING,
 };
 
 /** The light and air for a scene id; the default for none or an unknown one. */
@@ -975,10 +1100,27 @@ export function washPlacement(
 /** The per-floor washes (`Atmosphere.pools`): each spot's position, target, half-angle and intensity. */
 export function poolPlacements(
   atmosphere: Atmosphere,
-  map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles'>>,
+  map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles' | 'meetingTiles'>>,
 ): { position: Vec3; target: Vec3; angle: number; intensity: number }[] {
   const pools = atmosphere.pools;
   if (!pools) return [];
+  if (pools.meetings) {
+    return meetingRooms(map).flatMap((room, i) => {
+      const intensity = pools.intensity[i];
+      if (intensity === undefined || intensity <= 0) return [];
+      const cx = (room.x0 + room.x1) / 2;
+      const cy = (room.inside + room.y1) / 2;
+      const position = gridToWorld(cx, cy + pools.forward, pools.height);
+      const target = gridToWorld(cx, cy);
+      const distance = Math.hypot(
+        position.x - target.x,
+        position.y - target.y,
+        position.z - target.z,
+      );
+      const radius = Math.max(pools.radius, (room.x1 - room.x0 + 1) / 2);
+      return [{ position, target, angle: Math.atan2(radius, distance), intensity }];
+    });
+  }
   if (pools.perRoom) {
     return roomRows(map).flatMap((room, i) => {
       const intensity = pools.intensity[i];
@@ -1116,10 +1258,24 @@ export function sunPlacement(
  */
 export function lampSpots(
   atmosphere: Atmosphere,
-  map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles'>>,
+  map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles' | 'meetingTiles'>>,
 ): Vec3[] {
   const lamps = atmosphere.lamps;
   if (!lamps) return [];
+  if (lamps.meetingRooms) {
+    const rows = floorRows(map, true).flatMap(({ inside, x0, x1 }) => {
+      const length = x1 - x0 + 1;
+      const count = Math.max(1, Math.round(length / lamps.spacing));
+      const y = inside - 0.5 + lamps.inset;
+      return Array.from({ length: count }, (_, i) =>
+        gridToWorld(x0 - 0.5 + (length * (i + 0.5)) / count, y, lamps.height),
+      );
+    });
+    const pendants = meetingRooms(map).map(({ inside, x0, x1 }) =>
+      gridToWorld((x0 + x1) / 2, inside - 0.5 + lamps.inset, lamps.height),
+    );
+    return [...rows, ...pendants];
+  }
   // The wall's inner face is half a tile in from its row's center.
   const runs = lamps.perRoom ? roomRows(map) : lamps.everyFloor ? floorRows(map) : backRows(map);
   const rows = runs.map((r) => ({ ...r, y: r.inside - 0.5 + lamps.inset }));
@@ -1196,21 +1352,66 @@ function backRows(
  * whole width along row 1.
  */
 function floorRows(
-  map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles'>>,
+  map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles' | 'meetingTiles'>>,
+  skipMeetings = false,
 ): { inside: number; x0: number; x1: number }[] {
   if (!map.tiles) return [{ inside: 1, x0: 1, x1: Math.max(1, map.width - 2) }];
   const full = map as LevelMap;
   const deepest = Math.floor(map.height * 0.5);
+  const meeting = new Set(
+    (skipMeetings ? (map.meetingTiles ?? []) : []).map((t) => t.y * map.width + t.x),
+  );
   const runs: { inside: number; x0: number; x1: number }[] = [];
   for (let x = 0; x < map.width; x++) {
     let top: number | null = null;
     for (let y = 1; y <= deepest && top === null; y++) if (getTile(full, x, y) === 'floor') top = y;
-    if (top === null) continue;
+    // A column that starts in a meeting room belongs to that room's own pendant.
+    if (top === null || meeting.has(top * map.width + x)) continue;
     const last = runs[runs.length - 1];
     if (last && last.inside === top && last.x1 === x - 1) last.x1 = x;
     else runs.push({ inside: top, x0: x, x1: x });
   }
   return runs.filter((r) => r.x1 - r.x0 >= 2);
+}
+
+/**
+ * The meeting rooms (`LevelMap.meetingTiles`): each connected area of
+ * meeting tiles (4-neighbours), with its first and last row and column, top
+ * to bottom, then left to right. None without meeting tiles.
+ */
+export function meetingRooms(
+  map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'meetingTiles'>>,
+): { inside: number; y1: number; x0: number; x1: number }[] {
+  const tiles = map.meetingTiles ?? [];
+  const left = new Set(tiles.map((t) => t.y * map.width + t.x));
+  const rooms: { inside: number; y1: number; x0: number; x1: number }[] = [];
+  for (const start of tiles) {
+    const key = start.y * map.width + start.x;
+    if (!left.has(key)) continue;
+    left.delete(key);
+    const room = { inside: start.y, y1: start.y, x0: start.x, x1: start.x };
+    const stack = [start];
+    for (let at = stack.pop(); at; at = stack.pop()) {
+      room.inside = Math.min(room.inside, at.y);
+      room.y1 = Math.max(room.y1, at.y);
+      room.x0 = Math.min(room.x0, at.x);
+      room.x1 = Math.max(room.x1, at.x);
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ] as const) {
+        const next = { x: at.x + dx, y: at.y + dy };
+        const k = next.y * map.width + next.x;
+        if (next.x < 0 || next.x >= map.width || !left.has(k)) continue;
+        left.delete(k);
+        stack.push(next);
+      }
+    }
+    rooms.push(room);
+  }
+  return rooms.sort((a, b) => a.inside - b.inside || a.x0 - b.x0);
 }
 
 /**
@@ -1331,7 +1532,7 @@ export interface MoteSeed {
 /** Where the dust motes hang inside the room, the same every time for a map. */
 export function moteSeeds(
   atmosphere: Atmosphere,
-  map: Pick<LevelMap, 'width' | 'height'>,
+  map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles'>>,
 ): MoteSeed[] {
   const motes = atmosphere.motes;
   if (!motes) return [];
@@ -1375,7 +1576,35 @@ function outsideMotes(
       return { at: { x: x - 0.5 + unit(i, 45), y: up(i), z: -0.5 - out(i) }, phase: unit(i, 46) };
     }),
   );
-  return [...side, ...back];
+  return [...side, ...back, ...voidMotes(spec, map)];
+}
+
+/** The motes over the void in front of the room (`motes.outside.perVoid`), well inside each tile. */
+function voidMotes(
+  spec: NonNullable<NonNullable<Atmosphere['motes']>['outside']>,
+  map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles'>>,
+): MoteSeed[] {
+  const per = spec.perVoid ?? 0;
+  if (per <= 0 || !map.tiles) return [];
+  const low = spec.voidLow ?? 0.1;
+  const high = spec.voidHigh ?? 0.8;
+  const spread = 1 - 2 * (spec.margin ?? 0.3);
+  const front = tilesOf(map as LevelMap, (tile) => tile === 'void').filter(
+    (t) => t.y >= map.height / 2,
+  );
+  return front.flatMap((t) =>
+    Array.from({ length: per }, (_, k) => {
+      const i = 6000 + (t.y * map.width + t.x) * 8 + k;
+      return {
+        at: gridToWorld(
+          t.x + (unit(i, 47) - 0.5) * spread,
+          t.y + (unit(i, 48) - 0.5) * spread,
+          low + unit(i, 49) * (high - low),
+        ),
+        phase: unit(i, 50),
+      };
+    }),
+  );
 }
 
 /** A number in [0, 1) from an index and a salt, like `tileHash`. */
