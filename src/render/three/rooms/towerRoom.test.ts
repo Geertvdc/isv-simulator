@@ -129,7 +129,7 @@ describe('Back to Back room plan', () => {
       for (const x of xs) expect(plan.swaps[key(x, v.y)]).toMatch(/^screen:/);
     }
     const pieces = plan.meetingPieces.map((p) => p.piece);
-    for (const p of ['garagePhoto', 'mowerCase', 'rollUp', 'momPortrait', 'waterTray'] as const)
+    for (const p of ['garagePhoto', 'heritageCase', 'rollUp', 'momPortrait', 'waterTray'] as const)
       expect(pieces).toContain(p);
   });
 
@@ -160,18 +160,38 @@ describe('Back to Back room plan', () => {
     }
   });
 
-  it('hangs pendants only at the back of the offices and over a meeting table, clear of the back stations', () => {
+  it('hangs pendants only over a meeting table away from the front, never in an office over the back row', () => {
     const spots = lampSpots(atmosphereFor('back-to-back'), map);
     const fits = spots.map((s) => towerPendantFit(s, map)).filter((f) => f !== null);
+    expect(fits.length).toBeGreaterThan(0);
     for (const f of fits) {
       // Never by the front: the corridor and Mom get none.
       expect(f.z).toBeLessThan(4);
-      const backRow = Math.floor(f.z);
-      for (let x = Math.floor(f.x - 0.42); x <= Math.ceil(f.x + 0.42); x++) {
-        const t = getTile(map, x, backRow);
-        if (Math.abs(x - f.x) < 0.5 + 0.42 - 0.2)
-          expect(['inbox', 'keyboard', 'bugQueue', 'testBench']).not.toContain(t);
-      }
+      expect(plan.tables.some((t) => t.x === f.x && Math.abs(t.y - f.z) <= 1.5)).toBe(true);
+      expect(plan.zones[key(Math.round(f.x), Math.round(f.z))]).toBe('meeting');
+    }
+  });
+
+  it("puts a portal with its head under the light on both of Mom's doors, the doorways still floor", () => {
+    for (const p of plan.portals) expect(getTile(map, p.x, p.y)).toBe('floor');
+    const mom = plan.portals.filter((p) => p.y > 6);
+    expect(mom).toHaveLength(2);
+    for (const p of mom) expect(p.leaf).toBe(false);
+  });
+
+  it('clusters the kit two or three to a pair of tiles, a breather between', () => {
+    const byWall = new Map<number, typeof plan.tops>();
+    for (const t of plan.tops.filter((q) => q.dx === 0)) {
+      const list = byWall.get(t.x) ?? [];
+      list.push(t);
+      byWall.set(t.x, list);
+    }
+    for (const t of plan.tops) expect(Math.abs(t.dx) + Math.abs(t.dy)).toBeLessThanOrEqual(0.5);
+    // Along a side wall: groups of props 0.56 apart, gaps of a tile and a half or more between groups.
+    for (const list of byWall.values()) {
+      const ys = list.map((t) => t.y + t.dy).sort((a, b) => a - b);
+      const gaps = ys.slice(1).map((y, i) => y - (ys[i] ?? 0));
+      for (const g of gaps) expect(g < 0.7 || g > 1.4).toBe(true);
     }
   });
 });

@@ -20,6 +20,7 @@ import {
   TOWER_FLOOR_LOOKS,
   TOWER_SWAP_MODELS,
   doorPortalModel,
+  towerPendantModel,
   releaseHatchModel,
   requestPortalModel,
   towerArtModels,
@@ -113,7 +114,6 @@ describe('Back to Back room dressing', () => {
       expect(box.max.y).toBeLessThanOrEqual(RELEASE_MAX_H);
       expect(box.max.z).toBeLessThanOrEqual(0.5 + BUTTON_OUT + 0.25);
     }
-    expect(bounds(doorPortalModel(false)).max.y).toBeLessThan(0.7);
     for (const m of Object.values(MEETING_PIECE_MODELS))
       expect(bounds(m()).max.y).toBeLessThan(0.65);
     expect(bounds(vinylModel('THE GARAGE', 4.8)).max.y).toBeLessThan(0.65);
@@ -127,19 +127,30 @@ describe('Back to Back room dressing', () => {
     }
   });
 
-  it('keeps a meeting door walkable and its light clear: the tall portal is posts, a head under the light and a leaf parked beside it', () => {
-    const m = doorPortalModel(true);
-    expect(bounds(m).max.y).toBeLessThanOrEqual(PORTAL_HEAD + 0.001);
-    expect(PORTAL_HEAD).toBeLessThan(1.25 - 0.12);
-    for (const g of [m.body, m.glass]) {
-      if (!g) continue;
-      const pos = g.getAttribute('position');
-      for (let i = 0; i < pos.count; i++) {
-        // In the doorway's middle, only the head overhead.
-        if (Math.abs(pos.getZ(i)) < 0.44 && Math.abs(pos.getX(i)) < 0.5)
-          expect(pos.getY(i)).toBeGreaterThanOrEqual(PORTAL_HEAD - 0.05);
+  it('keeps a meeting door walkable and its light on the portal: posts, a head the light rests on, a leaf only in a full wall', () => {
+    // The door light is a 0.12 sphere at 1.25 (`Mechanics`): it sits on the head, never hidden by it.
+    expect(PORTAL_HEAD).toBeLessThanOrEqual(1.25 - 0.12);
+    expect(PORTAL_HEAD).toBeGreaterThan(1.25 - 0.12 - 0.03);
+    for (const leaf of [true, false]) {
+      const m = doorPortalModel(leaf);
+      expect(bounds(m).max.y).toBeLessThanOrEqual(PORTAL_HEAD + 0.001);
+      for (const g of [m.body, m.glass]) {
+        if (!g) continue;
+        const pos = g.getAttribute('position');
+        for (let i = 0; i < pos.count; i++) {
+          // In the doorway's middle, only the head overhead.
+          if (Math.abs(pos.getZ(i)) < 0.44 && Math.abs(pos.getX(i)) < 0.5)
+            expect(pos.getY(i)).toBeGreaterThanOrEqual(PORTAL_HEAD - 0.05);
+        }
       }
     }
+    expect(doorPortalModel(false).glass).toBeNull();
     expect(FRONT_WALL_HEIGHT).toBeLessThan(0.3);
+  });
+  it('builds the pendant graphite, a thin lit strip under it', () => {
+    const m = towerPendantModel();
+    const glow = m.glow ? bounds({ body: m.glow, glow: null, glass: null }) : null;
+    expect(glow).not.toBeNull();
+    if (glow) expect(glow.max.z - glow.min.z).toBeLessThanOrEqual(0.02);
   });
 });

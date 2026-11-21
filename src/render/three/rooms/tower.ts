@@ -53,11 +53,14 @@ const FLAT = new Set<string>([
  * doorways; smoked-oak credenzas for counters; the request portal over the
  * inbox, the release hatch and THE BIG RED BUTTON at the ship; the rooms'
  * names in vinyl (Unit 4, The Biscuit, The Garage, Mom), booking screens
- * and glass portals at the meeting doors, THE PLAN under its picture light,
- * the room directory, the thermostat at 29°C; The Garage's photo of Mom's
- * garage, its heritage lawnmower and printed roll-up door, Mom's portrait
- * and her first cheque and a jug of water; heatwave kit on the wall tops;
- * slim linear pendants along the backs of the rooms. The foundation is
+ * and glass portals at the meeting doors (each door light on its portal's
+ * head), THE PLAN under its picture light, the room directory, the
+ * thermostat at 29°C; The Garage's photo of Mom's garage, its heritage
+ * traffic cone in a glass case and the roll-up door printed on its back
+ * glass, Mom's portrait and her first cheque and a jug of water; heatwave
+ * kit in clusters on the wall tops; a slim graphite pendant over each
+ * meeting table (none in the offices: there they'd cross the back row's
+ * stations on screen). The foundation is
  * the floor's pale stone edge over the curtain wall of the floor below.
  */
 export const TOWER_ROOM: RoomDressing<TowerRoom> = {
@@ -83,7 +86,7 @@ export const TOWER_ROOM: RoomDressing<TowerRoom> = {
       place(`art:${a.art}`, art[a.art], { at: gridToWorld(a.x, a.y), yaw: 0 });
     for (const t of plan.tops)
       place(`top:${t.kind}`, TOWER_TOPS[t.kind], {
-        at: gridToWorld(t.x, t.y, WALL_HEIGHT + TOP_LIFT),
+        at: gridToWorld(t.x + t.dx, t.y + t.dy, WALL_HEIGHT + TOP_LIFT),
         yaw: t.yaw,
       });
     for (const v of plan.vinyl) {
@@ -97,7 +100,7 @@ export const TOWER_ROOM: RoomDressing<TowerRoom> = {
         yaw: 0,
       });
     for (const d of plan.portals)
-      place(`doorPortal:${d.tall}`, () => doorPortalModel(d.tall), {
+      place(`doorPortal:${d.leaf}`, () => doorPortalModel(d.leaf), {
         at: gridToWorld(d.x, d.y),
         yaw: d.axis === 'x' ? 0 : Math.PI / 2,
       });
