@@ -3,6 +3,7 @@ import { BEFORE_MAPS } from './fixtures/beforeMaps';
 import { getTile, isSolid } from '../../sim/level';
 import { parseLevelMap as parseDraftMap } from '../../sim/level';
 import {
+  BACK_TO_BACK,
   DEMO_DAY,
   DOWN_THE_HALL,
   GARAGE,
@@ -23,7 +24,7 @@ import onCallDraft from '../../../maps/level-06-on-call.txt?raw';
 import middleManagementDraft from '../../../maps/level-07-middle-management.txt?raw';
 import { LEVEL_LOOKS } from '../mapLook';
 import { WALL_HEIGHT } from './layout';
-import { fitCamera3d, gridToWorld, projectPoint } from '../projection';
+import { type Vec3, fitCamera3d, gridToWorld, projectPoint } from '../projection';
 import {
   ATMOSPHERES,
   DEFAULT_ATMOSPHERE,
@@ -37,6 +38,7 @@ import {
   glintSpots,
   lampColor,
   lampSpots,
+  meetingRooms,
   moteSeeds,
   lightWellSpots,
   mullionShade,
@@ -98,6 +100,7 @@ describe('atmosphereFor', () => {
       MIDDLE_MANAGEMENT.id,
       HYPERGROWTH.id,
       HOT_DESKING.id,
+      BACK_TO_BACK.id,
     ]);
     for (const level of LEVELS) {
       if (lit.has(level.id)) continue;
@@ -304,7 +307,7 @@ describe('the stage wash and the side lights', () => {
   });
 
   it('gives only the stage (and the few sets lit by lamps) a brighter sky on low, where its working lights are off', () => {
-    const lit = ['demo-day', 'on-call', 'hot-desking'];
+    const lit = ['demo-day', 'on-call', 'hot-desking', 'back-to-back'];
     for (const [id, other] of Object.entries(ATMOSPHERES))
       expect(other.lowSky !== undefined, id).toBe(lit.includes(id));
     expect(DEFAULT_ATMOSPHERE.lowSky).toBeUndefined();
@@ -556,7 +559,7 @@ describe('the spring morning (middle-management)', () => {
     expect(a.vignette?.saturate).toBeLessThan(1.6);
     // No other preset is graded but 3-2's rain: their pictures stay exactly as they were.
     for (const [id, other] of Object.entries(ATMOSPHERES))
-      if (other !== a && id !== 'hypergrowth' && id !== 'hot-desking')
+      if (other !== a && !['hypergrowth', 'hot-desking', 'back-to-back'].includes(id))
         expect(other.vignette?.saturate, id).toBeUndefined();
   });
 
@@ -816,7 +819,8 @@ describe('the Friday afternoon (hot-desking)', () => {
     // Without tiles, or for the other presets, none.
     expect(stationFillSpots(a, SHIPPED)).toEqual([]);
     for (const [id, other] of Object.entries(ATMOSPHERES))
-      if (other !== a) expect(stationFillSpots(other, map), id).toEqual([]);
+      if (other !== a && id !== 'back-to-back')
+        expect(stationFillSpots(other, map), id).toEqual([]);
   });
 
   it('finds the three rooms: top floor, test lab, hot-desk floor', () => {
@@ -890,7 +894,152 @@ describe('the Friday afternoon (hot-desking)', () => {
     }
     // The other presets' motes (if any) stay in their rooms.
     for (const [id, other] of Object.entries(ATMOSPHERES))
-      if (other !== a) expect(other.motes?.outside, id).toBeUndefined();
+      if (other !== a && id !== 'back-to-back') expect(other.motes?.outside, id).toBeUndefined();
+  });
+});
+
+describe('the heatwave morning (back-to-back)', () => {
+  const a = atmosphereFor('back-to-back');
+  const map = BACK_TO_BACK.map;
+  const rgb = (c: number) => [(c >> 16) & 255, (c >> 8) & 255, c & 255] as const;
+  const rooms = meetingRooms(map);
+
+  it('gives back-to-back its own light', () => {
+    expect(atmosphereFor(LEVEL_LOOKS[BACK_TO_BACK.id]?.scene)).toBe(ATMOSPHERES['back-to-back']);
+    for (const [id, other] of Object.entries(ATMOSPHERES))
+      if (id !== 'back-to-back') expect(other, id).not.toBe(a);
+  });
+
+  it('keys it high, hard and bleached from the front left, about 55° up', () => {
+    const { position: s, target: t } = sunPlacement(a, map);
+    const elevation = Math.atan2(s.y - t.y, Math.hypot(s.x - t.x, s.z - t.z)) * (180 / Math.PI);
+    expect(elevation).toBeGreaterThan(52);
+    expect(elevation).toBeLessThan(58);
+    // From the left and toward the camera: walls throw their shadows back into
+    // the rooms, and the back row's faces are in the sun.
+    expect(s.x).toBeLessThan(t.x);
+    expect(s.z).toBeGreaterThan(t.z);
+    // Crisp shadows, and a near-white sun: hot by its whites, not by yellow.
+    expect(a.sun.softness ?? 4).toBeLessThan(4);
+    const [r, g, b] = rgb(a.sun.color);
+    expect(Math.min(r, g, b)).toBeGreaterThan(215);
+    expect(r - b).toBeLessThan(40);
+  });
+
+  it('keeps the fill and sky only a touch blue, the haze warm but pale, the horizon near white', () => {
+    for (const c of [a.fill.color, a.sky.sky]) {
+      const [r, g, b] = rgb(c);
+      expect(b).toBeGreaterThanOrEqual(r);
+      expect(b - r).toBeLessThan(25);
+      expect(Math.min(r, g, b)).toBeGreaterThan(210);
+    }
+    // Warm heat haze, never brown: warmer than blue, but pale.
+    const [fr, fg, fb] = rgb(a.fog?.color ?? 0);
+    expect(fr).toBeGreaterThan(fb);
+    expect(Math.min(fr, fg, fb)).toBeGreaterThan(200);
+    expect(Math.min(...rgb(a.backdrop?.inner ?? 0))).toBeGreaterThan(225);
+    expect(a.vignette?.opacity).toBeCloseTo(0.35);
+    expect(a.vignette?.inner).toBeCloseTo(0.7);
+    expect(a.vignette?.saturate).toBeGreaterThan(1.3);
+    expect(a.vignette?.saturate).toBeLessThanOrEqual(1.6);
+    expect(a.lowSky).toBeGreaterThan(a.sky.intensity);
+  });
+
+  it('finds the two meeting rooms: The Garage between the offices, Mom off the corridor', () => {
+    expect(rooms).toHaveLength(2);
+    const [garage, mom] = rooms;
+    if (!garage || !mom) return;
+    expect(garage.inside).toBeLessThan(map.height / 2);
+    expect(mom.inside).toBeGreaterThan(map.height / 2);
+    for (const r of rooms) expect(r.x1 - r.x0).toBeGreaterThanOrEqual(2);
+    expect(meetingRooms(SHIPPED)).toEqual([]);
+  });
+
+  it('hangs pendants along the back of each office and one at the back of each meeting room, only there', () => {
+    const spots = lampSpots(a, map);
+    const meeting = new Set(map.meetingTiles.map((t) => `${t.x},${t.y}`));
+    const back = (p: Vec3) => Math.round(p.z - (a.lamps?.inset ?? 0) + 0.5);
+    for (const p of spots) {
+      const x = Math.round(p.x);
+      const z = Math.round(p.z);
+      expect(getTile(map, x, z), `${p.x},${p.z}`).toBe('floor');
+      expect(p.y).toBe(a.lamps?.height);
+      // Right inside a back wall: the tile behind the lamp's row is solid.
+      expect(isSolid(getTile(map, x, back(p) - 1) ?? 'void'), `${p.x},${p.z}`).toBe(true);
+    }
+    // One pendant per meeting room, over its back row.
+    for (const r of rooms) {
+      const inRoom = spots.filter(
+        (p) =>
+          meeting.has(`${Math.round(p.x)},${Math.round(p.z)}`) &&
+          p.x >= r.x0 &&
+          p.x <= r.x1 &&
+          p.z > r.inside - 0.5 &&
+          p.z <= r.y1 + 0.5,
+      );
+      expect(inRoom).toHaveLength(1);
+      expect(back(inRoom[0] as Vec3)).toBe(r.inside);
+    }
+    // Two offices along the map's first row, none along the corridor behind The Garage.
+    const offices = spots.filter((p) => !meeting.has(`${Math.round(p.x)},${Math.round(p.z)}`));
+    expect(offices.length).toBeGreaterThanOrEqual(2);
+    for (const p of offices) expect(back(p)).toBe(1);
+    expect(offices.some((p) => p.x < map.width / 2)).toBe(true);
+    expect(offices.some((p) => p.x > map.width / 2)).toBe(true);
+    // The other presets keep their own rows.
+    for (const [id, other] of Object.entries(ATMOSPHERES))
+      if (other !== a) expect(other.lamps?.meetingRooms, id).toBeUndefined();
+  });
+
+  it('lays a soft pool on each meeting room, and none elsewhere', () => {
+    const pools = poolPlacements(a, map);
+    expect(pools).toHaveLength(rooms.length);
+    pools.forEach((p, i) => {
+      const r = rooms[i];
+      if (!r) return;
+      // Over the middle of its room (the table).
+      expect(p.target.x).toBeCloseTo((r.x0 + r.x1) / 2);
+      expect(p.target.z).toBeCloseTo((r.inside + r.y1) / 2);
+      expect(p.position.y).toBeGreaterThan(WALL_HEIGHT * 2);
+      expect(p.angle).toBeLessThan(Math.PI / 4);
+    });
+    for (const [id, other] of Object.entries(ATMOSPHERES))
+      if (other !== a) expect(other.pools?.meetings, id).toBeUndefined();
+  });
+
+  it('hangs heat shimmer over the terrace and the city below only, never over the room', () => {
+    const seeds = moteSeeds(a, map);
+    expect(seeds.length).toBeGreaterThan(40);
+    expect(moteSeeds(a, map)).toEqual(seeds);
+    // A mote drifts at most MOTE_DRIFT (0.18) from its seed.
+    const drift = 0.2;
+    let overTerrace = 0;
+    let below = 0;
+    for (const { at, phase } of seeds) {
+      expect(phase).toBeGreaterThanOrEqual(0);
+      expect(phase).toBeLessThan(1);
+      const inMap =
+        at.x > -0.5 - drift &&
+        at.x < map.width - 0.5 + drift &&
+        at.z > -0.5 - drift &&
+        at.z < map.height - 0.5 + drift;
+      if (inMap) {
+        // Over a void tile in front, and inside it with room to drift.
+        const x = Math.round(at.x);
+        const z = Math.round(at.z);
+        expect(getTile(map, x, z)).toBe('void');
+        expect(z).toBeGreaterThanOrEqual(map.height / 2);
+        expect(Math.abs(at.x - x) + drift).toBeLessThan(0.5);
+        expect(Math.abs(at.z - z) + drift).toBeLessThan(0.5);
+        overTerrace++;
+      } else {
+        // Out beside or behind the building: in the air over the city, below this floor.
+        expect(at.y).toBeLessThan(0);
+        below++;
+      }
+    }
+    expect(overTerrace).toBeGreaterThan(10);
+    expect(below).toBeGreaterThan(10);
   });
 });
 
