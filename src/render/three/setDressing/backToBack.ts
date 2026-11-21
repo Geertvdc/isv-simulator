@@ -52,6 +52,30 @@ function bar(b: ModelBuilder, a: V3, c: V3, t: number, color: number): void {
   b.add(g, color, { at: [(a[0] + c[0]) / 2, (a[1] + c[1]) / 2, (a[2] + c[2]) / 2] });
 }
 
+/**
+ * A flat box whose color shades vertex by vertex: `color(x, y)` gives each
+ * corner's color from where it ends up (in the piece's space). For washes of
+ * light and sky caught in glass.
+ */
+function shaded(
+  b: ModelBuilder,
+  w: number,
+  h: number,
+  d: number,
+  at: V3,
+  color: (x: number, y: number) => number,
+): void {
+  const g = new THREE.BoxGeometry(w, h, d).toNonIndexed();
+  b.add(g, 0xffffff, { at });
+  const pos = g.getAttribute('position');
+  const col = g.getAttribute('color');
+  const c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    c.set(color(pos.getX(i), pos.getY(i)));
+    col.setXYZ(i, c.r, c.g, c.b);
+  }
+}
+
 /** `a` mixed toward `c` by `t`. */
 function mix(a: number, c: number, t: number): number {
   return new THREE.Color(a).lerp(new THREE.Color(c), t).getHex();
@@ -86,7 +110,7 @@ const FONT: Readonly<Record<string, string>> = {
   '0': '111101101101111',
   '1': '010110010010111',
   '2': '110001010100111',
-  '3': '110001010001110',
+  '3': '111001011001111',
   '4': '101101111001001',
   '5': '111100110001110',
   '6': '011100111101111',
@@ -168,28 +192,40 @@ function glowLetters(
 export const FLOOR = 0.463;
 /** YOTTA violet. */
 export const VIOLET = 0x8a64d8;
-/** The lobby: dark stone wall, pale stone floor, brushed steel, black steel. */
+/** The lobby: dark stone wall, honed grey stone floor and its joints, brushed steel, black steel. */
 const STONE_DARK = 0x34353b;
-const STONE_FLOOR = 0xe2ddd2;
+const STONE_FLOOR = 0x9c978d;
+const STONE_JOINT = 0x7a766f;
 const STEEL = 0xd4d8de;
+/** YOTTA's letters: brushed faces, darker returns, a bright top edge catching the sky. */
+const LETTER_FACE = 0xb8bfc6;
+const LETTER_RETURN = 0x6c737b;
+const LETTER_TOP = 0xe8ecef;
+/** The warm wash the uplights throw up the stone, and the soffit's dark band. */
+const WASH = 0xffd7a0;
+const SOFFIT = 0x2a2b2e;
+/** The runner from the lifts to the bench: dark blue-grey wool, a darker border. */
+const RUNNER = 0x3e4152;
 const STEEL_DARK = 0x8a9096;
 const BLACK_STEEL = 0x2a2c30;
 const LEATHER = 0x4a4048;
 /** Warm white uplight, amber lift digits. */
-const UPLIGHT = 0xfff0d0;
+const UPLIGHT = 0xffe6c0;
 const AMBER = 0xffb040;
-/** The terrace: pale limestone pavers, silver-grey decking, gravel. */
+/** The terrace: pale limestone pavers and their joints, silver-grey decking, gravel. */
 const PAVER = 0xb0a89c;
+const PAVER_JOINT = 0x8a7f6e;
 const DECK = 0xc8b8a0;
 const GRAVEL = 0x9a968e;
 const ALU = 0xc4cad0;
 const ALU_DARK = 0x6e757c;
 const GLASS = 0x9cc4dc;
-/** The curtain wall: pale blue glass, slate mullions, white spandrels. */
-const CW_GLASS = 0xa4b8c6;
-const CW_MULLION = 0x5e666e;
-const CW_SPANDREL = 0xe8eae6;
-const HAZE = 0xdfe4e6;
+/** The curtain wall: blue-grey glass with the sky in it, slate mullions, dark spandrels. */
+const CW_GLASS = 0x6d8293;
+const CW_SKY = 0xa9bccb;
+const CW_MULLION = 0x4b525a;
+const CW_SPANDREL = 0x3b434c;
+const HAZE = 0xd8d4c8;
 /** MONOLITH: black glass, cold blue windows, its white logo. */
 const MONO_BLACK = 0x15171c;
 const MONO_FIN = 0x2a2e36;
@@ -199,21 +235,21 @@ const MONO_LOGO = 0xf4f8ff;
 // ---- The lift lobby ----
 
 /**
- * A slab of light stone floor `w` × `d`, centred on the origin, its top at the
- * level's floor: large polished tiles, each its own tone, thin joints, a
- * polished sheen along the middle. Stands on the ground.
+ * A slab of honed grey stone floor `w` × `d`, centred on the origin, its top at
+ * the level's floor: large tiles, each its own tone, in darker joints. Stands
+ * on the ground.
  */
 export function stoneFloor(w: number, d: number): SetPiece {
   return once(`stoneFloor:${w.toFixed(2)}:${d.toFixed(2)}`, () =>
     looks([w, d], 1, (b) => {
-      flat(b, w, FLOOR - 0.006, d, 0x9a968e, [0, (FLOOR - 0.006) / 2, 0]);
+      flat(b, w, FLOOR - 0.006, d, STONE_JOINT, [0, (FLOOR - 0.006) / 2, 0]);
       const s = 0.6;
       for (let i = 0, x = -w / 2; x < w / 2 - 0.01; i++, x += s)
         for (let j = 0, z = -d / 2; z < d / 2 - 0.01; j++, z += s) {
           const xb = Math.min(w / 2, x + s);
           const zb = Math.min(d / 2, z + s);
-          const tone = (hash01(i, j, 31) - 0.5) * 0.06;
-          flat(b, xb - x - 0.012, 0.006, zb - z - 0.012, tint(STONE_FLOOR, tone), [
+          const tone = (hash01(i, j, 31) - 0.5) * 0.08;
+          flat(b, xb - x - 0.014, 0.006, zb - z - 0.014, tint(STONE_FLOOR, tone), [
             (x + xb) / 2,
             FLOOR - 0.003,
             (z + zb) / 2,
@@ -224,27 +260,59 @@ export function stoneFloor(w: number, d: number): SetPiece {
 }
 
 /**
- * The lobby's dark stone feature wall, `w` along x centred on 0 and `h` high,
- * its face at z = 0 toward +z: big honed slabs with fine joints and a few pale
- * veins, a black steel shadow gap at its foot and a slim steel cap. Placed on
- * the lobby floor.
+ * The lobby's runner, `len` along x and `w` across, centred: dark blue-grey
+ * wool with a darker border and a worn, paler track down the middle where
+ * everyone walks from the lifts. Flush on the stone.
  */
-export function featureWall(w: number, h: number): SetPiece {
-  return once(`featureWall:${w.toFixed(2)}:${h.toFixed(2)}`, () =>
+export function runner(len: number, w: number): SetPiece {
+  return once(`runner:${len.toFixed(2)}:${w.toFixed(2)}`, () =>
+    looks([len, w], 1, (b) => {
+      flat(b, len, 0.008, w, tint(RUNNER, -0.25), [0, 0.004, 0]);
+      flat(b, len - 0.08, 0.009, w - 0.08, RUNNER, [0, 0.0045, 0]);
+      flat(b, len - 0.3, 0.0095, w * 0.35, tint(RUNNER, 0.06), [0, 0.0048, 0]);
+    }),
+  );
+}
+
+/**
+ * The tower's core round the lift lobby: a dark stone feature wall `w` along
+ * x centred on 0 and `h` high, its face at z = 0 toward +z, big honed slabs
+ * with fine joints and a few pale veins; stone returns `ret` deep at both
+ * ends, a dark soffit band along its top, a black steel shadow gap at its
+ * foot. Over `wash` (a centre and a width along x) the uplights' warm light
+ * washes up the stone, fading as it rises. Placed on the lobby floor.
+ */
+export function featureWall(
+  w: number,
+  h: number,
+  ret: number,
+  wash: { x: number; w: number },
+): SetPiece {
+  const key = `featureWall:${w.toFixed(2)}:${h.toFixed(2)}:${ret}:${wash.x.toFixed(2)}:${wash.w.toFixed(2)}`;
+  return once(key, () =>
     looks([w, 0.25], 1, (b) => {
       flat(b, w, h, 0.24, tint(STONE_DARK, -0.15), [0, h / 2, -0.12]);
       const sw = 0.62;
-      const sh = h / 3;
+      const sh = (h - 0.16) / 3;
+      /** How much warm light reaches the stone at (x, y): most at the foot under the letters. */
+      const lit = (x: number, y: number) => {
+        const across = Math.max(0, 1 - Math.abs(x - wash.x) / (wash.w / 2 + 0.4));
+        const up = Math.max(0, 1 - y / (h * 0.85));
+        return 0.34 * Math.min(1, across * 1.6) * up * up;
+      };
       for (let i = 0, x = -w / 2; x < w / 2 - 0.01; i++, x += sw)
         for (let j = 0; j < 3; j++) {
           const xb = Math.min(w / 2, x + sw);
           const y0 = 0.04 + j * sh;
-          const tone = (hash01(i, j, 41) - 0.5) * 0.12;
-          flat(b, xb - x - 0.012, sh - 0.012, 0.01, tint(STONE_DARK, tone), [
-            (x + xb) / 2,
-            y0 + sh / 2,
-            0.005,
-          ]);
+          const tone = tint(STONE_DARK, (hash01(i, j, 41) - 0.5) * 0.12);
+          shaded(
+            b,
+            xb - x - 0.012,
+            sh - 0.012,
+            0.01,
+            [(x + xb) / 2, y0 + sh / 2, 0.005],
+            (vx, vy) => mix(tone, WASH, lit(vx, vy)),
+          );
           // A pale vein across some slabs.
           if (hash01(i, j, 43) > 0.55) {
             const a = (hash01(i, j, 47) - 0.5) * 1.6;
@@ -253,14 +321,31 @@ export function featureWall(w: number, h: number): SetPiece {
               (xb - x) * 0.8,
               0.008,
               0.004,
-              tint(STONE_DARK, 0.28),
+              tint(STONE_DARK, 0.22),
               [(x + xb) / 2, y0 + sh * (0.3 + hash01(i, j, 53) * 0.4), 0.012],
               [0, 0, a * 0.4],
             );
           }
         }
       flat(b, w, 0.04, 0.02, BLACK_STEEL, [0, 0.02, 0.01]);
-      flat(b, w + 0.02, 0.03, 0.27, STEEL_DARK, [0, h + 0.015, -0.12]);
+      // The soffit: a dark band along the top, standing out over the lobby, and the wall's top.
+      flat(b, w + 0.02, 0.14, ret, SOFFIT, [0, h - 0.07, ret / 2 - 0.02]);
+      flat(b, w + 0.02, 0.02, ret + 0.24, tint(SOFFIT, 0.08), [0, h + 0.01, ret / 2 - 0.13]);
+      // The returns: the core's stone coming forward at both ends, its slabs and a dark edge.
+      for (const s of [-1, 1]) {
+        const x = s * (w / 2 - 0.09);
+        flat(b, 0.18, h, ret, tint(STONE_DARK, -0.05), [x, h / 2, ret / 2]);
+        for (let j = 0; j < 3; j++)
+          flat(
+            b,
+            0.006,
+            sh - 0.012,
+            ret - 0.03,
+            tint(STONE_DARK, (hash01(s, j, 45) - 0.5) * 0.14),
+            [x - s * 0.093, 0.04 + j * sh + sh / 2, ret / 2],
+          );
+        flat(b, 0.19, h, 0.012, tint(STONE_DARK, -0.3), [x, h / 2, ret + 0.004]);
+      }
     }),
   );
 }
@@ -268,9 +353,9 @@ export function featureWall(w: number, h: number): SetPiece {
 /**
  * YOTTA's logo in brushed steel channel letters standing off the stone, the
  * chapter's logo: `px` a pixel, centred on x = 0 with their foot at y = 0,
- * face toward +z; the violet orbit mark to their left. Lit from below: a warm
- * wash on the stone under each letter and a slot of light in the floor (the
- * `uplights` piece).
+ * face toward +z; the violet orbit mark to their left. Each stroke a brushed
+ * face over a darker return, its top edge catching the sky; the uplights'
+ * warm wash on the stone behind is the wall's (`featureWall`).
  */
 export function steelLogo(text: string, px: number): SetPiece {
   return once(`steelLogo:${text}:${px}`, () =>
@@ -278,13 +363,17 @@ export function steelLogo(text: string, px: number): SetPiece {
       const tw = textWidth(text) * px;
       const cx = px * 4;
       const cy = px * 2.5;
-      // The letters: a darker return, a bright brushed face.
       glyphs(text, (u, r, w) => {
         const at: V3 = [cx + u * px, cy + (2 - r) * px, 0.04];
-        flat(b, w * px, px, 0.06, STEEL_DARK, at);
-        flat(b, w * px - 0.006, px - 0.006, 0.006, STEEL, [at[0], at[1], 0.073]);
-        // The light from below catching each stroke's underside.
-        flat(b, w * px - 0.01, 0.006, 0.05, 0xfff4e0, [at[0], at[1] - px / 2 + 0.002, 0.045]);
+        flat(b, w * px, px, 0.06, LETTER_RETURN, at);
+        flat(b, w * px - 0.008, px - 0.008, 0.006, LETTER_FACE, [at[0], at[1], 0.073]);
+        // Brushed grain across the face, and the top edge bright with the sky.
+        flat(b, w * px - 0.03, 0.006, 0.004, tint(LETTER_FACE, -0.12), [
+          at[0],
+          at[1] - px * 0.18,
+          0.077,
+        ]);
+        flat(b, w * px, 0.02, 0.062, LETTER_TOP, [at[0], at[1] + px / 2 - 0.009, 0.041]);
       });
       // The orbit mark: a violet ring round a steel planet, left of the letters.
       const rx = cx - tw / 2 - px * 2.6;
@@ -294,7 +383,7 @@ export function steelLogo(text: string, px: number): SetPiece {
         { at: [rx, cy, 0.05], rot: [0, 0, 0.5] },
         'glow',
       );
-      b.sphere(px * 1.1, STEEL, { at: [rx, cy, 0.04] }, [1, 1, 0.5]);
+      b.sphere(px * 1.1, LETTER_FACE, { at: [rx, cy, 0.04] }, [1, 1, 0.5]);
     }),
   );
 }
@@ -304,21 +393,15 @@ export function uplights(len: number): SetPiece {
   return once(`uplights:${len.toFixed(2)}`, () =>
     looks([len, 0.1], 1, (b) => {
       flat(b, len + 0.06, 0.012, 0.09, BLACK_STEEL, [0, 0.006, 0]);
-      glowBox(b, len, 0.012, 0.04, UPLIGHT, [0, 0.012, 0]);
-      // Grazing light up the stone from each fitting: warm streaks, fading upward.
-      for (let x = -len / 2 + 0.2; x < len / 2 - 0.1; x += 0.36)
-        for (const [h, c] of [
-          [0.9, 0x1e1a14],
-          [0.5, 0x2c241a],
-          [0.22, 0x40342a],
-        ] as const)
-          b.add(new THREE.PlaneGeometry(0.16 + h * 0.08, h), c, { at: [x, h / 2, -0.065] }, 'glow');
+      glowBox(b, len, 0.012, 0.03, UPLIGHT, [0, 0.012, 0]);
     }),
   );
 }
 
 /** How wide a lift's frame is and how tall its doors. */
 export const LIFT = { w: 0.78, h: 1.02 } as const;
+/** The lift indicator panel over the doors: its width, height and centre's height. */
+const PANEL = { w: 0.62, h: 0.28, y: LIFT.h + 0.26 } as const;
 
 /**
  * A lift in the lobby's stone wall, facing +z: a black steel frame round two
@@ -341,24 +424,30 @@ export const liftDoor = looks([LIFT.w, 0.12], 1, (b) => {
   }
   flat(b, 0.008, h - 0.02, 0.022, 0x1a1c20, [0, h / 2, 0.062]);
   flat(b, w + 0.04, 0.02, 0.1, STEEL_DARK, [0, 0.01, 0.07]);
-  // The indicator panel over the doors.
-  flat(b, 0.42, 0.18, 0.03, 0x121316, [0, h + 0.2, 0.03]);
+  // The indicator panel over the doors, in a steel bezel.
+  flat(b, PANEL.w + 0.04, PANEL.h + 0.04, 0.026, STEEL_DARK, [0, PANEL.y, 0.02]);
+  flat(b, PANEL.w, PANEL.h, 0.03, 0x0e0f12, [0, PANEL.y, 0.03]);
   // The call buttons.
   flat(b, 0.08, 0.16, 0.02, STEEL_DARK, [w / 2 + 0.16, 0.5, 0.01]);
 });
 
-/** A lift's indicator: the floor number in amber and an up arrow, on its panel. */
+/** A lift's indicator: the floor number in big amber digits and, clear of it, an up arrow. */
 export function liftDigits(text: string): SetPiece {
   return once(`liftDigits:${text}`, () =>
-    looks([0.4, 0.05], 1, (b) => {
-      const px = 0.03;
-      glowLetters(b, text, -0.04, LIFT.h + 0.2, 0.047, px, AMBER);
-      // An up arrow, right of the number.
-      const ax = 0.13;
-      const ay = LIFT.h + 0.2;
-      for (let r = 0; r < 3; r++)
-        glowBox(b, px * (1 + r * 2), px, 0.004, AMBER, [ax, ay + px * (1 - r), 0.047]);
-      glowBox(b, px, px * 2, 0.004, AMBER, [ax, ay - px * 2.5, 0.047]);
+    looks([0.6, 0.05], 1, (b) => {
+      const px = 0.044;
+      const z = 0.047;
+      glowLetters(b, text, -0.08, PANEL.y, z, px, AMBER);
+      // An up arrow at the panel's right: a triangle on a stem.
+      const ax = 0.2;
+      const ap = 0.026;
+      b.add(
+        new THREE.CircleGeometry(ap * 3, 3),
+        AMBER,
+        { at: [ax, PANEL.y + ap * 1.2, z], rot: [0, 0, Math.PI / 2] },
+        'glow',
+      );
+      glowBox(b, ap * 1.2, ap * 3, 0.004, AMBER, [ax, PANEL.y - ap * 2.2, z]);
       // The call button, lit.
       b.led(0.018, 0xfff0d0, { at: [LIFT.w / 2 + 0.16, 0.53, 0.025] });
     }),
@@ -378,17 +467,17 @@ export function lobbyBench(len: number): SetPiece {
 }
 
 /**
- * A linear floor grille along x, `len` long, set in the stone: steel slats over
- * a dark trench, and round it the stone a paler, cooler grey where the AC's
- * cold air spills out. Flush with the floor.
+ * A linear floor grille along x, `len` long, set in the stone: dark steel slats
+ * over a black trench, in a slate surround where the AC's cold air spills out
+ * (dark, so the tabby on it stands out). Flush with the floor.
  */
 export function floorGrille(len: number): SetPiece {
   return once(`floorGrille:${len.toFixed(2)}`, () =>
     looks([len, 0.2], 1, (b) => {
-      flat(b, len + 0.5, 0.004, 0.7, 0xc4ccd2, [0, 0.002, 0.05]);
+      flat(b, len + 0.5, 0.004, 0.7, 0x5a5d62, [0, 0.002, 0.05]);
       flat(b, len, 0.006, 0.14, 0x1e2024, [0, 0.004, 0]);
       for (let x = -len / 2 + 0.03; x < len / 2; x += 0.045)
-        flat(b, 0.016, 0.008, 0.13, STEEL, [x, 0.006, 0]);
+        flat(b, 0.016, 0.008, 0.13, 0x7a8086, [x, 0.006, 0]);
       flat(b, len + 0.02, 0.008, 0.012, STEEL_DARK, [0, 0.006, 0.07]);
       flat(b, len + 0.02, 0.008, 0.012, STEEL_DARK, [0, 0.006, -0.07]);
     }),
@@ -458,22 +547,32 @@ export const rollerCase = looks([0.25, 0.16], 1, (b) => {
     b.cylinder(0.02, 0.02, 0.02, 0x1a1a1a, { at: [s * 0.08, 0.02, -0.05], rot: [0, 0, 1.57] }, 8);
 });
 
-/** A desk fan held at chest height, facing +z: its round guard, blades and base. */
-export const carriedFan = looks([0.5, 0.3], 1, (b) => {
-  b.cylinder(0.2, 0.2, 0.05, 0x3a3e46, { at: [0, 0.1, 0.03], rot: [Math.PI / 2, 0, 0] }, 20);
-  b.torus(0.2, 0.014, 0xf0f0ec, { at: [0, 0.1, 0.06] });
+/**
+ * A desk fan carried upright by its base (hold the origin at chest height):
+ * the round base in both hands, the neck up out of it and the head on top,
+ * guard toward +z, its flex hanging down. About 0.45 high over the hands.
+ */
+export const carriedFan = looks([0.34, 0.2], 1, (b) => {
+  const pale = 0xdedcd6;
+  b.cylinder(0.11, 0.12, 0.05, pale, { at: [0, 0.0, 0] }, 16);
+  b.cylinder(0.018, 0.022, 0.16, pale, { at: [0, 0.1, -0.01] }, 8);
+  const hy = 0.3;
+  b.cylinder(0.05, 0.05, 0.08, pale, { at: [0, hy, -0.05], rot: [Math.PI / 2, 0, 0] }, 12);
+  b.cylinder(0.15, 0.15, 0.03, 0x50555c, { at: [0, hy, 0.0], rot: [Math.PI / 2, 0, 0] }, 20);
+  b.torus(0.15, 0.012, pale, { at: [0, hy, 0.02] });
   for (let a = 0; a < 3; a++)
     b.box(
-      0.09,
-      0.17,
-      0.01,
-      0x5a8ab0,
-      { at: [0, 0.1, 0.06], rot: [0, 0, (a * Math.PI * 2) / 3] },
+      0.07,
+      0.12,
+      0.008,
+      0x8a98a4,
+      { at: [0, hy, 0.02], rot: [0, 0, (a * Math.PI * 2) / 3] },
       0,
     );
-  b.sphere(0.04, 0xf0f0ec, { at: [0, 0.1, 0.07] });
-  b.cylinder(0.022, 0.022, 0.4, 0xf0f0ec, { at: [0, -0.15, -0.02] }, 8);
-  b.cylinder(0.14, 0.14, 0.03, 0xf0f0ec, { at: [0, -0.35, -0.02] }, 14);
+  b.sphere(0.03, pale, { at: [0, hy, 0.03] });
+  // The flex, looped down from the base.
+  bar(b, [0.08, -0.02, -0.02], [0.12, -0.22, 0.0], 0.012, 0x2a2c30);
+  b.box(0.03, 0.04, 0.02, 0x2a2c30, { at: [0.12, -0.24, 0.0] }, 0);
 });
 
 // ---- The sky terrace ----
@@ -487,7 +586,7 @@ export function paverDeck(w: number, d: number): SetPiece {
   return once(`paverDeck:${w.toFixed(2)}:${d.toFixed(2)}`, () =>
     looks([w, d], 1, (b) => {
       const top = FLOOR - 0.008;
-      flat(b, w, top, d, 0xb4aea4, [0, top / 2, 0]);
+      flat(b, w, top, d, PAVER_JOINT, [0, top / 2, 0]);
       flat(b, w, 0.04, 0.012, ALU_DARK, [0, top - 0.02, d / 2 + 0.006]);
       const s = 0.5;
       for (let i = 0, x = -w / 2; x < w / 2 - 0.01; i++, x += s)
@@ -501,6 +600,17 @@ export function paverDeck(w: number, d: number): SetPiece {
             (z + zb) / 2,
           ]);
         }
+      // Where pots stood all spring: pale sun-bleached squares with a dark ring of grime round
+      // them, and a few rust-brown drip stains.
+      for (let k = 0; k < Math.floor((w * d) / 2.2); k++) {
+        const x = -w / 2 + 0.3 + hash01(k, 1, 63) * (w - 0.6);
+        const z = -d / 2 + 0.3 + hash01(k, 2, 63) * (d - 0.6);
+        const r = 0.16 + hash01(k, 3, 63) * 0.1;
+        if (hash01(k, 4, 63) > 0.35) {
+          flat(b, r * 2 + 0.05, 0.002, r * 2 + 0.05, tint(PAVER, -0.16), [x, top + 0.009, z]);
+          flat(b, r * 2, 0.0025, r * 2, tint(PAVER, 0.2), [x, top + 0.0095, z]);
+        } else b.cylinder(r * 0.8, r * 0.8, 0.002, 0x9a8a72, { at: [x, top + 0.009, z] }, 14);
+      }
     }),
   );
 }
@@ -692,45 +802,109 @@ export const closedBoard = looks([0.74, 0.3], 1, (b) => {
 });
 
 /**
- * A big outdoor thermometer on a post, its dial tilted up toward the camera:
- * a white face with a red sector at the hot end, the needle in it and the
- * reading, "38°", big. Under 0.55 high.
+ * A big outdoor thermometer, upright and leaning back a little toward the
+ * camera: a cream enamel board on a short post, the glass tube up its middle
+ * with the red column right up at the top, the bulb at the foot, a scale of
+ * ticks, the hot end painted red and the reading, "38°", big at the top.
+ * Under 0.55 high.
  */
-export const thermometer = looks([0.4, 0.2], 1, (b) => {
-  flat(b, 0.04, 0.3, 0.04, ALU_DARK, [0, 0.15, -0.04]);
-  flat(b, 0.16, 0.02, 0.12, ALU_DARK, [0, 0.01, -0.04]);
-  const a = 0.85;
-  const p = tilted([0, 0.34, 0], a);
-  const disc = (r: number, h: number, c: number, off: number) =>
-    b.cylinder(r, r, h, c, { at: p.at(0, 0, off), rot: [Math.PI / 2 - a, 0, 0] }, 28);
-  disc(0.27, 0.05, 0xb83a30, 0);
-  disc(0.24, 0.01, 0xf6f4ee, 0.026);
-  const mark = (w: number, h: number, c: number, ang: number, r: number, off: number) =>
-    b.box(
-      w,
-      h,
-      0.004,
-      c,
-      { at: p.at(Math.sin(ang) * r, Math.cos(ang) * r, off), rot: [-a, 0, -ang] },
-      0,
-    );
-  for (let k = 0; k < 9; k++) mark(0.01, 0.04, 0x3a3c40, -2.2 + k * 0.55, 0.205, 0.033);
-  for (let k = 0; k < 5; k++) mark(0.05, 0.04, 0xd0382c, 1.2 + k * 0.22, 0.205, 0.034);
-  // The needle, right up in the red.
-  mark(0.018, 0.17, 0xc8302a, 1.55, 0.085, 0.037);
-  b.sphere(0.018, 0x3a3c40, { at: p.at(0, 0, 0.04) });
-  const px = 0.036;
-  glyphs('38°', (u, r, w) =>
-    b.box(
-      w * px,
-      px,
-      0.004,
-      0x2a2c30,
-      { at: p.at(u * px - 0.01, -0.13 + (2 - r) * px, 0.034), rot: p.rot },
-      0,
-    ),
+export const thermometer = looks([0.34, 0.16], 1, (b) => {
+  flat(b, 0.16, 0.02, 0.12, ALU_DARK, [0, 0.01, -0.02]);
+  flat(b, 0.03, 0.06, 0.03, ALU_DARK, [0, 0.04, -0.02]);
+  const p = tilted([0, 0.06, 0], 0.36);
+  const box = (w: number, h: number, d: number, c: number, u: number, v: number, off: number) =>
+    b.box(w, h, d, c, { at: p.at(u, v, off), rot: p.rot }, 0);
+  const w = 0.32;
+  const h = 0.5;
+  box(w, h, 0.025, 0x3a3c40, 0, h / 2, 0);
+  box(w - 0.02, h - 0.02, 0.006, 0xf2ecdc, 0, h / 2, 0.015);
+  // The reading across the top, big.
+  const px = 0.026;
+  glyphs('38°', (u, r, gw) =>
+    box(gw * px, px, 0.004, 0x2a2c30, u * px, h - 0.1 + (2 - r) * px, 0.022),
   );
+  // The tube down the middle, the bulb at its foot and the red column right up to the top.
+  const tv0 = 0.05;
+  const tv1 = h - 0.2;
+  box(0.036, tv1 - tv0 + 0.02, 0.008, 0xe8eef2, 0, (tv0 + tv1) / 2, 0.02);
+  box(0.022, tv1 - tv0 - 0.01, 0.012, 0xd8402e, 0, (tv0 + tv1) / 2 + 0.005, 0.024);
+  b.sphere(0.04, 0xd8402e, { at: p.at(0, tv0, 0.03) });
+  // The ticks either side, the hot end of the scale painted red.
+  for (let k = 0; k < 6; k++)
+    for (const s of [-1, 1])
+      box(0.04, 0.007, 0.004, 0x3a3c40, s * 0.06, tv0 + 0.04 + k * 0.045, 0.02);
+  box(0.035, 0.07, 0.004, 0xd8402e, 0.11, tv1 - 0.04, 0.02);
+  box(0.035, 0.07, 0.004, 0xd8402e, -0.11, tv1 - 0.04, 0.02);
 });
+
+/**
+ * A folded parasol taken down and laid on the pavers along x (the terrace is
+ * closed): its canopy furled round the pole in sun-faded canvas, tied, the
+ * crank at its foot, and its granite base beside it. 0.16 high.
+ */
+export const foldedParasol = looks([1.7, 0.4], 1, (b) => {
+  const canvas = 0xe9e1cf;
+  b.cylinder(0.022, 0.022, 1.6, 0xb8bcc0, { at: [0, 0.06, 0], rot: [0, 0, Math.PI / 2] }, 8);
+  // The furled canopy: a long cone round the pole's top half, fattest near the tip.
+  b.cylinder(0.08, 0.03, 0.75, canvas, { at: [0.35, 0.09, 0], rot: [0, 0, -Math.PI / 2] }, 10);
+  b.cone(0.08, 0.12, canvas, { at: [0.78, 0.09, 0], rot: [0, 0, -Math.PI / 2] }, 10);
+  for (const x of [0.15, 0.45])
+    b.torus(0.07, 0.01, 0x9a8a6a, { at: [x, 0.09, 0], rot: [0, Math.PI / 2, 0] });
+  b.box(0.08, 0.05, 0.05, 0x5a5e64, { at: [-0.45, 0.06, 0] }, 0.01);
+  // The base: a square granite slab with its socket.
+  b.box(0.36, 0.08, 0.36, 0x8a8680, { at: [-0.62, 0.04, 0.3] }, 0.02);
+  b.cylinder(0.04, 0.04, 0.08, 0xb8bcc0, { at: [-0.62, 0.12, 0.3] }, 10);
+});
+
+/**
+ * A garden hose reel cart, facing +z: a steel frame on two wheels, the drum
+ * wound with faded green hose, the crank. About 0.4 high. The hose run is
+ * `hoseRun`.
+ */
+export const hoseReel = looks([0.4, 0.3], 1, (b) => {
+  const hose = 0x5a7a52;
+  for (const s of [-1, 1]) {
+    bar(b, [s * 0.15, 0.04, 0], [s * 0.15, 0.36, -0.06], 0.02, ALU_DARK);
+    b.cylinder(
+      0.05,
+      0.05,
+      0.03,
+      0x24262a,
+      { at: [s * 0.17, 0.05, 0.04], rot: [0, 0, Math.PI / 2] },
+      12,
+    );
+  }
+  b.cylinder(
+    0.11,
+    0.11,
+    0.24,
+    tint(hose, -0.15),
+    { at: [0, 0.2, 0], rot: [0, 0, Math.PI / 2] },
+    16,
+  );
+  for (let k = 0; k < 5; k++)
+    b.torus(0.115, 0.016, tint(hose, (k % 2) * 0.08), {
+      at: [-0.1 + k * 0.05, 0.2, 0],
+      rot: [0, Math.PI / 2, 0],
+    });
+  bar(b, [-0.15, 0.36, -0.06], [0.15, 0.36, -0.06], 0.02, ALU_DARK);
+  bar(b, [0.16, 0.2, 0], [0.22, 0.26, 0.04], 0.014, 0x24262a);
+});
+
+/** A garden hose lying along +x from 0, `len` long, in lazy curves: faded green. */
+export function hoseRun(len: number): SetPiece {
+  return once(`hoseRun:${len.toFixed(2)}`, () =>
+    looks([len, 0.2], 1, (b) => {
+      const step = 0.14;
+      let prev: V3 = [0, 0.016, 0];
+      for (let x = step; x <= len + 0.001; x += step) {
+        const at: V3 = [x, 0.016, Math.sin(x * 2.1) * 0.06 + Math.sin(x * 5.3) * 0.02];
+        bar(b, prev, at, 0.026, 0x5a7a52);
+        prev = at;
+      }
+    }),
+  );
+}
 
 /**
  * Prod, a small tree now: a big square planter in black steel with a timber
@@ -747,15 +921,15 @@ export const prodTree = looks([0.75, 0.75], 1, (b) => {
   bar(b, [0, 0.95, 0], [0.18, 1.2, 0.05], 0.03, 0x6a5444);
   bar(b, [0, 1.05, 0], [-0.16, 1.3, -0.04], 0.028, 0x6a5444);
   for (const [x, y, z, r, c] of [
-    [0, 1.42, 0, 0.36, 0x557f45],
-    [0.22, 1.28, 0.08, 0.26, 0x64904e],
-    [-0.22, 1.32, -0.04, 0.27, 0x4a7240],
-    [0.06, 1.66, -0.02, 0.24, 0x64904e],
-    [-0.08, 1.38, 0.2, 0.22, 0x6e9a56],
+    [0, 1.42, 0, 0.36, 0x737a6a],
+    [0.22, 1.28, 0.08, 0.26, 0x7c8472],
+    [-0.22, 1.32, -0.04, 0.27, 0x6a7064],
+    [0.06, 1.66, -0.02, 0.24, 0x838a78],
+    [-0.08, 1.38, 0.2, 0.22, 0x868c78],
   ] as const)
     b.sphere(r, c, { at: [x, y, z] }, [1, 0.85, 1]);
   // A few sun-scorched leaves.
-  b.sphere(0.06, 0xa89a4a, { at: [0.3, 1.2, 0.2] });
+  b.sphere(0.06, 0xa49a6a, { at: [0.3, 1.2, 0.2] });
 });
 
 /** A low planter trough along x, `len` long, with grasses bleached by the sun. 0.4 high. */
@@ -780,31 +954,31 @@ export function grassTrough(len: number): SetPiece {
 
 /**
  * The tower's curtain wall from the floor's foot down, `len` along +x from 0,
- * `drop` deep, facing +z: storey after storey of pale blue glass between
- * slate mullions and white spandrels, sky caught in the upper panes, greying
- * into the heat haze the further down it goes. Its top at the origin.
+ * `drop` deep, facing +z: a dark spandrel band at every floor and between them
+ * tall blue-grey glass with the sky caught in it (paler at the top of each
+ * pane), slate mullions, all greying into the heat haze the further down it
+ * goes. Its top at the origin.
  */
 export function towerFacade(len: number, drop: number): SetPiece {
   return once(`towerFacade:${len.toFixed(2)}:${drop.toFixed(2)}`, () =>
     looks([len, 0.1], 1, (b) => {
-      const storey = 0.42;
+      const storey = 0.9;
+      const band = 0.28;
       const floors = Math.ceil(drop / storey);
+      const hazed = (c: number, y: number) => mix(c, HAZE, Math.min(0.75, (-y / drop) * 0.9));
       for (let k = 0; k < floors; k++) {
         const y1 = -k * storey;
         const y0 = Math.max(-drop, y1 - storey);
-        const fade = Math.min(1, (k + 0.5) / floors);
-        flat(b, len, y1 - y0 - 0.1, 0.02, mix(CW_GLASS, HAZE, fade * 0.6), [
-          len / 2,
-          (y0 + y1) / 2 - 0.05,
-          -0.01,
-        ]);
-        flat(b, len, 0.1, 0.03, mix(CW_SPANDREL, HAZE, fade * 0.5), [len / 2, y1 - 0.05, 0.0]);
+        flat(b, len, band, 0.05, hazed(CW_SPANDREL, y1), [len / 2, y1 - band / 2, 0.01]);
+        const gTop = y1 - band;
+        const gh = gTop - y0;
+        if (gh <= 0.02) continue;
+        shaded(b, len, gh, 0.02, [len / 2, gTop - gh / 2, -0.01], (_x, y) =>
+          hazed(mix(CW_GLASS, CW_SKY, Math.max(0, (y - y0) / gh) ** 1.5), y),
+        );
       }
-      for (let x = 0.02, i = 0; x < len; x += 0.6, i++)
+      for (let x = 0.02; x < len; x += 0.6)
         flat(b, 0.04, drop, 0.05, CW_MULLION, [x, -drop / 2, 0.012]);
-      // Sky caught in the upper panes: pale diagonal streaks.
-      for (let x = 0.5, i = 0; x < len; x += 2.3, i++)
-        flat(b, 0.18, storey * 1.6, 0.004, 0xd8e6ee, [x, -storey * 0.9, 0.004], [0, 0, 0.5]);
     }),
   );
 }
@@ -838,14 +1012,24 @@ export function monolithHQ(w: number, d: number, h: number): SetPiece {
       }
       for (let x = -w / 2; x <= w / 2 + 0.01; x += 0.28)
         flat(b, 0.03, h, 0.05, MONO_FIN, [x, h / 2, 0.02]);
-      // The crown: a black band with the logo panel, set back plant screen, the roof.
+      // The crown: a black band with the logo panel, a steel-grey parapet round the roof, the
+      // plant screen set back at the right, the roof deck.
       flat(b, w + 0.04, 0.42, d + 0.04, MONO_BLACK, [0, h - 0.21, -d / 2]);
-      flat(b, w * 0.7, 0.18, d * 0.6, MONO_FIN, [0.1, h + 0.09, -d / 2 - 0.1]);
-      for (let x = -w * 0.35 + 0.05; x < w * 0.35 + 0.1; x += 0.07)
-        flat(b, 0.02, 0.18, 0.015, 0x3a3e46, [x + 0.1, h + 0.09, -d / 2 - 0.1 + d * 0.3]);
-      // The helipad on the roof, toward the front: a pale circle and its H.
-      const hx = -w * 0.18;
-      const hz = -d * 0.32;
+      flat(b, w - 0.1, 0.01, d - 0.1, 0x30343c, [0, h + 0.005, -d / 2]);
+      const rim = 0x5a606a;
+      for (const z of [0.0, -d]) flat(b, w + 0.06, 0.1, 0.06, rim, [0, h + 0.05, z]);
+      for (const sx of [-1, 1])
+        flat(b, 0.06, 0.1, d + 0.06, rim, [(sx * (w + 0.03)) / 2, h + 0.05, -d / 2]);
+      const px0 = w * 0.08;
+      const pw = w * 0.38;
+      const pz = -d * 0.62;
+      const pd = d * 0.5;
+      flat(b, pw, 0.22, pd, MONO_FIN, [px0 + pw / 2, h + 0.11, pz]);
+      for (let x = px0 + 0.04; x < px0 + pw; x += 0.07)
+        flat(b, 0.022, 0.22, 0.015, 0x4a505a, [x, h + 0.11, pz + pd / 2 + 0.01]);
+      // The helipad on the roof, toward the front left: a pale circle and its H.
+      const hx = -w * 0.24;
+      const hz = -d * 0.42;
       b.cylinder(0.42, 0.42, 0.02, 0x3a3e46, { at: [hx, h + 0.01, hz] }, 28);
       b.torus(0.36, 0.02, 0xe8e4d8, { at: [hx, h + 0.022, hz], rot: [Math.PI / 2, 0, 0] });
       flat(b, 0.04, 0.006, 0.26, 0xe8e4d8, [hx - 0.09, h + 0.024, hz]);
@@ -1055,17 +1239,18 @@ export function neighbourTower(w: number, d: number, h: number): SetPiece {
         flat(b, 0.02, h, 0.03, 0x5a6870, [x, h / 2, 0.01]);
       flat(b, w + 0.04, 0.08, d + 0.04, 0xc8ccc8, [0, h + 0.04, -d / 2]);
       flat(b, w - 0.1, 0.01, d - 0.1, 0x8a8782, [0, h + 0.085, -d / 2]);
-      // The gondola's track round the roof's edge, the machine and its jib.
-      flat(b, w - 0.3, 0.03, 0.05, 0x5a5e64, [0, h + 0.1, -0.2]);
-      const mx = -w / 2 + 0.6;
-      b.box(0.36, 0.22, 0.3, 0xe0e2de, { at: [mx, h + 0.2, -0.3] }, 0.02);
-      bar(b, [mx, h + 0.3, -0.3], [mx + 0.1, h + 0.5, 0.15], 0.05, 0xd8a830);
-      // The cradle parked on the roof in front of the machine.
-      flat(b, 0.6, 0.05, 0.16, 0x6a6e72, [mx + 0.45, h + 0.115, -0.12]);
-      flat(b, 0.6, 0.08, 0.012, 0xe6b834, [mx + 0.45, h + 0.17, -0.04]);
-      flat(b, 0.6, 0.012, 0.012, ALU, [mx + 0.45, h + 0.3, -0.04]);
-      for (const x of [-0.29, 0, 0.29])
-        flat(b, 0.012, 0.18, 0.012, ALU, [mx + 0.45 + x, h + 0.22, -0.04]);
+      // The gondola's track round the roof's edge, the machine and its yellow jib reaching out
+      // over the front, the cradle hung from it just under the parapet.
+      flat(b, w - 0.3, 0.04, 0.08, 0x5a5e64, [0, h + 0.1, -0.35]);
+      const mx = 0;
+      b.box(0.6, 0.34, 0.5, 0xe8e8e4, { at: [mx, h + 0.25, -0.55] }, 0.03);
+      bar(b, [mx, h + 0.42, -0.5], [mx, h + 0.5, 0.35], 0.08, 0xe6b834);
+      for (const s of [-1, 1])
+        bar(b, [mx, h + 0.5, 0.35], [mx + s * 0.55, h - 0.05, 0.35], 0.015, 0x2a2c30);
+      flat(b, 1.4, 0.08, 0.3, 0x6a6e72, [mx, h - 0.25, 0.35]);
+      flat(b, 1.4, 0.22, 0.02, 0xe6b834, [mx, h - 0.12, 0.5]);
+      flat(b, 1.4, 0.03, 0.03, ALU, [mx, h + 0.02, 0.5]);
+      for (const x of [-0.69, 0, 0.69]) flat(b, 0.03, 0.28, 0.03, ALU, [mx + x, h - 0.12, 0.5]);
     }),
   );
 }
