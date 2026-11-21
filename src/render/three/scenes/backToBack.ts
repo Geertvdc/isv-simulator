@@ -13,6 +13,7 @@ import {
   condenserCase,
   condenserFan,
   featureWall,
+  drainGrate,
   floorGrille,
   FLOOR,
   foldedParasol,
@@ -23,6 +24,7 @@ import {
   hoseReel,
   hoseRun,
   lanyard,
+  loungerStack,
   LIFT,
   liftDigits,
   liftDoor,
@@ -50,6 +52,7 @@ import {
   tinyWagon,
   towerFacade,
   uplights,
+  visitorBay,
 } from '../setDressing/backToBack';
 import { pigeon } from '../setDressing/businessPark';
 import type { SetPiece } from '../setDressing/shared';
@@ -104,19 +107,23 @@ const DEEP = -9;
  */
 const CITY = 0.6;
 /** The plaza round the tower's foot, out to the right (the visitor bays at its edge). */
-const PLAZA_R = 2.6;
+const PLAZA_R = 3.6;
 /** The lift lobby: its depth behind the back wall line, its wall's height, how far it runs past the notch. */
 const LOBBY = { back: 2.2, wall: 1.75, left: 1.0, right: 3.4 } as const;
 /** How deep the core's stone returns come forward at the lobby wall's ends. */
 const CORE_RETURN = 0.4;
 /** MONOLITH's tower: width, depth, its top (over the ground the slab stands on) and its front. */
-const MONO = { w: 3.9, d: 2.4, top: -1.35, front: -5.85 } as const;
+const MONO = { w: 3.9, d: 2.4, top: -1.65, front: -6.3 } as const;
 /** The river behind the tower, along x: its near and far banks. */
-const RIVER = { near: -3.4, far: -5.0 } as const;
+const RIVER = { near: -2.5, far: -5.8 } as const;
 /** How far the scene's people fade toward grey: well past the default, so none reads as a player. */
 const PERSON_GREY = 0.6;
 /** Cars far below are smaller again than the city's scale (a car is short next to a block). */
 const CAR = 0.5;
+/** The streets between the city's blocks, in city units: wide, so the city reads calm. */
+const BLOCK_GAP = 0.8;
+/** Where along the street on the right Mom's wagon is parked. */
+const WAGON_Z = 2.3;
 /** The screen the scene is composed for. */
 const VIEW = { width: 1440, height: 810 };
 /** Screen rectangles the HUD covers at 1440×810: story props stay out of them. */
@@ -407,9 +414,9 @@ export function backToBackScene(map: LevelMap): Scene {
     let k = 0;
     const z0 = RIVER.far - 1.4 * c;
     for (let z = z0, j = 0; z > topZ; j++) {
-      const bd = 2.0 + unit(j, 1, 11) * 1.4;
+      const bd = 2.6 + unit(j, 1, 11) * 1.4;
       for (let x = edgeL - 3, i = 0; x < edgeR + 3; i++) {
-        const bw = 1.6 + unit(i, j, 13) * 1.6;
+        const bw = 2.4 + unit(i, j, 13) * 1.8;
         const cx = x + (bw * c) / 2;
         // Leave MONOLITH's plot and the loft's.
         const inMono = z > MONO.front - MONO.d - 1 && Math.abs(cx - monoX) < MONO.w / 2 + 0.8;
@@ -418,10 +425,11 @@ export function backToBackScene(map: LevelMap): Scene {
         const roll = unit(i, j, 23);
         if (inLoft) {
           patch('park', x, x + bw * c, z - bd * c, z);
-        } else if (!inMono && roll < 0.14) {
-          // A little park: lawn, paths and trees.
-          patch('park', x, x + bw * c, z - bd * c, z);
-          for (let t = 0; t < 4; t++)
+        } else if (!inMono && roll < 0.38) {
+          // Green and open squares between the blocks: a park (lawn, path, trees) or a paved
+          // plaza with a few trees.
+          patch(roll < 0.24 ? 'park' : 'plaza', x, x + bw * c, z - bd * c, z);
+          for (let t = 0; t < (roll < 0.24 ? 4 : 2); t++)
             put(
               summerTree,
               x + (0.3 + unit(i, t, 27) * (bw - 0.6)) * c,
@@ -437,9 +445,9 @@ export function backToBackScene(map: LevelMap): Scene {
           const h = (glass ? 1.6 : 0.6) + unit(i, j, 17) * 1.8 + (j > 2 ? unit(i, j, 19) * 1.2 : 0);
           put(cityRoof(bw, bd, h, k++, glass), cx, z, 0, 0, 'far', DEEP, c);
         }
-        x += (bw + 0.5) * c;
+        x += (bw + BLOCK_GAP) * c;
       }
-      z -= (bd + 0.5) * c;
+      z -= (bd + BLOCK_GAP) * c;
     }
   }
 
@@ -483,18 +491,22 @@ export function backToBackScene(map: LevelMap): Scene {
   nb.x = xAt(70, nb.z, nb.top) - nb.w / 2;
   put(neighbourTower(2.6, 2.6, (nb.top - DEEP) / c), nb.x, nb.z, 0, 0, 'far', DEEP, c);
 
-  // ---- Round the tower's foot: the visitor bay with Mom's wagon, trees, cars ----
+  // ---- Round the tower's foot: the parking bays, Mom's wagon on the street, trees, cars ----
   {
     const bx = R + PLAZA_R - 0.4;
     for (let z = 0.85, k = 0; z < 7.4; z += 0.55 * c, k++) {
-      if (k === 9) put(tinyWagon, bx, z, Math.PI, 0, 'far', DEEP, c * CAR);
-      else if (unit(k, 3, 23) > 0.35) put(tinyCar, bx, z, Math.PI, k, 'far', DEEP, c * CAR);
+      if (unit(k, 3, 23) > 0.35) put(tinyCar, bx, z, Math.PI, k, 'far', DEEP, c * CAR);
     }
+    // Mom's wagon, a bit bigger than the rest, kerbside in a bay marked for visitors on the
+    // street past the tower's right, where it shows beside the corner.
+    const wx = R + PLAZA_R + 0.45 * c;
+    put(visitorBay(0.42, 0.22), wx, WAGON_Z, 0, 0, 'far', DEEP);
+    put(tinyWagon, wx, WAGON_Z, Math.PI / 2, 0, 'far', DEEP, c * CAR * 1.3);
     for (const side of [-1, 1] as const) {
       const sx = side < 0 ? L - 1.5 - 0.5 * c : R + PLAZA_R + 0.5 * c;
       for (let z = RIVER.near + 0.6, k = 0; z < F + 12; z += 1.1 * c, k++) {
         put(summerTree, sx - side * 0.75 * c, z, 0, k, 'far', DEEP, c);
-        if (unit(k, side, 29) > 0.55)
+        if (unit(k, side, 29) > 0.55 && !(side > 0 && Math.abs(z + 0.5 * c - WAGON_Z) < 0.5))
           put(
             tinyCar,
             sx + (unit(k, side, 31) > 0.5 ? 0.22 : -0.22) * c,
@@ -515,21 +527,37 @@ export function backToBackScene(map: LevelMap): Scene {
       let k = 40 + (side + 1) * 20;
       const x0 = side < 0 ? L - 1.5 - 1.4 * c : R + PLAZA_R + 1.4 * c;
       for (let z = RIVER.near + 0.6 * c, j = 0; z < F + 8; j++) {
-        const bd = 2.0 + unit(j, side, 37) * 1.2;
+        const bd = 2.6 + unit(j, side, 37) * 1.4;
         for (let x = x0, i = 0; side < 0 ? x > edgeL - 3 : x < edgeR + 3; i++) {
-          const bw = 1.8 + unit(i, j * side, 41) * 1.2;
+          const bw = 2.4 + unit(i, j * side, 41) * 1.6;
           const h = 0.8 + unit(i, j * side, 43) * 2.2;
+          const roll = unit(i, j * side, 47);
           const cx = x + (side * bw * c) / 2;
           // Leave the neighbouring tower's plot.
           const inNb =
             Math.abs(cx - nb.x) < (bw * c + nb.w) / 2 + 0.2 &&
             z < nb.z + 0.2 &&
             z + bd * c > nb.z - nb.d - 0.2;
-          if (!inNb) put(cityRoof(bw, bd, h, k), cx, z + bd * c, 0, 0, 'far', DEEP, c);
+          const xa = Math.min(x, x + side * bw * c);
+          if (roll < 0.36 && !inNb) {
+            // Green or paved open ground between the blocks.
+            patch(roll < 0.22 ? 'park' : 'plaza', xa, xa + bw * c, z, z + bd * c);
+            for (let t = 0; t < 3; t++)
+              put(
+                summerTree,
+                xa + (0.3 + unit(i, t, 49) * (bw - 0.6)) * c,
+                z + (0.3 + unit(j, t, 51) * (bd - 0.6)) * c,
+                0,
+                t,
+                'far',
+                DEEP,
+                c,
+              );
+          } else if (!inNb) put(cityRoof(bw, bd, h, k), cx, z + bd * c, 0, 0, 'far', DEEP, c);
           k++;
-          x += side * (bw + 0.5) * c;
+          x += side * (bw + BLOCK_GAP) * c;
         }
-        z += (bd + 0.5) * c;
+        z += (bd + BLOCK_GAP) * c;
       }
     }
   }
@@ -606,10 +634,10 @@ export function backToBackScene(map: LevelMap): Scene {
     const fx = Math.max(notch.x0 + 1.5, split + 0.25);
     const fz = backLine - 0.85;
     person(fx, fz, Math.PI / 2 - 0.2, 'carrying');
-    // The runner from the lifts toward the bench, in front of the grille.
-    const rx0 = notch.x0 + 0.5;
-    const rx1 = liftX + LIFT.w / 2;
-    put(runner(rx1 - rx0, 0.62), (rx0 + rx1) / 2, zBack + 1.78, 0, 0, 'far', FLOOR);
+    // The rug from the lifts forward toward the office, along z.
+    const rz0 = zBack + 0.12;
+    const rz1 = backLine - 0.05;
+    put(runner(rz1 - rz0, 1.2), liftX - gap / 2, (rz0 + rz1) / 2, 0, 0, 'far', FLOOR);
     const fyaw = Math.PI / 2 - 0.2;
     put(
       carriedFan,
@@ -672,9 +700,12 @@ export function backToBackScene(map: LevelMap): Scene {
     putClear(thermometer, seatX1 - 0.4, t.z0 + 0.75, 0.2, 0.55, 0, 0, FLOOR);
     // Past the deck's left end, the parasol taken down and laid on the pavers beside its base,
     // where it clears the player legend.
+    // At the terrace's far left a stack of folded loungers, a drain grate in the pavers in front.
+    const px0 = t.x0 + 0.55;
+    putClear(loungerStack, px0, t.z0 + 0.32, 0.5, 0.32, 0.05, 0, FLOOR, 1, 0.25);
+    put(drainGrate, px0 + 0.75, t.z0 + 0.95, 0, 0, 'far', FLOOR);
     for (const z of [t.z0 + 0.4, t.z0 + 0.7])
-      if (putClear(foldedParasol, (t.x0 + seatX0) / 2 + 0.15, z, 0.9, 0.18, 0.08, 0, FLOOR, 1, 0.5))
-        break;
+      if (putClear(foldedParasol, px0 + 1.55, z, 0.9, 0.18, 0.08, 0, FLOOR, 1, 0.5)) break;
     // Along the rail in front of the deck, the hose off its reel, run out to the condensers.
     const hoseZ = t.z1 - 0.3;
     if (putClear(hoseReel, seatX0 + 0.3, hoseZ, 0.22, 0.4, -0.15, 0, FLOOR, 1, 0.16))
@@ -825,7 +856,7 @@ const bays: GroundPainter = (b, g) => {
 
 /** A city park: dry summer lawn, a pale path across it. */
 const park: GroundPainter = (b, g) => {
-  fill(b, g, 0.012, 0x8a9a5a);
+  fill(b, g, 0.012, 0x8e9a6c);
   b.box(
     g.x1 - g.x0,
     0.003,
