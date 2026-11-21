@@ -138,10 +138,16 @@ export interface TowerArtSpot {
 /** What stands on a wall top: the heatwave kit. */
 export type TowerTopKind = 'deskFan' | 'portableAc' | 'binders' | 'monitorTurned' | 'acNote';
 
-/** A wall-top prop: its tile, kind and turn (its back toward the outside beyond the wall). */
+/**
+ * A wall-top prop: its tile, how far it's slid along its wall from the
+ * tile's middle (`dx`, `dy`, in tiles: a cluster packs two or three onto
+ * two tiles), kind and turn (its back toward the outside beyond the wall).
+ */
 export interface TowerTop {
   x: number;
   y: number;
+  dx: number;
+  dy: number;
   kind: TowerTopKind;
   yaw: number;
 }
@@ -155,7 +161,7 @@ export interface TowerVinyl {
 }
 
 /** A meeting room's own pieces on its back wall's top (the side nearer the room). */
-export type MeetingPiece = 'garagePhoto' | 'mowerCase' | 'rollUp' | 'momPortrait' | 'waterTray';
+export type MeetingPiece = 'garagePhoto' | 'heritageCase' | 'rollUp' | 'momPortrait' | 'waterTray';
 
 export interface TowerMeetingSpot {
   x: number;
@@ -163,12 +169,16 @@ export interface TowerMeetingSpot {
   piece: MeetingPiece;
 }
 
-/** A glass door portal round a meeting door: full height in a full wall line, low in a low one. */
+/**
+ * A glass door portal round a meeting door: posts and a head under the door
+ * light, and in a full wall line a glass leaf parked open beside it (in a
+ * low one there's no wall to park it over).
+ */
 export interface TowerPortal {
   x: number;
   y: number;
   axis: 'z' | 'x';
-  tall: boolean;
+  leaf: boolean;
 }
 
 export interface TowerRoom {
@@ -283,7 +293,7 @@ export function towerRoom(map: LevelMap): TowerRoom {
         x: d.x,
         y: d.y,
         axis: d.axis,
-        tall: d.axis === 'x' || wallPiece(map, d.x - 1, d.y) !== 'wall-front',
+        leaf: d.axis === 'x' || wallPiece(map, d.x - 1, d.y) !== 'wall-front',
       })),
     tables,
     hatches,
@@ -638,8 +648,8 @@ const textCols = (s: string) => s.length * 4 - 1;
  * meeting room's on the glass in front of it if its front is partitions,
  * else on the middle of its back wall. Each meeting room's back wall top
  * carries its own story: The Garage (the first) a framed photo of Mom's
- * garage at one end, the heritage lawnmower in its case at the other and a
- * roll-up door printed on the glass between; Mom (the second) her portrait
+ * garage at one end, a heritage traffic cone in its glass case at the other
+ * and a roll-up door printed on the glass between; Mom (the second) her portrait
  * and first cheque at one end, a jug of water and glasses at the other.
  */
 function roomLabels(
@@ -701,7 +711,7 @@ function roomLabels(
     const right = backTiles[backTiles.length - 1];
     if (room.index === 0) {
       if (left) pieces.push({ ...left, piece: 'garagePhoto' });
-      if (right && right !== left) pieces.push({ ...right, piece: 'mowerCase' });
+      if (right && right !== left) pieces.push({ ...right, piece: 'heritageCase' });
       for (const p of backTiles.slice(1, -1)) pieces.push({ ...p, piece: 'rollUp' });
     } else {
       if (right) pieces.push({ ...right, piece: 'momPortrait' });
@@ -836,25 +846,27 @@ function floorWearOf(
 
 /** What each cluster of heatwave kit piles up, in turn along the walls. */
 const CLUSTERS: readonly (readonly TowerTopKind[])[] = [
-  ['portableAc', 'binders'],
-  ['deskFan'],
+  ['portableAc', 'binders', 'deskFan'],
+  ['binders', 'acNote', 'deskFan'],
   ['monitorTurned', 'deskFan'],
-  ['binders', 'acNote'],
-  ['portableAc', 'deskFan'],
-  ['deskFan', 'binders'],
+  ['portableAc', 'deskFan', 'binders'],
 ];
 
 /** Wall-top props at most. */
-export const TOWER_TOPS_MAX = 12;
+export const TOWER_TOPS_MAX = 14;
+/** How far apart the props of a cluster stand along their wall, in tiles. */
+const CLUSTER_STEP = 0.56;
+/** The breather left between clusters along a wall, in tiles. */
+export const TOWER_TOPS_BREATHER = 2;
 
 /**
- * Heatwave kit on the wall tops in clusters of one or two along each wall
- * line, a tile's breather between: on full walls with nothing open behind
- * (it'd hide someone standing there), not within a tile of a station or
- * counter (it'd look like something to pick up), not beside a meeting
- * room (it has its own story) or a meeting door (its light), not in a
- * doorway's own wall line beside it, not on the front corners (the front
- * strip stays low), not on walls with art.
+ * Heatwave kit on the wall tops in clusters of two or three packed onto two
+ * tiles along each wall line, a breather of two tiles between: on full
+ * walls with nothing open behind (it'd hide someone standing there), not
+ * within a tile of a station or counter (it'd look like something to pick
+ * up), not beside a meeting room (it has its own story) or a meeting door
+ * (its light), not in a doorway's own wall line beside it, not on the front
+ * corners (the front strip stays low), not on walls with art.
  */
 function topProps(
   map: LevelMap,
@@ -889,7 +901,7 @@ function topProps(
     for (let x = 0; x < map.width; x++) if (free(x, y)) cands.push({ x, y });
   const has = (x: number, y: number) => cands.some((c) => c.x === x && c.y === y);
   // Runs down the columns first (the side walls), then along the rows.
-  const runs: GridPoint[][] = [];
+  const runs: { tiles: GridPoint[]; axis: 'x' | 'y' }[] = [];
   const inRun = new Set<string>();
   for (const c of [...cands].sort((a, b) => a.x - b.x || a.y - b.y)) {
     if (inRun.has(key(c.x, c.y)) || has(c.x, c.y - 1)) continue;
@@ -897,35 +909,48 @@ function topProps(
     for (let y = c.y; has(c.x, y); y++) run.push({ x: c.x, y });
     if (run.length < 2 && (has(c.x - 1, c.y) || has(c.x + 1, c.y))) continue;
     for (const p of run) inRun.add(key(p.x, p.y));
-    runs.push(run);
+    runs.push({ tiles: run, axis: 'y' });
   }
   for (const c of [...cands].sort((a, b) => a.y - b.y || a.x - b.x)) {
     if (inRun.has(key(c.x, c.y)) || has(c.x - 1, c.y)) continue;
     const run: GridPoint[] = [];
     for (let x = c.x; has(x, c.y) && !inRun.has(key(x, c.y)); x++) run.push({ x, y: c.y });
     for (const p of run) inRun.add(key(p.x, p.y));
-    runs.push(run);
+    runs.push({ tiles: run, axis: 'x' });
   }
   const out: TowerTop[] = [];
   let cluster = 0;
-  const turn = (q: GridPoint) => ((((tileHash(q.y + 3, q.x + 1) ^ salt) >>> 2) % 5) - 2) * 0.05;
-  for (const run of runs) {
-    // Clusters of up to two with a tile's breather between.
+  const turn = (q: GridPoint, k: number) =>
+    ((((tileHash(q.y + 3 + k, q.x + 1) ^ salt) >>> 2) % 5) - 2) * 0.06;
+  for (const { tiles: run, axis } of runs) {
+    // A cluster on two tiles (or the one left), then the breather.
     for (let i = 0; i < run.length && out.length < TOWER_TOPS_MAX;) {
-      const kinds = CLUSTERS[cluster % CLUSTERS.length] ?? [];
+      const span = Math.min(2, run.length - i);
+      const kinds = (CLUSTERS[cluster % CLUSTERS.length] ?? []).slice(0, span === 1 ? 2 : 3);
       cluster++;
-      let j = 0;
-      for (; j < kinds.length && i + j < run.length; j++) {
-        const p = run[i + j];
-        const kind = kinds[j];
-        if (!p || !kind) continue;
+      // Centred on the span, CLUSTER_STEP apart.
+      const mid = i + (span - 1) / 2;
+      kinds.forEach((kind, k) => {
+        if (out.length >= TOWER_TOPS_MAX) return;
+        const u = mid + (k - (kinds.length - 1) / 2) * CLUSTER_STEP;
+        const at = Math.min(i + span - 1, Math.max(i, Math.round(u)));
+        const p = run[at];
+        if (!p) return;
+        const shift = Math.round((u - at) * 100) / 100;
         const side = outer[key(p.x, p.y)] ?? 'back';
-        out.push({ x: p.x, y: p.y, kind, yaw: OUT_YAW[side] + turn(p) });
-      }
-      i += j + 1;
+        out.push({
+          x: p.x,
+          y: p.y,
+          dx: axis === 'x' ? shift : 0,
+          dy: axis === 'y' ? shift : 0,
+          kind,
+          yaw: OUT_YAW[side] + turn(p, k),
+        });
+      });
+      i += span + TOWER_TOPS_BREATHER;
     }
   }
-  return out.sort((a, b) => a.y - b.y || a.x - b.x);
+  return out.sort((a, b) => a.y + a.dy - (b.y + b.dy) || a.x + a.dx - (b.x + b.dx));
 }
 
 // ---- The pendants ----
@@ -939,11 +964,10 @@ const roomsCache = new WeakMap<LevelMap, TowerRoom>();
 
 /**
  * The linear pendant for the lamp spot `at` (see `RoomDressing.lamp.fit`):
- * only in an office or a meeting room (never the corridor, whose back is
- * mid-room, nor by the front wall), hung just in front of the room's back
- * wall in the column it's in, slid along it clear of the stations in the
- * back row (it'd hide them on screen) and inside the room; a meeting
- * room's hangs over its table. Else none (the light stays at the spot).
+ * only in a meeting room away from the front wall, one over its table.
+ * Never in an office: hung anywhere near its back it lands on the back
+ * row's stations on screen, so the light stays at the spot without a
+ * fitting; nor in the corridor (its back is mid-room). Else none.
  */
 export function towerPendantFit(at: Vec3, map: LevelMap): Vec3 | null {
   let plan = roomsCache.get(map);
@@ -964,33 +988,10 @@ export function towerPendantFit(at: Vec3, map: LevelMap): Vec3 | null {
   const ys = room.tiles.map((t) => t.y);
   // Never in a room that reaches the map's front (its back is too near the front wall).
   if (Math.max(...ys) >= map.height - 3) return null;
-  if (room.zone === 'meeting') {
-    const table = p.tables.find((t) => room.tiles.some((q) => cheb(q, t) <= 1));
-    const top = Math.min(...ys);
-    if (!table) return null;
-    // One per room: only for the spot nearest the table.
-    return { x: table.x, y: TOWER_PENDANT_Y, z: top - 1 + TOWER_PENDANT_FORWARD + 0.4 };
-  }
-  const top = Math.min(...room.tiles.filter((t) => t.x === tx).map((t) => t.y));
-  if (!Number.isFinite(top)) return null;
-  const xs = room.tiles.filter((t) => t.y === top).map((t) => t.x);
-  const x0 = Math.min(...xs);
-  const x1 = Math.max(...xs);
-  const blocked: number[] = [];
-  for (let x = x0 - 1; x <= x1 + 1; x++) if (isBlock(map, x, top - 1)) blocked.push(x);
-  const ok = (x: number) =>
-    x - TOWER_PENDANT_HALF >= x0 - 0.4 &&
-    x + TOWER_PENDANT_HALF <= x1 + 0.4 &&
-    blocked.every((bx) => Math.abs(bx - x) >= 0.5 + TOWER_PENDANT_HALF - 0.2);
-  for (let i = 0; i <= 40; i++) {
-    const d = i * 0.05;
-    for (const x of d === 0 ? [at.x] : [at.x - d, at.x + d])
-      if (ok(x))
-        return {
-          x: Math.round(x * 100) / 100,
-          y: TOWER_PENDANT_Y,
-          z: top - 1 + TOWER_PENDANT_FORWARD,
-        };
-  }
-  return null;
+  if (room.zone !== 'meeting') return null;
+  const table = p.tables.find((t) => room.tiles.some((q) => cheb(q, t) <= 1));
+  const top = Math.min(...ys);
+  if (!table) return null;
+  // One per room, hung over the table a little in front of the back wall.
+  return { x: table.x, y: TOWER_PENDANT_Y, z: top - 1 + TOWER_PENDANT_FORWARD + 0.4 };
 }

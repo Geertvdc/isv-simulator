@@ -76,25 +76,31 @@ const ALU_DARK = 0x858d95;
 export const ANODISED = 0x5c646d;
 /** The partitions' pale plinth, a shade under white. */
 export const PLINTH = 0xd3d6d8;
-/** The partitions' cool glass core (the far side seen through two panes), never a bright slab. */
-export const PARTITION_CORE = 0x8b9fae;
-const PANE = 0xdbe7ee;
-const FROST = 0xcdd4da;
+/** The partitions' cool glass core (the far side seen through two panes), darker than the plinth, never ice. */
+export const PARTITION_CORE = 0x6a7d8c;
+const PANE = 0xc4d2dc;
+/** The low screens' glass: a cool grey-blue tint, so they read as glass and never out-shine a station. */
+export const SCREEN_GLASS = 0x6c8090;
+const FROST = 0xdfe3ea;
 /** The manifestation's violet dots. */
-export const DOT_VIOLET = 0x7a64c4;
+export const DOT_VIOLET = 0x8a6fd0;
+/** The mullion between every pair of panes: dark anodised, so a run reads as framed glass. */
+export const MULLION = 0x4b525a;
+/** The slim steel head track: the one light line along a wall's top. */
+export const HEAD_TRACK = 0xb8c0c8;
 export const YOTTA_VIOLET = 0x6a4cc0;
 /** The curtain wall: sky-tinted vision glass, the spandrel under it, the blinds' sun-faded fabric. */
-export const CURTAIN_CORE = 0x6f8596;
+export const CURTAIN_CORE = 0x62788a;
 export const SPANDREL = 0x525b66;
 export const BLIND = 0xd6d0c2;
-const BLIND_BAR = 0x8f949a;
+const BLIND_BAR = 0x5a5f66;
 /** The caps: the head track's infill seen from above (partitions), the curtain wall's head, the sill's top. */
 export const PARTITION_CAP = WALL_COLORS.tower.top;
 export const CURTAIN_CAP = 0x6b747d;
 /** The curtain wall's glazing seen from above, catching the pale sky: cool, still under every station top. */
-export const CURTAIN_SKY = 0x778b9a;
-/** A partition's glass seen from above: paler, frostier than the curtain wall's. */
-export const PARTITION_SKY = 0x8396a4;
+export const CURTAIN_SKY = 0x5f7383;
+/** A partition's glass seen from above: a touch paler than the curtain wall's. */
+export const PARTITION_SKY = 0x6b7e8d;
 export const SILL_CAP = 0x727b84;
 /** The cladding of the piers between the curtain wall's units. */
 const PIER = 0xc4c8cb;
@@ -120,7 +126,7 @@ const MANIFEST_Y = 0.66;
  * proud of the faces and the cap's infill flush in it (`cap`), so from
  * above a run reads as a slim frame round a cool grey, never a pale slab.
  */
-function headTrack(b: ModelBuilder, h: number, cap: number, lip = ALU, lipH = 0.03): void {
+function headTrack(b: ModelBuilder, h: number, cap: number, lip = HEAD_TRACK, lipH = 0.03): void {
   b.box(1.02, lipH, 1.02, lip, { at: [0, h - 0.004 - lipH / 2, 0] }, 0);
   b.box(1.016, 0.005, 1.016, tint(lip, -0.45), { at: [0, h - 0.004 - lipH - 0.0025, 0] }, 0);
   b.box(1.0, 0.012, 1.0, cap, { at: [0, h - 0.006, 0] }, 0);
@@ -128,24 +134,29 @@ function headTrack(b: ModelBuilder, h: number, cap: number, lip = ALU, lipH = 0.
 
 /**
  * A wall's top seen from above as glass, not a slab: the glazing either
- * side of the wall line catching the pale sky (`sky`), the head along the
- * line's middle (`line`) and a mullion's cap across at the unit's joint.
+ * side of the wall line catching the sky (`sky`, dark and cool), the slim
+ * steel head along the line's middle (`line`, the one light line) and a
+ * dark mullion's cap across at every unit's joint.
  */
 function glassTop(b: ModelBuilder, h: number, along: 'x' | 'z', sky: number, line: number): void {
   const t = framed(b, [0, h, 0], [0, along === 'z' ? Math.PI / 2 : 0, 0]);
-  for (const z of [-0.25, 0.25]) t.box(0.98, 0.003, 0.36, sky, { at: [0, 0.0005, z] }, 0);
-  t.box(1.0, 0.012, 0.07, line, { at: [0, 0.004, 0] }, 0);
-  t.box(1.0, 0.003, 0.02, tint(line, 0.3), { at: [0, 0.011, 0] }, 0);
-  t.box(0.05, 0.01, 1.0, line, { at: [-0.49, 0.003, 0] }, 0);
+  for (const z of [-0.26, 0.26]) {
+    t.box(0.98, 0.003, 0.4, sky, { at: [0, 0.0005, z] }, 0);
+    // The sky's sheen across the glazing, toward the room side.
+    t.box(0.98, 0.003, 0.08, tint(sky, 0.1), { at: [0, 0.0012, z + (z > 0 ? 0.1 : -0.1)] }, 0);
+  }
+  t.box(1.0, 0.012, 0.05, MULLION, { at: [0, 0.004, 0] }, 0);
+  t.box(1.0, 0.004, 0.026, line, { at: [0, 0.011, 0] }, 0);
+  t.box(0.05, 0.012, 1.0, MULLION, { at: [-0.49, 0.004, 0] }, 0);
 }
 
 /** The frosted manifestation band on a face (`on`), its violet dot line, at height `y`. */
-function manifestation(b: ModelBuilder, on: Face, y: number, w = 0.96, dots = 12): void {
-  b.box(w, 0.07, 0.004, FROST, on(0, y), 0);
-  b.box(w, 0.012, 0.004, FROST, on(0, y - 0.07), 0);
+function manifestation(b: ModelBuilder, on: Face, y: number, w = 0.96, dots = 8): void {
+  b.box(w, 0.1, 0.004, FROST, on(0, y), 0);
+  b.box(w, 0.014, 0.004, FROST, on(0, y - 0.085), 0);
   for (let k = 0; k < dots; k++) {
     const u = -w / 2 + (w / dots) * (k + 0.5);
-    b.box(0.024, 0.024, 0.005, DOT_VIOLET, on(u, y), 0);
+    b.box(0.038, 0.038, 0.005, DOT_VIOLET, on(u, y), 0);
   }
 }
 
@@ -169,7 +180,7 @@ function partitionModel(look: number, along: 'x' | 'z' | null): Model {
   const outer = faces(0.506);
   const inner = faces(0.484);
   outer.forEach((on, f) => {
-    b.box(0.024, GLASS1 - GLASS0, 0.014, ALU, on(-0.488, (GLASS0 + GLASS1) / 2), 0);
+    b.box(0.04, GLASS1 - GLASS0, 0.016, MULLION, on(-0.48, (GLASS0 + GLASS1) / 2), 0);
     manifestation(b, inner[f] ?? on, MANIFEST_Y);
     if (look === 2) {
       const g = (inner[f] ?? on)(0.16 * (f % 2 ? -1 : 1), 0.78);
@@ -189,7 +200,7 @@ function partitionModel(look: number, along: 'x' | 'z' | null): Model {
   for (const on of faces(0.5))
     b.pane(1, GLASS1 - GLASS0, 0.006, PANE, on(0, (GLASS0 + GLASS1) / 2));
   headTrack(b, WALL_HEIGHT, PARTITION_CAP);
-  if (along) glassTop(b, WALL_HEIGHT, along, PARTITION_SKY, ALU);
+  if (along) glassTop(b, WALL_HEIGHT, along, PARTITION_SKY, HEAD_TRACK);
   return b.build();
 }
 
@@ -205,22 +216,22 @@ function screenModel(along: 'x' | 'z', look: number): Model {
   lowPlinth(b);
   const y0 = FRONT_WALL_HEIGHT;
   const g = framed(b, [0, 0, 0], [0, along === 'z' ? Math.PI / 2 : 0, 0]);
-  g.box(1.0, 0.03, 0.05, ALU, { at: [0, y0 + 0.015, 0] }, 0.006);
-  g.pane(1.0, SCREEN_H, 0.012, PANE, { at: [0, y0 + 0.03 + SCREEN_H / 2, 0] });
-  g.box(1.0, 0.016, 0.026, ALU, { at: [0, y0 + 0.03 + SCREEN_H + 0.008, 0] }, 0.004);
-  g.box(0.02, SCREEN_H, 0.03, ALU, { at: [-0.49, y0 + 0.03 + SCREEN_H / 2, 0] }, 0);
-  const band = y0 + 0.03 + SCREEN_H * 0.86;
+  g.box(1.0, 0.03, 0.05, MULLION, { at: [0, y0 + 0.015, 0] }, 0.006);
+  g.pane(1.0, SCREEN_H, 0.012, SCREEN_GLASS, { at: [0, y0 + 0.03 + SCREEN_H / 2, 0] });
+  g.box(1.0, 0.016, 0.026, HEAD_TRACK, { at: [0, y0 + 0.03 + SCREEN_H + 0.008, 0] }, 0.004);
+  g.box(0.03, SCREEN_H, 0.03, MULLION, { at: [-0.49, y0 + 0.03 + SCREEN_H / 2, 0] }, 0);
+  const band = y0 + 0.03 + SCREEN_H * 0.84;
   for (const z of [0.008, -0.008]) {
-    g.box(1.0, 0.03, 0.003, FROST, { at: [0, band, z] }, 0);
+    g.box(1.0, SCREEN_H * 0.18, 0.003, FROST, { at: [0, band, z] }, 0);
     for (let k = 0; k < 6; k++)
-      g.box(0.022, 0.016, 0.004, DOT_VIOLET, { at: [-0.42 + k * 0.168, band, z * 1.2] }, 0);
+      g.box(0.034, 0.034, 0.004, DOT_VIOLET, { at: [-0.42 + k * 0.168, band, z * 1.25] }, 0);
   }
   if (look === 2)
     g.box(
       0.03,
       SCREEN_H * 0.8,
       0.014,
-      tint(PANE, -0.25),
+      tint(SCREEN_GLASS, 0.3),
       {
         at: [0.18, y0 + 0.03 + SCREEN_H / 2, 0],
         rot: [0, 0, 0.6],
@@ -236,7 +247,7 @@ function lowPlinth(b: ModelBuilder): void {
   b.box(1.0, h - 0.03, 1.0, PLINTH, { at: [0, (h - 0.03) / 2, 0] }, 0);
   b.box(1.004, 0.012, 1.004, tint(PLINTH, -0.5), { at: [0, 0.006, 0] }, 0);
   b.box(1.012, 0.022, 1.012, ALU_DARK, { at: [0, 0.07, 0] }, 0);
-  headTrack(b, h, PARTITION_CAP, ALU, 0.024);
+  headTrack(b, h, PARTITION_CAP, HEAD_TRACK, 0.024);
 }
 
 /** A wall in the theme's own look: a full glass partition, or a low one (left plain: the plan gives every low one its screen). */
@@ -266,7 +277,7 @@ function solidModel(along: 'x' | 'z'): Model {
     0,
   );
   faces(0.5).forEach((on, f) => {
-    b.box(0.024, GLASS1 - GLASS0, 0.012, ALU, on(-0.488, (GLASS0 + GLASS1) / 2), 0);
+    b.box(0.04, GLASS1 - GLASS0, 0.014, MULLION, on(-0.48, (GLASS0 + GLASS1) / 2), 0);
     b.box(
       0.006,
       GLASS1 - GLASS0 - 0.04,
@@ -277,7 +288,7 @@ function solidModel(along: 'x' | 'z'): Model {
     );
   });
   headTrack(b, WALL_HEIGHT, PARTITION_CAP);
-  glassTop(b, WALL_HEIGHT, along, mix(PARTITION_SKY, FROST, 0.4), ALU);
+  glassTop(b, WALL_HEIGHT, along, mix(PARTITION_SKY, PLINTH, 0.35), HEAD_TRACK);
   return b.build();
 }
 
@@ -286,8 +297,8 @@ function solidModel(along: 'x' | 'z'): Model {
 const SPANDREL_H = 0.26;
 const SILL_BOARD = 0.022;
 const TRANSOM_Y = 0.92;
-/** How far down each look's blinds come, from the head. */
-const BLIND_DOWN = [0.38, 0.5, 0.3] as const;
+/** How far down each look's blinds come, from the head: about half the glass, each look its own. */
+const BLIND_DOWN = [0.4, 0.46, 0.34] as const;
 
 /**
  * A unit of the curtain wall, full height: the dark spandrel under an
@@ -333,43 +344,54 @@ function curtainModel(look: number, along: 'x' | 'z'): Model {
   for (const on of faces(0.5)) b.pane(1, top - g0, 0.006, PANE, on(0, (g0 + top) / 2));
   // The blinds, inside the glass, and their cassette under the head.
   faces(0.508).forEach((on) => {
-    b.box(0.9, 0.03, 0.02, BLIND_BAR, on(0.02, top - 0.015), 0);
-    b.box(0.88, drop, 0.004, BLIND, on(0.02, top - 0.03 - drop / 2), 0);
-    for (let k = 1; k < 4; k++)
-      b.box(0.88, 0.003, 0.005, tint(BLIND, -0.06), on(0.02, top - 0.03 - (drop * k) / 4), 0);
-    b.box(0.9, 0.016, 0.012, BLIND_BAR, on(0.02, top - 0.03 - drop - 0.008), 0);
-    b.box(0.012, 0.012, 0.012, BLIND_BAR, on(0.32, top - 0.03 - drop - 0.03), 0);
+    b.box(0.9, 0.036, 0.024, BLIND_BAR, on(0.02, top - 0.018), 0);
+    b.box(0.86, drop, 0.004, BLIND, on(0.02, top - 0.036 - drop / 2), 0);
+    // The fabric's slats, and the shadow it throws on the glass under its rail.
+    const slats = Math.round(drop / 0.045);
+    for (let k = 1; k < slats; k++)
+      b.box(0.86, 0.004, 0.005, tint(BLIND, -0.1), on(0.02, top - 0.036 - (drop * k) / slats), 0);
+    b.box(0.92, 0.028, 0.018, BLIND_BAR, on(0.02, top - 0.036 - drop - 0.014), 0);
+    b.box(0.92, 0.006, 0.019, tint(BLIND_BAR, 0.5), on(0.02, top - 0.036 - drop - 0.002), 0);
+    // The pull cord and its toggle.
+    b.box(0.004, 0.14, 0.004, BLIND_BAR, on(0.36, top - 0.036 - drop - 0.098), 0);
+    b.box(0.016, 0.026, 0.016, tint(BLIND, -0.2), on(0.36, top - 0.036 - drop - 0.17), 0.004);
   });
   headTrack(b, WALL_HEIGHT, CURTAIN_CAP, ANODISED, 0.04);
-  glassTop(b, WALL_HEIGHT, along, CURTAIN_SKY, ANODISED);
+  glassTop(b, WALL_HEIGHT, along, CURTAIN_SKY, HEAD_TRACK);
   return b.build();
 }
 
+/** The cut-down curtain wall's spandrel, its sill board's top, and its low glass. */
+const SILL_TOP = 0.16;
+const SILL_GLASS_TOP = 0.46;
+
 /**
- * The curtain wall cut down on the front: its spandrel under the
- * aluminium sill board and the dark head, the deep mullions' stubs standing
- * a little proud of the top, a panel joint per look.
+ * The curtain wall cut down on the front: a low dark spandrel under a wide
+ * aluminium sill board, and on it a strip of the curtain wall's own glass
+ * (sky-tinted, a dark mullion at each unit's joint, the slim steel head
+ * track along its top), so the front reads as a sill and glass, never as
+ * slabs.
  */
 function sillModel(look: number, along: 'x' | 'z'): Model {
   const b = new ModelBuilder();
-  const h = FRONT_WALL_HEIGHT;
-  b.box(1.0, h - 0.03, 1.0, SPANDREL, { at: [0, (h - 0.03) / 2, 0] }, 0);
+  const h = SILL_TOP;
+  b.box(1.0, h, 1.0, SPANDREL, { at: [0, h / 2, 0] }, 0);
   b.box(1.006, 0.012, 1.006, tint(SPANDREL, -0.4), { at: [0, 0.006, 0] }, 0);
   faces(0.5).forEach((on, f) => {
-    b.box(
-      0.008,
-      h - 0.06,
-      0.004,
-      tint(SPANDREL, -0.3),
-      on(((look + f) % 3) * 0.2 - 0.2, (h - 0.03) / 2),
-      0,
-    );
-    b.box(0.06, h + 0.05, 0.05, ANODISED, on(-0.47, (h + 0.05) / 2), 0);
-    b.box(0.012, h + 0.03, 0.052, tint(ANODISED, 0.25), on(-0.452, (h + 0.03) / 2), 0);
-    b.box(0.96, 0.012, 0.006, tint(SPANDREL, 0.18), on(0, h * 0.45), 0);
+    b.box(0.008, h - 0.05, 0.004, tint(SPANDREL, -0.3), on(((look + f) % 3) * 0.2 - 0.2, h / 2), 0);
   });
-  headTrack(b, h, SILL_CAP, ALU, 0.024);
-  glassTop(b, h, along, CURTAIN_SKY, ANODISED);
+  // The sill board, its drip edge.
+  b.box(1.02, 0.022, 1.02, SILL_CAP, { at: [0, h + 0.011, 0] }, 0.004);
+  b.box(1.022, 0.006, 1.022, tint(SILL_CAP, -0.35), { at: [0, h + 0.001, 0] }, 0);
+  // The glass on it, along the wall line.
+  const g = framed(b, [0, 0, 0], [0, along === 'z' ? Math.PI / 2 : 0, 0]);
+  const g0 = h + 0.022;
+  const gh = SILL_GLASS_TOP - g0 - 0.02;
+  g.box(1.0, 0.026, 0.05, MULLION, { at: [0, g0 + 0.013, 0] }, 0.004);
+  g.pane(1.0, gh, 0.014, SCREEN_GLASS, { at: [0, g0 + 0.026 + gh / 2, 0] });
+  g.box(1.0, 0.004, 0.016, tint(SCREEN_GLASS, 0.45), { at: [0, g0 + 0.026 + gh * 0.7, 0] }, 0);
+  g.box(0.04, gh + 0.026, 0.04, MULLION, { at: [-0.49, g0 + (gh + 0.026) / 2, 0] }, 0);
+  g.box(1.0, 0.02, 0.034, HEAD_TRACK, { at: [0, SILL_GLASS_TOP - 0.01, 0] }, 0.004);
   return b.build();
 }
 
@@ -487,16 +509,20 @@ const FLECK_VIOLET = 0x7e70b4;
  */
 export const MEETING_CARPETS = [0x6d7c5a, 0x8a7a64] as const;
 /**
- * The meeting carpets as they show under the rug's tint (`WorldFx`: 0.35 of
- * 0x8e6bd8), for a threshold's half, which the tint doesn't reach.
+ * Each room's rug tint over its carpet (`atmosphere`'s `rug.perRoom` for
+ * Back to Back, at its 0.48 opacity), so a threshold's half, which the
+ * tint doesn't reach, shows the same as the room beside it.
  */
-export const MEETING_BARE = MEETING_CARPETS.map((c) => mix(c, 0x8e6bd8, 0.35));
+const MEETING_RUGS = [0x8a70c8, 0x6c78bc] as const;
+export const MEETING_BARE = MEETING_CARPETS.map((c, i) =>
+  mix(c, MEETING_RUGS[i] ?? 0x8e6bd8, 0.48),
+);
 /** The corridor's pale terrazzo (darker than every station top), its chips and zinc strips. */
-export const TERRAZZO = 0x878b8e;
-const CHIPS = [0xc2c4c4, 0x5f6266, 0x8a84a8, 0xd0d0cc, 0x70757c] as const;
-const ZINC = 0x7c8086;
+export const TERRAZZO = 0x8b8984;
+const CHIPS = [0x9e968a, 0x7b766f, 0x8e899c, 0xa59d90, 0x6f6b66] as const;
+const ZINC = 0x7a766f;
 /** The corridor's walk line: the terrazzo a shade darker, dulled by feet. */
-export const WALK_LINE = mix(TERRAZZO, 0x6e7276, 0.55);
+export const WALK_LINE = mix(TERRAZZO, 0x726e68, 0.75);
 
 /** A flat mark `w` × `d` on the floor at (x, z), `y` up, turned `turn`. */
 function mark(
@@ -650,9 +676,10 @@ export function towerFloorModel(look: number): Model {
 // ---- Counters ----
 
 /** The counters' smoked oak top (darker than every station top), its edge, the charcoal plinth body. */
-export const COUNTER_TOP = 0x6e5b47;
-const COUNTER_EDGE = 0x4d3f31;
-const COUNTER_BODY = 0x464c54;
+export const COUNTER_TOP = 0x575550;
+const COUNTER_EDGE = 0x42403c;
+const COUNTER_BODY = 0x4a4e57;
+const COUNTER_KICK = 0x3a3e45;
 
 /**
  * A counter as an HQ credenza (the hatch counters in the partitions, the
@@ -664,7 +691,7 @@ export function towerCounter(run: CounterRun): StationModel {
   const b = new ModelBuilder();
   const h = STATION_HEIGHT;
   const top = 0.045;
-  b.box(0.9, 0.06, 0.8, 0x2c3036, { at: [0, 0.03, 0] }, 0);
+  b.box(0.9, 0.06, 0.8, COUNTER_KICK, { at: [0, 0.03, 0] }, 0);
   b.box(
     0.94,
     h - top - 0.06,
@@ -1014,31 +1041,39 @@ export function vinylModel(name: string, width: number): Model {
   return b.build();
 }
 
-/** How high the tall door portal's head sits: under the door light (`Mechanics`, 1.25). */
-export const PORTAL_HEAD = 1.1;
+/** How high the door portal's head sits: the door light (`Mechanics`, 0.12 round at 1.25) rests on it. */
+export const PORTAL_HEAD = 1.12;
+/** The portal's brushed aluminium. */
+const PORTAL_ALU = 0xaab2ba;
 
 /**
  * A slim aluminium door portal round a meeting door, built for a wall line
  * along z (turn it a quarter for one along x): a post at each end of the
- * tile and, when `tall`, a slim head between them under the door light and
- * a glass sliding leaf parked open over the wall behind it (−z), with its
- * frosted band and pull handle; low, just the posts to the screens' top.
+ * tile, a slim head between them and on it a round seat for the door light;
+ * with `leaf`, a glass sliding leaf parked open over the wall behind it
+ * (−z), with its frosted band and pull handle. The doorway stays open under
+ * the head.
  */
-export function doorPortalModel(tall: boolean): Model {
+export function doorPortalModel(leaf: boolean): Model {
   const b = new ModelBuilder();
-  const h = tall ? PORTAL_HEAD : FRONT_WALL_HEIGHT + 0.03 + SCREEN_H + 0.016;
-  for (const s of [-1, 1]) b.box(0.07, h, 0.05, ALU, { at: [0, h / 2, s * 0.5] }, 0.006);
-  if (!tall) return b.build();
-  b.box(0.06, 0.04, 1.04, ALU, { at: [0, h - 0.02, 0] }, 0.006);
+  const h = PORTAL_HEAD;
+  for (const s of [-1, 1]) {
+    b.box(0.045, h - 0.04, 0.045, PORTAL_ALU, { at: [0, (h - 0.04) / 2, s * 0.5] }, 0.006);
+    b.box(0.05, 0.02, 0.05, MULLION, { at: [0, 0.01, s * 0.5] }, 0);
+  }
+  b.box(0.06, 0.04, 1.05, PORTAL_ALU, { at: [0, h - 0.02, 0] }, 0.006);
+  b.box(0.062, 0.006, 1.0, tint(PORTAL_ALU, -0.3), { at: [0, h - 0.037, 0] }, 0);
+  b.cylinder(0.08, 0.07, 0.02, MULLION, { at: [0, h - 0.01, 0] }, 20);
+  if (!leaf) return b.build();
   // The sliding leaf, parked open beside the wall behind it.
   const lz = -0.98;
-  const lh = h - 0.1;
+  const lh = h - 0.12;
   b.pane(0.012, lh, 0.92, PANE, { at: [0.08, 0.04 + lh / 2, lz] });
-  b.box(0.02, 0.03, 0.94, ALU, { at: [0.08, 0.05, lz] }, 0);
-  b.box(0.02, 0.03, 0.94, ALU, { at: [0.08, 0.04 + lh, lz] }, 0);
-  b.box(0.016, 0.06, 0.9, FROST, { at: [0.08, MANIFEST_Y, lz] }, 0);
+  b.box(0.02, 0.03, 0.94, PORTAL_ALU, { at: [0.08, 0.05, lz] }, 0);
+  b.box(0.02, 0.03, 0.94, PORTAL_ALU, { at: [0.08, 0.04 + lh, lz] }, 0);
+  b.box(0.016, 0.08, 0.9, FROST, { at: [0.08, MANIFEST_Y, lz] }, 0);
   for (let k = 0; k < 8; k++)
-    b.box(0.018, 0.022, 0.022, DOT_VIOLET, { at: [0.08, MANIFEST_Y, lz - 0.4 + k * 0.115] }, 0);
+    b.box(0.018, 0.032, 0.032, DOT_VIOLET, { at: [0.08, MANIFEST_Y, lz - 0.4 + k * 0.115] }, 0);
   b.box(0.05, 0.4, 0.02, STEEL_DARK, { at: [0.1, 0.55, lz + 0.4] }, 0.006);
   return b.build();
 }
@@ -1128,88 +1163,111 @@ function waterTrayModel(): Model {
   return b.build();
 }
 
-/** A framed photo of Mom's garage on a little easel (where it started). */
+/** A framed photo of Mom's garage on a little easel, leaned back to the camera (where it started). */
 function garagePhotoModel(): Model {
   const b = new ModelBuilder();
   const y0 = FRONT_WALL_HEIGHT;
-  const p = framed(b, [0.05, y0, LEDGE_Z], [-0.18, 0.15, 0]);
-  p.box(0.34, 0.26, 0.024, 0x5a4532, { at: [0, 0.15, 0] }, 0.006);
-  p.box(0.29, 0.21, 0.004, 0xa8c4d8, { at: [0, 0.15, 0.013] }, 0);
-  p.box(0.29, 0.05, 0.003, 0x7a8c66, { at: [0, 0.065, 0.0155] }, 0);
-  p.box(0.2, 0.13, 0.003, 0xd8c9a4, { at: [0, 0.135, 0.0158] }, 0);
-  p.box(0.22, 0.03, 0.003, 0x8a4a3a, { at: [0, 0.205, 0.0162] }, 0);
-  p.box(0.13, 0.09, 0.003, 0x9aa0a6, { at: [-0.01, 0.115, 0.0164] }, 0);
-  for (let k = 0; k < 4; k++)
-    p.box(0.13, 0.004, 0.002, 0x7a8086, { at: [-0.01, 0.08 + k * 0.022, 0.0168] }, 0);
-  p.box(0.035, 0.035, 0.003, 0xf2e6a8, { at: [0.08, 0.16, 0.0164] }, 0);
+  const p = framed(b, [0.02, y0, LEDGE_Z - 0.02], [-0.62, 0.12, 0]);
+  const w = 0.56;
+  const h = 0.42;
+  const cy = h / 2;
+  p.box(w, h, 0.026, 0x3a2e24, { at: [0, cy, 0] }, 0.008);
+  p.box(w - 0.06, h - 0.06, 0.004, 0xf2efe7, { at: [0, cy, 0.014] }, 0);
+  const f = 0.017;
+  const iw = w - 0.12;
+  // Golden-hour sky, the house's cream wall under its roof, the driveway and lawn.
+  p.box(iw, 0.3, 0.003, 0xe9c88e, { at: [0, cy + 0.0, f] }, 0);
+  p.box(iw * 0.82, 0.17, 0.003, 0xd8c9a4, { at: [-0.02, cy - 0.02, f + 0.001] }, 0);
+  p.box(iw * 0.9, 0.04, 0.003, 0x8a4a3a, { at: [-0.02, cy + 0.08, f + 0.002] }, 0);
+  p.box(iw, 0.06, 0.003, 0x8f8b84, { at: [0, cy - 0.12, f + 0.001] }, 0);
+  p.box(0.1, 0.06, 0.003, 0x6f8a4e, { at: [0.15, cy - 0.12, f + 0.002] }, 0);
+  // The roll-up door, slats and its dark bottom bar, and the kitchen door.
+  p.box(0.17, 0.12, 0.003, 0xcfd3d6, { at: [-0.05, cy - 0.04, f + 0.002] }, 0);
+  for (let k = 0; k < 5; k++)
+    p.box(0.17, 0.008, 0.003, 0x8a9098, { at: [-0.05, cy - 0.09 + k * 0.024, f + 0.003] }, 0);
+  p.box(0.17, 0.012, 0.003, 0x3a3f45, { at: [-0.05, cy - 0.1, f + 0.004] }, 0);
+  p.box(0.05, 0.1, 0.003, 0x6a4a3a, { at: [0.1, cy - 0.05, f + 0.002] }, 0);
+  // The sun, low, and the lawnmower on the drive.
+  p.cylinder(
+    0.025,
+    0.025,
+    0.003,
+    0xffe2a0,
+    { at: [0.15, cy + 0.11, f + 0.002], rot: [Math.PI / 2, 0, 0] },
+    14,
+  );
+  p.box(0.04, 0.025, 0.003, 0xc8342a, { at: [-0.18, cy - 0.11, f + 0.003] }, 0);
+  // The easel's leg behind it.
   b.box(
     0.02,
-    0.2,
+    0.26,
     0.02,
-    0x5a4532,
-    { at: [0.05, y0 + 0.1, LEDGE_Z - 0.09], rot: [0.5, 0, 0] },
+    0x3a2e24,
+    { at: [0.02, y0 + 0.11, LEDGE_Z - 0.22], rot: [-0.4, 0, 0] },
     0.004,
   );
   return b.build();
 }
 
-/** The heritage lawnmower in a glass case on a plinth, with its plaque. */
-function mowerCaseModel(): Model {
+/** The heritage traffic cone in a glass case on a white plinth, with its brass plaque. */
+function heritageCaseModel(): Model {
   const b = new ModelBuilder();
   const y0 = FRONT_WALL_HEIGHT;
   const x = 0.05;
-  b.box(0.34, 0.1, 0.3, 0xe6e6e2, { at: [x, y0 + 0.05, LEDGE_Z - 0.04] }, 0.008);
-  b.box(0.12, 0.03, 0.004, 0xb08a4a, { at: [x, y0 + 0.05, LEDGE_Z + 0.112] }, 0);
-  b.box(0.08, 0.005, 0.002, INK, { at: [x, y0 + 0.05, LEDGE_Z + 0.115] }, 0);
-  const m = y0 + 0.1;
-  b.box(0.18, 0.06, 0.12, 0xc8342a, { at: [x, m + 0.05, LEDGE_Z - 0.04] }, 0.02);
-  b.cylinder(0.035, 0.035, 0.05, 0x2a2d33, { at: [x, m + 0.09, LEDGE_Z - 0.04] }, 12);
-  for (const [dx, dz] of [
-    [-0.08, 0.04],
-    [0.08, 0.04],
-    [-0.08, -0.12],
-    [0.08, -0.12],
+  const z = LEDGE_Z - 0.04;
+  const top = y0 + 0.1;
+  b.box(0.34, 0.1, 0.3, 0xe6e6e2, { at: [x, y0 + 0.05, z] }, 0.008);
+  b.box(0.24, 0.05, 0.004, 0xb08a4a, { at: [x, y0 + 0.05, z + 0.152] }, 0);
+  text(b, 'HERITAGE', x, y0 + 0.05, z + 0.155, 0.0058, 0x2a1e10);
+  // The cone: its square base, the body and two reflective bands.
+  const cone = 0xe8752a;
+  b.box(0.2, 0.02, 0.2, tint(cone, -0.25), { at: [x, top + 0.01, z] }, 0.01);
+  b.cylinder(0.012, 0.075, 0.27, cone, { at: [x, top + 0.02 + 0.135, z] }, 18);
+  for (const [y, r0, r1] of [
+    [0.1, 0.05, 0.057],
+    [0.17, 0.034, 0.041],
   ] as const)
-    b.cylinder(
-      0.025,
-      0.025,
-      0.02,
-      0x1e2126,
-      { at: [x + dx, m + 0.025, LEDGE_Z + dz], rot: [0, 0, Math.PI / 2] },
-      12,
-    );
-  for (const s of [-1, 1])
-    b.box(
-      0.012,
-      0.012,
-      0.16,
-      0x9aa0a6,
-      { at: [x + s * 0.06, m + 0.14, LEDGE_Z - 0.15], rot: [0.9, 0, 0] },
-      0,
-    );
-  b.pane(0.32, 0.26, 0.28, 0xeef6fa, { at: [x, m + 0.13, LEDGE_Z - 0.04] });
-  b.box(0.33, 0.012, 0.29, ALU, { at: [x, m + 0.266, LEDGE_Z - 0.04] }, 0);
+    b.cylinder(r0 + 0.002, r1 + 0.002, 0.03, 0xf2f2ee, { at: [x, top + 0.02 + y, z] }, 18);
+  // The case.
+  const ch = 0.32;
+  b.pane(0.3, ch, 0.26, 0xeef6fa, { at: [x, top + ch / 2, z] });
+  b.box(0.31, 0.014, 0.27, PORTAL_ALU, { at: [x, top + ch + 0.007, z] }, 0.003);
+  for (const [sx, sz] of [
+    [-1, -1],
+    [1, -1],
+    [-1, 1],
+    [1, 1],
+  ] as const)
+    b.box(0.012, ch, 0.012, PORTAL_ALU, { at: [x + sx * 0.15, top + ch / 2, z + sz * 0.13] }, 0);
   return b.build();
 }
 
-/** A roll-up garage door printed on the screen's glass, both faces. */
+/** How far back the roll-up print leans on the glass, toward the lobby. */
+const ROLLUP_LEAN = 0.5;
+
+/**
+ * A roll-up garage door printed on a board leaned back on the back screen's
+ * glass, toward the room and the camera: pale panel, bold slats, the dark
+ * bottom bar and its handle; a run of three makes one door.
+ */
 function rollUpModel(): Model {
   const b = new ModelBuilder();
-  const y0 = FRONT_WALL_HEIGHT + 0.03;
-  const h = SCREEN_H * 0.8;
-  for (const z of [0.008, -0.008]) {
-    b.box(1.0, h, 0.003, 0xa7adb2, { at: [0, y0 + h / 2, z] }, 0);
-    for (let k = 1; k < 9; k++)
-      b.box(1.0, 0.006, 0.004, 0x7f868d, { at: [0, y0 + (h * k) / 9, z * 1.15] }, 0);
-    b.box(0.16, 0.014, 0.005, 0x4c5259, { at: [0, y0 + 0.03, z * 1.3] }, 0);
-  }
+  const h = 0.46;
+  const g = framed(b, [0, FRONT_WALL_HEIGHT + 0.005, 0.3], [-ROLLUP_LEAN, 0, 0]);
+  g.box(1.0, h, 0.012, 0xcfd3d6, { at: [0, h / 2, 0] }, 0);
+  const slats = 9;
+  for (let k = 1; k < slats; k++)
+    g.box(1.0, 0.014, 0.004, 0x9aa0a8, { at: [0, 0.04 + ((h - 0.04) * k) / slats, 0.007] }, 0);
+  g.box(1.0, 0.04, 0.006, 0x3a3f45, { at: [0, 0.02, 0.008] }, 0);
+  g.box(0.14, 0.018, 0.01, 0x5a6068, { at: [0, 0.065, 0.009] }, 0.003);
+  g.box(1.0, 0.01, 0.006, 0x8a9098, { at: [0, h - 0.005, 0.008] }, 0);
   return b.build();
 }
 
 /** Every meeting piece, by name. */
 export const MEETING_PIECE_MODELS: Readonly<Record<MeetingPiece, () => Model>> = {
   garagePhoto: garagePhotoModel,
-  mowerCase: mowerCaseModel,
+  heritageCase: heritageCaseModel,
   rollUp: rollUpModel,
   momPortrait: momPortraitModel,
   waterTray: waterTrayModel,
@@ -1227,13 +1285,16 @@ export function speakerPuckModel(): Model {
 
 // ---- The pendants ----
 
-/** A slim linear pendant: an anodised body, its warm-white diffuser underneath, two fine wires up. */
+/**
+ * A slim linear pendant over a meeting table: a graphite body (never a pale
+ * bar), a thin warm lit strip under it, two fine wires up.
+ */
 export function towerPendantModel(): Model {
   const b = new ModelBuilder();
   const len = TOWER_PENDANT_HALF * 2;
-  b.box(len, 0.03, 0.045, 0xc9ced3, { at: [0, 0, 0] }, 0.008);
-  b.box(len - 0.02, 0.004, 0.046, tint(ANODISED, 0.35), { at: [0, 0.015, 0] }, 0);
-  b.add(new THREE.BoxGeometry(len - 0.03, 0.006, 0.032), 0xfff2dc, { at: [0, -0.016, 0] }, 'glow');
+  b.box(len, 0.03, 0.04, 0x2e3238, { at: [0, 0, 0] }, 0.008);
+  b.box(len - 0.02, 0.004, 0.041, 0x3c4148, { at: [0, 0.015, 0] }, 0);
+  b.add(new THREE.BoxGeometry(len - 0.05, 0.003, 0.014), 0xfff2dc, { at: [0, -0.0165, 0] }, 'glow');
   for (const s of [-1, 1]) {
     b.box(0.004, 0.3, 0.004, 0x2a2d33, { at: [s * (len / 2 - 0.08), 0.165, 0] }, 0);
     b.box(0.02, 0.012, 0.014, 0x2a2d33, { at: [s * (len / 2 - 0.08), 0.31, 0] }, 0.004);
