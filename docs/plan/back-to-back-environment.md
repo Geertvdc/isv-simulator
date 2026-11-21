@@ -1,6 +1,10 @@
 # Back to Back environment pass
 
-**Status:** brief. Level 4-1 (`back-to-back`, "Back to Back"), the first level of the Enterprise chapter, gets a hand-built world after [Hot Desking](hot-desking-environment.md) (3-3). It opens a new chapter in a new building, so its props and atmosphere are the kit 4-2 Synergy and 4-3 The Reorg reuse. The bar: the best level so far.
+**Status:** three rounds done (build, critic review, fixes, a second review, a short third round). Level 4-1 (`back-to-back`, "Back to Back"), the first level of the Enterprise chapter, gets a hand-built world after [Hot Desking](hot-desking-environment.md) (3-3). It opens a new chapter in a new building, so its props and atmosphere are the kit 4-2 Synergy and 4-3 The Reorg reuse. The bar: the best level so far.
+
+| Before                                           | After                                           |
+| ------------------------------------------------ | ----------------------------------------------- |
+| ![](images/back-to-back-environment/before.webp) | ![](images/back-to-back-environment/after.webp) |
 
 **Goal:** the world around the level tells one story, the way Overcooked 2 levels do. Render-only (`src/render/`); the sim, map and balance don't change. One text change in `src/sim/content.ts`: the two meeting rooms are renamed from "Fishbowl" and "Aquarium" to **"The Garage"** and **"Mom"**, so the storyline's joke (meeting rooms named after where they came from) reads in the HUD itself ("P2: to Mom!").
 
@@ -108,11 +112,54 @@ Three agents in one worktree at once, with strict file ownership. The shared plu
 
 ## Done when
 
-- [ ] The shot reads as "the startup's own glass HQ, high up, in a heatwave" without explanation, and nothing in it reads as food or a kitchen.
-- [ ] The storyline beat reads with no explanation: the steel logo in the lobby, the city far below, MONOLITH level with them, rooms named after the past, the heat.
-- [ ] The outside connects to the play: the request portal by the lifts, the release hatch with the red button, the named meeting rooms.
-- [ ] The running gags are in place: steel letters, Prod, Segfault, Mom's room and wagon, MONOLITH, the framed plan.
-- [ ] No flat empty ground and no void in the 1440×810 frame.
-- [ ] Stations, players, the meeting doors and their lights read at a glance; nothing hides them.
-- [ ] Mean luminance about 105+, stations the most saturated things on screen.
-- [ ] `npm run check` passes; other levels look as before.
+- [x] The shot reads as "the startup's own glass HQ, high up, in a heatwave" without explanation, and nothing in it reads as food or a kitchen.
+- [x] The storyline beat reads with no explanation: the steel logo in the lobby, the city far below, MONOLITH level with them, rooms named after the past, the heat.
+- [x] The outside connects to the play: the request portal by the lifts, the release hatch with the red button, the named meeting rooms.
+- [x] The running gags are in place: steel letters, Prod, Segfault, Mom's room and wagon, MONOLITH, the framed plan.
+- [x] No flat empty ground and no void in the 1440×810 frame.
+- [x] Stations, players, the meeting doors and their lights read at a glance; nothing hides them.
+- [x] Mean luminance about 105+, stations the most saturated things on screen.
+- [x] `npm run check` passes; other levels look as before.
+
+## Rounds
+
+Round 1 ran three agents at once (Room, World, Light), with our finished 3-1, 3-2 and 3-3 frames as the bar (no Overcooked shots were supplied). The critic scored it **6/10** (before: 3/10). The bones were right: the stone lift lobby with the steel letters in the notch, MONOLITH as a black slab on the right, the closed terrace with condensers and the red release button, the four room names legible on the glass. What held it back:
+
+- It read as neither hot nor high up: a cool, overcast roof about six floors up, washed out by white haze (luminance 121, saturation 0.199; the corridor at saturation 0.022).
+- The heat-shimmer motes and white terrazzo chips read as snow in a still.
+- White linear pendants cut across the back-row stations.
+- The lobby floor was as bright as the keyboards, Prod's canopy more saturated than any station, the counters near-black crates, the glass walls pale ice blocks.
+- The Garage, which carries the joke, was empty but for its table; Mom's door lights floated with nothing holding them.
+
+Round 2, in three chunks:
+
+- **Room:** glass with a mullion per tile and dark sky-reflecting tops, sills as a dark spandrel with a strip of curtain-wall glass, half-lowered blinds with a bottom rail; warm terrazzo with a visible walk line; no pendant fittings in the offices (the light stays), a graphite pendant over The Garage's table; The Garage's roll-up-door print, a traffic cone in a HERITAGE case and a bigger photo of Mom's garage; aluminium portals on every meeting door with the door light on the header; wall tops in two or three clusters per side.
+- **World:** the city two storeys further down at 0.6 scale with tiny cars, the tower's own façade dropping away in spandrel bands, a smaller loft in the haze, a neighbour tower with a gondola, MONOLITH's parapet, plant screen and helipad in frame; a calmer stone lobby with brushed-steel letters, a warm wash, stone returns and a soffit, lift digits that read 38; a muted Prod, an upright 38° thermometer, a folded parasol and a hose on the terrace; Segfault on a darker grille.
+- **Light:** a warmer key against cool shadows, straw haze pushed back so the city keeps contrast, `saturate` 1.5 and `contrast` 1.1 for this level only, exposure 1.07, no motes over the terrace, one violet rug per meeting room at the same strength.
+
+The critic re-scored round 2 at **7.5/10**, tying 3-3, and found one new problem: the city below had become the busiest texture on screen and the river had almost gone. Round 3 (World and Room only): about 60% fewer city blocks with parks, plazas and muted roofs, windows only on south faces, a river three units wide with its bridge between YOTTA Tower and MONOLITH; a flat lobby rug; folded loungers and a drain on the terrace; Mom's wagon in a violet visitor bay; counters and meeting tables as warm oak on a grey credenza instead of near-black boxes; brushed-grey portals; the violet dot band moved to the partitions' outer faces.
+
+Measured on the final shots:
+
+| Measure                     | Before | Round 1 | Round 2 | Final |
+| --------------------------- | ------ | ------- | ------- | ----- |
+| Frame mean luminance        | 96.1   | 121.2   | 112.3   | 113.9 |
+| Frame mean luminance, low   |        | 123.2   | 114.5   | 116.0 |
+| Frame saturation            | 0.376  | 0.199   | 0.274   | 0.280 |
+| Frame contrast (std)        | 36.1   | 42.6    | 46.4    | 46.6  |
+| City top band (luminance)   |        | 190     | 157     | 159   |
+| Lobby floor (luminance)     |        | 175     | 111     | 128   |
+| Corridor (saturation)       |        | 0.022   | 0.28    | 0.28  |
+| City edge density, top-left |        | 19.1    | 22.0    | 20.2  |
+| City edge density, left     |        | 18.5    | 27.5    | 20.3  |
+
+The keyboards and test benches stay the most saturated large surfaces (0.41–0.54). Hot Desking's frame is identical to its docs shot (105.8 / 0.288); Open Plan looks as before.
+
+Left for later:
+
+- **The critic did not re-score round 3.** Not checked on a real GPU (SwiftShader only).
+- **The meeting tables sit in full sun**, so their tops (luminance 128–134) are brighter than the bug queue and the ship. They share one counter model with the office counters and the model gets no position; giving them their own top needs the room to tell the counter which room it's in.
+- **Heat is in the grade, not in motion:** there is no visible heat shimmer in a still frame.
+- **Prod is about 1.7 high on the terrace**, the one exception to "nothing taller than 0.6 in front"; it hides nothing.
+- **Small cameos:** Mom's wagon (about 7 px), the loft's letters (about 18 px), the heritage cone, the fan the facilities person carries, and the lobby rug (mostly behind the visitor) are hard to find; the blind slats are faint at this camera angle.
+- **The city on the right** has a few dark, warm brick blocks.
