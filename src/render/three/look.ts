@@ -147,8 +147,8 @@ export const FLOOR_COLORS: Readonly<Record<FloorTheme, readonly [number, number]
   mixedFloors: [0x828a80, 0x747b72],
   // Worn office carpet tiles on the hot-desk floor; the second is the tiles laid the other way.
   threeFloors: [0x71879a, 0x667c8f],
-  // An HQ floor's new carpet; the second is the tiles laid the other way. (The Room track tunes it.)
-  towerFloors: [0x6f7f92, 0x68788b],
+  // An HQ floor's new deep slate broadloom; the second is a run from another dye lot.
+  towerFloors: [0x606c80, 0x5c687b],
 };
 
 /** Wall colors per theme: face and top. Caps stay darker than stations, so the eye goes to the stations. */
@@ -174,8 +174,8 @@ export const WALL_COLORS: Readonly<Record<WallTheme, { face: number; top: number
   lowerFloors: { face: 0xc0c3bd, top: 0x868d93 },
   // The same building's partitions, higher up and lived in, capped with cool concrete coping (3-1's lip).
   upperFloors: { face: 0xc9ccce, top: 0x9a9d9a },
-  // YOTTA Tower's glass offices on a white plinth, capped with a slim brushed head track. (The Room track tunes it.)
-  tower: { face: 0xd0d3d6, top: 0x8a9198 },
+  // YOTTA Tower's glass partitions on a pale plinth, capped with a slim brushed head track over cool glass grey.
+  tower: { face: 0xd3d6d8, top: 0x737c85 },
 };
 
 /** Marks the room's warm lamps, which only `medium` and `high` quality light (see `Stage`). */
