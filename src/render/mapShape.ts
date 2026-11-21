@@ -93,6 +93,8 @@ export const WALL_DECOS: Readonly<Record<WallTheme, readonly string[]>> = {
   lowerFloors: ['whiteboard', 'officeClock', 'fireExit'],
   // Hot Desking's floors hang their own pieces (see `rooms/upperFloorsRoom.ts`); this is the fallback.
   upperFloors: ['whiteboard', 'officeClock', 'fireExit'],
+  // YOTTA Tower hangs its own pieces (see `rooms/towerRoom.ts`); this is the fallback.
+  tower: ['whiteboard', 'officeClock', 'dashboard'],
 };
 /** No two decorations this close along a wall are the same. */
 export const WALL_DECO_SPREAD = 4;

@@ -11,7 +11,9 @@ import type { BlockTile } from '../sim/level';
  * of a mid-rise office building: plasterboard and glass partitions (Middle
  * Management), `lowerFloors` the same building's ground and first floor
  * mid-move-in, with a lift, a stairwell and a loading bay (Hypergrowth), `upperFloors` three
- * floors of it shown as a cutaway round one lift, full of lockers (Hot Desking). A theme's room dressing, if it has one, is
+ * floors of it shown as a cutaway round one lift, full of lockers (Hot Desking), `tower` a high
+ * floor of YOTTA Tower, the HQ: glass offices and meeting rooms off a corridor in a
+ * heatwave (Back to Back). A theme's room dressing, if it has one, is
  * in `src/render/three/rooms/`.
  */
 export const WALL_THEMES = [
@@ -27,6 +29,7 @@ export const WALL_THEMES = [
   'midRise',
   'lowerFloors',
   'upperFloors',
+  'tower',
 ] as const;
 export type WallTheme = (typeof WALL_THEMES)[number];
 
@@ -38,7 +41,9 @@ export type WallTheme = (typeof WALL_THEMES)[number];
  * anti-static raised-floor tiles, `corporateCarpet` a rented office floor's
  * new two-tone carpet tiles, `mixedFloors` a rubber ground floor, carpet
  * upstairs and concrete stair treads between them, `threeFloors` worn carpet on
- * the hot-desk floor, vinyl in the test lab and carpet in the meeting room.
+ * the hot-desk floor, vinyl in the test lab and carpet in the meeting room,
+ * `towerFloors` an HQ floor's new carpet in the offices and meeting rooms and a
+ * hard corridor between them.
  */
 export const FLOOR_THEMES = [
   'concrete',
@@ -53,6 +58,7 @@ export const FLOOR_THEMES = [
   'corporateCarpet',
   'mixedFloors',
   'threeFloors',
+  'towerFloors',
 ] as const;
 export type FloorTheme = (typeof FLOOR_THEMES)[number];
 
@@ -90,7 +96,8 @@ export const LEVEL_LOOKS: Readonly<Record<string, MapLook>> = {
   // Hot Desking: three floors of the same building as a cutaway round one lift, Friday afternoon.
   'hot-desking': { walls: 'upperFloors', floor: 'threeFloors', scene: 'hot-desking' },
   // Enterprise: carpet and glass as far as the eye can see.
-  'back-to-back': { walls: 'glass', floor: 'carpet' },
+  // Back to Back: a high floor of YOTTA Tower in a summer heatwave, meeting rooms named after where they came from.
+  'back-to-back': { walls: 'tower', floor: 'towerFloors', scene: 'back-to-back' },
   synergy: { walls: 'plaster', floor: 'concrete' },
   'the-reorg': { walls: 'glass', floor: 'carpet' },
   // Big Tech: a bright campus, wood and glass.

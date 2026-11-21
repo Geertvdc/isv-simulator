@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import backToBackDraft from '../../maps/level-10-back-to-back.txt?raw';
 import { TICKS_PER_SECOND } from './balance';
 import { botInput, createBot } from './bot';
-import { meetingRoomName } from './content';
+import { inviteRoomText, meetingRoomName } from './content';
 import { parseLevelMap } from './level';
 import { BACK_TO_BACK, type MeetingSchedule, levelWithMap } from './levels';
 import { inMeetingRoom, meetingDoors, meetingRooms, roomName, shutDoors } from './meetings';
@@ -47,8 +47,12 @@ describe('named meeting rooms', () => {
   });
 
   it('names rooms per level', () => {
-    expect(meetingRoomName('back-to-back', 0)).toBe('Fishbowl');
-    expect(meetingRoomName('back-to-back', 1)).toBe('Aquarium');
+    expect(meetingRoomName('back-to-back', 0)).toBe('The Garage');
+    expect(meetingRoomName('back-to-back', 1)).toBe('Mom');
+    expect(inviteRoomText('back-to-back', 0)).toBe('The Garage');
+    expect(inviteRoomText('back-to-back', 1)).toBe('Mom');
+    expect(inviteRoomText('synergy', 0)).toBe('the Boardroom');
+    expect(inviteRoomText('garage', 0)).toBe('the meeting room');
     expect(meetingRoomName('garage', 0)).toBe('Meeting room');
     expect(roomName(game(), 0)).toBe('Meeting room');
   });
@@ -118,7 +122,7 @@ describe('meeting doors', () => {
 });
 
 describe('Back to Back draft', () => {
-  it('has the Fishbowl and the Aquarium, each with two doors, and bots attend and ship', () => {
+  it('has The Garage and Mom, each with two doors, and bots attend and ship', () => {
     const map = parseLevelMap(backToBackDraft);
     expect(meetingRooms(map)).toHaveLength(2);
     const state = createGame({ ...BACK_TO_BACK, map }, 3, [1, 2, 3, 4]);

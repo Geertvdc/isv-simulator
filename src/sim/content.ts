@@ -227,9 +227,13 @@ export const NO_WEBGL_TEXT =
 /** Over a meeting room. */
 export const MEETING_ROOM_TEXT = 'Meeting room';
 
-/** Meeting room names per level, rooms in reading order (`meetingRooms`). */
+/**
+ * Meeting room names per level, rooms in reading order (`meetingRooms`). At
+ * HQ the rooms are named after where YOTTA came from: the glass room between
+ * the offices is "The Garage", the bay off the corridor is "Mom".
+ */
 const MEETING_ROOM_NAMES: Readonly<Record<string, readonly string[]>> = {
-  'back-to-back': ['Fishbowl', 'Aquarium'],
+  'back-to-back': ['The Garage', 'Mom'],
   synergy: ['Boardroom'],
   'the-reorg': ['Boardroom'],
   'middle-management': ['Huddle room'],
@@ -241,10 +245,14 @@ export function meetingRoomName(levelId: string, room: number): string {
   return MEETING_ROOM_NAMES[levelId]?.[room] ?? MEETING_ROOM_TEXT;
 }
 
-/** How the invite card names the room: "the Fishbowl", or "the meeting room". */
+/** Room names that read as proper names on an invite: no "the" in front ("to Mom!"). */
+const PROPER_ROOM_NAMES: ReadonlySet<string> = new Set(['Mom']);
+
+/** How the invite card names the room: "the Boardroom", "The Garage", "Mom", or "the meeting room". */
 export function inviteRoomText(levelId: string, room: number): string {
   const name = MEETING_ROOM_NAMES[levelId]?.[room];
-  return name ? `the ${name}` : 'the meeting room';
+  if (!name) return 'the meeting room';
+  return name.startsWith('The ') || PROPER_ROOM_NAMES.has(name) ? name : `the ${name}`;
 }
 /** On a player's invite card in the HUD. */
 export function inviteText(playerNumber: number, room = 'the meeting room'): string {
