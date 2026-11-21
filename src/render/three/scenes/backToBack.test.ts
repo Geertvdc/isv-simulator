@@ -104,8 +104,8 @@ describe('backToBackScene', () => {
     for (const p of scene.pieces) {
       const onTerrace =
         p.at.x > plan.terrace.x0 && p.at.x < plan.terrace.x1 && p.at.z > plan.terrace.z0;
-      // Prod is the one tall thing out there, in the corner by Mom's glass, clear of the stations;
-      // the pigeon perches on the rail.
+      // Prod (about 1.7 high) is the one documented exception to the 0.6 rule: it stands in the
+      // corner by Mom's glass and hides no station. The pigeon perches on the rail.
       if (p.piece === bb.prodTree || p.piece === pigeon) continue;
       for (const v of worldPoints(p)) {
         const inFront = v.z > front && v.x > -0.5 && v.x < map.width - 0.5;
@@ -237,6 +237,28 @@ describe('backToBackScene', () => {
     for (const g of scene.ground) {
       expect(scene.painters?.[g.kind], g.kind).toBeDefined();
       expect(g.y).toBe(scene.horizonY);
+    }
+  });
+
+  it('keeps the cars far below tiny, so the city reads a long way down', () => {
+    const cars = [...find(bb.tinyCar), ...find(bb.tinyWagon)];
+    expect(cars.length).toBeGreaterThan(5);
+    for (const car of find(bb.tinyCar)) {
+      const shown = screen(car).filter((s) => s.x > 0 && s.x < 1440 && s.y > 0 && s.y < 810);
+      if (shown.length === 0) continue;
+      const w = Math.max(...shown.map((s) => s.x)) - Math.min(...shown.map((s) => s.x));
+      const h = Math.max(...shown.map((s) => s.y)) - Math.min(...shown.map((s) => s.y));
+      expect(Math.max(w, h)).toBeLessThanOrEqual(10);
+    }
+  });
+
+  it("shows MONOLITH's roof and beacon at the top of the frame, clear of the mute button", () => {
+    const beacon = find(bb.beacon)[0];
+    if (!beacon) throw new Error('no beacon');
+    for (const s of screen(beacon)) {
+      expect(s.y).toBeGreaterThan(5);
+      expect(s.y).toBeLessThan(60);
+      expect(s.x).toBeLessThan(1370);
     }
   });
 

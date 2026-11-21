@@ -15,10 +15,13 @@ import {
   featureWall,
   floorGrille,
   FLOOR,
+  foldedParasol,
   glassRail,
   grassTrough,
   gravelBed,
   heatShimmer,
+  hoseReel,
+  hoseRun,
   lanyard,
   LIFT,
   liftDigits,
@@ -35,6 +38,7 @@ import {
   riverBoat,
   riverBridge,
   rollerCase,
+  runner,
   sprawledCat,
   steelLogo,
   stoneFloor,
@@ -93,15 +97,26 @@ import {
 /** The street far below, in its haze. */
 const HORIZON = 0x9a9890;
 /** How far down the city lies (under the slab's foot). */
-const DEEP = -7;
-/** The lift lobby: its depth behind the back wall line, the niche's, its wall's height. */
+const DEEP = -9;
+/**
+ * The city's scale: blocks, streets, trees and cars are built this much
+ * smaller than life, so with the drop they read as far, far below.
+ */
+const CITY = 0.6;
 /** The plaza round the tower's foot, out to the right (the visitor bays at its edge). */
-const PLAZA_R = 4.0;
+const PLAZA_R = 2.6;
+/** The lift lobby: its depth behind the back wall line, its wall's height, how far it runs past the notch. */
 const LOBBY = { back: 2.2, wall: 1.75, left: 1.0, right: 3.4 } as const;
-/** MONOLITH's tower: width, depth and its top (over the ground the slab stands on). */
-const MONO = { w: 3.9, d: 2.4, top: -0.35, front: -7 } as const;
+/** How deep the core's stone returns come forward at the lobby wall's ends. */
+const CORE_RETURN = 0.4;
+/** MONOLITH's tower: width, depth, its top (over the ground the slab stands on) and its front. */
+const MONO = { w: 3.9, d: 2.4, top: -1.35, front: -5.85 } as const;
 /** The river behind the tower, along x: its near and far banks. */
-const RIVER = { near: -3.6, far: -6.3 } as const;
+const RIVER = { near: -3.4, far: -5.0 } as const;
+/** How far the scene's people fade toward grey: well past the default, so none reads as a player. */
+const PERSON_GREY = 0.6;
+/** Cars far below are smaller again than the city's scale (a car is short next to a block). */
+const CAR = 0.5;
 /** The screen the scene is composed for. */
 const VIEW = { width: 1440, height: 810 };
 /** Screen rectangles the HUD covers at 1440×810: story props stay out of them. */
@@ -332,7 +347,8 @@ export function backToBackScene(map: LevelMap): Scene {
       ground.push({ kind, x0, x1, z0, z1, ...(y !== 0 ? { y } : {}) });
   };
   const person = (x: number, z: number, yaw: number, pose: ScenePerson['pose'], lift = FLOOR) =>
-    people.push({ at: gridToWorld(x, z, GROUND + lift), yaw, pose });
+    people.push({ at: gridToWorld(x, z, GROUND + lift), yaw, pose, grey: PERSON_GREY });
+  const c = CITY;
 
   // Where the frame's edges fall far below, a little past them.
   const topZ = -26;
@@ -343,72 +359,87 @@ export function backToBackScene(map: LevelMap): Scene {
   // ---- The city far below: the ground ----
   {
     // Round the tower's foot, its plaza, with the streets either side and in front.
-    const plazaL = L - 2.4;
+    const plazaL = L - 1.5;
     const plazaR = R + PLAZA_R;
-    patch('plaza', plazaL, plazaR, RIVER.near + 0.3, F + 2.2);
-    patch('street:z', plazaL - 1.0, plazaL, RIVER.near + 0.3, F + 30);
-    patch('street:z', plazaR, plazaR + 1.0, RIVER.near + 0.3, F + 30);
-    patch('street:x', edgeL - 4, edgeR + 4, F + 2.2, F + 3.2);
+    const q = 0.3 * c;
+    const st = 1.0 * c;
+    patch('plaza', plazaL, plazaR, RIVER.near + q, F + 1.4);
+    patch('street:z', plazaL - st, plazaL, RIVER.near + q, F + 30);
+    patch('street:z', plazaR, plazaR + st, RIVER.near + q, F + 30);
+    patch('street:x', edgeL - 4, edgeR + 4, F + 1.4, F + 1.4 + st);
     // The near bank's quay, the river, the far quay.
-    patch('quay', edgeL - 4, edgeR + 4, RIVER.near, RIVER.near + 0.3);
+    patch('quay', edgeL - 4, edgeR + 4, RIVER.near, RIVER.near + q);
     patch('river', edgeL - 4, edgeR + 4, RIVER.far, RIVER.near);
-    patch('quay', edgeL - 4, edgeR + 4, RIVER.far - 0.3, RIVER.far);
-    patch('street:x', edgeL - 4, edgeR + 4, RIVER.far - 1.2, RIVER.far - 0.3);
+    patch('quay', edgeL - 4, edgeR + 4, RIVER.far - q, RIVER.far);
+    patch('street:x', edgeL - 4, edgeR + 4, RIVER.far - q - st, RIVER.far - q);
     // Out past the streets beside the tower: more city, blocks on a street grid.
-    patch('city', edgeL - 4, plazaL - 1.0, RIVER.near + 0.3, F + 30);
-    patch('city', plazaR + 1.0, edgeR + 4, RIVER.near + 0.3, F + 30);
-    patch('city', edgeL - 4, edgeR + 4, topZ - 20, RIVER.far - 1.2);
-    patch('city', edgeL - 4, edgeR + 4, F + 3.2, F + 30);
+    patch('city', edgeL - 4, plazaL - st, RIVER.near + q, F + 30);
+    patch('city', plazaR + st, edgeR + 4, RIVER.near + q, F + 30);
+    patch('city', edgeL - 4, edgeR + 4, topZ - 20, RIVER.far - q - st);
+    patch('city', edgeL - 4, edgeR + 4, F + 1.4 + st, F + 30);
     // The visitor bays at the tower's foot, on the plaza's right.
-    patch('bays', R + PLAZA_R - 1.1, R + PLAZA_R - 0.1, 0.3, 7.5);
+    patch('bays', plazaR - 0.7, plazaR - 0.08, 0.3, 7.5);
   }
 
   // ---- The far bank: blocks behind the river, glass offices, parks, the old loft ----
   const monoX = Math.min(xAt(1345, MONO.front, MONO.top) - MONO.w / 2, R + 3.2);
-  // The old seed-round loft, its letters still lit: right of the lobby, under the sky.
-  const loftZ = RIVER.far - 4.0;
-  const loftX = (xAt(1010, loftZ, DEEP + 2) + xAt(1100, loftZ, DEEP + 2)) / 2;
+  // The old seed-round loft, its letters still lit: right of the lobby, small and far off in
+  // the haze, under the sky.
+  const LOFT = 0.5;
+  const loftZ = RIVER.far - 9.0;
+  const loftX = (xAt(1030, loftZ, DEEP + 1) + xAt(1090, loftZ, DEEP + 1)) / 2;
   {
     const lh = 1.5;
-    put(oldLoft(1.5, 1.4, lh), loftX, loftZ + 0.05, 0, 0, 'far', DEEP);
-    put(loftLetters(0.045), loftX, loftZ - 0.07, 0, 0, 'far', DEEP + lh + 0.07);
+    put(oldLoft(1.5, 1.4, lh), loftX, loftZ + 0.05 * LOFT, 0, 0, 'far', DEEP, LOFT);
+    put(
+      loftLetters(0.045),
+      loftX,
+      loftZ - 0.07 * LOFT,
+      0,
+      0,
+      'far',
+      DEEP + (lh + 0.07) * LOFT,
+      LOFT,
+    );
     hot();
   }
   {
     let k = 0;
-    const z0 = RIVER.far - 1.4;
+    const z0 = RIVER.far - 1.4 * c;
     for (let z = z0, j = 0; z > topZ; j++) {
       const bd = 2.0 + unit(j, 1, 11) * 1.4;
       for (let x = edgeL - 3, i = 0; x < edgeR + 3; i++) {
         const bw = 1.6 + unit(i, j, 13) * 1.6;
-        const cx = x + bw / 2;
+        const cx = x + (bw * c) / 2;
         // Leave MONOLITH's plot and the loft's.
-        const inMono = j === 0 && cx > monoX - MONO.w / 2 - 1.2 && cx < monoX + MONO.w / 2 + 1.2;
-        const inLoft = Math.abs(cx - loftX) < bw / 2 + 1.0 && z > loftZ - 0.5 && z - bd < loftZ;
+        const inMono = z > MONO.front - MONO.d - 1 && Math.abs(cx - monoX) < MONO.w / 2 + 0.8;
+        const inLoft =
+          Math.abs(cx - loftX) < (bw * c) / 2 + 0.5 && z > loftZ - 0.6 && z - bd * c < loftZ + 2.0;
         const roll = unit(i, j, 23);
         if (inLoft) {
-          patch('park', x, x + bw, z - bd, z);
+          patch('park', x, x + bw * c, z - bd * c, z);
         } else if (!inMono && roll < 0.14) {
           // A little park: lawn, paths and trees.
-          patch('park', x, x + bw, z - bd, z);
+          patch('park', x, x + bw * c, z - bd * c, z);
           for (let t = 0; t < 4; t++)
             put(
               summerTree,
-              x + 0.3 + unit(i, t, 27) * (bw - 0.6),
-              z - 0.3 - unit(j, t, 29) * (bd - 0.6),
+              x + (0.3 + unit(i, t, 27) * (bw - 0.6)) * c,
+              z - (0.3 + unit(j, t, 29) * (bd - 0.6)) * c,
               0,
               t,
               'far',
               DEEP,
+              c,
             );
         } else if (!inMono) {
           const glass = roll > 0.82;
           const h = (glass ? 1.6 : 0.6) + unit(i, j, 17) * 1.8 + (j > 2 ? unit(i, j, 19) * 1.2 : 0);
-          put(cityRoof(bw, bd, h, k++, glass), cx, z, 0, 0, 'far', DEEP);
+          put(cityRoof(bw, bd, h, k++, glass), cx, z, 0, 0, 'far', DEEP, c);
         }
-        x += bw + 0.5;
+        x += (bw + 0.5) * c;
       }
-      z -= bd + 0.5;
+      z -= (bd + 0.5) * c;
     }
   }
 
@@ -425,7 +456,7 @@ export function backToBackScene(map: LevelMap): Scene {
     // Its plaza on the far bank, a bridge over to it.
     const bx = Math.max(R + 4.2, xAt(1400, RIVER.near, DEEP));
     put(
-      riverBridge(RIVER.near - RIVER.far + 1.4, 1.2, 0.35),
+      riverBridge(RIVER.near - RIVER.far + 1.4 * c, 1.2 * c, 0.35 * c),
       bx,
       (RIVER.near + RIVER.far) / 2,
       0,
@@ -435,65 +466,72 @@ export function backToBackScene(map: LevelMap): Scene {
     );
     put(
       riverBoat,
-      xAt(1250, RIVER.far + 0.9, DEEP) + 0.5,
-      RIVER.far + 0.9,
+      xAt(1250, RIVER.far + 0.55, DEEP) + 0.5,
+      RIVER.far + 0.55,
       Math.PI,
       0,
       'far',
       DEEP,
+      c,
     );
-    put(riverBoat, xAt(40, RIVER.near - 0.8, DEEP), RIVER.near - 0.8, 0, 0, 'far', DEEP);
+    put(riverBoat, xAt(60, RIVER.near - 0.7, DEEP), RIVER.near - 0.7, 0, 0, 'far', DEEP, c);
   }
+
+  // The neighbouring tower on the left: its roof well below this floor, the window cleaners'
+  // gondola parked on its front edge.
+  const nb = { w: 2.6 * c, d: 2.6 * c, top: -3.6, z: 1.6, x: 0 };
+  nb.x = xAt(70, nb.z, nb.top) - nb.w / 2;
+  put(neighbourTower(2.6, 2.6, (nb.top - DEEP) / c), nb.x, nb.z, 0, 0, 'far', DEEP, c);
 
   // ---- Round the tower's foot: the visitor bay with Mom's wagon, trees, cars ----
   {
-    const bx = R + PLAZA_R - 0.6;
-    for (let z = 0.85, k = 0; z < 7.4; z += 0.55, k++) {
-      if (k === 7) put(tinyWagon, bx, z, Math.PI, 0, 'far', DEEP);
-      else if (unit(k, 3, 23) > 0.35) put(tinyCar, bx, z, Math.PI, k, 'far', DEEP);
+    const bx = R + PLAZA_R - 0.4;
+    for (let z = 0.85, k = 0; z < 7.4; z += 0.55 * c, k++) {
+      if (k === 9) put(tinyWagon, bx, z, Math.PI, 0, 'far', DEEP, c * CAR);
+      else if (unit(k, 3, 23) > 0.35) put(tinyCar, bx, z, Math.PI, k, 'far', DEEP, c * CAR);
     }
     for (const side of [-1, 1] as const) {
-      const sx = side < 0 ? L - 2.4 - 0.5 : R + PLAZA_R + 0.5;
-      for (let z = RIVER.near + 1, k = 0; z < F + 12; z += 1.1, k++) {
-        put(summerTree, sx - side * 0.75, z, 0, k, 'far', DEEP);
+      const sx = side < 0 ? L - 1.5 - 0.5 * c : R + PLAZA_R + 0.5 * c;
+      for (let z = RIVER.near + 0.6, k = 0; z < F + 12; z += 1.1 * c, k++) {
+        put(summerTree, sx - side * 0.75 * c, z, 0, k, 'far', DEEP, c);
         if (unit(k, side, 29) > 0.55)
           put(
             tinyCar,
-            sx + (unit(k, side, 31) > 0.5 ? 0.22 : -0.22),
-            z + 0.5,
+            sx + (unit(k, side, 31) > 0.5 ? 0.22 : -0.22) * c,
+            z + 0.5 * c,
             Math.PI / 2,
             k,
             'far',
             DEEP,
+            c * CAR,
           );
       }
     }
     // Along the near quay, a row of trees.
-    for (let x = edgeL, k = 0; x < edgeR; x += 1.3, k++)
-      put(summerTree, x, RIVER.near + 0.55, 0, k, 'far', DEEP);
+    for (let x = edgeL, k = 0; x < edgeR; x += 1.3 * c, k++)
+      put(summerTree, x, RIVER.near + 0.55 * c, 0, k, 'far', DEEP, c);
     // Further out beside the tower, more blocks.
     for (const side of [-1, 1] as const) {
       let k = 40 + (side + 1) * 20;
-      const x0 = side < 0 ? L - 3.4 - 0.4 : R + PLAZA_R + 1.4;
-      for (let z = RIVER.near + 0.6, j = 0; z < F + 8; j++) {
+      const x0 = side < 0 ? L - 1.5 - 1.4 * c : R + PLAZA_R + 1.4 * c;
+      for (let z = RIVER.near + 0.6 * c, j = 0; z < F + 8; j++) {
         const bd = 2.0 + unit(j, side, 37) * 1.2;
         for (let x = x0, i = 0; side < 0 ? x > edgeL - 3 : x < edgeR + 3; i++) {
           const bw = 1.8 + unit(i, j * side, 41) * 1.2;
           const h = 0.8 + unit(i, j * side, 43) * 2.2;
-          put(cityRoof(bw, bd, h, k++), x + (side * bw) / 2, z + bd, 0, 0, 'far', DEEP);
-          x += side * (bw + 0.5);
+          const cx = x + (side * bw * c) / 2;
+          // Leave the neighbouring tower's plot.
+          const inNb =
+            Math.abs(cx - nb.x) < (bw * c + nb.w) / 2 + 0.2 &&
+            z < nb.z + 0.2 &&
+            z + bd * c > nb.z - nb.d - 0.2;
+          if (!inNb) put(cityRoof(bw, bd, h, k), cx, z + bd * c, 0, 0, 'far', DEEP, c);
+          k++;
+          x += side * (bw + 0.5) * c;
         }
-        z += bd + 0.5;
+        z += (bd + 0.5) * c;
       }
     }
-  }
-
-  // ---- The neighbouring tower's top on the left, the window cleaners' gondola on its roof ----
-  {
-    const nz = 0.8;
-    const top = -2.2;
-    const nx = xAt(40, nz, top) - 1.2;
-    put(neighbourTower(2.6, 2.6, top - DEEP), nx, nz, 0, 0, 'far', DEEP);
   }
 
   // ---- The tower's own curtain wall dropping away under the front ----
@@ -522,23 +560,26 @@ export function backToBackScene(map: LevelMap): Scene {
       0,
       'far',
     );
-    // The dark stone feature wall right across the back.
-    put(featureWall(lx1 - lx0, LOBBY.wall), (lx0 + lx1) / 2, zBack, 0, 0, 'far', FLOOR);
     // YOTTA in steel, lit from below, between the niche and the lifts.
     const px = 0.12;
-    const liftX = lx1 - 0.6 - LIFT.w / 2;
+    const liftX = lx1 - 0.6 - CORE_RETURN / 2 - LIFT.w / 2;
     const gap = LIFT.w + 0.3;
     const logoMid = (split + liftX - gap - LIFT.w / 2 - 0.2) / 2;
-    put(steelLogo('YOTTA', px), logoMid - px * 1.75, zBack + 0.01, 0, 0, 'near', FLOOR + 0.5);
+    const washW = textWidth('YOTTA') * px + 0.5;
+    // The core: the dark stone feature wall right across the back, its returns and soffit, the
+    // uplights' warm wash up the stone under the letters.
+    const wallX = (lx0 + lx1) / 2;
     put(
-      uplights(textWidth('YOTTA') * px + 0.5),
-      logoMid + px * 2.25,
-      zBack + 0.08,
+      featureWall(lx1 - lx0, LOBBY.wall, CORE_RETURN, { x: logoMid + px * 2.25 - wallX, w: washW }),
+      wallX,
+      zBack,
       0,
       0,
-      'near',
+      'far',
       FLOOR,
     );
+    put(steelLogo('YOTTA', px), logoMid - px * 1.75, zBack + 0.01, 0, 0, 'near', FLOOR + 0.5);
+    put(uplights(washW), logoMid + px * 2.25, zBack + 0.08, 0, 0, 'near', FLOOR);
     hot();
     // Two lifts at floor 38, a visitor waiting at the first with her case.
     for (const k of [0, 1]) {
@@ -565,7 +606,20 @@ export function backToBackScene(map: LevelMap): Scene {
     const fx = Math.max(notch.x0 + 1.5, split + 0.25);
     const fz = backLine - 0.85;
     person(fx, fz, Math.PI / 2 - 0.2, 'carrying');
-    put(carriedFan, fx + CARRY.reach, fz - 0.06, 0.4, 0, 'near', FLOOR + CARRY.lift, 1.3);
+    // The runner from the lifts toward the bench, in front of the grille.
+    const rx0 = notch.x0 + 0.5;
+    const rx1 = liftX + LIFT.w / 2;
+    put(runner(rx1 - rx0, 0.62), (rx0 + rx1) / 2, zBack + 1.78, 0, 0, 'far', FLOOR);
+    const fyaw = Math.PI / 2 - 0.2;
+    put(
+      carriedFan,
+      fx + Math.sin(fyaw) * CARRY.reach,
+      fz + Math.cos(fyaw) * CARRY.reach,
+      0.5,
+      0,
+      'near',
+      FLOOR + CARRY.lift,
+    );
     // A bench on the left; on the right a floor grille breathing cold air, and Segfault flat out
     // on the coolest stone beside it.
     putClear(lobbyBench(1.0), notch.x0 + 0.9, zBack + 0.75, 0.5, 0.3, 0, 0, FLOOR, 1, 0.21);
@@ -615,7 +669,16 @@ export function backToBackScene(map: LevelMap): Scene {
     putClear(bistroSet, seatX0 + 0.75, cz + 0.05, 0.45, 0.45, 0.2, 0, FLOOR);
     putClear(bistroSet, seatX0 + 2.05, cz + 0.75, 0.45, 0.45, -0.3, 1, FLOOR);
     // The thermometer at the deck's end by the hatch, the CLOSED board out front.
-    putClear(thermometer, seatX1 - 0.4, t.z0 + 0.75, 0.3, 0.6, 0, 0, FLOOR);
+    putClear(thermometer, seatX1 - 0.4, t.z0 + 0.75, 0.2, 0.55, 0, 0, FLOOR);
+    // Past the deck's left end, the parasol taken down and laid on the pavers beside its base,
+    // where it clears the player legend.
+    for (const z of [t.z0 + 0.4, t.z0 + 0.7])
+      if (putClear(foldedParasol, (t.x0 + seatX0) / 2 + 0.15, z, 0.9, 0.18, 0.08, 0, FLOOR, 1, 0.5))
+        break;
+    // Along the rail in front of the deck, the hose off its reel, run out to the condensers.
+    const hoseZ = t.z1 - 0.3;
+    if (putClear(hoseReel, seatX0 + 0.3, hoseZ, 0.22, 0.4, -0.15, 0, FLOOR, 1, 0.16))
+      put(hoseRun(seatX1 - seatX0 - 0.1), seatX0 + 0.5, hoseZ + 0.02, 0, 0, 'near', FLOOR);
     putClear(closedBoard, seatX1 - 0.55, t.z1 - 0.75, 0.32, 0.55, -0.1, 0, FLOOR);
     // The condensers on their gravel bed, right across in front of the hatch: the reason the AC
     // can't keep up.
@@ -703,7 +766,7 @@ function flags(b: Builder, g: GroundPatch, top: number, base: number, s: number,
 
 /** The plaza round the tower's foot: big pale flags. */
 const plaza: GroundPainter = (b, g, salt) => {
-  flags(b, g, 0.02, 0xc8c2b6, 1.0, salt + 5);
+  flags(b, g, 0.02, 0xc8c2b6, 1.0 * CITY, salt + 5);
 };
 
 /** A street along x or z: sun-bleached asphalt, a dashed centre line. */
@@ -711,10 +774,11 @@ function street(along: 'x' | 'z'): GroundPainter {
   return (b, g) => {
     fill(b, g, 0.006, 0x6a6c6e);
     const len = along === 'x' ? g.x1 - g.x0 : g.z1 - g.z0;
-    for (let u = 0.2; u < len; u += 0.6) {
+    for (let u = 0.12; u < len; u += 0.6 * CITY) {
       const at: [number, number, number] =
         along === 'x' ? [g.x0 + u, 0.01, (g.z0 + g.z1) / 2] : [(g.x0 + g.x1) / 2, 0.01, g.z0 + u];
-      b.box(along === 'x' ? 0.3 : 0.03, 0.002, along === 'x' ? 0.03 : 0.3, 0xd8d4c8, { at }, 0);
+      const dash = 0.3 * CITY;
+      b.box(along === 'x' ? dash : 0.02, 0.002, along === 'x' ? 0.02 : dash, 0xd8d4c8, { at }, 0);
     }
   };
 }
@@ -722,8 +786,9 @@ function street(along: 'x' | 'z'): GroundPainter {
 /** The city past the streets: a grid of pale pavements and asphalt, under the blocks. */
 const city: GroundPainter = (b, g) => {
   fill(b, g, 0.004, 0x7a7a78);
-  for (let x = Math.ceil(g.x0 / 2.4) * 2.4; x < g.x1; x += 2.4)
-    b.box(0.36, 0.003, g.z1 - g.z0, 0xa8a49a, { at: [x, 0.008, (g.z0 + g.z1) / 2] }, 0);
+  const grid = 2.4 * CITY;
+  for (let x = Math.ceil(g.x0 / grid) * grid; x < g.x1; x += grid)
+    b.box(0.36 * CITY, 0.003, g.z1 - g.z0, 0xa8a49a, { at: [x, 0.008, (g.z0 + g.z1) / 2] }, 0);
 };
 
 /** The river: deep green-blue with paler ripples running along it. */
@@ -734,9 +799,9 @@ const river: GroundPainter = (b, g, salt) => {
   const count = Math.min(220, Math.floor(w * d * 1.2));
   for (let k = 0; k < count; k++)
     b.box(
-      0.3 + shade(k, 3, salt) * 0.5,
+      (0.3 + shade(k, 3, salt) * 0.5) * CITY,
       0.002,
-      0.03,
+      0.02,
       0x7a9aa2,
       {
         at: [g.x0 + shade(k, 5, salt) * w, 0.006, g.z0 + 0.1 + shade(k, 7, salt) * (d - 0.2)],
@@ -754,8 +819,8 @@ const quay: GroundPainter = (b, g) => {
 /** The visitor bays: asphalt with white bay lines along z, a VISITOR bay in violet. */
 const bays: GroundPainter = (b, g) => {
   fill(b, g, 0.008, 0x5e6062);
-  for (let z = g.z0 + 0.3; z < g.z1; z += 0.55)
-    b.box(0.6, 0.002, 0.025, 0xe8e4d8, { at: [(g.x0 + g.x1) / 2 - 0.2, 0.012, z] }, 0);
+  for (let z = g.z0 + 0.39; z < g.z1; z += 0.55 * CITY)
+    b.box(0.4, 0.002, 0.018, 0xe8e4d8, { at: [(g.x0 + g.x1) / 2 - 0.1, 0.012, z] }, 0);
 };
 
 /** A city park: dry summer lawn, a pale path across it. */
@@ -764,7 +829,7 @@ const park: GroundPainter = (b, g) => {
   b.box(
     g.x1 - g.x0,
     0.003,
-    0.12,
+    0.07,
     0xd8d0bc,
     { at: [(g.x0 + g.x1) / 2, 0.016, (g.z0 + g.z1) / 2] },
     0,
