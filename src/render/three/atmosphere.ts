@@ -198,6 +198,12 @@ export interface Atmosphere {
      * Nothing along a hallway behind a meeting room's front wall.
      */
     meetingRooms?: boolean;
+    /**
+     * With `meetingRooms`, look for each column's first floor tile from this
+     * row down instead of from row 1: the back of a hall behind an interior
+     * wall line (a corridor along the back wall gets no lamps).
+     */
+    fromRow?: number;
     /** Colors cycled along the lamps (`lampSpots` order) instead of `color`: a stage's gelled par cans. */
     colors?: number[];
     /**
@@ -406,11 +412,13 @@ export interface Atmosphere {
  * room (negative: out of it) and `shift` along x (`inbox`); over the middle
  * of the pager board's wall tile (`pagerTile`), pulled `out` the same way
  * (`pager`); `out` grid units outside the outline's left or right edge,
- * a share `along` of its depth from the back (`left`, `right`); over the
+ * a share `along` of its depth from the back (`left`, `right`); `out` grid
+ * units behind the outline's back edge, a share `along` of its width from
+ * the left (`back`: a room behind the back wall, say); over the
  * middle of the interior walls (`core`, none without them); or in each
  * light well (`wells`, see `lightWellSpots`).
  */
-export type AccentAnchor = 'inbox' | 'pager' | 'left' | 'right' | 'core' | 'wells';
+export type AccentAnchor = 'inbox' | 'pager' | 'left' | 'right' | 'back' | 'core' | 'wells';
 
 export interface Accent {
   anchor: AccentAnchor;
@@ -1069,6 +1077,108 @@ const HEATWAVE_MORNING: Atmosphere = {
   },
 };
 
+/**
+ * A hot summer afternoon a few floors above 4-1, in the same tower: the sun
+ * lower and warmer (about 40° up) from the front right, the west, so the
+ * walls' shadows fall back and left, onto the corridor behind the hall and
+ * never over its back row; warm late light raking across the carpet against
+ * cool blue shadows; a warm cream sky, no longer bleached white; the city
+ * far below golden, the haze pushed back so it keeps its contrast. Slim
+ * pendants along the back of the dev and ops sides (behind the hall's wall
+ * line, not along the corridor) and one at the back of the boardroom, with
+ * a soft pool on its table; a little light on the ops stations, which face
+ * away from the sun. No motes: nothing in the air that could read as snow.
+ */
+const SUMMER_AFTERNOON: Atmosphere = {
+  sun: {
+    // Late gold, warmer than 4-1's pale straw, never orange.
+    color: 0xffd6a0,
+    intensity: 3.6,
+    // About 40° up, from the right and in front: hypot(5, 3.5) × tan 40° ≈ 5.1.
+    from: { x: 5, y: 3.5, height: 5.1, perMapSize: false },
+    reach: 0.95,
+    softness: 3,
+  },
+  // The boardroom's own light: a soft pool on the long table.
+  pools: {
+    color: 0xfff0dc,
+    intensity: [1],
+    height: 7,
+    forward: 1.5,
+    depth: 0,
+    radius: 2.4,
+    meetings: true,
+  },
+  sky: { sky: 0xd4e0f0, ground: 0xc8b496, intensity: 0.85 },
+  // Low hides the pendants and the station fill: the sky makes up for them there.
+  lowSky: 0.92,
+  // The shadows stay cool: a slightly blue fill from the camera side.
+  fill: { color: 0xc8d8f4, intensity: 0.6 },
+  environment: 0.16,
+  backdrop: { inner: 0xfbeed8, outer: 0xb8c6d8 },
+  // Golden haze over the city far below, late enough that the roofs keep their contrast.
+  fog: { color: 0xf2dcb8, start: 10, span: 38 },
+  vignette: {
+    color: 0x34364a,
+    opacity: 0.35,
+    inner: 0.7,
+    saturate: 1.2,
+    contrast: 1.08,
+    exposure: 1.21,
+    glows: [
+      // The warm sky behind the city, under the order cards.
+      { color: 0xffdcae, opacity: 0.2, x: 0.5, y: 0, reach: 0.55 },
+      // The low west sun off the right edge, under the mute button.
+      { color: 0xffcf96, opacity: 0.2, x: 1, y: 0.45, reach: 0.3 },
+    ],
+  },
+  lamps: {
+    color: 0xfff0dc,
+    intensity: 6,
+    distance: 3.4,
+    height: 2.1,
+    spacing: 3,
+    inset: 0.45,
+    // Back walls only: a pendant by the front wall would hang over the players' heads on screen.
+    frontFrom: 99,
+    meetingRooms: true,
+    // The dev and ops sides start under the hall's back wall line (row 3), behind it is the corridor.
+    fromRow: 4,
+  },
+  // The test benches and pipelines stand on the west wall, their fronts turned from the sun.
+  stationFill: {
+    color: 0xfff0dc,
+    intensity: 5,
+    distance: 2.6,
+    height: 1.3,
+    forward: 0.85,
+    kinds: ['testBench', 'pipeline'],
+  },
+  // The executive reception behind the back glass: cool, expensive downlight on the stone.
+  accents: [
+    {
+      anchor: 'back',
+      color: 0xb4c8ff,
+      intensity: 26,
+      distance: 7,
+      height: 2.4,
+      out: 1.6,
+      along: 0.4,
+    },
+    {
+      anchor: 'back',
+      color: 0xb4c8ff,
+      intensity: 26,
+      distance: 7,
+      height: 2.4,
+      out: 1.6,
+      along: 0.68,
+    },
+  ],
+  // The usual violet, a touch lighter than 4-1's: on the good carpet's deep charcoal it glows.
+  rug: { color: 0xa496d0, opacity: 0.4, invited: 0.62 },
+};
+
 /** Presets per `MapLook.scene` id. */
 export const ATMOSPHERES: Readonly<Record<string, Atmosphere>> = {
   garage: GOLDEN_HOUR,
@@ -1081,6 +1191,7 @@ export const ATMOSPHERES: Readonly<Record<string, Atmosphere>> = {
   hypergrowth: SPRING_RAIN,
   'hot-desking': FRIDAY_AFTERNOON,
   'back-to-back': HEATWAVE_MORNING,
+  synergy: SUMMER_AFTERNOON,
 };
 
 /** The light and air for a scene id; the default for none or an unknown one. */
@@ -1281,7 +1392,7 @@ export function lampSpots(
   const lamps = atmosphere.lamps;
   if (!lamps) return [];
   if (lamps.meetingRooms) {
-    const rows = floorRows(map, true).flatMap(({ inside, x0, x1 }) => {
+    const rows = floorRows(map, true, lamps.fromRow).flatMap(({ inside, x0, x1 }) => {
       const length = x1 - x0 + 1;
       const count = Math.max(1, Math.round(length / lamps.spacing));
       const y = inside - 0.5 + lamps.inset;
@@ -1372,17 +1483,19 @@ function backRows(
 function floorRows(
   map: Pick<LevelMap, 'width' | 'height'> & Partial<Pick<LevelMap, 'tiles' | 'meetingTiles'>>,
   skipMeetings = false,
+  fromRow = 1,
 ): { inside: number; x0: number; x1: number }[] {
-  if (!map.tiles) return [{ inside: 1, x0: 1, x1: Math.max(1, map.width - 2) }];
+  if (!map.tiles) return [{ inside: fromRow, x0: 1, x1: Math.max(1, map.width - 2) }];
   const full = map as LevelMap;
-  const deepest = Math.floor(map.height * 0.5);
+  const deepest = Math.max(fromRow, Math.floor(map.height * 0.5));
   const meeting = new Set(
     (skipMeetings ? (map.meetingTiles ?? []) : []).map((t) => t.y * map.width + t.x),
   );
   const runs: { inside: number; x0: number; x1: number }[] = [];
   for (let x = 0; x < map.width; x++) {
     let top: number | null = null;
-    for (let y = 1; y <= deepest && top === null; y++) if (getTile(full, x, y) === 'floor') top = y;
+    for (let y = fromRow; y <= deepest && top === null; y++)
+      if (getTile(full, x, y) === 'floor') top = y;
     // A column that starts in a meeting room belongs to that room's own pendant.
     if (top === null || meeting.has(top * map.width + x)) continue;
     const last = runs[runs.length - 1];
@@ -1712,6 +1825,8 @@ function accentPoints(
       return [gridToWorld(-0.5 - out, z, accent.height)];
     case 'right':
       return [gridToWorld(map.width - 0.5 + out, z, accent.height)];
+    case 'back':
+      return [gridToWorld(-0.5 + map.width * (accent.along ?? 0.5), -0.5 - out, accent.height)];
     case 'wells':
       return wells.map((w) => ({ ...w.at, y: w.at.y + accent.height }));
     case 'inbox': {

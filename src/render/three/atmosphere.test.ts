@@ -14,6 +14,7 @@ import {
   ON_CALL,
   OPEN_PLAN,
   SEED_ROUND,
+  SYNERGY,
 } from '../../sim/levels';
 import draftText from '../../../maps/level-01-garage.txt?raw';
 import openPlanDraft from '../../../maps/level-02-open-plan.txt?raw';
@@ -102,6 +103,7 @@ describe('atmosphereFor', () => {
       HYPERGROWTH.id,
       HOT_DESKING.id,
       BACK_TO_BACK.id,
+      SYNERGY.id,
     ]);
     for (const level of LEVELS) {
       if (lit.has(level.id)) continue;
@@ -308,7 +310,7 @@ describe('the stage wash and the side lights', () => {
   });
 
   it('gives only the stage (and the few sets lit by lamps) a brighter sky on low, where its working lights are off', () => {
-    const lit = ['demo-day', 'on-call', 'hot-desking', 'back-to-back'];
+    const lit = ['demo-day', 'on-call', 'hot-desking', 'back-to-back', 'synergy'];
     for (const [id, other] of Object.entries(ATMOSPHERES))
       expect(other.lowSky !== undefined, id).toBe(lit.includes(id));
     expect(DEFAULT_ATMOSPHERE.lowSky).toBeUndefined();
@@ -560,7 +562,7 @@ describe('the spring morning (middle-management)', () => {
     expect(a.vignette?.saturate).toBeLessThan(1.6);
     // No other preset is graded but 3-2's rain: their pictures stay exactly as they were.
     for (const [id, other] of Object.entries(ATMOSPHERES))
-      if (other !== a && !['hypergrowth', 'hot-desking', 'back-to-back'].includes(id))
+      if (other !== a && !['hypergrowth', 'hot-desking', 'back-to-back', 'synergy'].includes(id))
         expect(other.vignette?.saturate, id).toBeUndefined();
   });
 
@@ -820,7 +822,7 @@ describe('the Friday afternoon (hot-desking)', () => {
     // Without tiles, or for the other presets, none.
     expect(stationFillSpots(a, SHIPPED)).toEqual([]);
     for (const [id, other] of Object.entries(ATMOSPHERES))
-      if (other !== a && id !== 'back-to-back')
+      if (other !== a && id !== 'back-to-back' && id !== 'synergy')
         expect(stationFillSpots(other, map), id).toEqual([]);
   });
 
@@ -949,7 +951,7 @@ describe('the heatwave morning (back-to-back)', () => {
     expect(a.vignette?.contrast).toBeLessThanOrEqual(1.15);
     expect(a.lowSky).toBeGreaterThan(a.sky.intensity);
     for (const [id, other] of Object.entries(ATMOSPHERES))
-      if (other !== a) expect(other.vignette?.contrast, id).toBeUndefined();
+      if (other !== a && id !== 'synergy') expect(other.vignette?.contrast, id).toBeUndefined();
   });
 
   it('tints each meeting rug for its own carpet, so both show the same violet', () => {
@@ -1019,7 +1021,7 @@ describe('the heatwave morning (back-to-back)', () => {
     expect(offices.some((p) => p.x > map.width / 2)).toBe(true);
     // The other presets keep their own rows.
     for (const [id, other] of Object.entries(ATMOSPHERES))
-      if (other !== a) expect(other.lamps?.meetingRooms, id).toBeUndefined();
+      if (other !== a && id !== 'synergy') expect(other.lamps?.meetingRooms, id).toBeUndefined();
   });
 
   it('lays a soft pool on each meeting room, and none elsewhere', () => {
@@ -1035,7 +1037,7 @@ describe('the heatwave morning (back-to-back)', () => {
       expect(p.angle).toBeLessThan(Math.PI / 4);
     });
     for (const [id, other] of Object.entries(ATMOSPHERES))
-      if (other !== a) expect(other.pools?.meetings, id).toBeUndefined();
+      if (other !== a && id !== 'synergy') expect(other.pools?.meetings, id).toBeUndefined();
   });
 
   it('hangs faint heat shimmer in the air over the city below only: never over the room or the terrace', () => {
@@ -1295,5 +1297,137 @@ describe('moteSeeds', () => {
 describe('cssRgba', () => {
   it('splits a hex color', () => {
     expect(cssRgba(0x102030, 0.5)).toBe('rgba(16, 32, 48, 0.5)');
+  });
+});
+
+describe('the summer afternoon (synergy)', () => {
+  const a = atmosphereFor('synergy');
+  const morning = atmosphereFor('back-to-back');
+  const map = SYNERGY.map;
+  const rgb = (c: number) => [(c >> 16) & 255, (c >> 8) & 255, c & 255] as const;
+  const warmth = (c: number) => rgb(c)[0] - rgb(c)[2];
+
+  it('gives synergy its own light, not 4-1s', () => {
+    expect(atmosphereFor(LEVEL_LOOKS[SYNERGY.id]?.scene)).toBe(ATMOSPHERES.synergy);
+    for (const [id, other] of Object.entries(ATMOSPHERES))
+      if (id !== 'synergy') expect(other, id).not.toBe(a);
+  });
+
+  it('keys it lower and warmer than the morning, from the front right, about 40° up', () => {
+    const { position: s, target: t } = sunPlacement(a, map);
+    const flat = Math.hypot(s.x - t.x, s.z - t.z);
+    const elevation = Math.atan2(s.y - t.y, flat) * (180 / Math.PI);
+    expect(elevation).toBeGreaterThan(38);
+    expect(elevation).toBeLessThan(42);
+    expect(elevation).toBeLessThan(
+      (Math.atan2(
+        sunPlacement(morning, map).position.y - t.y,
+        Math.hypot(
+          sunPlacement(morning, map).position.x - t.x,
+          sunPlacement(morning, map).position.z - t.z,
+        ),
+      ) *
+        180) /
+        Math.PI,
+    );
+    // From the west (right) and toward the camera: shadows fall back and left,
+    // so the hall's back wall line throws its shadow onto the corridor, not the back row.
+    expect(s.x).toBeGreaterThan(t.x);
+    expect(s.z).toBeGreaterThan(t.z);
+    // A full-height wall's shadow reaches at most a tile and a half sideways.
+    const sideways = (WALL_HEIGHT / Math.tan((elevation * Math.PI) / 180)) * ((s.x - t.x) / flat);
+    expect(sideways).toBeLessThan(1.5);
+    // Late gold: warmer than the morning's pale straw, never orange.
+    expect(warmth(a.sun.color)).toBeGreaterThan(warmth(morning.sun.color));
+    const [r, g, b] = rgb(a.sun.color);
+    expect(b).toBeGreaterThan(140);
+    expect(g).toBeGreaterThan(200);
+    expect(r - b).toBeLessThan(110);
+  });
+
+  it('keeps the shadows cool, the sky warmer than the bleached morning, the city haze pushed back', () => {
+    const [fr, , fb] = rgb(a.fill.color);
+    expect(fb).toBeGreaterThan(fr);
+    expect(a.fill.intensity).toBeLessThan(a.sky.intensity);
+    expect(warmth(a.backdrop?.inner ?? 0)).toBeGreaterThan(warmth(morning.backdrop?.inner ?? 0));
+    expect(Math.min(...rgb(a.backdrop?.inner ?? 0))).toBeGreaterThan(200);
+    // Golden haze, never brown, and later than the morning's.
+    expect(warmth(a.fog?.color ?? 0)).toBeGreaterThan(warmth(morning.fog?.color ?? 0));
+    expect(Math.min(...rgb(a.fog?.color ?? 0))).toBeGreaterThanOrEqual(180);
+    expect(a.fog?.start).toBeGreaterThan(morning.fog?.start ?? 0);
+    expect(a.vignette?.opacity).toBeCloseTo(0.35);
+    expect(a.vignette?.inner).toBeCloseTo(0.7);
+    // A gentler grade than the morning's: richer, nowhere near crushed.
+    expect(a.vignette?.saturate).toBeGreaterThan(1);
+    expect(a.vignette?.saturate).toBeLessThanOrEqual(morning.vignette?.saturate ?? 0);
+    expect(a.vignette?.contrast).toBeLessThanOrEqual(morning.vignette?.contrast ?? 0);
+    expect(a.lowSky).toBeGreaterThan(a.sky.intensity);
+  });
+
+  it('hangs pendants along the back of the dev and ops sides and one at the back of the boardroom, none in the corridor', () => {
+    const spots = lampSpots(a, map);
+    const meeting = new Set(map.meetingTiles.map((t) => `${t.x},${t.y}`));
+    const rooms = meetingRooms(map);
+    expect(rooms).toHaveLength(1);
+    const room = rooms[0];
+    if (!room) return;
+    const inRoom = spots.filter((p) => meeting.has(`${Math.round(p.x)},${Math.round(p.z)}`));
+    expect(inRoom).toHaveLength(1);
+    expect(inRoom[0]?.x).toBeCloseTo((room.x0 + room.x1) / 2);
+    const sides = spots.filter((p) => !meeting.has(`${Math.round(p.x)},${Math.round(p.z)}`));
+    expect(sides.filter((p) => p.x < room.x0)).toHaveLength(2);
+    expect(sides.filter((p) => p.x > room.x1)).toHaveLength(2);
+    for (const p of spots) {
+      const x = Math.round(p.x);
+      const z = Math.round(p.z);
+      expect(getTile(map, x, z), `${p.x},${p.z}`).toBe('floor');
+      // Under the hall's back wall line (row 3), never in the corridor behind it or toward the front.
+      expect(z).toBe(a.lamps?.fromRow);
+    }
+    // The sides' right under the wall (the boardroom's back has a doorway).
+    for (const p of sides)
+      expect(isSolid(getTile(map, Math.round(p.x), Math.round(p.z) - 1) ?? 'void')).toBe(true);
+    // Without `fromRow`, the same rows run along the corridor instead.
+    if (!a.lamps) return;
+    const corridor = lampSpots({ ...a, lamps: { ...a.lamps, fromRow: undefined } }, map);
+    expect(corridor.some((p) => Math.round(p.z) === 1)).toBe(true);
+  });
+
+  it('lights the ops stations turned away from the sun, and nothing floats in the air', () => {
+    const spots = stationFillSpots(a, map);
+    expect(spots.length).toBeGreaterThanOrEqual(2);
+    for (const p of spots) {
+      expect(p.x).toBeGreaterThan(map.width / 2);
+      expect(getTile(map, Math.round(p.x), Math.round(p.z))).toBe('floor');
+    }
+    expect(a.motes).toBeUndefined();
+    expect(a.snow).toBeUndefined();
+    expect(a.petals).toBeUndefined();
+  });
+
+  it('lays a lavender rug on the boardroom, near the morning’s strength, brighter when invited', () => {
+    // The good carpet is deep charcoal: a softer, lighter violet reads there without out-shouting the stations.
+    const [r, g, b] = rgb(a.rug?.color ?? 0);
+    expect(b).toBeGreaterThan(Math.max(r, g) + 25);
+    expect(Math.min(r, g, b)).toBeGreaterThan(140);
+    expect(a.rug?.opacity).toBeGreaterThanOrEqual(0.35);
+    expect(a.rug?.opacity).toBeLessThanOrEqual(morning.rug?.opacity ?? 0);
+    expect(a.rug?.invited).toBeGreaterThan(a.rug?.opacity ?? 1);
+    expect(a.rug?.perRoom).toBeUndefined();
+    expect(poolPlacements(a, map)).toHaveLength(1);
+  });
+
+  it('lights the executive reception behind the back glass cool, never over the room', () => {
+    const spots = accentSpots(a, map, []);
+    expect(spots.length).toBeGreaterThanOrEqual(1);
+    for (const { at, accent } of spots) {
+      expect(accent.anchor).toBe('back');
+      // Behind the back wall's outer face, across the middle of the floor.
+      expect(at.z).toBeLessThan(-0.5);
+      expect(at.x).toBeGreaterThan(2);
+      expect(at.x).toBeLessThan(map.width - 3);
+      const [cr, , cb] = rgb(accent.color);
+      expect(cb).toBeGreaterThan(cr + 40);
+    }
   });
 });
