@@ -32,7 +32,7 @@ import {
 import { BOARDROOM_TOPS } from '../setDressing/boardroomWallTops';
 import { ROOMS, floorDressing } from '.';
 import { BOARDROOM_ROOM } from './boardroom';
-import { BOARDROOM_SWAPS, type BoardroomArt, boardroomRoom } from './boardroomRoom';
+import { BOARDROOM_SWAPS, type BoardroomArt, boardroomRoom, POCKET_SWAP } from './boardroomRoom';
 
 const luminance = (c: number) => {
   const { r, g, b } = new THREE.Color(c);
@@ -94,7 +94,9 @@ describe('Synergy room dressing', () => {
     for (let look = 0; look < BOARDROOM_FLOOR_LOOKS; look++)
       expect(boardroomFloorModel(look).body.getAttribute('position').count).toBeGreaterThan(0);
     for (const s of BOARDROOM_SWAPS) expect(BOARDROOM_SWAP_MODELS[s]).toBeDefined();
-    for (const s of Object.values(plan.swaps)) expect(BOARDROOM_ROOM.swapModels?.[s]).toBeDefined();
+    // The pockets are left bare on purpose: the folding walls build their closets there.
+    for (const s of Object.values(plan.swaps))
+      if (s !== POCKET_SWAP) expect(BOARDROOM_ROOM.swapModels?.[s]).toBeDefined();
     for (const a of plan.art) expect(BOARDROOM_ART_MODELS[a.art]).toBeDefined();
     for (const t of plan.tops) expect(BOARDROOM_TOPS[t.kind]).toBeDefined();
     for (const s of plan.stubs)

@@ -290,7 +290,7 @@ export function boardroomRoom(map: LevelMap): BoardroomRoom {
     floorWear: floorWearOf(map, zones, boardroom, doorways),
     capProps: [],
     frontProps: [],
-    swaps: wallSwaps(map, outer, art, stubRow, salt),
+    swaps: wallSwaps(map, outer, art, stubRow, salt, pockets),
     outer,
     art,
     stubs,
@@ -416,19 +416,29 @@ export const BOARDROOM_SWAPS: readonly string[] = [
  * outside is (a sill on the low front), the stubs low walnut, the full
  * inner walls a walnut panel.
  */
+/** The swap on a pocket tile: it has no model, so only the floor is drawn there. */
+export const POCKET_SWAP = 'pocket';
+
 function wallSwaps(
   map: LevelMap,
   outer: Readonly<Record<string, Side>>,
   art: readonly BoardroomArtSpot[],
   stubRow: number,
   salt: number,
+  pockets: readonly GridPoint[],
 ): Record<string, string> {
+  const pocketKeys = new Set(pockets.map((p) => key(p.x, p.y)));
   const panel = new Set(art.filter((a) => !ON_GLASS.has(a.art)).map((a) => key(a.x, a.y)));
   const out: Record<string, string> = {};
   for (let y = 0; y < map.height; y++)
     for (let x = 0; x < map.width; x++) {
       if (!isWall(map, x, y)) continue;
       const k = key(x, y);
+      // The folding walls' closets stand here (`boardroom/`): no wall, just the floor under them.
+      if (pocketKeys.has(k)) {
+        out[k] = POCKET_SWAP;
+        continue;
+      }
       const low = wallPiece(map, x, y) === 'wall-front';
       const look = ((tileHash(x + 23, y + 7) ^ salt) >>> 6) % CURTAIN_LOOKS;
       if (isReception(map, outer, x, y)) {
