@@ -1,4 +1,6 @@
+import type * as THREE from 'three';
 import type { LevelMap } from '../../../sim/level';
+import type { GameState } from '../../../sim/state';
 import type { FloorTheme } from '../../mapLook';
 import type { WallPiece } from '../../mapShape';
 import type { Vec3 } from '../../projection';
@@ -64,6 +66,20 @@ export interface FloorDressing {
   tone?(x: number, y: number, level: number): number;
 }
 
+/**
+ * The live look of a level's moving tiles (reorg partitions and rolling
+ * desks, `reorgTiles`), in place of `Mechanics`' stand-in boxes. It reads the
+ * live tiles and the reorg schedule from `state` each frame and may animate
+ * (fold, slide, roll) as visual-only state; drive any animation from the
+ * sim's tick (`state.tick`, `state.settings.reorgs`, `reorgWarning`) rather
+ * than wall time, so a still from a screenshot scene catches it mid-move.
+ * A tile that is solid in the sim must read solid by the time it is.
+ */
+export interface MovingTilesLook {
+  sync(state: GameState, timeMs: number): void;
+  destroy(): void;
+}
+
 /** A room's dressing, for one wall theme. `P` is its own plan, with whatever its story needs. */
 export interface RoomDressing<P extends RoomPlan = RoomPlan> {
   /** The plan of the room on `map`: pure and deterministic. */
@@ -101,4 +117,9 @@ export interface RoomDressing<P extends RoomPlan = RoomPlan> {
   placeStory?(plan: P, map: LevelMap, place: Place): void;
   /** Keys of story pieces that cast no shadow (flat things: a mat, a stain). */
   flat?: ReadonlySet<string>;
+  /**
+   * Builds the moving tiles' own look under `root` (folding walls, rolling
+   * tables); left out, `Mechanics` draws plain partition and desk boxes.
+   */
+  movingTiles?(root: THREE.Group, map: LevelMap): MovingTilesLook;
 }

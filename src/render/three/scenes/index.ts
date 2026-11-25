@@ -9,6 +9,7 @@ import { middleManagementScene } from './middleManagement';
 import { onCallScene } from './onCall';
 import { openPlanScene } from './openPlan';
 import { seedRoundScene } from './seedRound';
+import { synergyScene } from './synergy';
 import type { Scene } from './types';
 
 /**
@@ -28,4 +29,5 @@ export const SCENES: Readonly<Record<string, (map: LevelMap) => Scene>> = {
   hypergrowth: hypergrowthScene,
   'hot-desking': hotDeskingScene,
   'back-to-back': backToBackScene,
+  synergy: synergyScene,
 };

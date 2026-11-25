@@ -4,6 +4,7 @@ import { PIPELINE_FAIL_TICKS, PIPELINE_WARN_TICKS } from './balance';
 import { type Level, LEVELS, settingsForPlayers } from './levels';
 import { type GameEvent } from './orders';
 import { pipelineAt } from './pipeline';
+import { applyReorg } from './reorgs';
 import { type GameState } from './state';
 import type { RoleId } from './roles';
 import {
@@ -84,10 +85,46 @@ function castScene(
   };
 }
 
+/**
+ * A reorg level in `phase` (as after its `stepsDone` first scheduled reorgs),
+ * `seconds` into the round: the level's own shot, with its walls moved.
+ */
+function reorgScene(
+  id: string,
+  level: Level,
+  phase: number,
+  stepsDone: number,
+  seconds: number,
+): Scene {
+  const base = levelScene(level);
+  return {
+    ...base,
+    id,
+    setup(state) {
+      // The clock first, so the orders open fresh at that time.
+      state.tick = Math.round(seconds * 60);
+      applyReorg(state, phase);
+      state.nextReorg = stepsDone;
+      base.setup(state);
+    },
+  };
+}
+
+const SYNERGY_LEVEL = LEVELS.find((l) => l.id === 'synergy');
+
+/** Synergy's boardroom folded open, and its walls half a second from closing again. */
+const SYNERGY_SCENES: Scene[] = SYNERGY_LEVEL
+  ? [
+      reorgScene('level-synergy-open', SYNERGY_LEVEL, 2, 1, 60),
+      reorgScene('synergy-folding', SYNERGY_LEVEL, 2, 1, 89.5),
+    ]
+  : [];
+
 // ---- Every scene ----
 
 export const SCENES: readonly Scene[] = [
   ...LEVELS.map(levelScene),
+  ...SYNERGY_SCENES,
   castScene('cast-mixed', ['generalist', 'frontend', 'backend', 'qa']),
   castScene('cast-platform', ['platform', 'qa', 'frontend', 'backend']),
   castScene('cast-duplicates', ['generalist', 'generalist', 'generalist', 'generalist']),

@@ -26,6 +26,7 @@ import { gridToWorld } from '../projection';
 import type { RoundView } from '../roundView';
 import { STATION_HEIGHT, blockHeight } from './layout';
 import { LiftCars } from './liftCars';
+import type { MovingTilesLook, RoomDressing } from './rooms/types';
 import { disposeTree } from './stage';
 
 const WET_COLOR = 0x3d8bff;
@@ -86,12 +87,17 @@ export class Mechanics {
   private readonly robots = new Map<number, RobotLook>();
   private readonly cars: LiftCars;
 
+  /** The room's own look for the moving tiles, if its dressing has one (see `RoomDressing.movingTiles`). */
+  private readonly movingLook: MovingTilesLook | undefined;
+
   constructor(
     private readonly world: THREE.Scene,
     private readonly map: LevelMap,
+    dressing?: RoomDressing,
   ) {
     world.add(this.root);
     this.cars = new LiftCars(this.root, map);
+    this.movingLook = dressing?.movingTiles?.(this.root, map);
     for (const mark of map.marks) {
       if (!WET_KINDS.has(mark.kind)) continue;
       const mesh = new THREE.Mesh(this.puddle, this.zoneMaterial);
@@ -111,7 +117,8 @@ export class Mechanics {
     this.syncLifts(state, timeMs);
     this.cars.sync(state, timeMs);
     this.syncChutes(state, timeMs);
-    this.syncReorg(state, timeMs);
+    if (this.movingLook) this.movingLook.sync(state, timeMs);
+    else this.syncReorg(state, timeMs);
     this.syncGates(state);
     this.syncDoors(state);
     this.syncCampus(state, timeMs);
@@ -452,6 +459,7 @@ export class Mechanics {
   }
 
   destroy(): void {
+    this.movingLook?.destroy();
     this.world.remove(this.root);
     disposeTree(this.root);
     this.puddle.dispose();

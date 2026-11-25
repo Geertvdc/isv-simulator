@@ -24,6 +24,7 @@ import { OVERLAY_SCALE, Overlays, POPUP_HEIGHT, type ScreenPoint, overlayScale }
 import { inShutCar } from '../../sim/lifts';
 import { withoutReorgTiles } from '../../sim/reorgs';
 import { Mechanics } from './Mechanics';
+import { ROOMS } from './rooms';
 import { People } from './People';
 import { Surroundings } from './surroundings';
 import { WorldFx } from './WorldFx';
@@ -96,7 +97,7 @@ export class ThreeRoundRenderer implements RoundRenderer {
     this.overlays = new Overlays(scene, map);
     this.fx = new WorldFx(this.world, map, this.atmosphere);
     this.people = new People(this.world, this.materials);
-    this.mechanics = new Mechanics(this.world, map);
+    this.mechanics = new Mechanics(this.world, map, ROOMS[look.walls]);
     this.surroundings = new Surroundings(map, look.setting, look.scene);
     this.world.add(this.surroundings.root);
 
