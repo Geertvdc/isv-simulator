@@ -3,12 +3,14 @@ import { type LevelMap, getTile } from '../../../sim/level';
 import { SYNERGY } from '../../../sim/levels';
 import { reorgTiles, withoutReorgTiles } from '../../../sim/reorgs';
 import { wallPiece } from '../../mapShape';
+import { pocketTiles } from '../boardroom/track';
 import {
   BACK_ART,
   BOARDROOM_CLUSTERS,
   BOARDROOM_WEAR,
   BOARDROOM_WEAR_KINDS,
   ON_GLASS,
+  POCKET_SWAP,
   boardroomBox,
   boardroomRoom,
   boardroomThreshold,
@@ -231,5 +233,14 @@ describe('Synergy room plan', () => {
     expect(plan.parked && getTile(map, plan.parked.x, plan.parked.y)).toBe('bin');
     expect(plan.deployDesk?.tiles.every((t) => getTile(map, t.x, t.y) === 'ship')).toBe(true);
     expect(plan.deployDesk?.side).toBe('front');
+  });
+});
+
+describe('the folding walls pockets', () => {
+  it('are bare floor in the room, on the tiles the folding walls build their closets on', () => {
+    const plan = boardroomRoom(withoutReorgTiles(SYNERGY.map));
+    const pockets = pocketTiles(SYNERGY.map).map((p) => `${p.x},${p.y}`);
+    expect(pockets).toHaveLength(2);
+    for (const k of pockets) expect(plan.swaps[k]).toBe(POCKET_SWAP);
   });
 });
