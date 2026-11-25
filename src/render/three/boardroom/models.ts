@@ -365,7 +365,8 @@ const DOOR_T = 0.026;
  */
 export function closetModel(outer: number): Model {
   const b = new ModelBuilder();
-  const w = 1.02;
+  // Inside its own tile, clear of the stubs beside it.
+  const w = 0.99;
   const half = w / 2;
   for (const side of [-1, 1]) {
     b.box(0.045, CLOSET_H, w, WALNUT, { at: [side * (half - 0.0225), CLOSET_H / 2, 0] }, 0.01);
@@ -407,18 +408,11 @@ export function closetModel(outer: number): Model {
     b.box(0.03, 0.03, 0.005, DOT_VIOLET, { at: [x, headY + 0.005, half + 0.002] }, 0);
   // The rim round the open top: walnut, a fine steel line on its inner edge.
   for (const side of [-1, 1]) {
-    b.box(
-      0.06,
-      0.014,
-      w + 0.01,
-      CAP_WALNUT,
-      { at: [side * (half - 0.03), CLOSET_H + 0.007, 0] },
-      0.004,
-    );
+    b.box(0.06, 0.014, w, CAP_WALNUT, { at: [side * (half - 0.03), CLOSET_H + 0.007, 0] }, 0.004);
     b.box(0.008, 0.004, w - 0.12, STEEL, { at: [side * (half - 0.064), CLOSET_H + 0.012, 0] }, 0);
   }
-  b.box(w + 0.01, 0.014, 0.06, CAP_WALNUT, { at: [0, CLOSET_H + 0.007, -half + 0.03] }, 0.004);
-  b.box(w + 0.01, 0.014, 0.07, CAP_WALNUT, { at: [0, CLOSET_H + 0.007, half - 0.035] }, 0.004);
+  b.box(w, 0.014, 0.06, CAP_WALNUT, { at: [0, CLOSET_H + 0.007, -half + 0.03] }, 0.004);
+  b.box(w, 0.014, 0.07, CAP_WALNUT, { at: [0, CLOSET_H + 0.007, half - 0.035] }, 0.004);
   for (const z of [-half + 0.064, half - 0.074])
     b.box(w - 0.12, 0.004, 0.008, STEEL, { at: [0, CLOSET_H + 0.012, z] }, 0);
   // Inside on the back: the stacking-order card (panels 1 to 6) and a coat hook for the pole.
