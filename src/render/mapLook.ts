@@ -30,6 +30,7 @@ export const WALL_THEMES = [
   'lowerFloors',
   'upperFloors',
   'tower',
+  'boardroom',
 ] as const;
 export type WallTheme = (typeof WALL_THEMES)[number];
 
@@ -43,7 +44,8 @@ export type WallTheme = (typeof WALL_THEMES)[number];
  * upstairs and concrete stair treads between them, `threeFloors` worn carpet on
  * the hot-desk floor, vinyl in the test lab and carpet in the meeting room,
  * `towerFloors` an HQ floor's new carpet in the offices and meeting rooms and a
- * hard corridor between them.
+ * hard corridor between them, `boardroomFloors` the same tower's boardroom
+ * floor: the boardroom's carpet, the dev and ops sides' and the corridors'.
  */
 export const FLOOR_THEMES = [
   'concrete',
@@ -59,6 +61,7 @@ export const FLOOR_THEMES = [
   'mixedFloors',
   'threeFloors',
   'towerFloors',
+  'boardroomFloors',
 ] as const;
 export type FloorTheme = (typeof FLOOR_THEMES)[number];
 
@@ -98,7 +101,8 @@ export const LEVEL_LOOKS: Readonly<Record<string, MapLook>> = {
   // Enterprise: carpet and glass as far as the eye can see.
   // Back to Back: a high floor of YOTTA Tower in a summer heatwave, meeting rooms named after where they came from.
   'back-to-back': { walls: 'tower', floor: 'towerFloors', scene: 'back-to-back' },
-  synergy: { walls: 'plaster', floor: 'concrete' },
+  // Synergy: the same tower's boardroom floor, summer afternoon; MONOLITH comes to align.
+  synergy: { walls: 'boardroom', floor: 'boardroomFloors', scene: 'synergy' },
   'the-reorg': { walls: 'glass', floor: 'carpet' },
   // Big Tech: a bright campus, wood and glass.
   'the-atrium': { walls: 'glass', floor: 'parquet' },

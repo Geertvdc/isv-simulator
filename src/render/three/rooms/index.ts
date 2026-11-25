@@ -1,5 +1,6 @@
 import type { FloorTheme, WallTheme } from '../../mapLook';
 import { BASEMENT_ROOM } from './basement';
+import { BOARDROOM_ROOM } from './boardroom';
 import { GARAGE_ROOM } from './garage';
 import { LOFT_ROOM } from './loft';
 import { LOWER_FLOORS_ROOM } from './lowerFloors';
@@ -26,6 +27,7 @@ export const ROOMS: Partial<Record<WallTheme, RoomDressing>> = {
   lowerFloors: LOWER_FLOORS_ROOM,
   upperFloors: UPPER_FLOORS_ROOM,
   tower: TOWER_ROOM,
+  boardroom: BOARDROOM_ROOM,
 };
 
 /**

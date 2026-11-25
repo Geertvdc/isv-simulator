@@ -149,6 +149,8 @@ export const FLOOR_COLORS: Readonly<Record<FloorTheme, readonly [number, number]
   threeFloors: [0x71879a, 0x667c8f],
   // An HQ floor's new deep slate broadloom; the second is a run from another dye lot.
   towerFloors: [0x606c80, 0x5c687b],
+  // The tower's boardroom floor: placeholder until the Synergy pass picks its carpet.
+  boardroomFloors: [0x606c80, 0x5c687b],
 };
 
 /** Wall colors per theme: face and top. Caps stay darker than stations, so the eye goes to the stations. */
@@ -176,6 +178,8 @@ export const WALL_COLORS: Readonly<Record<WallTheme, { face: number; top: number
   upperFloors: { face: 0xc9ccce, top: 0x9a9d9a },
   // YOTTA Tower's glass partitions on a pale plinth, capped with a slim brushed head track over cool glass grey.
   tower: { face: 0xd3d6d8, top: 0x737c85 },
+  // The tower's boardroom floor: placeholder until the Synergy pass picks its walls.
+  boardroom: { face: 0xd3d6d8, top: 0x737c85 },
 };
 
 /** Marks the room's warm lamps, which only `medium` and `high` quality light (see `Stage`). */
