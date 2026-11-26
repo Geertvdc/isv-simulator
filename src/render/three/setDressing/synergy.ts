@@ -215,8 +215,8 @@ function glowLetters(
 export const FLOOR = 0.463;
 /** YOTTA violet. */
 export const VIOLET = 0x8a64d8;
-/** The reception: near-black stone walls, its honed grey floor, walnut, brass, chrome, black steel. */
-const STONE = 0x36363c;
+/** The reception: warm grey stone walls, its honed grey floor, walnut, brass, chrome, black steel. */
+const STONE = 0x5d5a60;
 const STONE_FLOOR = 0x8a8c94;
 const STONE_JOINT = 0x62646c;
 const WALNUT = 0x5a3c28;
@@ -224,8 +224,11 @@ const WALNUT_DARK = 0x3a271c;
 const BRASS = 0xb8955a;
 const CHROME = 0xc4c9cf;
 const BLACK_STEEL = 0x24262a;
-const LINEN = 0xe6e2da;
+/** The catering trolleys' cloth. */
+const DRAPE = 0xe9e4da;
 const COVE = 0xffe2b8;
+/** The wall-washers' warm light on the walnut. */
+const WASH = 0xffe2b4;
 /** MONOLITH's black: suits, cases, coats, cars; a touch blue so it reads as cloth, not a hole. */
 const SUIT = 0x1d1f26;
 const SUIT_EDGE = 0x2c2f38;
@@ -327,23 +330,48 @@ export function receptionWall(w: number, h: number, slats: readonly SlatZone[]):
           }
         }
       }
-      // The walnut slats, each zone between brass edges.
+      // The walnut slats, each zone between brass edges, washed by warm pools of light from
+      // downlights in the soffit: near each end of a wide zone, in the middle of a narrow one.
+      const pools = slats.flatMap((z) =>
+        z.w > 2 ? [z.x - z.w / 2 + 0.38, z.x + z.w / 2 - 0.38] : [z.x],
+      );
+      const washed = (base: number, x: number, y: number) => {
+        let a = 0;
+        for (const px of pools) {
+          const dx = (x - px) / 0.34;
+          a = Math.max(a, Math.exp(-dx * dx) * Math.max(0, (y - h * 0.1) / (h * 0.9)) ** 0.8);
+        }
+        return mix(base, WASH, a);
+      };
       for (const [zi, zone] of slats.entries()) {
         const sx0 = zone.x - zone.w / 2;
         const sx1 = zone.x + zone.w / 2;
-        flat(b, sx1 - sx0, h - 0.12, 0.02, 0x121214, [zone.x, h / 2, 0.01]);
-        for (let x = sx0 + 0.04, k = 0; x < sx1 - 0.02; x += 0.075, k++)
-          flat(b, 0.045, h - 0.14, 0.05, tint(WALNUT, (hash01(k, zi, 231) - 0.5) * 0.14), [
-            x,
-            h / 2,
-            0.04,
-          ]);
+        shaded(b, sx1 - sx0, h - 0.12, 0.02, [zone.x, h / 2, 0.01], (x, y) =>
+          washed(0x121214, x, y),
+        );
+        for (let x = sx0 + 0.04, k = 0; x < sx1 - 0.02; x += 0.075, k++) {
+          const c = tint(WALNUT, (hash01(k, zi, 231) - 0.5) * 0.14);
+          shaded(b, 0.045, h - 0.14, 0.05, [x, h / 2, 0.04], (vx, vy) => washed(c, vx, vy));
+        }
         for (const x of [sx0, sx1]) flat(b, 0.018, h - 0.1, 0.06, BRASS, [x, h / 2, 0.04]);
       }
       flat(b, w, 0.04, 0.03, BLACK_STEEL, [0, 0.02, 0.015]);
       // The soffit and its warm cove.
       flat(b, w + 0.02, 0.12, 0.32, 0x1c1c20, [0, h - 0.06, 0.14]);
       glowBox(b, w - 0.1, 0.014, 0.02, COVE, [0, h - 0.125, 0.29]);
+      // The wall-washers' trims in the soffit over each pool.
+      for (const px of pools) {
+        b.cylinder(0.045, 0.045, 0.01, BRASS, { at: [px, h - 0.125, 0.1] }, 12);
+        b.add(
+          new THREE.CircleGeometry(0.032, 12),
+          WASH,
+          {
+            at: [px, h - 0.131, 0.1],
+            rot: [Math.PI / 2, 0, 0],
+          },
+          'glow',
+        );
+      }
     }),
   );
 }
@@ -565,6 +593,8 @@ export const SUIT_POSE = {
   tablet: 7,
   driver: 8,
 } as const;
+/** How many poses a suit has. */
+const SUIT_POSES = 9;
 
 /**
  * One of MONOLITH's people: an identical black suit, white shirt, black tie,
@@ -576,9 +606,9 @@ export const SUIT_POSE = {
  * (grey hair, blue-grey suit, red tie): from above they read as a block of
  * black.
  */
-export const suitFigure = looks([0.5, 0.4], 9, (b, v) => {
+export const suitFigure = looks([0.5, 0.4], SUIT_POSES * 2, (b, look) => {
+  const v = look % SUIT_POSES;
   const skin = nth(SKINS, v * 3 + 1);
-  const hair = nth(HAIR, v);
   // Legs and shoes.
   for (const s of [-1, 1]) {
     b.capsule(0.06, 0.18, tint(SUIT, -0.1), { at: [s * 0.075, 0.15, 0] });
@@ -592,14 +622,9 @@ export const suitFigure = looks([0.5, 0.4], 9, (b, v) => {
   flat(b, 0.04, 0.2, 0.02, SHADES, [0, 0.5, 0.162]);
   for (const s of [-1, 1])
     flat(b, 0.03, 0.18, 0.02, SUIT_EDGE, [s * 0.075, 0.52, 0.155], [0, 0, s * 0.35]);
-  // The head: skin, slicked hair, the sunglasses' wide black bar.
+  // The head, unless it's a piece of its own (`suitHead`) that turns.
   const hy = 0.83;
-  const look = v === SUIT_POSE.watch ? -0.05 : 0;
-  b.sphere(0.2, skin, { at: [0, hy, 0] }, [1, 0.95, 1]);
-  b.sphere(0.205, hair, { at: [0, hy + 0.05, -0.04] }, [1, 0.72, 0.95]);
-  flat(b, 0.3, 0.06, 0.03, SHADES, [0, hy + 0.02 + look, 0.185]);
-  for (const s of [-1, 1]) flat(b, 0.02, 0.02, 0.2, SHADES, [s * 0.15, hy + 0.03, 0.08]);
-  flat(b, 0.06, 0.02, 0.02, 0x6a5a50, [0, hy - 0.08, 0.195]);
+  if (look < SUIT_POSES) suitHeadParts(b, v, hy);
   const shoulder = (s: number): V3 => [s * 0.22, 0.58, 0];
   const hand = (at: V3) => b.sphere(0.055, skin, { at });
   const arm = (s: number, at: V3) => {
@@ -640,15 +665,9 @@ export const suitFigure = looks([0.5, 0.4], 9, (b, v) => {
       arm(1, [0.05, 0.47, 0.25]);
       break;
     case SUIT_POSE.guard:
-      // Hands clasped behind, an earpiece's curly wire down the neck.
+      // Hands clasped behind (the earpiece is on the head).
       arm(1, [0.06, 0.35, -0.2]);
       arm(-1, [-0.06, 0.35, -0.2]);
-      b.sphere(0.022, 0xe8e8e8, { at: [0.2, hy, 0.02] });
-      for (let k = 0; k < 4; k++)
-        b.torus(0.012, 0.004, 0xe8e8e8, {
-          at: [0.19, hy - 0.06 - k * 0.025, -0.02],
-          rot: [Math.PI / 2, 0, 0],
-        });
       break;
     case SUIT_POSE.pointing:
       arm(1, [0.3, 0.66, 0.36]);
@@ -672,12 +691,53 @@ export const suitFigure = looks([0.5, 0.4], 9, (b, v) => {
       );
       break;
     default:
-      // The driver: hands clasped in front, a black peaked cap.
+      // The driver: hands clasped in front (his cap is on the head).
       arm(1, [0.04, 0.32, 0.2]);
       arm(-1, [-0.04, 0.32, 0.2]);
-      b.cylinder(0.18, 0.17, 0.08, SHADES, { at: [0, hy + 0.16, -0.01] }, 16);
-      flat(b, 0.24, 0.015, 0.12, SHADES, [0, hy + 0.12, 0.16], [0.25, 0, 0]);
   }
+});
+
+/**
+ * A suit's head, `hy` up, for pose `v`: skin, slicked hair, the sunglasses'
+ * wide black bar; the guard's earpiece and its curly wire, the driver's
+ * peaked cap.
+ */
+function suitHeadParts(b: ModelBuilder, v: number, hy: number): void {
+  const skin = nth(SKINS, v * 3 + 1);
+  const hair = nth(HAIR, v);
+  const look = v === SUIT_POSE.watch ? -0.05 : 0;
+  b.sphere(0.2, skin, { at: [0, hy, 0] }, [1, 0.95, 1]);
+  b.sphere(0.205, hair, { at: [0, hy + 0.05, -0.04] }, [1, 0.72, 0.95]);
+  flat(b, 0.3, 0.06, 0.03, SHADES, [0, hy + 0.02 + look, 0.185]);
+  for (const s of [-1, 1]) flat(b, 0.02, 0.02, 0.2, SHADES, [s * 0.15, hy + 0.03, 0.08]);
+  flat(b, 0.06, 0.02, 0.02, 0x6a5a50, [0, hy - 0.08, 0.195]);
+  if (v === SUIT_POSE.guard) {
+    b.sphere(0.022, 0xe8e8e8, { at: [0.2, hy, 0.02] });
+    for (let k = 0; k < 4; k++)
+      b.torus(0.012, 0.004, 0xe8e8e8, {
+        at: [0.19, hy - 0.06 - k * 0.025, -0.02],
+        rot: [Math.PI / 2, 0, 0],
+      });
+  }
+  if (v === SUIT_POSE.driver) {
+    b.cylinder(0.18, 0.17, 0.08, SHADES, { at: [0, hy + 0.16, -0.01] }, 16);
+    flat(b, 0.24, 0.015, 0.12, SHADES, [0, hy + 0.12, 0.16], [0.25, 0, 0]);
+  }
+}
+
+/** Where a suit's head turns about: its neck, this far up from its feet. */
+export const SUIT_NECK = 0.64;
+/** A suit's look `SUIT_POSES + pose`: the same figure without its head, for a `suitHead` on top. */
+export const SUIT_HEADLESS = SUIT_POSES;
+
+/**
+ * A suit's head on its own, for pose `v` (`SUIT_POSE`), its origin at the
+ * neck (`SUIT_NECK` up from the feet), so a living kind (`peck`) turns it
+ * and dips it: glancing round, down at the watch, down at the tablet.
+ * Put it on a `SUIT_HEADLESS + v` figure, at the same spot and size.
+ */
+export const suitHead = looks([0.42, 0.42], SUIT_POSES, (b, v) => {
+  suitHeadParts(b, v, 0.83 - SUIT_NECK);
 });
 
 /** Identical black briefcases standing in a row along x, `n` of them, gold clasps. 0.26 high. */
@@ -739,15 +799,16 @@ export const umbrellaStand = looks([0.3, 0.3], 1, (b) => {
 });
 
 /**
- * A covered catering trolley, facing +z: a steel trolley on castors with a
- * long cloth draped over it to the floor, its folds hanging straight, a
- * cloche's dome under the cloth on top. Nothing on show. About 0.6 high.
+ * A covered catering trolley, facing +z: a steel trolley on castors under
+ * one long cream cloth draped over the whole of it to just off the floor,
+ * a soft fold across its top and its folds hanging straight, the handle
+ * left out at one end. Nothing on show, no domes. About 0.55 high.
  */
 export const coveredTrolley = looks([0.9, 0.55], 2, (b, v) => {
-  const cloth = v ? 0xd6d0da : LINEN;
+  const cloth = DRAPE;
   const w = 0.82;
   const d = 0.5;
-  const h = 0.5;
+  const h = 0.52;
   for (const sx of [-1, 1])
     for (const sz of [-1, 1])
       b.cylinder(
@@ -759,28 +820,61 @@ export const coveredTrolley = looks([0.9, 0.55], 2, (b, v) => {
         8,
       );
   // A steel handle at the end.
-  bar(b, [w / 2 + 0.06, h - 0.02, -0.15], [w / 2 + 0.06, h - 0.02, 0.15], 0.02, CHROME);
+  const hs = v ? -1 : 1;
+  bar(
+    b,
+    [hs * (w / 2 + 0.06), h - 0.04, -0.15],
+    [hs * (w / 2 + 0.06), h - 0.04, 0.15],
+    0.02,
+    CHROME,
+  );
   for (const s of [-1, 1])
-    bar(b, [w / 2, h - 0.04, s * 0.15], [w / 2 + 0.06, h - 0.02, s * 0.15], 0.018, CHROME);
-  // The cloth: the top, the drop to just off the floor, folds along its front.
-  b.box(w + 0.04, h - 0.04, d + 0.04, cloth, { at: [0, 0.04 + (h - 0.04) / 2, 0] }, 0.03);
+    bar(
+      b,
+      [hs * (w / 2 + 0.01), h - 0.06, s * 0.15],
+      [hs * (w / 2 + 0.06), h - 0.04, s * 0.15],
+      0.018,
+      CHROME,
+    );
+  // The cloth: the top, the drop flaring a little to just off the floor.
+  b.box(w + 0.04, h - 0.06, d + 0.04, cloth, { at: [0, 0.05 + (h - 0.06) / 2, 0] }, 0.04);
+  flat(b, w + 0.1, 0.02, d + 0.1, tint(cloth, -0.06), [0, 0.06, 0]);
+  // A soft fold across the top where the cloth was shaken out, a crease each side of it.
+  const fx = v ? 0.12 : -0.1;
+  b.box(
+    0.08,
+    0.025,
+    d + 0.05,
+    tint(cloth, 0.06),
+    { at: [fx, h + 0.005, 0], rot: [0, 0.12, 0] },
+    0.01,
+  );
+  flat(b, 0.012, 0.004, d + 0.04, tint(cloth, -0.16), [fx + 0.05, h + 0.003, 0], [0, 0.12, 0]);
+  flat(b, 0.012, 0.004, d * 0.6, tint(cloth, -0.12), [fx - 0.18, h + 0.003, 0.05], [0, -0.3, 0]);
+  // Folds hanging down the front and the ends, shaded light and dark.
   for (let x = -w / 2 + 0.05, k = 0; x < w / 2; x += 0.1, k++)
-    flat(b, 0.03, h - 0.08, 0.012, tint(cloth, k % 2 ? -0.08 : 0.04), [
+    flat(b, 0.035, h - 0.1, 0.014, tint(cloth, k % 2 ? -0.1 : 0.04), [
       x,
-      0.04 + (h - 0.06) / 2,
+      0.06 + (h - 0.08) / 2,
       d / 2 + 0.024,
     ]);
   for (let z = -d / 2 + 0.06, k = 0; z < d / 2; z += 0.12, k++)
     for (const s of [-1, 1])
-      flat(b, 0.012, h - 0.08, 0.03, tint(cloth, k % 2 ? -0.08 : 0.03), [
+      flat(b, 0.014, h - 0.1, 0.035, tint(cloth, k % 2 ? -0.1 : 0.03), [
         s * (w / 2 + 0.024),
-        0.04 + (h - 0.06) / 2,
+        0.06 + (h - 0.08) / 2,
         z,
       ]);
-  // The domes under the cloth: one, or two on the violet-grey one.
-  const domes = v ? [-0.18, 0.18] : [0];
-  for (const x of domes)
-    b.sphere(v ? 0.15 : 0.2, tint(cloth, 0.04), { at: [x, h, 0] }, [1, 0.5, 0.9]);
+  // The corners where the cloth bunches, a little lower.
+  for (const sx of [-1, 1])
+    b.box(
+      0.07,
+      h - 0.08,
+      0.07,
+      tint(cloth, -0.05),
+      { at: [sx * (w / 2 + 0.005), (h - 0.08) / 2 + 0.05, d / 2 + 0.005] },
+      0.03,
+    );
 });
 
 /**
@@ -1249,33 +1343,68 @@ export const yottaFlag = looks([0.4, 0.1], 1, (b) => {
 // ---- MONOLITH across the river ----
 
 /**
- * The afternoon sun on MONOLITH's black glass, `w` × `h`, laid over its front
- * (face toward +z, from the origin up): a sheet of glass over its upper right,
- * warming to amber toward the corner where the low sun sits in it, so the
- * windows show through a warm glint and the rest stays black.
+ * The afternoon sun on MONOLITH's black glass, `w` wide and `h` high, laid
+ * over its front (face toward +z, from the origin up): a soft vertical
+ * streak `cols` window bays wide (each bay `bay` wide) at `x` from the
+ * front's centre, warm amber at its top and fading out over the lower 60%
+ * of it, its sides fading too. The glass layer has one opacity, so it's
+ * drawn as a halftone: fine squares sized by how strong the glint is there
+ * (and a second sheet where it's stronger than one sheet), so it reads as
+ * a soft gradient from across the river and the windows show through.
  */
-export function monolithGlint(w: number, h: number): SetPiece {
-  return once(`monolithGlint:${w.toFixed(2)}:${h.toFixed(2)}`, () =>
+export function monolithGlint(
+  w: number,
+  h: number,
+  x = w * 0.22,
+  cols = 3.5,
+  bay = 0.28,
+): SetPiece {
+  return once(`monolithGlint:${w.toFixed(2)}:${h.toFixed(2)}:${x.toFixed(2)}:${cols}`, () =>
     looks([w, 0.05], 1, (b) => {
-      // Only the upper right of the front catches it: a sheet of glass there, clear at its
-      // lower left and amber at its upper right corner.
-      const gw = w * 0.5;
-      const gh = h * 0.5;
-      shaded(
-        b,
-        gw,
-        gh,
-        0.004,
-        [w / 2 - gw / 2, h - gh / 2, 0],
-        (x, y) => {
-          const t = Math.max(0, (x / gw + y / gh) * 0.5 + 0.1);
-          return mix(0x15171c, 0xffb868, Math.min(1, t) * 0.8);
-        },
-        'glass',
-      );
+      const sw = cols * bay;
+      const cell = 0.06;
+      const sheet = 0.3;
+      for (let j = 0, y = h - cell / 2; y > 0; j++, y -= cell) {
+        // Full strength near the top, then out to nothing over 60% of its height.
+        const t = (h - y) / h;
+        const fall = t < 0.12 ? 1 : Math.max(0, 1 - (t - 0.12) / 0.6) ** 2.2;
+        for (let i = 0, u = -sw / 2 + cell / 2; u < sw / 2; i++, u += cell) {
+          // The sides ramp in over 15% of the width each, softly.
+          const edge = Math.min(1, (sw / 2 - Math.abs(u)) / (sw * 0.22));
+          const a = GLINT_PEAK * fall * edge * edge * (3 - 2 * edge);
+          if (a < 0.02) continue;
+          // A breath of shimmer, so the squares don't line up like a print.
+          const jitter = 1 + (hash01(i, j, 271) - 0.5) * 0.25;
+          const color = mix(0xffc880, GLINT, Math.min(1, t * 2.2));
+          for (let k = 0, f = (a / sheet) * jitter; f > 0.02 && k < 2; k++, f -= 1) {
+            const side = Math.sqrt(Math.min(1, f)) * cell;
+            b.add(
+              new THREE.PlaneGeometry(side, side),
+              color,
+              { at: [x + u, y, 0.002 + k * 0.002] },
+              'glass',
+            );
+          }
+        }
+      }
     }),
   );
 }
+
+/** How strong the glint is at its brightest (as an opacity), and its color there. */
+const GLINT_PEAK = 0.45;
+const GLINT = 0xffb15c;
+
+/**
+ * The sun caught on the helipad's parapet: a bright spot on its rail and a
+ * short flare along it, facing +z, centred. Hot.
+ */
+export const parapetSun = looks([0.5, 0.05], 1, (b) => {
+  b.led(0.035, 0xfff0c8, { at: [0, 0, 0.012] });
+  glowBox(b, 0.5, 0.012, 0.004, 0xffd890, [0, 0, 0.014]);
+  glowBox(b, 0.22, 0.02, 0.004, 0xffe8b0, [0, 0, 0.016]);
+  glowBox(b, 0.012, 0.12, 0.004, 0xffe0a0, [0, 0, 0.014]);
+});
 
 /** The sun's own fleck in MONOLITH's glass: a small warm star. Hot. */
 export const sunFleck = looks([0.3, 0.05], 1, (b) => {
@@ -1391,27 +1520,51 @@ export function billboardWords(w: number): SetPiece {
 // ---- The front: the floors below, the gondola ----
 
 /**
- * The life behind the curtain wall of the two floors under this one, `len`
+ * The life behind the curtain wall of the floors under this one, `len`
  * along +x from 0, facing +z, laid over `towerFacade`'s glass (its bays 0.6
- * wide from x = 0.02, a storey 0.9 with a 0.28 spandrel): blinds let down to
- * all sorts of heights against the afternoon sun, a desk lamp on here and
- * there, sticky notes on the inside of the glass, a pot plant on a sill.
- * Its top at the origin (the slab's foot).
+ * wide from x = 0.02, a storey 0.9 with a 0.28 spandrel): each bay's blind
+ * let down to one of three heights against the afternoon sun, one window in
+ * six lit warm, people at their desks as dark shapes against the light on
+ * the floor just below (a head and shoulders, a monitor's glow), sticky
+ * notes on the inside of the glass, a pot plant on a sill, and YOTTA's
+ * violet stripe along every second spandrel. Its top at the origin (the
+ * slab's foot).
  */
 export function floorsBelow(len: number): SetPiece {
   return once(`floorsBelow:${len.toFixed(2)}`, () =>
     looks([len, 0.05], 1, (b) => {
-      for (let storey = 0; storey < 2; storey++) {
-        const top = -storey * 0.9 - 0.3;
+      for (let storey = 0; storey < 3; storey++) {
+        const y1 = -storey * 0.9;
+        // YOTTA's stripe along every second spandrel.
+        if (storey % 2 === 0)
+          flat(b, len, 0.06, 0.01, tint(VIOLET, -0.08), [len / 2, y1 - 0.14, 0.006]);
+        if (storey === 2) continue;
+        const top = y1 - 0.3;
         const fade = storey * 0.25;
         for (let k = 0, x = 0.32; x < len - 0.2; k++, x += 0.6) {
           const roll = hash01(k, storey, 261);
-          // The blind: down a little, halfway or nearly all the way, its bottom rail.
-          const drop = 0.1 + Math.floor(hash01(k, storey, 263) * 4) * 0.13;
-          flat(b, 0.54, drop, 0.006, mix(BLIND, 0x9ab0c0, fade), [x, top - drop / 2, 0.002]);
+          // One in six lit warm (`litWindows` hangs its lights), the blind up there.
+          const lit = isLit(k, storey);
+          // The blind: down a little, halfway or nearly to the sill, its bottom rail.
+          const drop = blindDrop(k, storey);
+          const glass = 0.6 - 0.02;
+          if (lit)
+            b.add(
+              new THREE.PlaneGeometry(0.54, glass - drop - 0.02),
+              mix(WARM_WINDOW, 0x9ab0c0, fade * 0.6),
+              { at: [x, top - drop - (glass - drop) / 2, 0.003] },
+              'glow',
+            );
+          const blind = lit ? mix(BLIND, WARM_WINDOW, 0.5) : BLIND;
+          flat(b, 0.54, drop, 0.006, mix(blind, 0x9ab0c0, fade), [x, top - drop / 2, 0.002]);
           for (let y = top - 0.04; y > top - drop; y -= 0.045)
             flat(b, 0.54, 0.006, 0.004, mix(tint(BLIND, -0.12), 0x9ab0c0, fade), [x, y, 0.006]);
           flat(b, 0.55, 0.014, 0.01, 0x8a857a, [x, top - drop, 0.008]);
+          // Someone at a desk, seen through the glass: on the floor just below, where the blind
+          // leaves room, more often in a lit window.
+          const sit = hash01(k, storey, 269);
+          if (storey === 0 && drop < 0.4 && (lit ? sit < 0.85 : sit < 0.3))
+            deskSilhouette(b, x + (sit - 0.4) * 0.3, top - glass + 0.02, lit, k);
           if (storey === 0 && roll > 0.82)
             for (let n = 0; n < 3; n++)
               flat(b, 0.05, 0.05, 0.004, nth(NOTES, k + n), [
@@ -1428,6 +1581,60 @@ export function floorsBelow(len: number): SetPiece {
       }
     }),
   );
+}
+
+/** A lit window on the floors below. */
+const WARM_WINDOW = 0xffd9a0;
+/** Whether bay `k` of storey `storey` below is lit: one in six. */
+const isLit = (k: number, storey: number) => hash01(k, storey, 267) < 1 / 6;
+/** How far bay `k`'s blind is let down: one of three heights, the shortest where it's lit. */
+const blindDrop = (k: number, storey: number) =>
+  isLit(k, storey) ? 0.1 : 0.1 + Math.floor(hash01(k, storey, 263) * 3) * 0.17;
+
+/**
+ * The lights in `floorsBelow`'s lit windows: a pair of warm ceiling strips
+ * just under each one's blind, as `floorsBelow` lays them out. Hot (small
+ * light sources; the window's own warmth is `floorsBelow`'s).
+ */
+export function litWindows(len: number): SetPiece {
+  return once(`litWindows:${len.toFixed(2)}`, () =>
+    looks([len, 0.05], 1, (b) => {
+      for (let storey = 0; storey < 2; storey++) {
+        const top = -storey * 0.9 - 0.3;
+        for (let k = 0, x = 0.32; x < len - 0.2; k++, x += 0.6) {
+          if (!isLit(k, storey)) continue;
+          const y = top - blindDrop(k, storey) - 0.035;
+          for (const s of [-1, 1])
+            glowBox(b, 0.2, 0.016, 0.004, 0xfff0d0, [x + s * 0.13, y, 0.012]);
+        }
+      }
+    }),
+  );
+}
+
+/**
+ * Someone at a desk behind the glass, flat on it at `x`, the sill at `sill`:
+ * the desk's edge, a monitor's back with its glow round it, the person's head
+ * and shoulders over it, dark against the room (darker still against a lit
+ * window).
+ */
+function deskSilhouette(b: ModelBuilder, x: number, sill: number, lit: boolean, k: number): void {
+  const dark = lit ? 0x2a2a34 : 0x3a4450;
+  const s = k % 2 ? 1 : -1;
+  flat(b, 0.4, 0.025, 0.004, tint(dark, 0.1), [x, sill + 0.12, 0.007]);
+  // The monitor and its glow.
+  b.add(
+    new THREE.PlaneGeometry(0.15, 0.1),
+    0x9ac0e0,
+    { at: [x + s * 0.1, sill + 0.19, 0.006] },
+    'glow',
+  );
+  flat(b, 0.12, 0.08, 0.004, 0x1c2026, [x + s * 0.1, sill + 0.19, 0.008]);
+  // Shoulders and a head.
+  b.add(new THREE.CircleGeometry(0.09, 12, 0, Math.PI), dark, {
+    at: [x - s * 0.06, sill + 0.13, 0.009],
+  });
+  b.add(new THREE.CircleGeometry(0.045, 12), dark, { at: [x - s * 0.06, sill + 0.27, 0.009] });
 }
 
 // ---- The gondola ----
@@ -1469,3 +1676,253 @@ export function gondola(len: number, up: number): SetPiece {
     }),
   );
 }
+
+/**
+ * A parked building-maintenance arm on the façade, along +x from its pivot
+ * at the origin (the slab's foot): a steel pivot block bolted to the
+ * spandrel, a white box-section jib with yellow and black chevrons folded
+ * flat along the façade, its sheave head at the far end and a short cable
+ * with the hook tied off. About 0.2 high, all below the origin.
+ */
+export function bmuArm(len: number): SetPiece {
+  return once(`bmuArm:${len.toFixed(2)}`, () =>
+    looks([len, 0.25], 1, (b) => {
+      const steel = 0x8a9096;
+      flat(b, 0.16, 0.2, 0.08, steel, [0, -0.1, 0.04]);
+      for (const y of [-0.04, -0.16])
+        b.cylinder(0.012, 0.012, 0.02, 0x3a3c40, { at: [0, y, 0.09], rot: [Math.PI / 2, 0, 0] }, 6);
+      flat(b, len, 0.07, 0.07, 0xe8eaec, [len / 2, -0.09, 0.12]);
+      for (let x = 0.15, k = 0; x < len - 0.1; x += 0.12, k++)
+        flat(b, 0.05, 0.071, 0.071, k % 2 ? 0x2a2c30 : 0xe6b834, [x, -0.09, 0.12], [0, 0, 0.6]);
+      b.cylinder(0.05, 0.05, 0.04, steel, { at: [len, -0.09, 0.12], rot: [Math.PI / 2, 0, 0] }, 12);
+      flat(b, 0.006, 0.1, 0.006, 0x2a2c30, [len, -0.17, 0.12]);
+      b.torus(0.02, 0.006, 0x3a3c40, { at: [len, -0.23, 0.12] }, Math.PI * 1.5);
+    }),
+  );
+}
+
+/** Non-square letters on a face at depth z facing +z, centred on (x, y): `px` wide and `py` high a pixel. */
+function tallLetters(
+  b: ModelBuilder,
+  text: string,
+  x: number,
+  y: number,
+  z: number,
+  px: number,
+  py: number,
+  color: number,
+): void {
+  glyphs(text, (u, r, w) => {
+    flat(b, w * px, py, 0.004, color, [x + u * px, y + (2 - r) * py, z + 0.002]);
+  });
+}
+
+/**
+ * YOTTA's welcome banner hung down the façade under the boardroom, `w` wide
+ * and `h` long from its pole at the origin (the slab's foot), facing +z:
+ * violet cloth with "YOTTA" and a "×" in white, then a black band with
+ * "MONOLITH" (the visitors' half), a steel pole at the top on two brackets
+ * and a weighted hem; the letters drawn tall, as the camera sees the façade
+ * steeply.
+ */
+export function facadeBanner(w: number, h: number): SetPiece {
+  return once(`facadeBanner:${w.toFixed(2)}:${h.toFixed(2)}`, () =>
+    looks([w, 0.1], 1, (b) => {
+      const z = 0.06;
+      for (const s of [-1, 1])
+        flat(b, 0.03, 0.03, z + 0.02, 0x8a9096, [(s * w) / 2.4, -0.03, z / 2]);
+      b.cylinder(
+        0.018,
+        0.018,
+        w + 0.08,
+        0xc4cad0,
+        { at: [0, -0.04, z], rot: [0, 0, Math.PI / 2] },
+        8,
+      );
+      const band = h * 0.4;
+      const top = h - band - 0.08;
+      // The cloth in vertical panels, a touch lighter and darker, as it hangs.
+      for (let k = 0; k < 6; k++) {
+        const x = -w / 2 + (k + 0.5) * (w / 6);
+        flat(b, w / 6 + 0.002, top, 0.006, tint(VIOLET, k % 2 ? -0.12 : -0.04), [
+          x,
+          -0.06 - top / 2,
+          z,
+        ]);
+        flat(b, w / 6 + 0.002, band, 0.006, tint(SUIT, k % 2 ? 0 : 0.04), [
+          x,
+          -0.06 - top - band / 2,
+          z,
+        ]);
+      }
+      const py = 0.06;
+      tallLetters(b, 'YOTTA', 0, -0.06 - top * 0.32, z + 0.003, w / 22, py, 0xf4f2fa);
+      tallLetters(b, '×', 0, -0.06 - top * 0.78, z + 0.003, w / 22, py * 0.8, 0xf4f2fa);
+      tallLetters(b, 'MONOLITH', 0, -0.06 - top - band / 2, z + 0.003, w / 34, py, MONO_WHITE);
+      // The slab mark over the word, the hem and its weight bar.
+      flat(b, 0.03, 0.08, 0.004, MONO_WHITE, [0, -0.06 - top - 0.07, z + 0.005]);
+      flat(b, w + 0.02, 0.03, 0.02, 0x2a2c30, [0, -h + 0.015, z]);
+    }),
+  );
+}
+
+/**
+ * A rooftop condenser unit, facing +z: an off-white louvred casing on steel
+ * rails, its fan guard on top (the fan is `condenserFan`, which spins, at
+ * `CONDENSER_TOP`), the refrigerant pipes in grey lagging out of its side.
+ */
+export const CONDENSER_TOP = 0.39;
+export const condenser = looks([0.55, 0.45], 1, (b) => {
+  const w = 0.5;
+  const d = 0.42;
+  const h = CONDENSER_TOP;
+  for (const s of [-1, 1]) flat(b, 0.04, 0.04, d + 0.06, 0x6a6e74, [s * (w / 2 - 0.05), 0.02, 0]);
+  b.box(w, h - 0.05, d, 0xd8dadc, { at: [0, 0.04 + (h - 0.05) / 2, 0] }, 0.02);
+  for (let y = 0.08; y < h - 0.04; y += 0.035) {
+    flat(b, w - 0.06, 0.012, 0.005, 0x8a8e94, [0, y, d / 2 + 0.002]);
+    for (const s of [-1, 1]) flat(b, 0.005, 0.012, d - 0.06, 0x8a8e94, [s * (w / 2 + 0.002), y, 0]);
+  }
+  flat(b, w - 0.02, 0.02, d - 0.02, 0xc4c6c8, [0, h - 0.005, 0]);
+  b.cylinder(0.17, 0.17, 0.012, 0x1c1e22, { at: [0, h + 0.002, 0] }, 20);
+  b.torus(0.175, 0.012, 0x9a9ea4, { at: [0, h + 0.02, 0], rot: [Math.PI / 2, 0, 0] });
+  for (let k = 0; k < 4; k++) {
+    const a = (k * Math.PI) / 4;
+    flat(b, 0.35, 0.006, 0.006, 0x9a9ea4, [0, h + 0.03, 0], [0, a, 0]);
+  }
+  // The pipes out of its side and along the roof.
+  bar(b, [w / 2, 0.12, 0.1], [w / 2 + 0.12, 0.05, 0.1], 0.03, 0x9a9aa0);
+  bar(b, [w / 2 + 0.12, 0.05, 0.1], [w / 2 + 0.12, 0.05, 0.6], 0.03, 0x9a9aa0);
+  flat(b, 0.1, 0.008, 0.07, 0xe6e8ea, [0, 0.2, d / 2 + 0.006]);
+});
+
+/** A condenser's fan, round its hub, three dark blades; it spins. */
+export const condenserFan = looks([0.34, 0.34], 1, (b) => {
+  b.cylinder(0.035, 0.035, 0.02, 0x4a4e54, { at: [0, 0.01, 0] }, 10);
+  for (let k = 0; k < 3; k++) {
+    const a = (k * Math.PI * 2) / 3;
+    flat(
+      b,
+      0.14,
+      0.006,
+      0.06,
+      0x5a5e64,
+      [Math.cos(a) * 0.09, 0.012, -Math.sin(a) * 0.09],
+      [0.3, a, 0],
+    );
+  }
+});
+
+/**
+ * The building-maintenance unit's track on a setback roof, `len` along z
+ * centred: two steel rails on concrete sleepers, and the machine parked at
+ * its back end: a white carriage on wheels with a yellow band, a stubby mast
+ * and its jib folded down flat along the track, the cradle's cables coiled
+ * on its drum. About 0.45 high.
+ */
+export function bmuTrack(len: number): SetPiece {
+  return once(`bmuTrack:${len.toFixed(2)}`, () =>
+    looks([0.6, len], 1, (b) => {
+      for (let z = -len / 2 + 0.1; z < len / 2; z += 0.3)
+        flat(b, 0.5, 0.025, 0.09, 0xb8b4aa, [0, 0.012, z]);
+      for (const s of [-1, 1]) flat(b, 0.03, 0.03, len, 0x6a6e74, [s * 0.18, 0.04, 0]);
+      const cz = -len / 2 + 0.32;
+      b.box(0.46, 0.2, 0.44, 0xe8eaec, { at: [0, 0.16, cz] }, 0.02);
+      flat(b, 0.465, 0.04, 0.445, 0xe6b834, [0, 0.2, cz]);
+      for (const s of [-1, 1])
+        for (const t of [-1, 1])
+          b.cylinder(
+            0.04,
+            0.04,
+            0.03,
+            0x2a2c30,
+            { at: [s * 0.18, 0.07, cz + t * 0.15], rot: [0, 0, Math.PI / 2] },
+            10,
+          );
+      b.cylinder(0.07, 0.07, 0.12, 0xd8dadc, { at: [0, 0.32, cz] }, 12);
+      b.cylinder(
+        0.06,
+        0.06,
+        0.3,
+        0x3a3c40,
+        { at: [0, 0.3, cz - 0.12], rot: [0, 0, Math.PI / 2] },
+        12,
+      );
+      // The jib folded down along the track, resting on a stand.
+      flat(b, 0.08, 0.08, len * 0.62, 0xe8eaec, [0, 0.4, cz + len * 0.31]);
+      for (let z = cz + 0.15, k = 0; z < cz + len * 0.6; z += 0.12, k++)
+        flat(b, 0.081, 0.081, 0.05, k % 2 ? 0x2a2c30 : 0xe6b834, [0, 0.4, z]);
+      flat(b, 0.04, 0.36, 0.04, 0x8a9096, [0, 0.18, cz + len * 0.55]);
+      b.cylinder(
+        0.05,
+        0.05,
+        0.05,
+        0x8a9096,
+        { at: [0, 0.4, cz + len * 0.62], rot: [0, 0, Math.PI / 2] },
+        10,
+      );
+    }),
+  );
+}
+
+/** MONOLITH's pennant planted on YOTTA's roof: a short pole, a black pennant with the white slab. 0.6 high; sways. */
+export const monolithPennant = looks([0.3, 0.1], 1, (b) => {
+  b.cylinder(0.04, 0.05, 0.03, 0x3a3c40, { at: [0, 0.015, 0] }, 10);
+  b.cylinder(0.01, 0.012, 0.58, 0xc4c9cf, { at: [0, 0.3, 0] }, 8);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute(
+    'position',
+    new THREE.Float32BufferAttribute([0, 0.58, 0, 0, 0.36, 0, 0.38, 0.47, 0.02], 3),
+  );
+  g.computeVertexNormals();
+  b.add(g, SUIT, {});
+  const back = new THREE.BufferGeometry();
+  back.setAttribute(
+    'position',
+    new THREE.Float32BufferAttribute([0, 0.58, 0, 0.38, 0.47, 0.02, 0, 0.36, 0], 3),
+  );
+  back.computeVertexNormals();
+  b.add(back, SUIT, {});
+  flat(b, 0.03, 0.12, 0.004, MONO_WHITE, [0.08, 0.47, 0.012]);
+  flat(b, 0.03, 0.12, 0.004, MONO_WHITE, [0.08, 0.47, -0.008]);
+});
+
+/** A walk of `n` pale paving slabs across the gravel, along x, centred. */
+export function pavingWalk(n: number): SetPiece {
+  return once(`pavingWalk:${n}`, () =>
+    looks([n * 0.42, 0.4], 1, (b) => {
+      for (let k = 0; k < n; k++)
+        flat(b, 0.36, 0.03, 0.36, tint(0xdcd6ca, (hash01(k, 1, 281) - 0.5) * 0.12), [
+          (k - (n - 1) / 2) * 0.42,
+          0.015,
+          (hash01(k, 2, 281) - 0.5) * 0.04,
+        ]);
+    }),
+  );
+}
+
+/** A black car's open rear door, along with the car (`blackCar`'s space): swung out on its near side. */
+export const carDoor = looks([0.56, 0.4], 1, (b) => {
+  const hinge: V3 = [0.02, 0.09, 0.11];
+  const a = 1.1;
+  const l = 0.15;
+  flat(
+    b,
+    l,
+    0.09,
+    0.012,
+    0x111216,
+    [hinge[0] - (Math.cos(a) * l) / 2, hinge[1], hinge[2] + (Math.sin(a) * l) / 2],
+    [0, a, 0],
+  );
+  flat(
+    b,
+    l * 0.8,
+    0.035,
+    0.013,
+    0x3a4250,
+    [hinge[0] - (Math.cos(a) * l) / 2, hinge[1] + 0.05, hinge[2] + (Math.sin(a) * l) / 2],
+    [0, a, 0],
+  );
+  // The cabin's pale inside showing through the gap.
+  flat(b, 0.13, 0.05, 0.004, 0x8a7a68, [hinge[0] - 0.07, 0.1, 0.112]);
+});
