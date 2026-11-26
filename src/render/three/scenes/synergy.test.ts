@@ -5,7 +5,7 @@ import { type LevelMap, getTile, parseLevelMap } from '../../../sim/level';
 import { projectPoint } from '../../projection';
 import { WALL_HEIGHT } from '../layout';
 import { SCENES } from '.';
-import { synergyPlan, synergyScene } from './synergy';
+import { BANNER, GONDOLA, synergyPlan, synergyScene } from './synergy';
 import { scenePose } from './downTheHall';
 import { groundModel } from './ground';
 import type { ScenePiece } from './types';
@@ -169,7 +169,28 @@ for (const [phase, map] of Object.entries(MAPS))
       }
       expect(find(sy.coatRack).length).toBe(1);
       expect(find(sy.briefcaseRow(5)).length).toBe(1);
-      expect(find(sy.coveredTrolley).length).toBeGreaterThanOrEqual(2);
+      // The catering trolleys stand one each side of the speed gates.
+      const gates = find(sy.speedGates)[0];
+      if (!gates) throw new Error('no gates');
+      const trolleys = find(sy.coveredTrolley);
+      expect(trolleys.some((t) => t.at.x < gates.at.x)).toBe(true);
+      expect(trolleys.some((t) => t.at.x > gates.at.x)).toBe(true);
+    });
+
+    it('gives four or more suits an idle: a head that turns, or the whole of them shifting', () => {
+      const heads = find(sy.suitHead);
+      const bodies = find(sy.suitFigure).filter((p) => p.alive === 'bob');
+      expect(heads.length + bodies.length).toBeGreaterThanOrEqual(4);
+      for (const h of heads) {
+        expect(h.alive).toBe('peck');
+        // On a headless figure of the same pose, at its neck.
+        const body = find(sy.suitFigure).find(
+          (p) =>
+            p.at.x === h.at.x && p.at.z === h.at.z && p.variant === sy.SUIT_HEADLESS + h.variant,
+        );
+        expect(body, `head at ${h.at.x}`).toBeDefined();
+        if (body) expect(h.at.y).toBeCloseTo(body.at.y + sy.SUIT_NECK * body.scale[1]);
+      }
     });
 
     it('builds the reception: the welcome screen right of the order cards, both logos, the desk', () => {
@@ -260,12 +281,13 @@ for (const [phase, map] of Object.entries(MAPS))
       for (const car of cars) {
         expect(car.at.y).toBeLessThan(-8);
         for (const s of screen(car)) {
-          expect(s.x).toBeGreaterThan(1340);
+          expect(s.x).toBeGreaterThan(1330);
           expect(s.x).toBeLessThan(1440);
           expect(s.y).toBeLessThan(755);
         }
       }
       expect(find(sy.hazards)[0]?.alive).toBe('blink');
+      expect(find(sy.carDoor).length).toBe(1);
       expect(find(sy.suitFigure).some((p) => p.variant === sy.SUIT_POSE.driver)).toBe(true);
     });
 
@@ -277,13 +299,61 @@ for (const [phase, map] of Object.entries(MAPS))
       expect(find(sy.yottaFlag)[0]?.alive).toBe('sway');
     });
 
-    it('parks the gondola low in front, at a corner, clear of the score and the timer', () => {
-      const g = scene.pieces.find(
-        (p) => p.at.z > front + 0.1 && p.at.y > GROUND - 1 && p.piece !== pigeon,
-      );
+    it('makes each setback roof a working roof: 4+ props, something moving, low by the room', () => {
+      const lift = GROUND + sy.FLOOR - 0.95;
+      for (const r of plan.corners) {
+        const on = scene.pieces.filter(
+          (p) =>
+            Math.abs(p.at.y - lift) < 0.5 &&
+            p.at.x > r.x0 - 1 &&
+            p.at.x < r.x1 + 1 &&
+            p.at.z > r.z0 - 0.1 &&
+            p.at.z < r.z1 + 0.1,
+        );
+        const kinds = new Set(on.map((p) => p.piece));
+        for (const k of [sy.condenser, sy.condenserFan, sy.satelliteDish])
+          expect(kinds.has(k)).toBe(true);
+        expect(kinds.size).toBeGreaterThanOrEqual(7);
+        expect(on.filter((p) => p.alive === 'spin').length).toBeGreaterThanOrEqual(2);
+        // Nothing over 0.6 above the roof within a tile of the room (the flag stands further out).
+        for (const p of on)
+          for (const v of worldPoints(p)) {
+            if (!aTileFromRoom(map, v.x, v.z) && p.piece !== sy.yottaFlag)
+              expect(v.y - lift, `piece at ${p.at.x.toFixed(2)}`).toBeLessThan(0.62);
+          }
+      }
+      // MONOLITH's pennant on the right-hand roof only.
+      const pennants = find(sy.monolithPennant);
+      expect(pennants.length).toBe(1);
+      expect(pennants[0]?.alive).toBe('sway');
+      expect(pennants[0]?.at.x).toBeGreaterThan(map.width / 2);
+    });
+
+    it('parks the gondola low in front, right of centre, well clear of the timer, an arm beside it', () => {
+      const g = find(sy.gondola(GONDOLA.len, sy.FLOOR - GONDOLA.lift - 0.02))[0];
       if (!g) throw new Error('no gondola');
       for (const v of worldPoints(g)) expect(v.y - GROUND).toBeLessThan(sy.FLOOR + 0.01);
       expect(g.at.x).toBeGreaterThan(map.width / 2);
+      for (const s of screen(g)) expect(s.x).toBeLessThan(1320 - 40);
+      expect(scene.pieces.some((p) => p.piece === sy.bmuArm(1.0) && p.at.z > front)).toBe(true);
+    });
+
+    it("hangs YOTTA's banner down the façade under the boardroom, ending above the pause hint", () => {
+      const b = find(sy.facadeBanner(BANNER.w, BANNER.h))[0];
+      if (!b) throw new Error('no banner');
+      for (const s of screen(b)) {
+        expect(s.x).toBeGreaterThan(690);
+        expect(s.x).toBeLessThan(770);
+        expect(s.y).toBeLessThan(762);
+      }
+      for (const t of ['YOTTA', '×', 'MONOLITH']) expect(sy.spellable(t)).toBe(true);
+    });
+
+    it('dresses the façade: the floors below, their lit windows hot, the glint, the sun on the parapet', () => {
+      expect(find(sy.litWindows(map.width)).every((p) => p.hot)).toBe(true);
+      expect(find(sy.litWindows(map.width)).length).toBe(1);
+      expect(find(sy.floorsBelow(map.width)).length).toBe(1);
+      expect(find(sy.parapetSun)[0]?.hot).toBe(true);
     });
 
     it('drops the city far below and fills both sides, the back and the front', () => {

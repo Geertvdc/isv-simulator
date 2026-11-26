@@ -21,16 +21,24 @@ import {
   billboard,
   billboardWords,
   blackCar,
+  bmuArm,
+  bmuTrack,
   briefcaseRow,
+  carDoor,
   coatRack,
+  CONDENSER_TOP,
+  condenser,
+  condenserFan,
   credenza,
   coveredTrolley,
   curtainReturn,
   dropOff,
+  facadeBanner,
   FLIP_TOP,
   flipChart,
   FLOOR,
   floorsBelow,
+  litWindows,
   gateLights,
   gondola,
   HELI_MAST,
@@ -39,7 +47,10 @@ import {
   lanyardTable,
   loafCat,
   monolithGlint,
+  monolithPennant,
   notebookBox,
+  parapetSun,
+  pavingWalk,
   receptionDesk,
   receptionFloor,
   receptionWall,
@@ -51,8 +62,11 @@ import {
   setbackRoof,
   skylight,
   speedGates,
+  SUIT_HEADLESS,
+  SUIT_NECK,
   SUIT_POSE,
   suitFigure,
+  suitHead,
   sunFleck,
   tallPlant,
   umbrellaStand,
@@ -164,7 +178,13 @@ const ALIVE: ReadonlyMap<SetPiece, AliveKind> = new Map<SetPiece, AliveKind>([
   [yottaFlag, 'sway'],
   [urnSteam, 'wisp'],
   [riverBoat, 'bob'],
+  [condenserFan, 'spin'],
+  [monolithPennant, 'sway'],
 ]);
+/** The window cleaners' gondola: its length, and how far under the slab's foot its rail hangs. */
+export const GONDOLA = { len: 1.4, lift: -0.06 } as const;
+/** YOTTA's welcome banner down the façade: its size, and where it hangs on screen (its centre). */
+export const BANNER = { w: 0.9, h: 1.3, sx: 730 } as const;
 /** Someone carrying something holds it this far out and this high. */
 const CARRY = { reach: 0.3, lift: 0.5 } as const;
 
@@ -339,6 +359,11 @@ export function synergyScene(map: LevelMap): Scene {
     const p = pieces[pieces.length - 1];
     if (p) p.hot = true;
   };
+  /** Makes the last piece put a living one of `kind`, if it's a tile from the room. */
+  const live = (kind: AliveKind) => {
+    const p = pieces[pieces.length - 1];
+    if (p && clearOfRoom(p.at.x, p.at.z)) p.alive = kind;
+  };
   /** Puts a near prop `r` round and `high` tall only where it keeps clear of the HUD. */
   const putClear = (
     piece: SetPiece,
@@ -362,9 +387,26 @@ export function synergyScene(map: LevelMap): Scene {
   };
   const person = (x: number, z: number, yaw: number, p: ScenePerson['pose'], lift = FLOOR) =>
     people.push({ at: gridToWorld(x, z, GROUND + lift), yaw, pose: p, grey: PERSON_GREY });
-  /** One of MONOLITH's suits, in pose `v`, on the reception floor where it keeps clear of the HUD. */
-  const suit = (x: number, z: number, yaw: number, v: number) =>
-    putClear(suitFigure, x, z, 0.3 * SUIT_SCALE, 1.0 * SUIT_SCALE, yaw, v, FLOOR, SUIT_SCALE);
+  /**
+   * One of MONOLITH's suits, in pose `v`, on the reception floor where it keeps clear of the
+   * HUD. `idle`: its head turns and dips on its own (`head`: glancing round, at the watch, at
+   * the tablet), or the whole of it shifts its weight and turns a little (`body`: on the
+   * phone). Still on low, like every living prop.
+   */
+  const suit = (x: number, z: number, yaw: number, v: number, idle?: 'head' | 'body') => {
+    const headless = idle === 'head';
+    const look = headless ? SUIT_HEADLESS + v : v;
+    if (
+      !putClear(suitFigure, x, z, 0.3 * SUIT_SCALE, 1.0 * SUIT_SCALE, yaw, look, FLOOR, SUIT_SCALE)
+    )
+      return false;
+    if (idle === 'body') live('bob');
+    if (headless) {
+      put(suitHead, x, z, yaw, v, 'near', FLOOR + SUIT_NECK * SUIT_SCALE, SUIT_SCALE);
+      live('peck');
+    }
+    return true;
+  };
   const c = CITY;
 
   // Where the frame's edges fall far below, a little past them.
@@ -373,10 +415,13 @@ export function synergyScene(map: LevelMap): Scene {
   const edgeR = Math.max(xAt(VIEW.width, topZ, DEEP), xAt(VIEW.width, F + 3, DEEP)) + 2;
 
   // ---- The city far below: the ground ----
-  // The drop-off lane on the right, where it shows past the slab's edge.
-  const dropZ = 0.4;
-  const dropX = Math.max(R + 3.6, xAt(1402, dropZ, DEEP));
+  // The bridge on the right, just past the slab's edge, and the drop-off lane running off it
+  // toward the tower (MONOLITH's convoy waits there, pointing back across the river).
+  const bridgeX = Math.max(R + 4.2, xAt(1370, RIVER.near, DEEP));
   const dropW = 0.5;
+  const dropX = bridgeX - 0.12;
+  const dropLen = 3.4;
+  const dropZ = RIVER.near + 0.18 + dropLen / 2;
   {
     const plazaL = L - PLAZA_L;
     const plazaR = dropX - dropW / 2;
@@ -403,10 +448,14 @@ export function synergyScene(map: LevelMap): Scene {
     const { w, d, front, top } = MONO;
     const h = top - DEEP;
     put(monolithHQ(w, d, h), monoX, front, 0, 0, 'far', DEEP);
-    // The afternoon sun in its black glass, and the sun's own fleck.
-    const gh = 6;
-    put(monolithGlint(w, gh), monoX, front + 0.035, 0, 0, 'far', top - 0.42 - gh);
-    put(sunFleck, monoX + w * 0.28, front + 0.05, 0, 0, 'far', top - 1.1);
+    // The afternoon sun in its black glass: a soft streak down a few bays right of the logo,
+    // the sun's own fleck at its top, and the sun caught on the helipad's parapet.
+    const gh = 5.2;
+    const gx = w * 0.24;
+    put(monolithGlint(w, gh, gx), monoX, front + 0.035, 0, 0, 'far', top - 0.45 - gh);
+    put(sunFleck, monoX + gx + 0.1, front + 0.05, 0, 0, 'far', top - 0.95);
+    hot();
+    put(parapetSun, monoX - w * 0.24 + 0.35, front + 0.035, 0, 0, 'far', top + 0.07);
     hot();
     put(monolithLogo(0.07), monoX + 0.15, front + 0.03, 0, 0, 'far', top - 0.25);
     hot();
@@ -427,7 +476,7 @@ export function synergyScene(map: LevelMap): Scene {
       HELI,
     );
     // The bridge over to its plaza, boats on the river.
-    const bx = Math.max(R + 4.2, xAt(1400, RIVER.near, DEEP));
+    const bx = bridgeX;
     put(
       riverBridge(RIVER.near - RIVER.far + 1.4 * c, 1.2 * c, 0.35 * c),
       bx,
@@ -560,34 +609,29 @@ export function synergyScene(map: LevelMap): Scene {
 
   // ---- The drop-off far below on the right: MONOLITH's convoy, the driver waiting ----
   {
-    const len = 3.4;
-    put(dropOff(len, dropW), dropX, dropZ, 0, 0, 'far', DEEP + 0.01);
-    const cars = 5;
-    const size = c * CAR * 2;
-    const step = 0.62 * size;
-    const z0 = dropZ - ((cars - 1) * step) / 2;
+    put(dropOff(dropLen, dropW), dropX, dropZ, 0, 0, 'far', DEEP + 0.01);
+    const cars = 4;
+    // A touch bigger than the city's cars, so the convoy reads at the frame's edge.
+    const size = c * CAR * 2.4;
+    const step = 0.64 * size;
+    // Nose to the bridge, the lead car at the lane's end, the rest queued back toward the tower.
+    const lead = RIVER.near + 0.62;
+    const yaw = Math.PI / 2;
     for (let k = 0; k < cars; k++)
-      put(blackCar, dropX, z0 + k * step, -Math.PI / 2, 0, 'far', DEEP + 0.01, size);
-    // The lead car's hazards blinking, its driver beside it in his cap.
-    const lead = z0 + (cars - 1) * step;
-    put(hazards, dropX, lead, -Math.PI / 2, 0, 'far', DEEP + 0.01, size);
+      put(blackCar, dropX, lead + k * step, yaw, 0, 'far', DEEP + 0.01, size);
+    // The lead car's hazards blinking, its back door open, its driver beside it in his cap.
+    put(hazards, dropX, lead, yaw, 0, 'far', DEEP + 0.01, size);
     hot();
-    put(
-      suitFigure,
-      dropX - dropW / 2 - 0.05,
-      lead + 0.05,
-      -Math.PI / 2 + 0.4,
-      SUIT_POSE.driver,
-      'far',
-      DEEP + 0.01,
-      0.34,
-    );
+    put(carDoor, dropX, lead, yaw, 0, 'far', DEEP + 0.01, size);
+    put(suitFigure, dropX + 0.22, lead + 0.2, -0.4, SUIT_POSE.driver, 'far', DEEP + 0.01, 0.34);
   }
 
   // ---- The tower's own curtain wall dropping away under the front ----
   put(towerFacade(R - L + 0.04, -DEEP), L - 0.02, F + 0.02, 0, 0, 'far');
   // The floors below behind it: blinds down against the sun, a lamp on, notes on the glass.
   put(floorsBelow(R - L), L, F + 0.065, 0, 0, 'far');
+  put(litWindows(R - L), L, F + 0.065, 0, 0, 'far');
+  hot();
 
   // ---- The corners: setback roofs a storey down ----
   for (const [k, r] of plan.corners.entries()) {
@@ -600,15 +644,31 @@ export function synergyScene(map: LevelMap): Scene {
     const z1 = r.z1 - 0.02;
     const lift = FLOOR - SETBACK;
     put(setbackRoof(x1 - x0, z1 - z0), (x0 + x1) / 2, (z0 + z1) / 2, 0, 0, 'far', lift);
-    // Pigeons on the gravel, at the back where they're a tile from the room.
-    const px = left ? r.x0 + 0.45 : r.x1 - 0.45;
-    put(pigeon, px, r.z0 + 0.45, left ? 0.8 : -0.8, k, 'near', lift);
-    put(pigeon, px + (left ? -0.35 : 0.35), r.z0 + 0.85, left ? -0.4 : 0.5, k + 1, 'near', lift);
-    // A skylight over the floor below; on the right-hand roof YOTTA's flag and a dish.
-    put(skylight, (x0 + x1) / 2 + (left ? -0.2 : 0.2), z1 - 0.75, 0, 0, 'near', lift);
+    // Each roof is a working roof, laid out from its outer edge (`o` in from it) so the two
+    // mirror: the maintenance machine's track along the edge, parked at the back; two
+    // condensers with their fans turning at the back, where they're a tile from the room; a
+    // paving-slab walk out from the hatch to them; a dish; pigeons on the walk; the skylight.
+    // Everything near the room stays under 0.6.
+    const ox = (o: number) => (left ? x0 + o : x1 - o);
+    const side = left ? 1 : -1;
+    /** A depth `d` back from the roof's back edge's tile line. */
+    const oz = (d: number) => r.z0 + 0.5 + d;
+    put(bmuTrack(z1 - z0 - 0.3), ox(0.24), (z0 + z1) / 2, 0, 0, 'near', lift);
+    for (const [k2, cz] of [oz(0.08), oz(0.68)].entries()) {
+      put(condenser, ox(0.86), cz, left ? Math.PI / 2 : -Math.PI / 2, 0, 'near', lift);
+      put(condenserFan, ox(0.86), cz, k2 * 0.7, 0, 'near', lift + CONDENSER_TOP);
+    }
+    put(pavingWalk(5), ox(1.75), oz(1.25), 0, 0, 'near', lift);
+    put(pavingWalk(3), ox(1.45), oz(0.75), Math.PI / 2, 0, 'near', lift);
+    put(satelliteDish, ox(1.6), oz(-0.12), side * 0.6, 0, 'near', lift);
+    // Pigeons on the walk, at the back where they're a tile from the room.
+    put(pigeon, ox(1.42), oz(0.42), side * 0.8, k, 'near', lift + 0.02);
+    put(pigeon, ox(1.7), oz(1.12), side * -0.4, k + 1, 'near', lift + 0.02);
+    put(skylight, ox(1.95), z1 - 0.75, 0, 0, 'near', lift);
     if (!left) {
-      put(yottaFlag, r.x1 + 0.35, r.z0 + 0.4, -0.3, 0, 'near', lift + 0.02);
-      put(satelliteDish, r.x1 + 0.4, (z0 + z1) / 2, -0.6, 0, 'near', lift);
+      // YOTTA's flag at the outer corner, and beside it the pennant MONOLITH planted this morning.
+      put(yottaFlag, ox(0.55), oz(1.3), -0.3, 0, 'near', lift + 0.02);
+      put(monolithPennant, ox(1.0), oz(1.32), -0.4, 0, 'near', lift + 0.02);
     }
   }
 
@@ -680,7 +740,7 @@ export function synergyScene(map: LevelMap): Scene {
     putClear(coatRack, rackX, zWall + 0.45, 0.3, 1.45, 0.2, 0, FLOOR);
     putClear(umbrellaStand, rackX - 0.55, zWall + 0.3, 0.15, 0.62, 0, 0, FLOOR);
     // Their guard in front of the coats, hands behind his back, the earpiece in.
-    suit(rackX + 0.2, zWall + 1.0, -0.35, SUIT_POSE.guard);
+    suit(rackX + 0.2, zWall + 1.0, -0.35, SUIT_POSE.guard, 'head');
     // MONOLITH's entourage, in a tight block right of the desk: on the phone, arms crossed,
     // pointing at the boardroom, sipping, checking the time, reading the deck on a tablet.
     const ex = wx + SCREEN.w / 2 - 0.5;
@@ -688,13 +748,13 @@ export function synergyScene(map: LevelMap): Scene {
     // A rug where the visitors wait, and one under the desk's front.
     put(rug(3.4, 1.5), ex + 1.45, ez - 0.05, 0, 0, 'far', FLOOR);
     put(rug(deskLen + 0.6, 1.0), wx, deskZ + 0.75, 0, 0, 'far', FLOOR);
-    suit(ex + 0.25, ez + 0.25, -0.3, SUIT_POSE.phoning);
-    suit(ex + 0.8, ez - 0.35, -0.1, SUIT_POSE.armsCrossed);
+    suit(ex + 0.25, ez + 0.25, -0.3, SUIT_POSE.phoning, 'body');
+    suit(ex + 0.8, ez - 0.35, -0.1, SUIT_POSE.armsCrossed, 'head');
     suit(ex + 1.35, ez + 0.4, 0.35, SUIT_POSE.pointing);
     suit(ex + 1.85, ez - 0.25, -0.5, SUIT_POSE.sipping);
-    suit(ex + 2.35, ez + 0.3, -0.2, SUIT_POSE.watch);
+    suit(ex + 2.35, ez + 0.3, -0.2, SUIT_POSE.watch, 'head');
     suit(ex + 2.75, ez - 0.4, -0.6, SUIT_POSE.briefcase);
-    suit(wx + deskLen / 2 + 0.05, zWall + 0.75, -0.9, SUIT_POSE.tablet);
+    suit(wx + deskLen / 2 + 0.05, zWall + 0.75, -0.9, SUIT_POSE.tablet, 'head');
     // The workshop's A-board, pointing everyone at the boardroom.
     putClear(workshopBoard, ex - 0.35, ez + 0.2, 0.25, 0.56, 0.3, 0, FLOOR, 1, 0.16);
     // A YOTTA staffer bringing more MONOLITH notebooks through from the left.
@@ -735,29 +795,43 @@ export function synergyScene(map: LevelMap): Scene {
         if (putClear(piece, x, z, r, high, yaw, v, FLOOR, 1, rz)) return z;
       return null;
     };
-    backmost(coveredTrolley, rx0 + 0.65, 0.47, 0.62, 0.3, 0);
+    backmost(coveredTrolley, rx0 + 0.6, 0.47, 0.58, 0.3, 0);
     const gx = rx0 + 1.85;
     const gz = backmost(speedGates, gx, 0.65, 0.56, 0.26);
     if (gz !== null) {
       put(gateLights, gx, gz, 0, 0, 'near', FLOOR);
       hot();
     }
-    backmost(lanyardTable, rx0 + 3.75, 0.48, 0.56, 0.26);
-    backmost(visitorsSign, rx0 + 4.7, 0.3, 0.8, 0.2, 0, -0.15);
-    backmost(briefcaseRow(5), rx0 + 5.85, 0.95, 0.3, 0.06);
-    backmost(coveredTrolley, rx0 + 7.15, 0.47, 0.62, 0.3, 1);
+    backmost(coveredTrolley, rx0 + 3.1, 0.47, 0.58, 0.3, 1);
+    backmost(lanyardTable, rx0 + 4.15, 0.48, 0.56, 0.26);
+    backmost(visitorsSign, rx0 + 5.0, 0.3, 0.8, 0.2, 0, -0.15);
+    backmost(briefcaseRow(5), rx0 + 6.2, 0.95, 0.3, 0.06);
   }
 
-  // ---- In front: the window cleaners' gondola parked low at the right-hand corner ----
+  // ---- In front: YOTTA's banner down the façade, the window cleaners' gondola, a parked arm ----
   {
-    // As far into the corner as it goes while it clears the timer, its rail just under the slab.
-    const len = 1.4;
+    // The banner under the boardroom, between the keyboards, ending above the pause hint.
+    const bz = F + 0.08;
+    const top = -0.04;
+    const bx = xAt(BANNER.sx, bz, top - BANNER.h / 2);
+    if (clear(bx, bz, BANNER.w / 2, top, 0.08, top - BANNER.h))
+      put(facadeBanner(BANNER.w, BANNER.h), bx, bz, 0, 0, 'near', top);
+  }
+  {
+    // Parked toward the right-hand corner but well in from it, clear of the timer with room to
+    // spare, its rail just under the slab.
+    const { len, lift } = GONDOLA;
     const gz = F + 0.22;
-    const lift = -0.06;
-    for (let gx = R - 0.15 - len / 2; gx > R - 3; gx -= 0.1) {
-      if (!clear(gx, gz, len / 2, FLOOR - 0.02, 0.2, lift - 0.38)) continue;
+    const start = Math.min(R - 0.15 - len / 2, xAt(1262, gz, lift - 0.2) - len / 2);
+    for (let gx = start; gx > R - 5; gx -= 0.1) {
+      if (!clear(gx, gz, len / 2 + 0.1, FLOOR - 0.02, 0.2, lift - 0.42)) continue;
       put(gondola(len, FLOOR - lift - 0.02), gx, gz, 0, 0, 'near', lift);
       put(pigeon, gx - 0.35, gz + 0.16, 0.5, 1, 'near', lift + 0.0125);
+      // The second machine's arm parked flat along the façade, folded into the corner.
+      const armLen = 1.0;
+      const ax = Math.max(gx + len / 2 + 0.25, R - 0.15 - armLen);
+      if (clear(ax + armLen / 2, F + 0.12, armLen / 2 + 0.08, -0.02, 0.1, -0.3))
+        put(bmuArm(armLen), ax, F + 0.02, 0, 0, 'near', -0.02);
       break;
     }
   }
