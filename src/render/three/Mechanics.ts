@@ -26,7 +26,7 @@ import { gridToWorld } from '../projection';
 import type { RoundView } from '../roundView';
 import { STATION_HEIGHT, blockHeight } from './layout';
 import { LiftCars } from './liftCars';
-import type { MovingTilesLook, RoomDressing } from './rooms/types';
+import type { GatesLook, MovingTilesLook, RoomDressing } from './rooms/types';
 import { disposeTree } from './stage';
 
 const WET_COLOR = 0x3d8bff;
@@ -89,6 +89,8 @@ export class Mechanics {
 
   /** The room's own look for the moving tiles, if its dressing has one (see `RoomDressing.movingTiles`). */
   private readonly movingLook: MovingTilesLook | undefined;
+  /** The room's own look for turnstiles and meeting doors, if its dressing has one (see `RoomDressing.gates`). */
+  private readonly gatesLook: GatesLook | undefined;
 
   constructor(
     private readonly world: THREE.Scene,
@@ -98,6 +100,7 @@ export class Mechanics {
     world.add(this.root);
     this.cars = new LiftCars(this.root, map);
     this.movingLook = dressing?.movingTiles?.(this.root, map);
+    this.gatesLook = dressing?.gates?.(this.root, map);
     for (const mark of map.marks) {
       if (!WET_KINDS.has(mark.kind)) continue;
       const mesh = new THREE.Mesh(this.puddle, this.zoneMaterial);
@@ -119,8 +122,11 @@ export class Mechanics {
     this.syncChutes(state, timeMs);
     if (this.movingLook) this.movingLook.sync(state, timeMs);
     else this.syncReorg(state, timeMs);
-    this.syncGates(state);
-    this.syncDoors(state);
+    if (this.gatesLook) this.gatesLook.sync(state, timeMs);
+    else {
+      this.syncGates(state);
+      this.syncDoors(state);
+    }
     this.syncCampus(state, timeMs);
   }
 
@@ -460,6 +466,7 @@ export class Mechanics {
 
   destroy(): void {
     this.movingLook?.destroy();
+    this.gatesLook?.destroy();
     this.world.remove(this.root);
     disposeTree(this.root);
     this.puddle.dispose();

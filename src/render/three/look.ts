@@ -151,6 +151,8 @@ export const FLOOR_COLORS: Readonly<Record<FloorTheme, readonly [number, number]
   towerFloors: [0x606c80, 0x5c687b],
   // The tower's boardroom floor: the dev and ops sides' warmer slate broadloom (late sun); the second another dye lot.
   boardroomFloors: [0x6d6f81, 0x696b7c],
+  // The floor mid-reorg: placeholder until The Reorg pass picks its carpet.
+  reorgFloors: [0x606c80, 0x5c687b],
 };
 
 /** Wall colors per theme: face and top. Caps stay darker than stations, so the eye goes to the stations. */
@@ -180,6 +182,8 @@ export const WALL_COLORS: Readonly<Record<WallTheme, { face: number; top: number
   tower: { face: 0xd3d6d8, top: 0x737c85 },
   // The tower's boardroom floor: walnut on a dark stone plinth, capped with dark honed stone.
   boardroom: { face: 0x5c5550, top: 0x5e5c59 },
+  // The floor mid-reorg: placeholder until The Reorg pass picks its walls.
+  reorg: { face: 0xd3d6d8, top: 0x737c85 },
 };
 
 /** Marks the room's warm lamps, which only `medium` and `high` quality light (see `Stage`). */

@@ -6,6 +6,7 @@ import { LOFT_ROOM } from './loft';
 import { LOWER_FLOORS_ROOM } from './lowerFloors';
 import { MID_RISE_ROOM } from './midRise';
 import { OFFICE_PARK_ROOM } from './officePark';
+import { REORG_ROOM } from './reorg';
 import { STAGE_SET_ROOM } from './stageSet';
 import { TOWER_ROOM } from './tower';
 import { UPPER_FLOORS_ROOM } from './upperFloors';
@@ -28,6 +29,7 @@ export const ROOMS: Partial<Record<WallTheme, RoomDressing>> = {
   upperFloors: UPPER_FLOORS_ROOM,
   tower: TOWER_ROOM,
   boardroom: BOARDROOM_ROOM,
+  reorg: REORG_ROOM,
 };
 
 /**

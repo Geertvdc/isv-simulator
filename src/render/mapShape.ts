@@ -97,6 +97,8 @@ export const WALL_DECOS: Readonly<Record<WallTheme, readonly string[]>> = {
   tower: ['whiteboard', 'officeClock', 'dashboard'],
   // The boardroom floor hangs its own pieces (see `rooms/boardroomRoom.ts`); this is the fallback.
   boardroom: ['whiteboard', 'officeClock'],
+  // The reorg floor hangs its own pieces (see `rooms/reorgRoom.ts`); this is the fallback.
+  reorg: ['whiteboard', 'officeClock', 'dashboard'],
 };
 /** No two decorations this close along a wall are the same. */
 export const WALL_DECO_SPREAD = 4;
