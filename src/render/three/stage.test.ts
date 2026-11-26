@@ -95,6 +95,25 @@ describe('vignetteCss', () => {
     expect(right).toBeLessThan(left);
     expect(left).toBeLessThan(css.indexOf('farthest-corner'));
   });
+
+  it('adds the low glows on low quality only, over the others', () => {
+    const vignette = {
+      color: 0x34364a,
+      opacity: 0.35,
+      inner: 0.7,
+      glows: [{ color: 0xffdcae, opacity: 0.2, x: 0.5, y: 0, reach: 0.55 }],
+      lowGlows: [{ color: 0xe4ecfa, opacity: 0.32, x: 0.66, y: 0.06, reach: 0.3 }],
+    };
+    expect(vignetteCss(vignette)).not.toContain('at 66% 6%');
+    expect(vignetteCss(vignette, false)).toBe(vignetteCss(vignette));
+    const low = vignetteCss(vignette, true);
+    expect(low.indexOf('at 66% 6%')).toBeGreaterThan(-1);
+    expect(low.indexOf('at 66% 6%')).toBeLessThan(low.indexOf('at 50% 0%'));
+    // A level without low glows looks the same on every quality.
+    for (const [id, a] of Object.entries(ATMOSPHERES))
+      if (a.vignette && !a.vignette.lowGlows)
+        expect(vignetteCss(a.vignette, true), id).toBe(vignetteCss(a.vignette));
+  });
 });
 
 describe('gradeFilter', () => {

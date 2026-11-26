@@ -219,7 +219,7 @@ export class Stage {
   private showVignette(vignette: Atmosphere['vignette']): void {
     const style = this.vignette.style;
     style.display = vignette ? 'block' : 'none';
-    if (vignette) style.background = vignetteCss(vignette);
+    if (vignette) style.background = vignetteCss(vignette, this.quality === 'low');
     this.renderer.domElement.style.filter = gradeFilter(vignette);
     // The level's exposure (`vignette.exposure`); the stage's own for every other level.
     this.renderer.toneMappingExposure = exposureFor(vignette);
@@ -307,8 +307,11 @@ export function applyPose(cam: THREE.PerspectiveCamera, pose: CameraPose): void 
   cam.updateMatrixWorld();
 }
 
-/** The CSS background of a vignette: its edges, the optional edge band, and the optional glow over them. */
-export function vignetteCss(vignette: NonNullable<Atmosphere['vignette']>): string {
+/**
+ * The CSS background of a vignette: its edges, the optional edge band, and
+ * the optional glows over them (on `low`, its `lowGlows` as well).
+ */
+export function vignetteCss(vignette: NonNullable<Atmosphere['vignette']>, low = false): string {
   const edge = cssRgba(vignette.color, vignette.opacity);
   const mid = cssRgba(vignette.color, vignette.opacity * 0.35);
   const inner = Math.round(vignette.inner * 100);
@@ -326,7 +329,11 @@ export function vignetteCss(vignette: NonNullable<Atmosphere['vignette']>): stri
       edges,
     ].join(', ');
   }
-  const glows = [vignette.glow, ...(vignette.glows ?? [])].filter((g) => g !== undefined);
+  const glows = [
+    vignette.glow,
+    ...(vignette.glows ?? []),
+    ...(low ? (vignette.lowGlows ?? []) : []),
+  ].filter((g) => g !== undefined);
   if (glows.length === 0) return edges;
   // The glows over the edges, the last on top: wide soft ellipses, strongest at their centres.
   return [...glows.reverse().map(glowCss), edges].join(', ');
