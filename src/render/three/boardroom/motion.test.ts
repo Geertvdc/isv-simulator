@@ -18,6 +18,7 @@ import {
   leafPoses,
   panelPose,
   reorgClock,
+  runWhole,
 } from './motion';
 import { type WallRun, desks, solidIn, wallRuns } from './track';
 
@@ -145,10 +146,9 @@ describe('the operable wall in motion', () => {
         for (let k = 0; k < run.length; k++) {
           for (const leaf of leafPoses(run, panelPose(run, k, clock))) {
             for (const table of tables) {
-              // The top is about 0.97 by 0.76; a leaf is 0.14 thick: its middle must stay out of that.
+              // The top is about 0.97 by 0.76; a leaf is 0.2 thick: its middle must stay out of that.
               const inside =
-                Math.abs(leaf.x - table.x) < 0.48 + 0.07 &&
-                Math.abs(leaf.z - table.z) < 0.38 + 0.07;
+                Math.abs(leaf.x - table.x) < 0.48 + 0.1 && Math.abs(leaf.z - table.z) < 0.38 + 0.1;
               expect({ tick, k, inside }).toEqual({ tick, k, inside: false });
             }
           }
@@ -156,6 +156,37 @@ describe('the operable wall in motion', () => {
       }
     });
   }
+
+  it('draws the head rail only while every panel stands in its place', () => {
+    for (const { map, steps } of CASES) {
+      const run = theRun(map);
+      for (const tick of ticks(steps)) {
+        const clock = clockAt(steps, tick);
+        if (!runWhole(run, clock)) continue;
+        for (let k = 0; k < run.length; k++) {
+          const pose = panelPose(run, k, clock);
+          expect({ tick, k, s: pose.s }).toEqual({ tick, k, s: k + 0.5 });
+          expect(pose.fold + Math.abs(pose.lateral) + pose.lift).toBe(0);
+        }
+      }
+    }
+  });
+
+  it('gets a table half under its ticket soon after the walls open', () => {
+    // The sim puts a ticket on a half's new spot at the switch; count the ticks the half is off it.
+    const run = theRun(SYNERGY.map);
+    const [desk] = desks(SYNERGY.map);
+    if (!desk) throw new Error('no desk');
+    const [a, b] = desk.spots;
+    if (!a || !b) throw new Error('no spots');
+    const span = Math.hypot(b.x - a.x, b.y - a.y);
+    let off = 0;
+    for (let t = 0; t < 60; t++) {
+      const roll = deskRoll(run, { from: 1, to: 2, t });
+      if ((1 - roll) * span > 0.25) off++;
+    }
+    expect(off).toBeLessThanOrEqual(22);
+  });
 
   it('is whole a few ticks before the switch and opens only after it', () => {
     const run = theRun(SYNERGY.map);
