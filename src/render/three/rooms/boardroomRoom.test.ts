@@ -9,11 +9,15 @@ import {
   BOARDROOM_CLUSTERS,
   BOARDROOM_WEAR,
   BOARDROOM_WEAR_KINDS,
+  FRONT_CLUSTERS,
+  FRONT_SILL_Y,
   ON_GLASS,
   POCKET_SWAP,
+  SLATE_WEAR,
   boardroomBox,
   boardroomRoom,
   boardroomThreshold,
+  rugTiles,
 } from './boardroomRoom';
 
 const raw = SYNERGY.map;
@@ -88,8 +92,13 @@ describe('Synergy room plan', () => {
       if (z === 'boardroom') {
         expect(w).toBeGreaterThanOrEqual(BOARDROOM_WEAR.boardroom);
         expect(w).toBeLessThan(BOARDROOM_WEAR.terrazzo);
+        if (rugTiles(map).some((r) => r.x === x && r.y === y)) {
+          expect(w).toBeGreaterThanOrEqual(BOARDROOM_WEAR.rug);
+          continue;
+        }
         const edge = x === b.x0 || x === b.x1 || y === b.y0 || y === b.y1;
         expect(w > BOARDROOM_WEAR.boardroom).toBe(edge);
+        expect(w).toBeLessThan(BOARDROOM_WEAR.rug);
       } else if (z === 'corridor') {
         expect(w).toBeGreaterThanOrEqual(BOARDROOM_WEAR.terrazzo);
         expect(w).toBeLessThan(BOARDROOM_WEAR.threshold);
@@ -101,13 +110,12 @@ describe('Synergy room plan', () => {
 
   it('places wear on every zone, and none on a spawn', () => {
     const wear = Object.values(plan.floorWear);
-    for (const w of [
-      BOARDROOM_WEAR.castor,
-      BOARDROOM_WEAR.walkX,
-      BOARDROOM_WEAR.doorScuff,
-      BOARDROOM_WEAR.sticky,
-    ])
-      expect(wear).toContain(w);
+    const slate = wear.filter((w) => w < BOARDROOM_WEAR.boardroom);
+    for (const f of Object.values(SLATE_WEAR))
+      expect(
+        slate.some((w) => (w & f) !== 0),
+        `flag ${f}`,
+      ).toBe(true);
     expect(wear.some((w) => w === BOARDROOM_WEAR.walkBoth || w === BOARDROOM_WEAR.walkFront)).toBe(
       true,
     );
@@ -118,6 +126,69 @@ describe('Synergy room plan', () => {
         w,
       );
     }
+  });
+
+  it('wears walk lines from the inbox to the keyboards and from the pipeline to the ship', () => {
+    const walk = SLATE_WEAR.walkN | SLATE_WEAR.walkS | SLATE_WEAR.walkW | SLATE_WEAR.walkE;
+    const walked = (x: number, y: number) => ((plan.floorWear[key(x, y)] ?? 0) & walk) !== 0;
+    const fronts = (tile: string) => {
+      const out: [number, number][] = [];
+      for (let y = 0; y < map.height; y++)
+        for (let x = 0; x < map.width; x++)
+          if (getTile(map, x, y) === tile)
+            for (const [dx, dy] of [
+              [0, 1],
+              [0, -1],
+              [1, 0],
+              [-1, 0],
+            ] as const)
+              if (getTile(map, x + dx, y + dy) === 'floor') out.push([x + dx, y + dy]);
+      return out;
+    };
+    for (const [from, to] of [
+      ['inbox', 'keyboard'],
+      ['pipeline', 'ship'],
+    ] as const) {
+      expect(
+        fronts(from).some(([x, y]) => walked(x, y)),
+        from,
+      ).toBe(true);
+      expect(
+        fronts(to).some(([x, y]) => walked(x, y)),
+        to,
+      ).toBe(true);
+    }
+    // A line's ends match up: a tile walked toward its neighbour is walked back from it.
+    for (const [k, w] of Object.entries(plan.floorWear)) {
+      if (w >= BOARDROOM_WEAR.boardroom) continue;
+      const [x, y] = k.split(',').map(Number) as [number, number];
+      const back = (dx: number, dy: number, f: number) =>
+        ((plan.floorWear[key(x + dx, y + dy)] ?? 0) & f) !== 0 ||
+        spawns.includes(key(x + dx, y + dy));
+      if (w & SLATE_WEAR.walkE) expect(back(1, 0, SLATE_WEAR.walkW), k).toBe(true);
+      if (w & SLATE_WEAR.walkS) expect(back(0, 1, SLATE_WEAR.walkN), k).toBe(true);
+    }
+  });
+
+  it('lays a rug where the table stands in either layout, bordered on its outer edges', () => {
+    const rugs = rugTiles(map);
+    // Both layouts' rolling desks: the table in the middle, its halves at the sides.
+    expect(rugs.length).toBe(4);
+    for (const r of rugs) {
+      expect(plan.zones[key(r.x, r.y)]).toBe('boardroom');
+      const w = (plan.floorWear[key(r.x, r.y)] ?? 0) - BOARDROOM_WEAR.rug;
+      expect(w).toBeGreaterThanOrEqual(0);
+      expect(w).toBeLessThan(16);
+      const alone = (dx: number, dy: number) =>
+        !rugs.some((q) => q.x === r.x + dx && q.y === r.y + dy);
+      expect(w).toBe(
+        (alone(-1, 0) ? 1 : 0) |
+          (alone(1, 0) ? 2 : 0) |
+          (alone(0, -1) ? 4 : 0) |
+          (alone(0, 1) ? 8 : 0),
+      );
+    }
+    expect(rugTiles(phase2)).toEqual(rugs);
   });
 
   it('dresses every face on the back wall and the stub line the camera sees', () => {
@@ -158,13 +229,16 @@ describe('Synergy room plan', () => {
         const swap = plan.swaps[key(x, y)];
         expect(swap, key(x, y)).toBeDefined();
         const side = plan.outer[key(x, y)];
-        if (side && side !== 'back') expect(swap).toMatch(/^(curtain|sill):/);
+        if (side === 'front') expect(swap).toMatch(/^frontSill:/);
+        else if ((side === 'left' || side === 'right') && y > plan.stubRow)
+          expect(swap).toMatch(new RegExp(`^sideGlass:${side}:`));
+        else if (side && side !== 'back') expect(swap).toMatch(/^(curtain|sill):/);
       }
   });
 
-  it('puts Prod and the name cards beside the pockets, never on them or on a floor tile', () => {
+  it('puts Prod and the visitor badges beside the pockets, never on them or on a floor tile', () => {
     const prod = plan.stubs.find((s) => s.scene === 'prod');
-    const cards = plan.stubs.find((s) => s.scene === 'credenza');
+    const cards = plan.stubs.find((s) => s.scene === 'badgeTray');
     expect(prod).toBeDefined();
     expect(cards).toBeDefined();
     for (const s of [prod, cards]) {
@@ -184,15 +258,13 @@ describe('Synergy room plan', () => {
   });
 
   it('clusters the workshop kit on full walls, clear of stations and the stretch behind the boardroom', () => {
-    expect(plan.tops.length).toBeGreaterThanOrEqual(20);
+    const high = plan.tops.filter((t) => t.h > FRONT_SILL_Y);
+    expect(high.length).toBeGreaterThanOrEqual(20);
     const kinds = new Set(plan.tops.map((t) => t.kind));
     expect(kinds.size).toBeGreaterThanOrEqual(20);
     expect(kinds.has('dndTent')).toBe(true);
     expect(kinds.has('notebooks')).toBe(true);
     for (const t of plan.tops) {
-      expect(wallPiece(map, t.x, t.y)).not.toBe('wall-front');
-      expect(open(map, t.x, t.y - 1)).toBe(false);
-      expect(t.x <= plan.boardroom.x0 || t.x >= plan.boardroom.x1).toBe(true);
       for (let dy = -1; dy <= 1; dy++)
         for (let dx = -1; dx <= 1; dx++)
           expect([
@@ -207,9 +279,45 @@ describe('Synergy room plan', () => {
           ]).not.toContain(getTile(map, t.x + dx, t.y + dy));
       expect(Math.abs(t.dx) + Math.abs(t.dy)).toBeLessThanOrEqual(0.5);
     }
-    // No two clusters alike.
+    for (const t of high) {
+      expect(wallPiece(map, t.x, t.y)).not.toBe('wall-front');
+      expect(open(map, t.x, t.y - 1)).toBe(false);
+      expect(t.x <= plan.boardroom.x0 || t.x >= plan.boardroom.x1).toBe(true);
+    }
+    // No two clusters alike, and no two neighbours along a wall alike.
     const all = BOARDROOM_CLUSTERS.flat();
     expect(new Set(all).size).toBe(all.length);
+    const front = FRONT_CLUSTERS.flat();
+    expect(new Set(front).size).toBe(front.length);
+    const near = (a: (typeof plan.tops)[number], b: (typeof plan.tops)[number]) =>
+      Math.hypot(a.x + a.dx - b.x - b.dx, a.y + a.dy - b.y - b.dy) < 1.2;
+    plan.tops.forEach((a, i) => {
+      plan.tops.forEach((b, j) => {
+        if (i < j && near(a, b)) expect(a.kind, `${a.x},${a.y}`).not.toBe(b.kind);
+      });
+    });
+  });
+
+  it('leaves the workshop kit on the front sill: three or more clusters, end tiles and every second tile, low', () => {
+    const front = plan.tops.filter((t) => t.h === FRONT_SILL_Y);
+    const tiles = [...new Set(front.map((t) => t.x))].sort((a, b) => a - b);
+    expect(tiles.length).toBeGreaterThanOrEqual(3);
+    for (const t of front) {
+      expect(plan.outer[key(t.x, t.y)]).toBe('front');
+      expect(wallPiece(map, t.x, t.y)).toBe('wall-front');
+    }
+    // Never two clusters on neighbouring tiles: they would read as a row.
+    for (let i = 1; i < tiles.length; i++)
+      expect((tiles[i] ?? 0) - (tiles[i - 1] ?? 0)).toBeGreaterThanOrEqual(2);
+    // Each cluster its own kit.
+    const byTile = tiles.map((x) =>
+      front
+        .filter((t) => t.x === x)
+        .map((t) => t.kind)
+        .sort()
+        .join(),
+    );
+    expect(new Set(byTile).size).toBe(byTile.length);
   });
 
   it('hangs the pendants along the back of each side only, on a wire tied off at both ends', () => {

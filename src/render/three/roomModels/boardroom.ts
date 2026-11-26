@@ -8,6 +8,11 @@ import {
   BOARDROOM_WEAR,
   BOARDROOM_WEAR_KINDS,
   type BoardroomArt,
+  FRONT_SILL_LOOKS,
+  SIDE_GLASS_LOOKS,
+  SLATE_WEAR,
+  frontSillSwap,
+  sideGlassSwap,
   type BoardroomFloor,
   type PendantRow,
   STUB_LOOKS,
@@ -50,10 +55,10 @@ function mix(a: number, b: number, t: number): number {
 
 // ---- Materials ----
 
-/** Walnut veneer: dark and fine, never warmer than a station. */
-export const WALNUT = 0x5a3e2c;
-const WALNUT_LIGHT = 0x6c4c37;
-const WALNUT_DARK = 0x3f2a1e;
+/** Walnut veneer: dark, fine and cool enough (on screen saturation about 0.3) never to outshout a station. */
+export const WALNUT = 0x5c5550;
+const WALNUT_LIGHT = 0x787068;
+const WALNUT_DARK = 0x403c39;
 /** The dark stone of the stubs' caps and the panels' plinths. */
 export const STONE = 0x5e5c59;
 const STONE_DARK = 0x45433f;
@@ -148,8 +153,187 @@ function stubModel(look: number): Model {
     b.box(0.004, h - 0.07, 0.004, WALNUT_DARK, { at: [(look - 1) * 0.3, h / 2, s * 0.491] }, 0);
     b.box(0.98, 0.006, 0.004, STEEL_DARK, { at: [0, h - 0.034, s * 0.491] }, 0);
   }
-  b.box(1.03, 0.03, 1.03, STONE, { at: [0, h - 0.015, 0] }, 0.006);
-  b.box(1.0, 0.003, 1.0, tint(STONE, 0.06), { at: [0, h + 0.0005, 0] }, 0);
+  stoneCap(b, h);
+  return b.build();
+}
+
+// ---- The side glass ----
+
+/** The side curtain wall's steel, glass tint, blinds and their warm cream bottom rail. */
+const SIDE_STEEL = 0x8c939b;
+const SIDE_GLASS = 0x9fb4c6;
+const SIDE_BLIND = 0xd8d1c3;
+const SIDE_RAIL = 0xd9cdb6;
+/** The side glass's spandrel and its sill; its glazing's depth (across the wall). */
+const SIDE_SPANDREL = 0.26;
+const SIDE_DEPTH = 0.8;
+/** The low unit's spandrel and head, where a side wall is cut down so the station behind it shows (the front strip's 0.6 at most). */
+const SIDE_LOW_SPANDREL = 0.12;
+export const SIDE_LOW_TOP = 0.55;
+/** How far down the blinds come, of the glass's height, look by look: about 60%. */
+const SIDE_DROP = [0.6, 0.55, 0.66] as const;
+
+/**
+ * A unit of the curtain wall down the hall's sides (its line along z, the
+ * room either way across x), so it reads from above as glass, not a box: a
+ * dark spandrel under an aluminium sill board, a double-glazed unit of
+ * see-through glass tinted cool, framed in slim steel mullions and a
+ * transom, the blind inside it down about 60% with its warm cream bottom
+ * rail, the cassette under a slim steel head, open above, so the camera
+ * looks down past the head into the glazing.
+ */
+export function sideGlassModel(look: number, room: 1 | -1, low: boolean): Model {
+  const b = new ModelBuilder();
+  const sp = low ? SIDE_LOW_SPANDREL : SIDE_SPANDREL;
+  const g0 = sp + 0.022;
+  const top = low ? SIDE_LOW_TOP : WALL_HEIGHT - 0.03;
+  const transom = low ? null : 0.92;
+  const gh = top - g0;
+  const half = SIDE_DEPTH / 2;
+  b.box(1.0, sp, 1.0, 0x525b66, { at: [0, sp / 2, 0] }, 0);
+  b.box(1.006, 0.014, 1.006, tint(0x525b66, -0.4), { at: [0, 0.007, 0] }, 0);
+  // Aluminium sill boards either side of the glazing; dark inside it, so the glass reads deep.
+  for (const s of [-1, 1])
+    b.box(
+      0.5 - SIDE_DEPTH / 2 + 0.01,
+      0.022,
+      1.02,
+      0xb0b7be,
+      {
+        at: [s * (SIDE_DEPTH / 2 + (0.5 - SIDE_DEPTH / 2) / 2), sp + 0.011, 0],
+      },
+      0.004,
+    );
+  b.box(SIDE_DEPTH, 0.022, 1.0, 0x51606e, { at: [0, sp + 0.011, 0] }, 0);
+  // The glazing: a pane on each face and the lid, the frame round them.
+  for (const s of [-1, 1]) {
+    b.pane(0.008, gh, 0.98, SIDE_GLASS, { at: [s * half, g0 + gh / 2, 0] });
+    // Mullions at the unit's ends, the transom, the sill and head rails.
+    for (const z of [-0.48, 0.48])
+      b.box(0.04, gh + 0.03, 0.04, SIDE_STEEL, { at: [s * half, g0 + gh / 2, z] }, 0);
+    b.box(0.04, 0.03, 1.0, SIDE_STEEL, { at: [s * half, g0 + 0.015, 0] }, 0);
+    if (transom) b.box(0.04, 0.024, 1.0, SIDE_STEEL, { at: [s * half, transom, 0] }, 0);
+    b.box(0.05, 0.03, 1.0, SIDE_STEEL, { at: [s * half, top + 0.015, 0] }, 0);
+    // The sky's glint across the face.
+    b.box(
+      0.004,
+      0.012,
+      0.6,
+      tint(SIDE_GLASS, 0.5),
+      { at: [s * (half + 0.006), g0 + gh * 0.72, 0.1], rot: [0.5, 0, 0] },
+      0,
+    );
+  }
+  for (const z of [-0.48, 0.48]) {
+    b.box(SIDE_DEPTH + 0.04, 0.03, 0.04, SIDE_STEEL, { at: [0, top + 0.015, z] }, 0);
+    // The unit's end glazing, so a lone unit reads as glass from the front too.
+    b.pane(SIDE_DEPTH - 0.04, gh, 0.008, SIDE_GLASS, { at: [0, g0 + gh / 2, z * 1.02] });
+    if (transom) b.box(SIDE_DEPTH + 0.04, 0.024, 0.04, SIDE_STEEL, { at: [0, transom, z] }, 0);
+  }
+  // The blind just inside the room's pane, down about 60%: its cassette, the fabric and its slats, the cream rail, the cord.
+  const drop = gh * (SIDE_DROP[look % SIDE_DROP.length] ?? 0.6);
+  const bx = room * (half - 0.035);
+  b.box(0.05, 0.05, 0.94, SIDE_RAIL, { at: [bx, top - 0.03, 0] }, 0.006);
+  b.box(0.006, drop, 0.92, SIDE_BLIND, { at: [bx, top - 0.055 - drop / 2, 0] }, 0);
+  const slats = Math.round(drop / 0.05);
+  for (let k = 1; k < slats; k++)
+    b.box(
+      0.004,
+      0.006,
+      0.92,
+      tint(SIDE_BLIND, -0.12),
+      {
+        at: [bx + room * 0.004, top - 0.055 - (drop * k) / slats, 0],
+      },
+      0,
+    );
+  b.box(0.03, 0.034, 0.95, SIDE_RAIL, { at: [bx, top - 0.055 - drop - 0.017, 0] }, 0.006);
+  b.box(0.032, 0.006, 0.952, tint(SIDE_RAIL, -0.3), { at: [bx, top - 0.055 - drop - 0.034, 0] }, 0);
+  b.box(
+    0.006,
+    0.16,
+    0.006,
+    0x6a7078,
+    { at: [bx + room * 0.01, top - 0.055 - drop - 0.11, 0.4] },
+    0,
+  );
+  b.box(
+    0.018,
+    0.03,
+    0.018,
+    SIDE_RAIL,
+    { at: [bx + room * 0.01, top - 0.055 - drop - 0.2, 0.4] },
+    0.004,
+  );
+  return b.build();
+}
+
+// ---- The front sill ----
+
+/** The front's window board: its height, and where its low glass stands (the outer edge, toward the camera). */
+const SILL_H = 0.16;
+const SILL_BOARD_T = 0.022;
+const FRONT_GLASS_Z = 0.455;
+const FRONT_GLASS_TOP = 0.34;
+/** The window board's honed stone: a cool mid grey, so the kit on it reads and no station is outshone. */
+export const SILL_STONE = 0x6f7176;
+
+/**
+ * The front's low wall: the curtain wall's dark spandrel (the façade's face
+ * unchanged), a deep honed-stone window board on it with a darker nosing, where
+ * the workshop leaves its kit, and the low glass at its outer edge (a dark
+ * mullion at each unit's joint, a slim steel rail on top), so whatever
+ * stands on the board shows over it.
+ */
+function frontSillModel(look: number): Model {
+  const b = new ModelBuilder();
+  b.box(1.0, SILL_H, 1.0, 0x525b66, { at: [0, SILL_H / 2, 0] }, 0);
+  b.box(1.006, 0.012, 1.006, tint(0x525b66, -0.4), { at: [0, 0.006, 0] }, 0);
+  for (const s of [1, -1])
+    b.box(
+      0.008,
+      SILL_H - 0.05,
+      0.004,
+      tint(0x525b66, -0.3),
+      {
+        at: [((look + (s > 0 ? 0 : 1)) % 3) * 0.2 - 0.2, SILL_H / 2, s * 0.502],
+      },
+      0,
+    );
+  // The window board: honed stone, its veining, the darker nosing on the room side and a shadow under it.
+  const y = SILL_H + SILL_BOARD_T / 2;
+  b.box(1.0, SILL_BOARD_T, 0.92, SILL_STONE, { at: [0, y, -0.04] }, 0.004);
+  for (const [z, w] of [
+    [-0.32, 0.7],
+    [-0.12, 0.5],
+    [0.1, 0.8],
+    [0.28, 0.4],
+  ] as const)
+    b.box(
+      w,
+      0.002,
+      0.008,
+      tint(WALNUT, -0.14),
+      { at: [((look + w * 10) % 3) * 0.08 - 0.08, SILL_H + SILL_BOARD_T + 0.0005, z] },
+      0,
+    );
+  b.box(1.0, SILL_BOARD_T + 0.006, 0.04, STONE, { at: [0, y, -0.5] }, 0.004);
+  b.box(1.0, 0.006, 0.01, tint(STONE_DARK, -0.45), { at: [0, SILL_H - 0.004, -0.5] }, 0);
+  // The low glass at the outer edge, its mullion and rail.
+  const g0 = SILL_H;
+  const gh = FRONT_GLASS_TOP - g0 - 0.02;
+  b.box(1.0, 0.026, 0.06, MULLION, { at: [0, g0 + 0.013, FRONT_GLASS_Z] }, 0.004);
+  b.pane(1.0, gh, 0.014, 0x6c8090, { at: [0, g0 + 0.026 + gh / 2, FRONT_GLASS_Z] });
+  b.box(
+    1.0,
+    0.004,
+    0.016,
+    tint(0x6c8090, 0.45),
+    { at: [0, g0 + 0.026 + gh * 0.7, FRONT_GLASS_Z] },
+    0,
+  );
+  b.box(0.04, gh + 0.026, 0.04, MULLION, { at: [-0.49, g0 + (gh + 0.026) / 2, FRONT_GLASS_Z] }, 0);
+  b.box(1.0, 0.02, 0.034, HEAD_TRACK, { at: [0, FRONT_GLASS_TOP - 0.01, FRONT_GLASS_Z] }, 0.004);
   return b.build();
 }
 
@@ -168,6 +352,13 @@ export const BOARDROOM_SWAP_MODELS: Readonly<Record<string, () => Model>> = (() 
   out[walnutSwap('x')] = () => walnutPanelModel('x');
   out[walnutSwap('z')] = () => walnutPanelModel('z');
   for (let l = 0; l < STUB_LOOKS; l++) out[stubSwap(l)] = () => stubModel(l);
+  for (let l = 0; l < SIDE_GLASS_LOOKS; l++) {
+    for (const low of [false, true]) {
+      out[sideGlassSwap('left', l, low)] = () => sideGlassModel(l, 1, low);
+      out[sideGlassSwap('right', l, low)] = () => sideGlassModel(l, -1, low);
+    }
+  }
+  for (let l = 0; l < FRONT_SILL_LOOKS; l++) out[frontSillSwap(l)] = () => frontSillModel(l);
   return out;
 })();
 
@@ -184,10 +375,10 @@ export function boardroomLook(x: number, y: number, wear: number): number {
   return wear * VARIANTS + variant;
 }
 
-/** A tile's brightness: ±4% per tile, picked by the tile and the level. */
+/** A tile's brightness: ±2% per tile, picked by the tile and the level (placed wear does the rest). */
 export function boardroomTone(x: number, y: number, salt: number): number {
   const own = ((Math.imul(x + 67, 73856093) ^ Math.imul(y + 17, 19349663) ^ salt) >>> 0) % 1001;
-  return 1 + (own / 1000 - 0.5) * 0.08;
+  return 1 + (own / 1000 - 0.5) * 0.04;
 }
 
 /** The sides' warm slate broadloom and its alternate, a violet and a warm fleck. */
@@ -303,15 +494,103 @@ function scuffs(b: ModelBuilder, variant: number, color: number): void {
   }
 }
 
-/** A sticky note lost on the carpet near a corner, sometimes two. */
+/** Sticky notes dropped on the carpet in a clump near a corner, two or three, one face down. */
 function strayNotes(b: ModelBuilder, variant: number): void {
   const corner = variant % 4;
   const sx = corner % 2 ? 1 : -1;
   const sz = corner < 2 ? 1 : -1;
-  mark(b, 0.11, 0.11, sticky(variant + 1), sx * 0.34, sz * 0.32, 0.003, 0.5 + variant);
-  mark(b, 0.03, 0.006, tint(INK, 0.3), sx * 0.36, sz * 0.34, 0.0045, 0.5 + variant);
-  if (variant !== 1)
-    mark(b, 0.11, 0.11, sticky(variant + 3), sx * 0.2, sz * 0.38, 0.0028, -0.3 - variant);
+  const notes: [number, number, number][] = [
+    [0.33, 0.3, 0.5],
+    [0.2, 0.37, -0.3],
+    [0.36, 0.14, 1.1],
+  ];
+  notes.forEach(([x, z, turn], k) => {
+    if (k === 2 && variant === 1) return;
+    const c = k === 1 ? tint(sticky(variant + k), -0.25) : sticky(variant + k + 1);
+    mark(b, 0.13, 0.13, c, sx * x, sz * z, 0.003 + k * 0.0003, turn + variant);
+    if (k !== 1)
+      mark(b, 0.05, 0.008, tint(INK, 0.3), sx * x, sz * z, 0.0042 + k * 0.0003, turn + variant);
+  });
+}
+
+/** The rug's ground (lum about 115 once lit, barely coloured), its walnut border and brass inlay. */
+export const RUG = 0x5f5967;
+const RUG_BAND = 0.08;
+/** Its border: smoked walnut softened toward the rug (no dark frame mid-room), the brass inlay muted the same way. */
+const RUG_EDGE = mix(RUG, WALNUT, 0.55);
+const RUG_INLAY = mix(RUG, BRASS, 0.28);
+
+/** The rug under the table's halves: a quiet ground, a soft walnut border band on its outer `edges`, a brass inlay inside it. */
+function rugModel(b: ModelBuilder, edges: number, variant: number): void {
+  broadloom(b, WHOLE, RUG, [tint(RUG, 0.08), tint(RUG, -0.08)], variant, 0.06);
+  // The rug's own pile rows, the other way: it was laid on the good carpet.
+  for (let k = 0; k < 6; k++) mark(b, 0.012, 1, tint(RUG, -0.04), -0.42 + k * 0.17, 0, 0.0014);
+  const sides: [number, Area][] = [
+    [1, { x0: -0.5, x1: -0.5 + RUG_BAND, z0: -0.5, z1: 0.5 }],
+    [2, { x0: 0.5 - RUG_BAND, x1: 0.5, z0: -0.5, z1: 0.5 }],
+    [4, { x0: -0.5, x1: 0.5, z0: -0.5, z1: -0.5 + RUG_BAND }],
+    [8, { x0: -0.5, x1: 0.5, z0: 0.5 - RUG_BAND, z1: 0.5 }],
+  ];
+  for (const [bit, a] of sides) {
+    if (!(edges & bit)) continue;
+    mark(b, a.x1 - a.x0, a.z1 - a.z0, RUG_EDGE, (a.x0 + a.x1) / 2, (a.z0 + a.z1) / 2, 0.0022);
+    // The walnut's outer arris, a shade darker.
+    const outer = bit === 1 ? a.x0 : bit === 2 ? a.x1 : bit === 4 ? a.z0 : a.z1;
+    const inner = bit === 1 ? a.x1 : bit === 2 ? a.x0 : bit === 4 ? a.z1 : a.z0;
+    const step = bit === 1 || bit === 4 ? 1 : -1;
+    if (bit < 4) {
+      mark(b, 0.014, 1, tint(RUG_EDGE, -0.08), outer + step * 0.007, 0, 0.0026);
+      mark(b, 0.012, 1, RUG_INLAY, inner + step * 0.03, 0, 0.0028);
+    } else {
+      mark(b, 1, 0.014, tint(RUG_EDGE, -0.08), 0, outer + step * 0.007, 0.0026);
+      mark(b, 1, 0.012, RUG_INLAY, 0, inner + step * 0.03, 0.0028);
+    }
+  }
+}
+
+/** The slate's placed wear (`SLATE_WEAR` flags) over its carpet tiles. */
+function slateWear(b: ModelBuilder, flags: number, variant: number): void {
+  const F = SLATE_WEAR;
+  if (flags & F.sun) {
+    // Faded where the sun comes through the glass every afternoon.
+    mark(b, 0.86, 0.72, tint(mix(SLATE, 0xa8a4a0, 0.25), 0.06), 0, 0, 0.0011);
+    mark(b, 0.7, 0.56, tint(mix(SLATE, 0xa8a4a0, 0.3), 0.09), 0, 0, 0.0013);
+  }
+  const walk: [number, number, number][] = [
+    [F.walkN, 0, -0.25],
+    [F.walkS, 0, 0.25],
+    [F.walkW, -0.25, 0],
+    [F.walkE, 0.25, 0],
+  ];
+  if (flags & (F.walkN | F.walkS | F.walkW | F.walkE)) {
+    mark(b, 0.5, 0.5, tint(SLATE, 0.11), 0, 0, 0.0018);
+    mark(b, 0.26, 0.26, tint(SLATE, 0.16), 0, 0, 0.002);
+    for (const [bit, x, z] of walk) {
+      if (!(flags & bit)) continue;
+      const alongX = x !== 0;
+      mark(b, 0.5, 0.5, tint(SLATE, 0.11), x, z, 0.0018);
+      mark(b, alongX ? 0.5 : 0.26, alongX ? 0.26 : 0.5, tint(SLATE, 0.16), x, z, 0.002);
+    }
+  }
+  if (flags & F.castor) {
+    for (const [x, z, a] of [
+      [-0.12, 0.08, 0.2],
+      [0.14, 0.02, 1.4],
+      [0.0, -0.06, 2.6],
+    ] as const)
+      b.torus(
+        0.35,
+        0.016,
+        tint(SLATE, -0.2),
+        { at: [x, 0.0024, z], rot: [Math.PI / 2, 0, a] },
+        Math.PI * 0.55,
+      );
+  }
+  if (flags & F.scuff) {
+    scuffs(b, variant, tint(SLATE, 0.16));
+    scuffs(b, variant + 7, tint(SLATE, -0.16));
+  }
+  if (flags & F.sticky) strayNotes(b, variant);
 }
 
 /**
@@ -334,7 +613,11 @@ export function boardroomFloorModel(look: number): Model {
     b.box(1, 0.004, 0.018, tint(BRASS, -0.1), { at: [0, 0.0055, 0] }, 0);
     return b.build();
   }
-  if (wear >= W.boardroom && wear < W.terrazzo) {
+  if (wear >= W.rug && wear < W.terrazzo) {
+    rugModel(b, wear - W.rug, variant);
+    return b.build();
+  }
+  if (wear >= W.boardroom && wear < W.rug) {
     const edges = wear - W.boardroom;
     broadloom(b, WHOLE, GOOD_CARPET, [tint(GOOD_CARPET, 0.1), tint(BORDER, -0.1)], variant, 0.08);
     const band = 0.2;
@@ -369,47 +652,24 @@ export function boardroomFloorModel(look: number): Model {
     return b.build();
   }
   broadloom(b, WHOLE, variant === 2 ? SLATE_ALT : SLATE, [FLECK_VIOLET, FLECK_WARM], variant);
-  // Carpet tiles, half a tile square, each quarter's pile a touch lighter or darker.
+  // Carpet tiles, half a tile square, each quarter's pile a touch lighter or darker (faint: wear reads over it).
   for (const [qx, qz] of [
     [-0.25, -0.25],
     [0.25, 0.25],
   ] as const)
-    mark(b, 0.49, 0.49, tint(SLATE, variant === 1 ? -0.012 : 0.012), qx, qz, 0.0009);
+    mark(b, 0.49, 0.49, tint(SLATE, variant === 1 ? -0.006 : 0.006), qx, qz, 0.0004);
   mark(b, 1, 0.006, tint(SLATE, -0.07), 0, 0, 0.0021);
   mark(b, 0.006, 1, tint(SLATE, -0.07), 0, 0, 0.0021);
   mark(b, 1, 0.006, tint(SLATE, -0.07), 0, -0.497, 0.0021);
   mark(b, 0.006, 1, tint(SLATE, -0.07), -0.497, 0, 0.0021);
-  if (wear === W.castor) {
-    for (const [x, z, r] of [
-      [-0.18, -0.12, 0.2],
-      [0.16, -0.18, 0.16],
-      [0.02, 0.05, 0.24],
-    ] as const)
-      b.torus(
-        r,
-        0.007,
-        tint(SLATE, 0.14),
-        { at: [x, 0.0016, z], rot: [Math.PI / 2, 0, 0.4 + x * 3] },
-        Math.PI * 0.7,
-      );
-  } else if (wear === W.walkX) {
-    mark(b, 1, 0.36, tint(SLATE, 0.04), 0, -0.05, 0.0018);
-    mark(b, 1, 0.18, tint(SLATE, 0.065), 0, -0.05, 0.002);
-  } else if (wear === W.walkZ) {
-    mark(b, 0.32, 1, tint(SLATE, 0.05), 0, 0, 0.0018);
-    mark(b, 0.16, 1, tint(SLATE, 0.08), 0, 0, 0.002);
-  } else if (wear === W.doorScuff) {
-    scuffs(b, variant, tint(SLATE, 0.12));
-  } else if (wear === W.sticky) {
-    strayNotes(b, variant);
-  }
+  slateWear(b, wear - W.slate, variant);
   return b.build();
 }
 
 // ---- Counters ----
 
 /** The credenzas' walnut top (darker than every station top), its edge, the dark body. */
-export const COUNTER_TOP = 0x4e3626;
+export const COUNTER_TOP = 0x4a3a2e;
 const COUNTER_BODY = 0x3c3430;
 
 /** A counter as a walnut credenza on a dark stone plinth, a brass pull, the grain along its top. */
@@ -822,16 +1082,6 @@ function grown(model: Model, s: number, cy: number): Model {
   return model;
 }
 
-/** `model` grown `s` times about the point `at`. */
-function grownAt(model: Model, s: number, at: [number, number, number]): Model {
-  const m = new THREE.Matrix4()
-    .makeTranslation(...at)
-    .multiply(new THREE.Matrix4().makeScale(s, s, s))
-    .multiply(new THREE.Matrix4().makeTranslation(-at[0], -at[1], -at[2]));
-  for (const g of [model.body, model.glow, model.glass]) g?.applyMatrix4(m);
-  return model;
-}
-
 /** How much bigger than life the art hangs, so it reads from the camera. */
 const ART_GROW = 1.3;
 
@@ -880,10 +1130,15 @@ export function glassNotesLook(look: number): Model {
 // ---- The stubs' scenes ----
 
 const STUB_TOP = FRONT_WALL_HEIGHT;
-/** How far back the boards lean (toward the corridor), so they show their face to the camera. */
-const BOARD_LEAN = 0.38;
+/** How far back the boards lean (toward the corridor), so they show their face to the camera without catching the sky. */
+const BOARD_LEAN = 0.64;
 /** The boards' height on the stubs: low, so the corridor behind still reads. */
 export const BOARD_H = 0.5;
+/** The whiteboards' face: a used, matt board (never the brightest thing in the room), and the foam board's. */
+export const BOARD_FACE = 0x64635f;
+const FOAM_FACE = 0x68645e;
+/** How much of a board run's length is left free at each end for the workshop's kit. */
+const BOARD_END = 0.4;
 
 /** Sticky notes along a stub's low front face. */
 function stubFaceNotes(b: ModelBuilder, span: number, seed: number): void {
@@ -901,15 +1156,144 @@ function stubFaceNotes(b: ModelBuilder, span: number, seed: number): void {
   }
 }
 
-/** A board on a stub run `span` tiles from the origin tile, leaned back, its face built by `face` (in board space, +z out). */
+/** The stubs' kit a little over life size, so it reads from the camera at the back of the hall. */
+const STUB_KIT = 1.35;
+/** A frame standing on a stub's cap at (x, z), turned `turn`, at the kit's size. */
+const onCap = (b: ModelBuilder, x: number, z: number, turn = 0) =>
+  framed(b, [x, STUB_TOP, z], [0, turn, 0], STUB_KIT);
+
+/** The workshop timer: a dark cube, its red countdown, the button on top. */
+function timerCube(b: ModelBuilder, x: number, z: number, turn = 0): void {
+  const g = onCap(b, x, z, turn);
+  g.box(0.12, 0.12, 0.12, 0x3a3f46, { at: [0, 0.06, 0] }, 0.014);
+  g.box(0.09, 0.05, 0.004, 0x1a1214, { at: [0, 0.07, 0.061] }, 0);
+  text(g, '4:59', 0, 0.07, 0.064, 0.0045, 0xe8584a);
+  g.cylinder(0.022, 0.022, 0.012, RED, { at: [0, 0.126, 0] }, 10);
+}
+
+/** A Bluetooth speaker lying on its side, its violet light ring at the end. */
+function speakerPill(b: ModelBuilder, x: number, z: number, turn = 0): void {
+  const g = onCap(b, x, z, turn);
+  g.cylinder(0.05, 0.05, 0.22, 0x2e3238, { at: [0, 0.05, 0], rot: [0, 0, Math.PI / 2] }, 14);
+  for (const s of [-1, 1])
+    g.cylinder(
+      0.051,
+      0.051,
+      0.012,
+      0x4a4f57,
+      { at: [s * 0.11, 0.05, 0], rot: [0, 0, Math.PI / 2] },
+      14,
+    );
+  g.torus(0.034, 0.006, DOT_VIOLET, { at: [0.118, 0.05, 0], rot: [0, Math.PI / 2, 0] });
+  g.box(0.1, 0.004, 0.03, 0x4a4f57, { at: [0, 0.1, 0] }, 0);
+}
+
+/** A stack of sticky-note pads, each a little turned, the top one written on. */
+function stickyStack(b: ModelBuilder, x: number, z: number, seed: number): void {
+  const g = onCap(b, x, z);
+  for (let k = 0; k < 3; k++)
+    g.box(
+      0.1,
+      0.03,
+      0.1,
+      sticky(seed + k),
+      { at: [0, 0.015 + k * 0.03, 0], rot: [0, (rnd(seed, k) - 0.5) * 0.8, 0] },
+      0,
+    );
+  g.box(0.05, 0.002, 0.008, INK, { at: [0, 0.091, 0], rot: [0, 0.3, 0] }, 0);
+}
+
+/** An A4 sign in a clear acrylic stand, leaned back to the camera, its lines in marker. */
+function a4Sign(
+  b: ModelBuilder,
+  x: number,
+  z: number,
+  lines: readonly [string, number][],
+  turn = 0,
+): void {
+  const g = onCap(b, x, z, turn);
+  g.add(new THREE.BoxGeometry(0.22, 0.016, 0.1), 0xdfe8ee, { at: [0, 0.008, 0] }, 'glass');
+  const p = framed(g, [0, 0.016, -0.02], [-0.42, 0, 0]);
+  p.box(0.2, 0.28, 0.004, 0xe9e6df, { at: [0, 0.14, 0] }, 0);
+  p.add(new THREE.BoxGeometry(0.21, 0.29, 0.003), 0xdfe8ee, { at: [0, 0.14, 0.004] }, 'glass');
+  lines.forEach(([t, c], k) => {
+    text(p, t, 0, 0.22 - k * 0.06, 0.0025, Math.min(0.0075, 0.17 / (t.length * 4)), c);
+  });
+}
+
+/** A tray of markers lying in a row, caps in four colours. */
+function markerCaddy(b: ModelBuilder, x: number, z: number, turn = 0): void {
+  const g = onCap(b, x, z, turn);
+  g.box(0.2, 0.03, 0.1, 0x3a3f46, { at: [0, 0.015, 0] }, 0.006);
+  [0x2a2e34, RED, 0x2f5aa8, 0x2f8a4a].forEach((c, k) => {
+    g.cylinder(
+      0.011,
+      0.011,
+      0.15,
+      0xe9e8e2,
+      { at: [-0.01, 0.034, -0.033 + k * 0.022], rot: [0, 0, Math.PI / 2] },
+      8,
+    );
+    g.cylinder(
+      0.012,
+      0.012,
+      0.04,
+      c,
+      { at: [0.08, 0.034, -0.033 + k * 0.022], rot: [0, 0, Math.PI / 2] },
+      8,
+    );
+  });
+}
+
+/** A presenter's clicker, a red dot on its tip. */
+function clickerOn(b: ModelBuilder, x: number, z: number, turn = 0): void {
+  const g = onCap(b, x, z, turn);
+  g.box(0.05, 0.02, 0.13, 0x24272c, { at: [0, 0.01, 0] }, 0.01);
+  g.cylinder(0.008, 0.008, 0.004, RED, { at: [0, 0.022, 0.04] }, 8);
+  g.box(0.02, 0.004, 0.03, 0x5f676f, { at: [0, 0.022, -0.01] }, 0.002);
+}
+
+/** A grey watering can, its spout over the planter: someone looks after Prod. */
+function wateringCan(b: ModelBuilder, x: number, z: number, turn = 0): void {
+  const g = onCap(b, x, z, turn);
+  g.cylinder(0.06, 0.065, 0.13, 0x7f8c8a, { at: [0, 0.065, 0] }, 14);
+  g.cylinder(0.061, 0.061, 0.01, tint(0x7f8c8a, -0.2), { at: [0, 0.13, 0] }, 14);
+  g.cylinder(0.01, 0.014, 0.16, 0x7f8c8a, { at: [-0.1, 0.12, 0], rot: [0, 0, 0.9] }, 8);
+  g.torus(0.045, 0.008, tint(0x7f8c8a, -0.15), { at: [0.03, 0.14, 0], rot: [0, 0, 0.3] }, Math.PI);
+}
+
+/** A cup of pens. */
+function penCup(b: ModelBuilder, x: number, z: number): void {
+  const g = onCap(b, x, z);
+  g.cylinder(0.04, 0.036, 0.09, 0x3a3f46, { at: [0, 0.045, 0] }, 12);
+  [0x2a2e34, RED, 0x2f5aa8].forEach((c, k) =>
+    g.cylinder(0.007, 0.007, 0.13, c, {
+      at: [(k - 1) * 0.014, 0.11, 0],
+      rot: [(k - 1) * 0.2, 0, (k - 1) * 0.25],
+    }),
+  );
+}
+
+/** A cap with its lip: dark honed stone, a light arris along the long edges, a shadow reveal under it. */
+function stoneCap(b: ModelBuilder, h: number): void {
+  b.box(1.0, 0.008, 1.0, tint(STONE_DARK, -0.45), { at: [0, h - 0.034, 0] }, 0);
+  b.box(1.04, 0.03, 1.04, STONE, { at: [0, h - 0.015, 0] }, 0.006);
+  b.box(1.0, 0.003, 1.0, tint(STONE, 0.06), { at: [0, h + 0.0005, 0] }, 0);
+  for (const s of [-1, 1])
+    b.box(1.04, 0.006, 0.01, tint(STONE, 0.22), { at: [0, h - 0.002, s * 0.515] }, 0);
+}
+
+/** A board on a stub run `span` tiles from the origin tile, leaned back, its face built by `face` (in board space, +z out); its ends left free. */
 function leanedBoard(
   span: number,
   frame: number,
   face: number,
   build: (g: ModelBuilder, w: number) => void,
+  kit: (b: ModelBuilder) => void,
 ): Model {
   const b = new ModelBuilder();
-  const w = span - 0.14;
+  kit(b);
+  const w = span - 2 * BOARD_END;
   const cx = (span - 1) / 2;
   // The feet: two steel shoes on the cap.
   for (const s of [-1, 1])
@@ -924,66 +1308,127 @@ function leanedBoard(
   const g = framed(b, [cx, STUB_TOP + 0.02, 0.3], [-BOARD_LEAN, 0, 0]);
   g.box(w, BOARD_H, 0.03, frame, { at: [0, BOARD_H / 2, 0] }, 0.006);
   g.box(w - 0.04, BOARD_H - 0.04, 0.004, face, { at: [0, BOARD_H / 2, 0.016] }, 0);
+  // Ghosts of old diagrams, wiped but not quite.
+  for (let k = 0; k < 4; k++)
+    g.box(
+      0.12 + rnd(k, span) * 0.2,
+      0.006,
+      0.002,
+      tint(face, -0.07),
+      {
+        at: [-w / 2 + 0.15 + k * (w / 4.4), 0.12 + rnd(span, k) * 0.25, 0.0185],
+        rot: [0, 0, (rnd(k, 9) - 0.5) * 0.6],
+      },
+      0,
+    );
   build(g, w);
   stubFaceNotes(b, span, span * 3 + 1);
   return b.build();
 }
 
-/** The IDEAS board: a whiteboard full of sticky notes in columns, a marker tray with markers and an eraser. */
+/**
+ * The IDEAS board: a whiteboard full of sticky notes in columns, a marker
+ * tray with markers and an eraser; at its ends the workshop timer and a
+ * stack of pads, the Bluetooth speaker and an A4 sign pointing to the
+ * parking lot (Prod).
+ */
 function ideasBoardModel(span: number): Model {
-  return leanedBoard(span, 0xb8bec4, 0xf4f5f2, (g, w) => {
-    g.box(w * 0.3, 0.07, 0.003, YOTTA_VIOLET, { at: [-w * 0.3, BOARD_H - 0.055, 0.019] }, 0);
-    text(g, 'IDEAS', -w * 0.3, BOARD_H - 0.055, 0.021, 0.011, 0xffffff);
-    text(g, '> ALIGN > SYNERGY', w * 0.15, BOARD_H - 0.055, 0.019, 0.008, INK);
-    noteField(
-      g,
-      0,
-      BOARD_H / 2 - 0.035,
-      0.018,
-      w - 0.08,
-      BOARD_H - 0.13,
-      Math.round(w * 8),
-      3,
-      2,
-      0.075,
-    );
-    g.box(w - 0.1, 0.02, 0.05, 0xa3abb2, { at: [0, 0.0, 0.03] }, 0.004);
-    for (let k = 0; k < 4; k++)
-      g.cylinder(
-        0.009,
-        0.009,
-        0.1,
-        k % 2 ? RED : 0x2f5aa8,
-        { at: [-w / 2 + 0.2 + k * 0.12, 0.016, 0.03], rot: [0, 0, Math.PI / 2] },
-        8,
+  const right = span - 1 + 0.5 - BOARD_END / 2;
+  return leanedBoard(
+    span,
+    0x9aa1a8,
+    BOARD_FACE,
+    (g, w) => {
+      g.box(w * 0.34, 0.07, 0.003, YOTTA_VIOLET, { at: [-w * 0.28, BOARD_H - 0.055, 0.019] }, 0);
+      text(g, 'IDEAS', -w * 0.28, BOARD_H - 0.055, 0.021, 0.011, 0xe9e6df);
+      text(g, '> SYNERGY', w * 0.2, BOARD_H - 0.055, 0.019, 0.008, INK);
+      noteField(
+        g,
+        0,
+        BOARD_H / 2 - 0.035,
+        0.018,
+        w - 0.08,
+        BOARD_H - 0.13,
+        Math.round(w * 8),
+        3,
+        2,
+        0.075,
       );
-    g.box(0.1, 0.03, 0.04, 0x2e3238, { at: [w / 2 - 0.2, 0.025, 0.03] }, 0.006);
-  });
+      g.box(w - 0.1, 0.02, 0.05, 0x8e959c, { at: [0, 0.0, 0.03] }, 0.004);
+      for (let k = 0; k < 4; k++)
+        g.cylinder(
+          0.009,
+          0.009,
+          0.1,
+          k % 2 ? RED : 0x2f5aa8,
+          { at: [-w / 2 + 0.16 + k * 0.1, 0.016, 0.03], rot: [0, 0, Math.PI / 2] },
+          8,
+        );
+      g.box(0.1, 0.03, 0.04, 0x2e3238, { at: [w / 2 - 0.16, 0.025, 0.03] }, 0.006);
+    },
+    (b) => {
+      timerCube(b, -0.3, -0.18, 0.3);
+      stickyStack(b, -0.3, 0.22, 3);
+      speakerPill(b, right, -0.2, Math.PI / 2 - 0.2);
+      a4Sign(b, right, 0.2, [
+        ['PARKING', INK],
+        ['LOT', INK],
+        ['-->', YOTTA_VIOLET],
+      ]);
+    },
+  );
 }
 
-/** HOW MIGHT WE… SYNERGIZE? on a foam board, a row of answers stuck under it. */
+/** HOW MIGHT WE… SYNERGIZE? on a foam board, a row of answers stuck under it; at its ends the house rules, markers, pads and the clicker. */
 function howMightWeModel(span: number): Model {
-  return leanedBoard(span, 0x2e3238, 0xf2efe7, (g, w) => {
-    text(g, 'HOW MIGHT WE...', -w * 0.1, BOARD_H - 0.07, 0.019, 0.016, INK);
-    text(g, '...SYNERGIZE?', w * 0.12, BOARD_H - 0.17, 0.019, 0.016, YOTTA_VIOLET);
-    g.box(w * 0.6, 0.008, 0.003, RED, { at: [w * 0.12, BOARD_H - 0.225, 0.019] }, 0);
-    noteField(g, 0, 0.075, 0.018, w - 0.12, 0.1, Math.round(w * 7), 1, 5, 0.07);
-  });
+  const right = span - 1 + 0.5 - BOARD_END / 2;
+  return leanedBoard(
+    span,
+    0x2e3238,
+    FOAM_FACE,
+    (g, w) => {
+      text(g, 'HOW MIGHT WE...', -w * 0.06, BOARD_H - 0.07, 0.019, 0.013, 0xe9e6df);
+      text(g, '...SYNERGIZE?', w * 0.1, BOARD_H - 0.17, 0.019, 0.013, YOTTA_VIOLET);
+      g.box(w * 0.6, 0.008, 0.003, RED, { at: [w * 0.1, BOARD_H - 0.225, 0.019] }, 0);
+      noteField(g, 0, 0.075, 0.018, w - 0.12, 0.1, Math.round(w * 7), 1, 5, 0.07);
+    },
+    (b) => {
+      a4Sign(b, -0.3, 0.2, [
+        ['NO BAD', INK],
+        ['IDEAS*', INK],
+        ['*SOME', RED],
+      ]);
+      markerCaddy(b, -0.3, -0.2, Math.PI / 2 + 0.2);
+      stickyStack(b, right, 0.22, 7);
+      clickerOn(b, right, -0.18, 0.5);
+    },
+  );
 }
+
+/** How much bigger than life Prod stands, so he reads as the room's tree. */
+const PROD_GROW = 1.2;
 
 /**
  * Prod as the workshop's parking lot: a small tree in a big walnut planter,
  * sticky notes stuck all over its leaves, PARKING LOT on the pot, a stake
- * sign of its own.
+ * sign of its own; parked ideas lying on the cap in front, a stack of pads,
+ * a cup of pens and a watering can (someone looks after him).
  */
 function prodModel(): Model {
-  const b = new ModelBuilder();
+  const root = new ModelBuilder();
+  // Prod himself, grown about the stub's front edge on the cap.
+  const b = framed(
+    root,
+    [0, STUB_TOP * (1 - PROD_GROW), 0.5 * (1 - PROD_GROW)],
+    [0, 0, 0],
+    PROD_GROW,
+  );
   const y = STUB_TOP;
   const z = -0.02;
   b.box(0.46, 0.2, 0.46, WALNUT, { at: [0, y + 0.1, z] }, 0.02);
   b.box(0.48, 0.02, 0.48, WALNUT_DARK, { at: [0, y + 0.2, z] }, 0.006);
   b.box(0.42, 0.01, 0.42, 0x4a3a2c, { at: [0, y + 0.205, z] }, 0);
-  b.box(0.36, 0.06, 0.004, 0xf2efe7, { at: [0, y + 0.1, z + 0.232] }, 0);
+  b.box(0.36, 0.06, 0.004, 0xe9e6df, { at: [0, y + 0.1, z + 0.232] }, 0);
   text(b, 'PARKING LOT', 0, y + 0.1, z + 0.235, 0.0068, INK);
   // The trunk and its canopy.
   b.cylinder(0.022, 0.03, 0.18, 0x6a4e36, { at: [0, y + 0.29, z] }, 10);
@@ -1018,54 +1463,87 @@ function prodModel(): Model {
   b.box(0.07, 0.07, 0.005, 0x2f5aa8, { at: [0.16, y + 0.37, z + 0.125] }, 0.004);
   text(b, 'P', 0.16, y + 0.37, z + 0.129, 0.009, 0xffffff);
   stubFaceNotes(b, 1, 9);
-  return b.build();
+  // Parked ideas lying on the cap in front of him, the kit at his sides.
+  for (let k = 0; k < 3; k++)
+    root.box(
+      0.1,
+      0.003,
+      0.1,
+      sticky(k + 2),
+      {
+        at: [-0.16 + k * 0.15, y + 0.002 + k * 0.0004, 0.36 + (k % 2) * 0.05],
+        rot: [0, (k - 1) * 0.4, 0],
+      },
+      0,
+    );
+  stickyStack(root, -0.42, 0.26, 5);
+  penCup(root, -0.42, -0.24);
+  wateringCan(root, 0.41, -0.06, -0.3);
+  return root.build();
 }
 
-/** The name cards, waiting on a walnut tray: YOTTA, MONOLITH and MOM (she has a board seat). */
-function credenzaModel(): Model {
+/**
+ * The visitors' welcome on the stub beside the right pocket (no name cards
+ * here: they wait on the table): a walnut tray of visitor badges on
+ * lanyards, YOTTA violet and MONOLITH black, a VISITORS tent card, the
+ * coffee urn with its tap and drip tray, a stack of paper cups.
+ */
+function badgeTrayModel(): Model {
   const b = new ModelBuilder();
   const y = STUB_TOP;
-  b.box(0.9, 0.05, 0.5, WALNUT, { at: [0, y + 0.025, 0.02] }, 0.01);
-  b.box(0.92, 0.012, 0.52, WALNUT_DARK, { at: [0, y + 0.056, 0.02] }, 0.004);
-  b.box(0.3, 0.008, 0.02, BRASS, { at: [0, y + 0.03, 0.272] }, 0.003);
-  const cards: [string, number, number][] = [
-    ['YOTTA', YOTTA_VIOLET, 0xffffff],
-    ['MONOLITH', BLACK, 0xffffff],
-    ['MOM', 0xf2efe7, INK],
-  ];
-  cards.forEach(([name, bg, fg], i) => {
-    const x = -0.29 + i * 0.29;
-    const g = framed(b, [x, y + 0.062, 0.1 + (i % 2) * 0.04], [0, (i - 1) * 0.1, 0]);
-    for (const s of [1, -1]) {
-      const t = framed(g, [0, 0, s * 0.04], [s * 0.55, s > 0 ? 0 : Math.PI, 0]);
-      t.box(0.29, 0.13, 0.004, bg, { at: [0, 0.065, 0] }, 0);
-      text(t, name, 0, 0.065, 0.003, Math.min(0.013, 0.25 / (name.length * 4)), fg);
+  // The tray and its badges in two rows, leaned in their slots.
+  const t = onCap(b, -0.16, 0.1, 0.12);
+  t.box(0.42, 0.03, 0.26, WALNUT, { at: [0, 0.015, 0] }, 0.008);
+  t.box(0.38, 0.01, 0.22, WALNUT_DARK, { at: [0, 0.028, 0] }, 0);
+  for (let r = 0; r < 2; r++)
+    for (let k = 0; k < 5; k++) {
+      const g = framed(t, [-0.15 + k * 0.075, 0.03, -0.05 + r * 0.1], [-0.5, 0, 0]);
+      g.box(0.064, 0.09, 0.004, 0xe9e6df, { at: [0, 0.045, 0] }, 0);
+      g.box(0.064, 0.022, 0.005, (k + r) % 2 ? BLACK : YOTTA_VIOLET, { at: [0, 0.078, 0] }, 0);
+      g.box(0.03, 0.006, 0.005, INK, { at: [0, 0.04, 0] }, 0);
     }
-  });
-  // A jug of water and two glasses at the back.
-  b.add(
-    new THREE.CylinderGeometry(0.04, 0.05, 0.16, 14),
-    0xe8f4fa,
-    { at: [0.33, y + 0.14, -0.14] },
-    'glass',
-  );
-  b.cylinder(0.036, 0.044, 0.08, 0x9fcbe2, { at: [0.33, y + 0.1, -0.14] }, 14);
-  for (const x of [0.2, 0.25])
-    b.add(
-      new THREE.CylinderGeometry(0.024, 0.022, 0.07, 12),
-      0xeef7fb,
-      { at: [x, y + 0.097, -0.17 + x * 0.2] },
-      'glass',
-    );
+  // Lanyards coiled at the tray's end.
+  for (let k = 0; k < 3; k++)
+    t.torus(0.04, 0.006, k === 1 ? BLACK : YOTTA_VIOLET, {
+      at: [0.17 + (k % 2) * 0.02, 0.034 + k * 0.006, -0.06 + k * 0.05],
+      rot: [Math.PI / 2, 0, 0],
+    });
+  // VISITORS, on a tent card behind the tray.
+  const c = onCap(b, -0.2, -0.27, -0.08);
+  for (const s of [1, -1]) {
+    const f = framed(c, [0, 0, s * 0.035], [s * 0.5, s > 0 ? 0 : Math.PI, 0]);
+    f.box(0.3, 0.12, 0.004, BLACK, { at: [0, 0.06, 0] }, 0);
+    text(f, 'VISITORS', 0, 0.06, 0.003, 0.0085, 0xe9e6df);
+  }
+  // The coffee urn: black base and lid, brushed body, the tap and its drip tray, a paper label.
+  const u = onCap(b, 0.26, -0.16);
+  u.box(0.2, 0.04, 0.22, BLACK, { at: [0, 0.02, 0] }, 0.01);
+  u.cylinder(0.085, 0.085, 0.28, STEEL, { at: [0, 0.18, 0] }, 18);
+  u.cylinder(0.088, 0.088, 0.02, tint(STEEL, -0.25), { at: [0, 0.1, 0] }, 18);
+  u.cylinder(0.08, 0.09, 0.04, BLACK, { at: [0, 0.34, 0] }, 18);
+  u.cylinder(0.02, 0.02, 0.03, BLACK, { at: [0, 0.37, 0] }, 10);
+  u.box(0.03, 0.03, 0.05, BLACK, { at: [0, 0.09, 0.1] }, 0.006);
+  u.box(0.012, 0.03, 0.012, BLACK, { at: [0, 0.07, 0.12] }, 0);
+  u.box(0.1, 0.012, 0.08, tint(STEEL, -0.3), { at: [0, 0.046, 0.13] }, 0.004);
+  u.box(0.09, 0.05, 0.004, 0xe9e6df, { at: [0, 0.22, 0.086] }, 0);
+  text(u, 'COFFEE', 0, 0.22, 0.089, 0.0042, INK);
+  // Paper cups, stacked, and one left out.
+  b.cylinder(0.034, 0.028, 0.17, 0xe9e6df, { at: [0.34, y + 0.085, 0.2] }, 12);
+  for (let k = 1; k < 6; k++)
+    b.cylinder(0.035, 0.035, 0.004, tint(0xe9e6df, -0.12), { at: [0.34, y + k * 0.028, 0.2] }, 12);
+  b.cylinder(0.034, 0.026, 0.07, 0xe9e6df, { at: [0.2, y + 0.035, 0.33] }, 12);
+  b.cylinder(0.03, 0.03, 0.002, 0x4a3426, { at: [0.2, y + 0.068, 0.33] }, 12);
   stubFaceNotes(b, 1, 13);
   return b.build();
 }
 
-/** A stub with only notes on it: a row on its face and a pad on its cap. */
+/** A stub with only notes on it: a row on its face, a pad, the timer and a speaker on its cap. */
 function stubNotesModel(): Model {
   const b = new ModelBuilder();
   stubFaceNotes(b, 1, 17);
-  b.box(0.1, 0.03, 0.1, sticky(2), { at: [0.2, STUB_TOP + 0.015, 0.1], rot: [0, 0.3, 0] }, 0);
+  stickyStack(b, 0.22, 0.12, 2);
+  timerCube(b, -0.2, -0.1, 0.4);
+  speakerPill(b, 0.1, -0.25, 0.2);
   return b.build();
 }
 
@@ -1077,9 +1555,9 @@ export function stubSceneModel(scene: StubScene, span: number): Model {
     case 'howMightWe':
       return howMightWeModel(span);
     case 'prod':
-      return grownAt(prodModel(), 1.2, [0, STUB_TOP, 0.5]);
-    case 'credenza':
-      return credenzaModel();
+      return prodModel();
+    case 'badgeTray':
+      return badgeTrayModel();
     default:
       return stubNotesModel();
   }
