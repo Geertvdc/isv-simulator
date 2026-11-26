@@ -1,10 +1,16 @@
 # Synergy environment pass
 
-**Status:** brief written, round 1 next. Level 4-2 (`synergy`, "Synergy"), the second level of the Enterprise chapter, gets a hand-built world after [Back to Back](back-to-back-environment.md) (4-1). Same building (YOTTA Tower), new floor and a new time of day. It reuses 4-1's tower kit and adds what 4-3 The Reorg builds on: the boardroom, the folding walls, MONOLITH's people. **The bar:** 4-1 Back to Back. The user's notes for this pass: **the folding walls must look and move like the real thing**, and the last few levels have had **less detail and fewer nice additions around them**, so the density target is higher than for any level so far (see "Detail budget").
+**Status:** two rounds done (build, critic review, fixes); round 2 not re-scored. Level 4-2 (`synergy`, "Synergy"), the second level of the Enterprise chapter, gets a hand-built world after [Back to Back](back-to-back-environment.md) (4-1). Same building (YOTTA Tower), new floor and a new time of day. It reuses 4-1's tower kit and adds what 4-3 The Reorg builds on: the boardroom, the folding walls, MONOLITH's people. **The bar:** 4-1 Back to Back. The user's notes for this pass: **the folding walls must look and move like the real thing**, and the last few levels have had **less detail and fewer nice additions around them**, so the density target is higher than for any level so far (see "Detail budget").
 
-| Before                                      |
-| ------------------------------------------- |
-| ![](images/synergy-environment/before.webp) |
+| Before                                      | After (closed)                             | After (open)                                    |
+| ------------------------------------------- | ------------------------------------------ | ----------------------------------------------- |
+| ![](images/synergy-environment/before.webp) | ![](images/synergy-environment/after.webp) | ![](images/synergy-environment/after-open.webp) |
+
+The folding walls, half a second before they close, and a contact sheet of their motion (closed, open, the closing train, the unlatch, the mid-fold zigzag, stacked, the BOARD | ROOM split):
+
+| Closing                                      | Motion                                            |
+| -------------------------------------------- | ------------------------------------------------- |
+| ![](images/synergy-environment/folding.webp) | ![](images/synergy-environment/walls-motion.webp) |
 
 **Goal:** the world around the level tells one story, the way Overcooked 2 levels do. Render-only (`src/render/`); the sim, the maps and balance don't change. Two screenshot scenes join the docs (`src/sim/sceneCatalog.ts`): `levels/synergy-open` (the boardroom folded open) and `mechanics/synergy-folding` (the walls half a second from closing).
 
@@ -138,13 +144,55 @@ Four agents in one worktree at once, with strict file ownership. The shared plum
 
 ## Done when
 
-- [ ] The shot reads as "YOTTA's boardroom floor, the afternoon MONOLITH came to visit" without explanation, and nothing in it reads as food or a kitchen.
-- [ ] The storyline beat reads with no explanation: the two logos side by side, MONOLITH's suits behind the glass, the boardroom with its walls, the sticky notes everywhere.
-- [ ] The folding walls look like a real operable wall (panels, track, pockets) and move like one: the train closing, the fold opening, the table rolling, telegraphed and readable, solid on time.
-- [ ] The outside connects to the play: the sticky-note wall (inbox), the deploy desk (ship), the boardroom open and closed.
-- [ ] The running gags are in place: both logos, MONOLITH, Prod as the parking lot, Segfault on the flip chart, the synergy matrix, Mom's name card.
-- [ ] The detail budget is met and the critic rates density above 4-1.
-- [ ] No flat empty ground and no void in the 1440×810 frame, in both phases.
-- [ ] Stations, players, the boardroom label and the reorg warning read at a glance; nothing hides them.
-- [ ] Mean luminance about 105+, stations the most saturated things on screen.
-- [ ] `npm run check` passes; other levels (4-1 included) look as before.
+- [x] The shot reads as "YOTTA's boardroom floor, the afternoon MONOLITH came to visit" without explanation, and nothing in it reads as food or a kitchen.
+- [x] The storyline beat reads with no explanation: the two logos side by side, MONOLITH's suits behind the glass, the boardroom with its walls, the sticky notes everywhere.
+- [x] The folding walls look like a real operable wall (panels, track, pockets) and move like one: the train closing, the fold opening, the table rolling, telegraphed and readable, solid on time.
+- [x] The outside connects to the play: the sticky-note wall (inbox), the deploy desk (ship), the boardroom open and closed.
+- [x] The running gags are in place: both logos, MONOLITH, Prod as the parking lot, Segfault on the flip chart, the synergy matrix, Mom's name card.
+- [ ] The detail budget is met and the critic rates density above 4-1. (The budget's counts are met; the critic scored round 1's density 5 against 4-1's 7 and has not re-scored round 2.)
+- [x] No flat empty ground and no void in the 1440×810 frame, in both phases.
+- [x] Stations, players, the boardroom label and the reorg warning read at a glance; nothing hides them.
+- [x] Mean luminance about 105+, stations the most saturated things on screen.
+- [x] `npm run check` passes; other levels (4-1 included) look as before.
+
+## Rounds
+
+Round 1 ran four agents at once: **Walls** (a track of its own for the folding walls, at the user's request), **Room**, **World** and **Light**, with 4-1's finished frame as the bar (no Overcooked shots were supplied). A `movingTiles` hook in `RoomDressing` lets a room draw its own reorg tiles instead of `Mechanics`' stand-in boxes; Synergy's are `boardroom/foldingWalls.ts`, posed from the sim's tick alone (`boardroom/motion.ts`), so a screenshot scene can catch any moment of the motion.
+
+The critic scored round 1 **6.5/10** (before: 2.5; 4-1: 7.5): folding walls 6.5 (look 5.5, motion 7.5, telegraph 8), density 5. The reception was the best backdrop in the campaign so far, and the mid-fold zigzag and the closing train the best motion in the game. What held it back:
+
+- Closed, the folding walls read as a low wooden railing from this camera (thin panels, light steel joints, carpet showing beside them, a low front run).
+- Walnut was more saturated than the stations; the row-3 whiteboards were the brightest things in the play area.
+- The front strip (bare cap, a uniform façade), the side edges (grey boxes, empty roofs) and the floors (a flat checker) were thin; the open boardroom had a dark hole where the table stood.
+- MONOLITH's glint was a hard orange half-façade; the catering trolleys' cloches read as food; the convoy sat at the frame's edge.
+
+Round 2, in four chunks:
+
+- **Walls:** a walnut head rail over whole runs, thicker panels with hairline joints on a steel track plinth, frosted glass over the cut-down front so it reads full height, framed fabric insets, smoked walnut, closets with a head box and a brass plate, doors that swing 100°, a shorter table roll, a softer warning wash.
+- **Room:** a stone window board along the front with four clusters of low kit, low side glass with mullions and cream blinds, darker leaned-back boards and a scene on every stub under a lipped stone cap, a rug where the table stood, placed wear on the slate (walk lines, castor arcs, scuffs, sticky notes, sun fade), a visitor-badge tray with a coffee urn.
+- **World:** a façade with varied blinds, lit windows, silhouettes, a violet stripe and a YOTTA × MONOLITH banner; the gondola clear of the timer and a parked BMU arm; setback roofs with condensers, a BMU track, paving and MONOLITH's pennant; a soft glint; lighter reception stone with wall-washers; draped trolleys; suits that glance round; the convoy in frame with an open door.
+- **Light:** three cool downlights and a cool glow over the reception (a CSS glow in their place on low), a near-neutral bounce and a stronger cool fill, a greyer boardroom rug, exposure 1.24.
+
+Measured on the final shots:
+
+| Measure                      | Before | Round 1   | Final |
+| ---------------------------- | ------ | --------- | ----- |
+| Frame mean luminance         | 107.2  | 106.6     | 114.7 |
+| Frame mean luminance, open   |        | 107.4     | 115.7 |
+| Frame mean luminance, low    |        | 105.9     | 113.1 |
+| Frame saturation             | 0.351  | 0.273     | 0.241 |
+| Frame contrast (std)         | 46.9   | 48.5      | 48.5  |
+| Top band 0–140 (luminance)   |        | 78.9      | 98.9  |
+| Row-3 boards (luminance)     |        | 206       | ≤ 150 |
+| Open table tiles (luminance) |        | 94        | 120   |
+| Walnut runs (saturation)     |        | 0.41–0.64 | 0.33  |
+
+Keyboards (0.40) and test benches (0.38) stay the most saturated large surfaces apart from the warning; ship and bug queue measure about 0.53. Back to Back and The Reorg look as before (mean pixel difference about 1 in 255, animation and webp noise).
+
+Left for later:
+
+- **The critic did not re-score round 2.** Not checked on a real GPU (SwiftShader only).
+- **Walnut measures about 0.33** on screen, over the 0.30 target: lower turns it grey. It already reads as smoked walnut rather than warm walnut.
+- **A ticket on a table half floats about 20 ticks** while the half rolls on opening (target 15): the last panel only clears the table at tick 18. The real fix is for the ticket billboard to follow `deskRoll` (`boardroom/motion.ts`), outside this pass's files.
+- **MONOLITH's suits** are static figures with a moving head (`peck`), a little bird-like; scene people only have the hoodie outfit. A `ScenePerson` outfit (a suit with sunglasses) would let them use the animated characters.
+- **Small things:** the front kit reads as clutter on a ledge more than separate props; the side glass's blinds show clearly only on the left; the façade silhouettes and banner letters are small; the head rail pops in in one frame at unlatch and arrival; the stacked panels show fine stripes from above; the plinth draws a grey frame round the open boardroom.

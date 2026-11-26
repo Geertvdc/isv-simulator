@@ -4,7 +4,7 @@ The campaign tells one story: **YOTTA**, a startup founded by two people in Mom'
 
 This page is canon for level design and environment passes. A level's map, its world, its props and its light should all tell this level's beat. The players never read this page, so **the story has to show in the world**: in the backdrop, the props, the people outside and the signs on the walls.
 
-Where a level already has an environment brief, that brief is the detailed version and wins on details: [garage](../plan/garage-environment.md), [open plan](../plan/open-plan-environment.md), [down the hall](../plan/down-the-hall-environment.md), [seed round](../plan/seed-round-environment.md), [demo day](../plan/demo-day-environment.md), [on call](../plan/on-call-environment.md), [middle management](../plan/middle-management-environment.md), [hypergrowth](../plan/hypergrowth-environment.md), [hot desking](../plan/hot-desking-environment.md), [back to back](../plan/back-to-back-environment.md). Everything else here is a starting point: change it when a pass finds something funnier, and update this page when you do.
+Where a level already has an environment brief, that brief is the detailed version and wins on details: [garage](../plan/garage-environment.md), [open plan](../plan/open-plan-environment.md), [down the hall](../plan/down-the-hall-environment.md), [seed round](../plan/seed-round-environment.md), [demo day](../plan/demo-day-environment.md), [on call](../plan/on-call-environment.md), [middle management](../plan/middle-management-environment.md), [hypergrowth](../plan/hypergrowth-environment.md), [hot desking](../plan/hot-desking-environment.md), [back to back](../plan/back-to-back-environment.md), [synergy](../plan/synergy-environment.md). Everything else here is a starting point: change it when a pass finds something funnier, and update this page when you do.
 
 ## The arc in one table
 
@@ -188,12 +188,12 @@ _New: meetings._ YOTTA has an HQ, a board, a brand book and a calendar. Shipping
 
 ### 4-2 Synergy (`synergy`)
 
-- **Where and when:** the boardroom floor, between the dev side and the ops side. Summer afternoon.
-- **The joke:** MONOLITH's executives come round for a "synergy workshop". The boardroom's folding walls open so everyone can "align", and the whole floor becomes one hall full of sticky notes, then closes again.
-- **Mechanic in the story:** the boardroom's folding walls open and close on a schedule; the front passage and the back corridor always work.
-- **Inbox and ship:** the inbox is the workshop's sticky-note wall; the ship hatch is the ops side's deploy desk.
-- **Outside:** MONOLITH's black cars in the drop-off, a facilitator with a flip chart, catering trolleys kept off the play area (no food on display: covered trolleys only).
-- **Running gags:** YOTTA and MONOLITH logos side by side on a welcome screen, Prod in the boardroom being used as a "parking lot" for sticky notes, Segfault on the flip chart, the plan rewritten as a synergy matrix.
+- **Where and when:** the boardroom floor of YOTTA Tower, a few floors above 4-1's offices, between the dev side and the ops side. A hot summer afternoon, the sun low in the west.
+- **The joke:** MONOLITH's executives come across the river for a "synergy workshop". They wait behind the glass in YOTTA's executive reception in identical black suits, under a welcome screen with both logos side by side. At the facilitator's signal the boardroom's walnut folding walls trundle out of their closets so everyone can "align", the whole floor becomes one hall of sticky notes, and then the walls roll back.
+- **Mechanic in the story:** the boardroom's folding walls open and close on a schedule; the front passage and the back corridor always work. The walls run on a steel floor track and stack in two closets at the boardroom's back corners; the boardroom table is in two halves on castors that roll apart.
+- **Inbox and ship:** the inbox is the workshop's sticky-note wall (IDEAS, GO WILD!); the ship hatch is the ops side's deploy desk ("DEPLOYS 42").
+- **Outside:** the executive reception (welcome screen, walnut desk, MONOLITH's suits and guard, identical coats, umbrellas and briefcases, covered catering trolleys, speed gates, the facilitator at her flip chart), setback roofs with condensers and a BMU track, the city below, MONOLITH's black tower across the river with its helicopter, MONOLITH's black convoy in the drop-off far below, the tower's façade with a YOTTA × MONOLITH banner and the window cleaners' gondola.
+- **Running gags:** YOTTA and MONOLITH logos side by side on the welcome screen (and on the banner); Prod as the workshop's "PARKING LOT", sticky notes on its leaves; Segfault asleep on the flip chart; the plan rewritten as a synergy matrix ("THE PLAN V2"); Mom's portrait and her seat on the board plaque, and her name card on the boardroom table.
 - **Level design hooks:** the folding room is the level; there is always one open route.
 - **How it ends:** the consultants say YOTTA needs a reorg.
 
@@ -272,7 +272,7 @@ A quick lookup for set dressing. "—" means it's not in that level.
 | 3-2   | banner over the lift shaft | stair landing           | on the lift car roof | —                           | —                       | almost done       |
 | 3-3   | on the locker doors        | reserved terrace desk   | open locker          | —                           | —                       | finished, TO LET  |
 | 4-1   | steel letters in the lobby | terrace planter, a tree | cool lobby floor     | meeting room; visitor bay   | across the river, level | they're inside it |
-| 4-2   | side by side with MONOLITH | sticky-note parking     | flip chart           | —                           | executives visiting     | —                 |
+| 4-2   | side by side with MONOLITH | sticky-note parking     | flip chart           | board portrait, name card   | executives visiting     | —                 |
 | 4-3   | rebrand to `yotta.`        | on a trolley            | box marked "Matrix"  | —                           | crowd outside its tower | —                 |
 | 5-1   | cherry-picker logo swap    | tree in the atrium      | skybridge rail       | wagon on a plinth           | its old belts and logo  | —                 |
 | 5-2   | cardboard, framed          | cutting on a desk       | swatch basket        | —                           | —                       | —                 |

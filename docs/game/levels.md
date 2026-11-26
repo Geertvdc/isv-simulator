@@ -341,6 +341,8 @@ X..1...#mmmmm#...3..#
 
 ![Synergy](images/levels/synergy.webp)
 
+![Synergy with the boardroom's folding walls stacked away](images/levels/synergy-open.webp)
+
 Dev and ops on either side of the boardroom, joined by a narrow front passage and a corridor round the back. On a schedule the boardroom walls fold away into one big hall, then close again; its table desks roll out to the edges and back with whatever is on them.
 
 - **New here:** Reorgs: walls and desks that move.
