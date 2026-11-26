@@ -43,20 +43,40 @@ export const TRAIN_END = 3;
 /** The pocket doors swing open just before the train (ticks before the switch). */
 const DOOR_OPEN_START = 78;
 const DOOR_OPEN_END = 60;
-/** The table halves roll together before the train comes through (ticks before the switch). */
-const DESK_CLOSE_START = 70;
-const DESK_CLOSE_END = 50;
+/**
+ * The table halves roll together around the train (ticks before the
+ * switch): just off the track before the train comes through (a ticket on a
+ * half stays by its end), then home as the tiles switch.
+ */
+const DESK_CLEAR_START = 47;
+const DESK_CLEAR_END = 40;
+const DESK_CLOSE_START = 10;
+const DESK_CLOSE_END = 1;
 /** Unlatching before the walls open (ticks before the switch). */
 export const UNLATCH = 30;
-/** The fold: the leaves hinge over `FOLD_IN` ticks and the trains are stacked by `FOLD` (after the switch). */
+/**
+ * The fold: the leaves hinge over `FOLD_IN` ticks and the trains are
+ * stacked by `FOLD` (after the switch). The slide picks up over
+ * `SLIDE_RAMP` ticks and then coasts into the pockets, so the far panels
+ * are past the table's spots early and the stack settles softly.
+ */
 const FOLD_IN = 6;
-export const FOLD = 34;
+const SLIDE_RAMP = 6;
+export const FOLD = 32;
 /** The pocket doors close after the stack (ticks after the switch). */
 const DOOR_CLOSE_START = 36;
 const DOOR_CLOSE_END = 52;
-/** The table halves roll apart behind the trains (ticks after the switch). */
-const DESK_OPEN_START = 12;
-const DESK_OPEN_END = 46;
+/**
+ * The table halves roll apart behind the trains (ticks after the switch):
+ * up to the track at once (`DESK_NEAR` of the way, the half's end just clear
+ * of the passing panels), then home onto the track as the last panel is by,
+ * so a ticket the sim puts on a half at the switch is over it within a
+ * quarter second and on it soon after.
+ */
+const DESK_NEAR_END = 12;
+const DESK_NEAR = 0.62;
+export const DESK_HOME_START = 17;
+export const DESK_HOME_END = 22;
 /** The beacons turn from the warning until the doors are shut again. */
 const BEACON_AFTER = DOOR_CLOSE_END;
 
@@ -113,6 +133,13 @@ const smooth = (v: number): number => {
 };
 /** `v` from `a` to `b` (either way round), smoothed. */
 const ramp = (v: number, a: number, b: number): number => smooth((v - a) / (b - a));
+
+/** How far the opening trains have slid, 0 to 1 over `FOLD` ticks: speed rising over `SLIDE_RAMP`, then easing out. */
+function slide(t: number): number {
+  const u = Math.min(FOLD, Math.max(0, t));
+  if (u < SLIDE_RAMP) return (u * u) / (SLIDE_RAMP * FOLD);
+  return 1 - ((FOLD - u) * (FOLD - u)) / ((FOLD - SLIDE_RAMP) * FOLD);
+}
 
 /** Where the walls are in the schedule, from the live state. */
 export function reorgClock(
@@ -204,7 +231,7 @@ export function panelPose(run: WallRun, k: number, clock: ReorgClock, animate = 
   const f = smooth(t / FOLD_IN);
   const spacing = 1 + (FOLD_SPACING - 1) * f;
   const fEnd = (n - 0.5) * FOLD_SPACING - UNLATCH_GAP * n + 0.5 + 0.01;
-  const c = Math.max(-0.5, (i + 0.5) * spacing - UNLATCH_GAP * (i + 1) - fEnd * smooth(t / FOLD));
+  const c = Math.max(-0.5, (i + 0.5) * spacing - UNLATCH_GAP * (i + 1) - fEnd * slide(t));
   const out = clamp01(c - 0.5 + 1);
   return {
     ...standing,
@@ -260,8 +287,26 @@ export function deskRoll(run: WallRun | undefined, clock: ReorgClock, animate = 
   const { t } = clock;
   if (!animate) return t < 0 ? 0 : 1;
   const closing = run ? changeOf(run, clock).change === 'closing' : false;
-  if (t < 0) return closing ? ramp(t, -DESK_CLOSE_START, -DESK_CLOSE_END) : 0;
-  return closing ? 1 : ramp(t, DESK_OPEN_START, DESK_OPEN_END);
+  if (t >= 0 && closing) return 1;
+  if (closing)
+    return t < -DESK_CLOSE_START
+      ? (1 - DESK_NEAR) * ramp(t, -DESK_CLEAR_START, -DESK_CLEAR_END)
+      : 1 - DESK_NEAR + DESK_NEAR * ramp(t, -DESK_CLOSE_START, -DESK_CLOSE_END);
+  if (t < 0) return 0;
+  return t < DESK_HOME_START
+    ? DESK_NEAR * ramp(t, 0, DESK_NEAR_END)
+    : DESK_NEAR + (1 - DESK_NEAR) * ramp(t, DESK_HOME_START, DESK_HOME_END);
+}
+
+/**
+ * Whether every panel of the run stands in its place, so the head rail
+ * over it is drawn: closed and at rest, the train home, or not yet unlatched.
+ */
+export function runWhole(run: WallRun, clock: ReorgClock, animate = true): boolean {
+  const { change, closedNow } = changeOf(run, clock);
+  if (change === 'rest' || !animate) return closedNow;
+  if (change === 'closing') return clock.t >= -TRAIN_END;
+  return clock.t < -UNLATCH;
 }
 
 /** Whether the pocket beacons turn, and their turn. */

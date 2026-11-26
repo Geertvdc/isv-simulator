@@ -17,23 +17,35 @@ import { type P2, type WallRun, pointAt } from './track';
 
 // ---- Materials ----
 
-/** Walnut veneer: the panels' rails, the closets; a deeper one for the table tops (under every station top). */
-export const WALNUT = 0x5b3b27;
-/** A panel's top: darker end grain. */
-const CAP_WALNUT = 0x4f3322;
-const WALNUT_LIGHT = 0x84573a;
-const WALNUT_DEEP = 0x4a2e1d;
-export const TABLE_TOP = 0x4b2f1f;
-const TABLE_EDGE = 0x2e1d13;
-const CLOSET_INSIDE = 0x2c1d14;
+/**
+ * Walnut veneer: the panels' rails, the closets; a deeper one for the table
+ * tops (under every station top). Smoked walnut, low in saturation: the warm
+ * afternoon light adds the orange, and the stations must stay the most
+ * saturated things on screen.
+ */
+export const WALNUT = 0x5c5550;
+/** A panel's top and the head rail: darker end grain. */
+export const CAP_WALNUT = 0x4d4844;
+const WALNUT_LIGHT = 0x787068;
+const WALNUT_DEEP = 0x403c39;
+/** The bead framing each fabric inset: a shade lighter than the veneer, so it catches the light. */
+const BEAD = 0x645d56;
+export const TABLE_TOP = 0x4c4743;
+const TABLE_EDGE = 0x2b2928;
+const CLOSET_INSIDE = 0x2b2928;
 /** The acoustic fabric: a quiet violet-grey. */
-export const FABRIC = 0x6f6a82;
-const FABRIC_WEAVE = 0x655f78;
+export const FABRIC = 0x7a7392;
+const FABRIC_WEAVE = 0x706a87;
 /** Brushed steel: edges, caps, the track; its darker kick plate and the black of a slot. */
 export const STEEL = 0xb3bac2;
 const STEEL_DARK = 0x5d646c;
-/** The panels' edges: brushed steel a shade down, so a run doesn't read as a ladder. */
-const STEEL_EDGE = 0x8e959c;
+/** The panels' edges: dark brushed steel, so a run's joints don't read as a ladder. */
+const STEEL_EDGE = 0x6a6f76;
+/** The brushed plinth the track is set in, under every partition tile and into the pockets. */
+const TRACK_PLINTH = 0x6e7073;
+/** The front run's frosted glass upper section, and its frosted manifestation band. */
+const FROST_GLASS = 0xdfe3ea;
+const FROST = 0xc4cad3;
 /** The track's bed in the floor: brushed steel in shade. */
 const TRACK_BED = 0x7c848c;
 const RUBBER = 0x24262a;
@@ -51,10 +63,16 @@ export const NOTES = [0xf0d45e, 0xee9bb6, 0x8fc6e8, 0xa8d78c, 0xf2ae64] as const
 // ---- The panels ----
 
 /** A panel's thickness and a leaf's length along the track (two leaves to a panel, one panel to a tile). */
-export const PANEL_T = 0.14;
+export const PANEL_T = 0.2;
 const LEAF = 0.5;
-/** The gap at a panel's outer ends (so twice this between panels). */
-const END_GAP = 0.007;
+/** The gap at a panel's outer ends (so twice this between panels: a hairline). */
+const END_GAP = 0.002;
+/** The track's plinth: the panels stand on it. */
+export const PLINTH_H = 0.012;
+const PLINTH_W = 0.55;
+/** The head rail over a whole run: walnut, wider than a panel, so a closed run's top reads as one wall cap. */
+const RAIL_W = 0.26;
+const RAIL_H = 0.04;
 /** The lower section: a cut-down panel stands this tall. */
 export const LOW_TOP = 0.6;
 const KICK_H = 0.06;
@@ -86,6 +104,8 @@ export interface LeafLook {
   handle: boolean;
   /** Variation (sticky notes). */
   salt: number;
+  /** Steel edges on its cap (every third panel), else walnut end grain, so a stack doesn't read as a pallet. */
+  steelCap: boolean;
 }
 
 /** A sticky note on a face at depth `z` (facing ±z by `face`). */
@@ -105,6 +125,39 @@ function note(b: ModelBuilder, x: number, y: number, z: number, color: number, t
   );
 }
 
+/**
+ * An acoustic fabric inset on the face at depth `side * z`: the fabric `w`
+ * by `h` round (`cx`, `cy`), a few weave lines, framed by a proud walnut
+ * bead with a dark shadow line inside it, so a face reads as an upholstered
+ * panel, not slats.
+ */
+function fabricInset(
+  b: ModelBuilder,
+  cx: number,
+  cy: number,
+  w: number,
+  h: number,
+  z: number,
+  side: number,
+): void {
+  const bead = 0.02;
+  const f = side * (z + 0.002);
+  b.box(w, h, 0.004, FABRIC, { at: [cx, cy, f] }, 0);
+  for (let k = 1; k < 4; k++)
+    b.box(0.003, h - 0.01, 0.0045, FABRIC_WEAVE, { at: [cx - w / 2 + (w * k) / 4, cy, f] }, 0);
+  // The shadow line just inside the bead.
+  const s = side * (z + 0.0025);
+  b.box(w, 0.006, 0.004, INK, { at: [cx, cy + h / 2 - 0.003, s] }, 0);
+  b.box(0.006, h, 0.004, INK, { at: [cx - w / 2 + 0.003, cy, s] }, 0);
+  // The bead: proud of the veneer, lit along its top.
+  const bz = side * (z + 0.004);
+  for (const dy of [-1, 1])
+    b.box(w + 2 * bead, bead, 0.008, BEAD, { at: [cx, cy + dy * (h / 2 + bead / 2), bz] }, 0.002);
+  for (const dx of [-1, 1])
+    b.box(bead, h, 0.008, BEAD, { at: [cx + dx * (w / 2 + bead / 2), cy, bz] }, 0.002);
+  b.box(w + 2 * bead, 0.004, 0.009, WALNUT_LIGHT, { at: [cx, cy + h / 2 + bead, bz] }, 0);
+}
+
 /** The lower section of a leaf, its middle at the origin, along x, outer face +z. */
 export function leafLowerModel(look: LeafLook): Model {
   const b = new ModelBuilder();
@@ -116,35 +169,24 @@ export function leafLowerModel(look: LeafLook): Model {
   const z = PANEL_T / 2;
   // Kick plate, walnut body, the steel lip round the top.
   b.box(len, KICK_H, PANEL_T + 0.006, STEEL_DARK, { at: [cx, KICK_H / 2, 0] }, 0.004);
-  b.box(len, LOW_TOP - KICK_H, PANEL_T, WALNUT, { at: [cx, (LOW_TOP + KICK_H) / 2, 0] }, 0.008);
+  b.box(len, LOW_TOP - KICK_H, PANEL_T, WALNUT, { at: [cx, (LOW_TOP + KICK_H) / 2, 0] }, 0.006);
   for (const side of [-1, 1]) {
     const fz = side * (z + 0.0015);
-    // The fabric inset in a dark reveal, a few weave lines.
-    b.box(len - 0.07, 0.31, 0.003, INK, { at: [cx, 0.29, fz] }, 0);
-    b.box(len - 0.08, 0.296, 0.004, FABRIC, { at: [cx, 0.29, side * (z + 0.002)] }, 0);
-    for (let k = 1; k < 4; k++)
-      b.box(
-        0.004,
-        0.29,
-        0.0045,
-        FABRIC_WEAVE,
-        {
-          at: [cx - (len - 0.08) / 2 + ((len - 0.08) * k) / 4, 0.29, side * (z + 0.002)],
-        },
-        0,
-      );
-    // A light grain line in the walnut rails above and below the fabric.
-    b.box(len - 0.02, 0.005, 0.003, WALNUT_LIGHT, { at: [cx, 0.475, fz] }, 0);
-    b.box(len - 0.02, 0.004, 0.003, WALNUT_DEEP, { at: [cx, 0.11, fz] }, 0);
+    fabricInset(b, cx, 0.29, len - 0.11, 0.27, z, side);
+    // A quiet grain line in the walnut rails above and below the fabric.
+    b.box(len - 0.02, 0.004, 0.003, WALNUT_LIGHT, { at: [cx, 0.475, fz] }, 0);
+    b.box(len - 0.02, 0.004, 0.003, WALNUT_DEEP, { at: [cx, 0.1, fz] }, 0);
     b.box(len, 0.012, 0.006, STEEL_EDGE, { at: [cx, LOW_TOP - 0.006, side * (z + 0.002)] }, 0);
   }
-  // The steel edge at the outer end.
+  // The lower section's top: walnut end grain, seen where the wall is cut down.
+  b.box(len, 0.004, PANEL_T - 0.01, CAP_WALNUT, { at: [cx, LOW_TOP + 0.001, 0] }, 0);
+  // The dark steel edge at the outer end: a hairline, not a bright stile.
   b.box(
-    0.012,
+    0.008,
     LOW_TOP - 0.004,
-    PANEL_T + 0.004,
+    PANEL_T + 0.002,
     STEEL_EDGE,
-    { at: [outerEnd + h * 0.005, LOW_TOP / 2, 0] },
+    { at: [outerEnd + h * 0.004, LOW_TOP / 2, 0] },
     0,
   );
   // The hinge: a steel post exactly in the panel's thickness, so a corner turns round it.
@@ -163,9 +205,9 @@ export function leafLowerModel(look: LeafLook): Model {
   for (let k = -1; k <= 1; k++)
     b.box(0.034, 0.034, 0.005, DOT_VIOLET, { at: [k * DOT_PITCH, DOT_Y, z + 0.0035] }, 0);
   for (const [x, y] of look.vinyl)
-    b.box(VINYL_PX, VINYL_PX, 0.004, VINYL, { at: [x, y, z + 0.004] }, 0);
+    b.box(VINYL_PX, VINYL_PX, 0.004, VINYL, { at: [x, y, z + 0.007] }, 0);
   if (look.handle) {
-    const hx = outerEnd + h * 0.06;
+    const hx = outerEnd + h * 0.035;
     for (const side of [-1, 1]) {
       b.box(0.022, 0.11, 0.003, INK, { at: [hx, 0.34, side * (z + 0.003)] }, 0);
       b.box(0.012, 0.085, 0.01, STEEL, { at: [hx, 0.34, side * (z + 0.004)] }, 0);
@@ -182,7 +224,7 @@ export function leafLowerModel(look: LeafLook): Model {
       b,
       x,
       y,
-      -(z + 0.004),
+      -(z + 0.009),
       NOTES[(hk >> 4) % NOTES.length] ?? NOTES[0],
       (((hk >> 12) % 9) - 4) * 0.04,
     );
@@ -194,55 +236,42 @@ export function leafLowerModel(look: LeafLook): Model {
 export function leafUpperModel(look: LeafLook): Model {
   const b = new ModelBuilder();
   const h = look.hinge;
-  const outerEnd = -h * (LEAF / 2 - END_GAP - 0.012);
-  const hingeEnd = h * (LEAF / 2 - 0.012);
+  const outerEnd = -h * (LEAF / 2 - END_GAP - 0.006);
+  const hingeEnd = h * (LEAF / 2 - 0.008);
   const len = Math.abs(hingeEnd - outerEnd);
   const cx = (hingeEnd + outerEnd) / 2;
   const z = UPPER_T / 2;
   b.box(len, UPPER_H, UPPER_T, WALNUT, { at: [cx, UPPER_H / 2, 0] }, 0.006);
-  for (const side of [-1, 1]) {
-    b.box(len - 0.06, 0.38, 0.003, INK, { at: [cx, 0.27, side * (z + 0.0015)] }, 0);
-    b.box(len - 0.07, 0.366, 0.004, FABRIC, { at: [cx, 0.27, side * (z + 0.002)] }, 0);
-    for (let k = 1; k < 4; k++)
-      b.box(
-        0.004,
-        0.36,
-        0.0045,
-        FABRIC_WEAVE,
-        {
-          at: [cx - (len - 0.07) / 2 + ((len - 0.07) * k) / 4, 0.27, side * (z + 0.002)],
-        },
-        0,
-      );
-  }
-  // The cap: walnut end grain between two fine steel edges, so from above a run reads as walnut, not a pale slab.
-  const capLen = len + 0.014;
-  b.box(capLen, CAP_H, PANEL_T + 0.006, CAP_WALNUT, { at: [cx, UPPER_H + CAP_H / 2, 0] }, 0.004);
+  for (const side of [-1, 1]) fabricInset(b, cx, 0.27, len - 0.1, 0.34, z, side);
+  // The cap: walnut end grain, its long edges steel on every third panel and darker grain on the rest.
+  const capLen = len + 0.012;
+  const edge = look.steelCap ? STEEL_EDGE : tint(CAP_WALNUT, -0.3);
+  b.box(capLen, CAP_H, PANEL_T + 0.004, CAP_WALNUT, { at: [cx, UPPER_H + CAP_H / 2, 0] }, 0.004);
   for (const side of [-1, 1])
     b.box(
       capLen,
       0.004,
-      0.011,
-      STEEL,
+      0.01,
+      edge,
       {
-        at: [cx, UPPER_H + CAP_H + 0.001, side * (PANEL_T / 2 - 0.003)],
+        at: [cx, UPPER_H + CAP_H + 0.001, side * (PANEL_T / 2 - 0.004)],
       },
       0,
     );
   b.box(
     capLen - 0.03,
     0.002,
-    0.008,
-    tint(CAP_WALNUT, 0.2),
+    0.014,
+    tint(CAP_WALNUT, 0.05),
     { at: [cx, UPPER_H + CAP_H + 0.0005, 0] },
     0,
   );
   b.box(
-    0.01,
+    0.008,
     UPPER_H,
-    UPPER_T + 0.004,
+    UPPER_T + 0.002,
     STEEL_EDGE,
-    { at: [outerEnd + h * 0.005, UPPER_H / 2, 0] },
+    { at: [outerEnd + h * 0.004, UPPER_H / 2, 0] },
     0,
   );
   if (h === 1)
@@ -259,7 +288,7 @@ export function leafUpperModel(look: LeafLook): Model {
   // A small violet YOTTA mark on some outer faces; notes higher up inside.
   const hash = tileHash(look.salt, 53);
   if (hash % 3 === 0) {
-    b.torus(0.022, 0.007, YOTTA_VIOLET, { at: [cx, 0.42, z + 0.004] });
+    b.torus(0.022, 0.007, YOTTA_VIOLET, { at: [cx, 0.47, z + 0.004] });
   }
   const count = hash % 4 === 0 ? 0 : 1 + ((hash >> 3) % 2);
   for (let k = 0; k < count; k++) {
@@ -270,11 +299,44 @@ export function leafUpperModel(look: LeafLook): Model {
       b,
       x,
       y,
-      -(z + 0.004),
+      -(z + 0.009),
       NOTES[(hk >> 4) % NOTES.length] ?? NOTES[0],
       (((hk >> 12) % 9) - 4) * 0.04,
     );
   }
+  return b.build();
+}
+
+/** The front run's glass section's full height: from the lower section's top to the wall's. */
+export const GLASS_H = WALL_HEIGHT - LOW_TOP;
+
+/**
+ * The frosted glass upper section of a leaf where the wall is cut down for
+ * the camera (the front run), its bottom middle at the origin, along x,
+ * `GLASS_H` tall (`foldingWalls.ts` scales it down as the walnut upper
+ * rises): a frameless pane on a steel shoe, the frosted manifestation band
+ * with its violet dots, a slim steel top rail. It reads full height and
+ * hides neither the table nor the room's label.
+ */
+export function leafGlassModel(look: LeafLook): Model {
+  const b = new ModelBuilder();
+  const h = look.hinge;
+  const outerEnd = -h * (LEAF / 2 - END_GAP);
+  const hingeEnd = h * (LEAF / 2 - 0.002);
+  const len = Math.abs(hingeEnd - outerEnd);
+  const cx = (hingeEnd + outerEnd) / 2;
+  b.box(len, 0.018, 0.04, STEEL_EDGE, { at: [cx, 0.009, 0] }, 0.003);
+  b.pane(len - 0.004, GLASS_H - 0.04, 0.012, FROST_GLASS, { at: [cx, GLASS_H / 2, 0] });
+  // The manifestation band, both faces, the dots on a world pitch like the walnut's.
+  const band = 0.3;
+  b.box(len - 0.004, 0.04, 0.003, FROST, { at: [cx, band, 0.0075] }, 0);
+  b.box(len - 0.004, 0.006, 0.003, FROST, { at: [cx, band - 0.04, 0.0075] }, 0);
+  for (let k = -1; k <= 1; k++)
+    b.box(0.032, 0.032, 0.004, DOT_VIOLET, { at: [k * DOT_PITCH, band, 0.0095] }, 0);
+  b.box(len, 0.022, 0.032, STEEL, { at: [cx, GLASS_H - 0.011, 0] }, 0.003);
+  b.box(len, 0.004, 0.034, STEEL_EDGE, { at: [cx, GLASS_H - 0.024, 0] }, 0);
+  // A slim steel post at the outer end, so the joints read as framed glass.
+  b.box(0.012, GLASS_H, 0.022, STEEL_EDGE, { at: [outerEnd + h * 0.006, GLASS_H / 2, 0] }, 0);
   return b.build();
 }
 
@@ -355,6 +417,13 @@ const DOOR_H = 1.04;
 const DOOR_W = 0.445;
 export const DOOR_HINGE = 0.455;
 const DOOR_T = 0.026;
+/** The head box over the closet's opening: how far it stands proud and how far it rises over the closet. */
+const HEAD_D = 0.11;
+const HEAD_UP = 0.05;
+/** The cornice round the closet's open top. */
+const RIM_H = 0.05;
+/** How far the closet's roof reaches from the back. */
+const ROOF_D = 0.42;
 
 /**
  * A walnut storage closet on a pocket tile, the track entering through its
@@ -381,6 +450,15 @@ export function closetModel(outer: number): Model {
       },
       0,
     );
+    // Felt-lined bays: the panels slide in against it.
+    b.box(
+      0.004,
+      0.62,
+      w - 0.16,
+      tint(FABRIC, -0.35),
+      { at: [side * (half - 0.05), 0.5, -0.03] },
+      0,
+    );
     b.box(
       0.014,
       CLOSET_H - 0.14,
@@ -397,24 +475,91 @@ export function closetModel(outer: number): Model {
   }
   b.box(w, CLOSET_H, 0.045, WALNUT, { at: [0, CLOSET_H / 2, -half + 0.0225] }, 0.01);
   b.box(w - 0.1, CLOSET_H - 0.2, 0.004, CLOSET_INSIDE, { at: [0, CLOSET_H / 2, -half + 0.047] }, 0);
-  // The header over the opening, a brass plaque and a violet dot pair on it.
-  const headY = DOOR_H + (CLOSET_H - DOOR_H) / 2 + 0.005;
-  b.box(w, CLOSET_H - DOOR_H - 0.01, 0.06, WALNUT, { at: [0, headY, half - 0.03] }, 0.008);
-  b.box(w - 0.04, 0.008, 0.004, WALNUT_LIGHT, { at: [0, headY - 0.03, half + 0.001] }, 0);
-  b.box(0.2, 0.05, 0.006, BRASS, { at: [0, headY + 0.005, half + 0.002] }, 0);
-  b.box(0.15, 0.008, 0.004, tint(BRASS, -0.45), { at: [0, headY + 0.012, half + 0.005] }, 0);
-  b.box(0.11, 0.006, 0.004, tint(BRASS, -0.45), { at: [0, headY - 0.004, half + 0.005] }, 0);
-  for (const x of [-0.36, 0.36])
-    b.box(0.03, 0.03, 0.005, DOT_VIOLET, { at: [x, headY + 0.005, half + 0.002] }, 0);
-  // The rim round the open top: walnut, a fine steel line on its inner edge.
+  // The head box over the opening: solid walnut, proud of the front, its
+  // brass "BOARDROOM" plate and a violet dot either side, a shadow line under it.
+  const headH = CLOSET_H - DOOR_H + HEAD_UP;
+  const headY = DOOR_H + headH / 2;
+  const headZ = half - HEAD_D / 2 + 0.03;
+  b.box(w + 0.02, headH, HEAD_D, WALNUT, { at: [0, headY, headZ] }, 0.01);
+  b.box(
+    w + 0.024,
+    0.012,
+    HEAD_D + 0.004,
+    CAP_WALNUT,
+    { at: [0, CLOSET_H + HEAD_UP - 0.006, headZ] },
+    0.004,
+  );
+  b.box(w, 0.006, 0.004, INK, { at: [0, DOOR_H + 0.003, headZ + HEAD_D / 2 + 0.001] }, 0);
+  b.box(
+    w - 0.02,
+    0.005,
+    0.004,
+    WALNUT_LIGHT,
+    { at: [0, headY + headH / 2 - 0.03, headZ + HEAD_D / 2 + 0.001] },
+    0,
+  );
+  const plateZ = headZ + HEAD_D / 2;
+  const plateY = headY - 0.012;
+  b.box(0.42, 0.075, 0.006, BRASS, { at: [0, plateY, plateZ + 0.002] }, 0.002);
+  b.box(0.4, 0.06, 0.004, tint(BRASS, 0.12), { at: [0, plateY, plateZ + 0.004] }, 0);
+  for (const [x, y] of pixels('BOARDROOM', 0.0105))
+    b.box(0.0105, 0.0105, 0.004, tint(BRASS, -0.62), { at: [x, plateY + y, plateZ + 0.006] }, 0);
+  for (const x of [-0.37, 0.37])
+    b.box(0.032, 0.032, 0.005, DOT_VIOLET, { at: [x, plateY, plateZ + 0.002] }, 0);
+  // The cornice round the open top: chunky walnut, a fine steel line on its inner edge.
   for (const side of [-1, 1]) {
-    b.box(0.06, 0.014, w, CAP_WALNUT, { at: [side * (half - 0.03), CLOSET_H + 0.007, 0] }, 0.004);
-    b.box(0.008, 0.004, w - 0.12, STEEL, { at: [side * (half - 0.064), CLOSET_H + 0.012, 0] }, 0);
+    b.box(
+      0.07,
+      RIM_H,
+      w,
+      CAP_WALNUT,
+      { at: [side * (half - 0.035), CLOSET_H + RIM_H / 2 - 0.02, 0] },
+      0.006,
+    );
+    b.box(
+      0.006,
+      0.004,
+      w - 0.14,
+      tint(STEEL, -0.2),
+      { at: [side * (half - 0.072), CLOSET_H + RIM_H - 0.02, 0] },
+      0,
+    );
   }
-  b.box(w, 0.014, 0.06, CAP_WALNUT, { at: [0, CLOSET_H + 0.007, -half + 0.03] }, 0.004);
-  b.box(w, 0.014, 0.07, CAP_WALNUT, { at: [0, CLOSET_H + 0.007, half - 0.035] }, 0.004);
-  for (const z of [-half + 0.064, half - 0.074])
-    b.box(w - 0.12, 0.004, 0.008, STEEL, { at: [0, CLOSET_H + 0.012, z] }, 0);
+  b.box(w, RIM_H, 0.07, CAP_WALNUT, { at: [0, CLOSET_H + RIM_H / 2 - 0.02, -half + 0.035] }, 0.006);
+  // A walnut roof over the back of the closet: from the front you still see down onto the stack.
+  b.box(
+    w - 0.02,
+    0.03,
+    ROOF_D,
+    WALNUT,
+    { at: [0, CLOSET_H + RIM_H - 0.035, -half + ROOF_D / 2] },
+    0.006,
+  );
+  b.box(
+    w - 0.06,
+    0.004,
+    0.012,
+    tint(CAP_WALNUT, -0.3),
+    { at: [0, CLOSET_H + RIM_H - 0.018, -half + ROOF_D] },
+    0,
+  );
+  for (const x of [-0.25, 0.1, 0.32])
+    b.box(
+      0.008,
+      0.002,
+      ROOF_D - 0.1,
+      WALNUT_LIGHT,
+      { at: [x, CLOSET_H + RIM_H - 0.019, -half + ROOF_D / 2] },
+      0,
+    );
+  b.box(
+    w - 0.14,
+    0.004,
+    0.006,
+    tint(STEEL, -0.2),
+    { at: [0, CLOSET_H + RIM_H - 0.02, -half + 0.072] },
+    0,
+  );
   // Inside on the back: the stacking-order card (panels 1 to 6) and a coat hook for the pole.
   const card = -half + 0.05;
   b.box(0.3, 0.2, 0.004, CARD, { at: [0, 0.86, card] }, 0);
@@ -549,6 +694,27 @@ export function doorLeafModel(dir: number): Model {
   b.box(0.014, 0.26, 0.014, STEEL, { at: [dir * (DOOR_W - 0.05), 0.62, fz + 0.016] }, 0);
   for (const y of [0.51, 0.73])
     b.box(0.01, 0.01, 0.018, STEEL_DARK, { at: [dir * (DOOR_W - 0.05), y, fz + 0.008] }, 0);
+  // The back face, seen when the doors stand open: book-matched veneer, a bead-framed panel.
+  const bz = -0.0015;
+  b.box(DOOR_W - 0.1, DOOR_H - 0.2, 0.003, tint(WALNUT, 0.06), { at: [cx, DOOR_H / 2, bz] }, 0);
+  b.box(
+    0.005,
+    DOOR_H - 0.26,
+    0.004,
+    WALNUT_LIGHT,
+    { at: [cx + dir * 0.06, DOOR_H / 2, bz - 0.001] },
+    0,
+  );
+  b.box(
+    0.004,
+    DOOR_H - 0.3,
+    0.004,
+    WALNUT_DEEP,
+    { at: [cx - dir * 0.09, DOOR_H / 2, bz - 0.001] },
+    0,
+  );
+  for (const y of [0.1, DOOR_H - 0.1])
+    b.box(DOOR_W - 0.08, 0.016, 0.006, BEAD, { at: [cx, y, bz - 0.001] }, 0);
   // Two hinge knuckles.
   for (const y of [0.18, 0.86]) b.cylinder(0.012, 0.012, 0.08, STEEL, { at: [0, y, 0] }, 8);
   return b.build();
@@ -591,15 +757,29 @@ function strip(
   bld.add(geometry, color, { at, rot: [0, yaw, 0] }, layer);
 }
 
-/** The brushed-steel track in the floor, pocket back to pocket back, with its dark slot, rails and unlit LED lines. */
+/**
+ * The brushed-steel track, pocket back to pocket back: a low brushed plinth
+ * under every partition tile and into the pockets (so no carpet shows beside
+ * a closed panel), and set in it the track's bed, its dark slot, rails and
+ * unlit LED lines.
+ */
 export function trackModel(run: WallRun): Model {
   const b = new ModelBuilder();
-  for (const { a, b: e } of pieces(run, -0.94, run.length + 0.94)) {
-    strip(b, a, e, 0.075, 0.004, 0, 0, TRACK_BED, 'body', 0.075);
-    strip(b, a, e, 0.026, 0.005, 0, 0, INK, 'body', 0.026);
+  const y = PLINTH_H;
+  for (const { a, b: e } of pieces(run, -0.97, run.length + 0.97)) {
+    strip(b, a, e, PLINTH_W, PLINTH_H, 0, 0, TRACK_PLINTH, 'body', PLINTH_W);
+    // A dark shadow line along each of its edges, and a fine bright arris on top.
     for (const side of [-1, 1]) {
-      strip(b, a, e, 0.008, 0.0055, 0, side * 0.022, tint(STEEL, -0.08), 'body', 0.008);
-      strip(b, a, e, 0.01, 0.0045, 0, side * 0.074, AMBER_DIM, 'body', 0.01);
+      strip(b, a, e, 0.012, PLINTH_H + 0.001, 0, side * (PLINTH_W / 2 + 0.004), INK, 'body', 0);
+      strip(b, a, e, 0.008, 0.001, y, side * (PLINTH_W / 2 - 0.006), tint(STEEL, -0.05));
+    }
+  }
+  for (const { a, b: e } of pieces(run, -0.94, run.length + 0.94)) {
+    strip(b, a, e, 0.075, 0.004, y, 0, TRACK_BED, 'body', 0.075);
+    strip(b, a, e, 0.026, 0.005, y, 0, INK, 'body', 0.026);
+    for (const side of [-1, 1]) {
+      strip(b, a, e, 0.008, 0.0055, y, side * 0.022, tint(STEEL, -0.08), 'body', 0.008);
+      strip(b, a, e, 0.01, 0.0045, y, side * 0.074, AMBER_DIM, 'body', 0.01);
     }
   }
   // Brass end stops at the pockets' backs and the brass socket where the two trains meet.
@@ -610,7 +790,7 @@ export function trackModel(run: WallRun): Model {
       0.05,
       0.09,
       BRASS,
-      { at: [p.x, 0.025, p.z], rot: [0, Math.atan2(-t.z, t.x), 0] },
+      { at: [p.x, y + 0.025, p.z], rot: [0, Math.atan2(-t.z, t.x), 0] },
       0.012,
     );
   }
@@ -621,18 +801,18 @@ export function trackModel(run: WallRun): Model {
     0.1,
     BRASS,
     {
-      at: [seam.p.x, 0.0035, seam.p.z],
+      at: [seam.p.x, y + 0.0035, seam.p.z],
       rot: [0, Math.atan2(-seam.t.z, seam.t.x), 0],
     },
     0,
   );
-  b.cylinder(0.018, 0.018, 0.009, INK, { at: [seam.p.x, 0.004, seam.p.z] }, 12);
+  b.cylinder(0.018, 0.018, 0.009, INK, { at: [seam.p.x, y + 0.004, seam.p.z] }, 12);
   // A turning plate at each corner.
   const ends = [run.path[1], run.path[run.path.length - 2]];
   run.path.slice(1, -1).forEach((p) => {
     if (ends.some((e) => e && e.x === p.x && e.z === p.z)) return;
-    b.box(0.2, 0.005, 0.2, tint(STEEL, -0.18), { at: [p.x, 0.0025, p.z] }, 0);
-    b.cylinder(0.07, 0.07, 0.007, STEEL, { at: [p.x, 0.0035, p.z] }, 20);
+    b.box(0.2, 0.005, 0.2, tint(STEEL, -0.18), { at: [p.x, y + 0.0025, p.z] }, 0);
+    b.cylinder(0.07, 0.07, 0.007, STEEL, { at: [p.x, y + 0.0035, p.z] }, 20);
   });
   return b.build();
 }
@@ -642,7 +822,63 @@ export function trackLightModel(run: WallRun, i: number): Model {
   const b = new ModelBuilder();
   for (const { a, b: e } of pieces(run, i, i + 1))
     for (const side of [-1, 1])
-      strip(b, a, e, 0.016, 0.006, 0.0005, side * 0.074, AMBER, 'glow', 0.016);
+      strip(b, a, e, 0.016, 0.006, PLINTH_H + 0.0005, side * 0.074, AMBER, 'glow', 0.016);
+  return b.build();
+}
+
+/**
+ * The head rail over a whole run (drawn only while every panel stands in
+ * its place): over the full-height tiles a walnut cap wider than a panel,
+ * with a steel lip under each edge and a fine grain line on top, so a closed
+ * run's top reads as one wall cap, not a row of panel tops; over the
+ * cut-down front a slim steel rail on the glass, so the joints read as one
+ * glazed screen.
+ */
+export function headRailModel(run: WallRun): Model {
+  const b = new ModelBuilder();
+  const top = WALL_HEIGHT + PLINTH_H;
+  // Each stretch of tiles of one height, as track pieces (split at the corners).
+  let k = 0;
+  while (k < run.length) {
+    const tall = run.tall[k] ?? true;
+    let end = k;
+    while (end < run.length && (run.tall[end] ?? true) === tall) end++;
+    // A tall stretch runs on over the cut-down ones' ends, so the corner reads mitred.
+    for (const { a, b: e } of pieces(run, k, end)) {
+      if (tall) {
+        strip(b, a, e, RAIL_W, RAIL_H, top - 0.006, 0, CAP_WALNUT, 'body', RAIL_W);
+        for (const side of [-1, 1])
+          strip(
+            b,
+            a,
+            e,
+            0.01,
+            0.01,
+            top - 0.014,
+            side * (RAIL_W / 2 - 0.004),
+            STEEL_EDGE,
+            'body',
+            RAIL_W - 0.008,
+          );
+        strip(b, a, e, 0.016, 0.002, top + RAIL_H - 0.006, 0.05, tint(CAP_WALNUT, 0.06), 'body', 0);
+        strip(
+          b,
+          a,
+          e,
+          0.012,
+          0.002,
+          top + RAIL_H - 0.006,
+          -0.06,
+          tint(CAP_WALNUT, -0.12),
+          'body',
+          0,
+        );
+      } else {
+        strip(b, a, e, 0.036, 0.024, top - 0.024, 0, STEEL, 'body', 0);
+      }
+    }
+    k = end;
+  }
   return b.build();
 }
 

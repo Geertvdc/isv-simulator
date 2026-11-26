@@ -11,6 +11,9 @@ import {
   AMBER,
   CASTORS,
   DOOR_HINGE,
+  GLASS_H,
+  LOW_TOP,
+  PLINTH_H,
   WHEEL_R,
   beaconAt,
   beaconLensModel,
@@ -18,6 +21,8 @@ import {
   beamGeometry,
   closetModel,
   doorLeafModel,
+  headRailModel,
+  leafGlassModel,
   leafLowerModel,
   leafUpperModel,
   tableBoardModel,
@@ -30,7 +35,16 @@ import {
   washGeometry,
   wheelModel,
 } from './models';
-import { beacon, blinkOn, deskRoll, doorOpen, leafPoses, panelPose, reorgClock } from './motion';
+import {
+  beacon,
+  blinkOn,
+  deskRoll,
+  doorOpen,
+  leafPoses,
+  panelPose,
+  reorgClock,
+  runWhole,
+} from './motion';
 import { type Desk, type WallRun, desks, wallRuns } from './track';
 
 /** The name cards on each table half, by its place in reading order (Mom has a board seat). */
@@ -39,7 +53,12 @@ const NAME_CARDS: readonly (readonly string[])[] = [['YOTTA', 'MOM'], ['MONOLITH
 interface LeafLook {
   lower: THREE.Group;
   upper: THREE.Group;
+  /** The frosted glass over a cut-down leaf, or null where the run is full height all along. */
+  glass: THREE.Group | null;
 }
+
+/** The pocket doors swing a little past square, so their walnut faces catch the light. */
+const DOOR_SWING = (100 / 180) * Math.PI;
 
 interface PocketLook {
   doors: [THREE.Group, THREE.Group];
@@ -53,6 +72,8 @@ interface RunLook {
   pockets: PocketLook[];
   /** The lit track per tile index. */
   lights: Map<number, THREE.Group>;
+  /** The head rail, drawn while the run is whole. */
+  rail: THREE.Group;
 }
 
 interface DeskLook {
@@ -82,7 +103,8 @@ export class FoldingWalls implements MovingTilesLook {
     color: AMBER,
     vertexColors: true,
     transparent: true,
-    opacity: 0.62,
+    // Under the full-strength track lines and beacons, so the table tiles don't glow orange.
+    opacity: 0.527,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     toneMapped: false,
@@ -125,12 +147,26 @@ export class FoldingWalls implements MovingTilesLook {
     all.forEach((desk, k) => this.desks.push(this.buildDesk(desk, k)));
   }
 
-  private mesh(model: Model, shadow = true): THREE.Group {
+  /** The front run's frosted glass: quieter than the kit's glass. */
+  private readonly frostMaterial = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.35,
+    metalness: 0,
+    transparent: true,
+    opacity: 0.22,
+    depthWrite: false,
+  });
+
+  private mesh(
+    model: Model,
+    shadow = true,
+    glass: THREE.Material = this.materials.glass,
+  ): THREE.Group {
     const g = new THREE.Group();
     const layers: [THREE.BufferGeometry | null, THREE.Material, boolean][] = [
       [model.body, this.materials.body, true],
       [model.glow, this.materials.glow, false],
-      [model.glass, this.materials.glass, false],
+      [model.glass, glass, false],
     ];
     for (const [geometry, material, lit] of layers) {
       if (!geometry?.getAttribute('position')) continue;
@@ -152,15 +188,25 @@ export class FoldingWalls implements MovingTilesLook {
           vinyl: vinyl[k * 2 + h] ?? [],
           handle: h === (k < run.split ? 1 : 0),
           salt: k * 2 + h + 5,
+          steelCap: k % 3 === 0,
         };
         const lower = this.mesh(leafLowerModel(look));
         const upper = this.mesh(leafUpperModel(look));
         this.group.add(lower, upper);
-        leaves.push({ lower, upper });
+        let glass: THREE.Group | null = null;
+        if (run.tall.some((t) => !t)) {
+          glass = this.mesh(leafGlassModel(look), false, this.frostMaterial);
+          this.group.add(glass);
+        }
+        leaves.push({ lower, upper, glass });
       }
     }
     const track = this.mesh(trackModel(run), false);
-    this.group.add(track);
+    track.traverse((m) => {
+      if (m instanceof THREE.Mesh) m.receiveShadow = true;
+    });
+    const rail = this.mesh(headRailModel(run));
+    this.group.add(track, rail);
     const lights = new Map<number, THREE.Group>();
     run.tiles.forEach((tile, i) => {
       const light = this.mesh(trackLightModel(run, i), false);
@@ -202,7 +248,7 @@ export class FoldingWalls implements MovingTilesLook {
       this.group.add(closet);
       return { doors, spinner, lit };
     });
-    return { run, leaves, pockets, lights };
+    return { run, leaves, pockets, lights, rail };
   }
 
   private buildDesk(desk: Desk, k: number): DeskLook {
@@ -225,23 +271,36 @@ export class FoldingWalls implements MovingTilesLook {
 
   private syncRun(look: RunLook, clock: ReturnType<typeof reorgClock>, animate: boolean): void {
     const { run } = look;
+    look.rail.visible = runWhole(run, clock, animate);
     for (let k = 0; k < run.length; k++) {
-      const leaves = leafPoses(run, panelPose(run, k, clock, animate));
-      leaves.forEach((pose, h) => {
+      const panel = panelPose(run, k, clock, animate);
+      // On the plinth; in a stack, each slot a hair higher than the last so the caps never fight.
+      const base = PLINTH_H + (panel.lateral + 0.5) * 0.008 * (panel.lateral === 0 ? 0 : 1);
+      leafPoses(run, panel).forEach((pose, h) => {
         const leaf = look.leaves[k * 2 + h];
         if (!leaf) return;
-        leaf.lower.position.set(pose.x, pose.y, pose.z);
+        const y = base + pose.y;
+        leaf.lower.position.set(pose.x, y, pose.z);
         leaf.lower.rotation.y = pose.yaw;
-        leaf.upper.position.set(pose.x, pose.y + upperBase(pose.ext), pose.z);
+        leaf.upper.position.set(pose.x, y + upperBase(pose.ext), pose.z);
         leaf.upper.rotation.y = pose.yaw;
+        if (leaf.glass) {
+          // The glass fills from the walnut upper's top to the wall's height, and goes as the walnut rises.
+          const from = upperBase(pose.ext) - upperBase(0);
+          const scale = (GLASS_H - from) / GLASS_H;
+          leaf.glass.visible = scale > 0.03;
+          leaf.glass.position.set(pose.x, y + LOW_TOP + from, pose.z);
+          leaf.glass.scale.y = Math.max(0.001, scale);
+          leaf.glass.rotation.y = pose.yaw;
+        }
       });
     }
     const open = doorOpen(run, clock, animate);
     const spin = beacon(clock);
     for (const pocket of look.pockets) {
       // Each leaf swings out a quarter turn, to lie along the track either side of it.
-      pocket.doors[0].rotation.y = (-Math.PI / 2) * open;
-      pocket.doors[1].rotation.y = (Math.PI / 2) * open;
+      pocket.doors[0].rotation.y = -DOOR_SWING * open;
+      pocket.doors[1].rotation.y = DOOR_SWING * open;
       pocket.lit.visible = spin.on;
       pocket.spinner.visible = spin.on && animate;
       pocket.spinner.rotation.y = spin.angle;
@@ -258,7 +317,7 @@ export class FoldingWalls implements MovingTilesLook {
     for (const i of warning?.tiles ?? []) {
       if (this.washes.has(i)) continue;
       const mesh = new THREE.Mesh(this.washGeometry, this.washMaterial);
-      const at = gridToWorld(i % this.map.width, Math.floor(i / this.map.width), 0.012);
+      const at = gridToWorld(i % this.map.width, Math.floor(i / this.map.width), PLINTH_H + 0.008);
       mesh.position.set(at.x, at.y, at.z);
       mesh.renderOrder = 2;
       this.group.add(mesh);
