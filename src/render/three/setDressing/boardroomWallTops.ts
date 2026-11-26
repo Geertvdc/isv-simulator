@@ -14,7 +14,10 @@ import { TOWER_TOPS } from './towerWallTops';
  * cups, a conference phone, rolls of flip-chart paper, a box of sticky
  * notes, dot-vote sticker sheets, the synergy deck printed out (v14), the
  * facilitator's clicker, a MONOLITH card holder, a succulent, a tablet on
- * its stand, a headset; the tower's desk fan, binders and turned monitor.
+ * its stand, a headset; the tower's desk fan, binders and turned monitor;
+ * and, low for the front sill, a half-closed laptop, a marker caddy, a small
+ * DO NOT DISTURB card, lanyards in a tray, a water jug and glasses, MONOLITH
+ * notebooks squared up and a desk plant.
  * Each built facing the room (+z), its back to the outside (−z), standing
  * on the wall top at the origin. Office kit only: nothing to eat.
  */
@@ -483,6 +486,145 @@ function headsetModel(): Model {
   });
 }
 
+// ---- The front sill's kit: all of it low (at most `FRONT_TOP_MAX` once scaled) ----
+
+/** The front sill's kit a little smaller than the wall tops' (it is nearer the camera). */
+const FRONT_S = 1.75;
+
+/** A laptop left half closed, the synergy deck's glow on the keys, a YOTTA sticker on the lid. */
+function laptopHalfModel(): Model {
+  return scaled((b) => {
+    b.box(0.26, 0.012, 0.18, 0xa6acb3, { at: [0, 0.006, 0.02] }, 0.006);
+    b.box(0.22, 0.002, 0.09, 0x50565e, { at: [0, 0.0125, 0.0] }, 0);
+    b.screen(0.2, 0.02, 0x3a4a7a, { at: [0, 0.013, -0.04], rot: [-Math.PI / 2, 0, 0] });
+    const s = framed(b, [0, 0.012, -0.07], [-1.15, 0, 0]);
+    s.box(0.26, 0.17, 0.01, 0xa6acb3, { at: [0, 0.085, 0] }, 0.006);
+    s.cylinder(
+      0.026,
+      0.026,
+      0.002,
+      VIOLET,
+      { at: [0.04, 0.1, -0.006], rot: [Math.PI / 2, 0, 0] },
+      14,
+    );
+    s.box(0.05, 0.026, 0.002, 0xe6d064, { at: [-0.06, 0.06, -0.006], rot: [0, 0, 0.2] }, 0);
+  }, FRONT_S);
+}
+
+/** A tray of whiteboard markers lying in a row, caps in four colours, an eraser at the end. */
+function markerCaddyModel(): Model {
+  return scaled((b) => {
+    b.box(0.17, 0.024, 0.09, 0x3a3f46, { at: [0, 0.012, 0] }, 0.006);
+    [0x2a2e34, 0xc0302a, 0x2f5aa8, 0x2f8a4a].forEach((c, k) => {
+      const z = -0.03 + k * 0.02;
+      b.cylinder(0.009, 0.009, 0.12, PAPER, { at: [-0.01, 0.03, z], rot: [0, 0, Math.PI / 2] }, 8);
+      b.cylinder(0.01, 0.01, 0.03, c, { at: [0.065, 0.03, z], rot: [0, 0, Math.PI / 2] }, 8);
+    });
+    b.box(0.07, 0.03, 0.035, 0x2e3238, { at: [0.0, 0.015, 0.075], rot: [0, 0.3, 0] }, 0.006);
+    b.box(0.07, 0.008, 0.035, 0xd8d6cf, { at: [0.0, 0.004, 0.075], rot: [0, 0.3, 0] }, 0);
+  }, FRONT_S);
+}
+
+/** DO NOT DISTURB – SYNERGY IN PROGRESS on a low tent card, turned to the passage. */
+function dndCardModel(): Model {
+  return scaled((b) => {
+    for (const s of [1, -1]) {
+      const g = framed(b, [0, 0, s * 0.03], [s * 0.45, s > 0 ? 0 : Math.PI, 0]);
+      g.box(0.2, 0.1, 0.004, 0xf2f2ee, { at: [0, 0.05, 0] }, 0);
+      g.box(0.2, 0.026, 0.005, 0xc0302a, { at: [0, 0.084, 0] }, 0);
+      text(g, 'DO NOT DISTURB', 0, 0.084, 0.003, 0.0031, 0xffffff);
+      text(g, 'SYNERGY', 0, 0.052, 0.003, 0.0055, INK);
+      text(g, 'IN PROGRESS', 0, 0.024, 0.003, 0.0036, VIOLET);
+    }
+  }, FRONT_S);
+}
+
+/** Lanyards coiled in a shallow tray, their badges fanned at the front. */
+function lanyardTrayModel(): Model {
+  return scaled((b) => {
+    b.box(0.18, 0.02, 0.13, 0x4a3a2e, { at: [0, 0.01, 0] }, 0.005);
+    b.box(0.16, 0.006, 0.11, tint(0x4a3a2e, -0.3), { at: [0, 0.018, 0] }, 0);
+    for (let k = 0; k < 4; k++)
+      b.torus(0.04 - k * 0.004, 0.005, k % 2 ? BLACK : VIOLET, {
+        at: [-0.03 + k * 0.02, 0.024 + k * 0.004, -0.02 + (k % 2) * 0.02],
+        rot: [Math.PI / 2, 0, k],
+      });
+    for (let k = 0; k < 3; k++) {
+      const g = framed(b, [-0.05 + k * 0.05, 0.02, 0.05], [-0.4, (k - 1) * 0.25, 0]);
+      g.box(0.045, 0.06, 0.003, 0xf2f2ee, { at: [0, 0.03, 0] }, 0);
+      g.box(0.045, 0.014, 0.004, k % 2 ? BLACK : VIOLET, { at: [0, 0.052, 0] }, 0);
+    }
+  }, FRONT_S);
+}
+
+/** A water jug and two glasses on a small walnut tray. */
+function jugGlassesModel(): Model {
+  return scaled((b) => {
+    b.box(0.2, 0.01, 0.12, 0x4a3a2e, { at: [0, 0.005, 0] }, 0.004);
+    b.cylinder(0.03, 0.036, 0.05, 0x9fcbe2, { at: [-0.05, 0.035, 0] }, 16);
+    b.add(
+      new THREE.CylinderGeometry(0.028, 0.04, 0.13, 16),
+      0xe8f4fa,
+      { at: [-0.05, 0.075, 0] },
+      'glass',
+    );
+    b.torus(0.025, 0.005, 0xdfe8ee, { at: [-0.09, 0.08, 0], rot: [0, 0, Math.PI / 2] }, Math.PI);
+    for (const [x, z] of [
+      [0.03, -0.025],
+      [0.07, 0.025],
+    ] as const) {
+      b.cylinder(0.017, 0.017, 0.02, 0xa9d2e6, { at: [x, 0.02, z] }, 12);
+      b.add(
+        new THREE.CylinderGeometry(0.02, 0.018, 0.06, 12),
+        0xeef7fb,
+        { at: [x, 0.04, z] },
+        'glass',
+      );
+    }
+  }, FRONT_S);
+}
+
+/** MONOLITH's swag notebooks, squared up, the white M on the top one, a pen across it. */
+function notebookStackModel(): Model {
+  return scaled((b) => {
+    for (let k = 0; k < 4; k++) {
+      const r = ((k * 37) % 7) * 0.025 - 0.07;
+      b.box(0.14, 0.018, 0.19, BLACK, { at: [0, 0.009 + k * 0.019, 0], rot: [0, r, 0] }, 0.004);
+      b.box(0.004, 0.016, 0.18, 0xd8d6cf, { at: [0.07, 0.009 + k * 0.019, 0], rot: [0, r, 0] }, 0);
+    }
+    b.box(0.05, 0.002, 0.05, 0xf2f2ee, { at: [0, 0.077, 0.02] }, 0);
+    text(b, 'M', 0, 0.079, 0.02, 0.008, BLACK);
+    b.cylinder(
+      0.006,
+      0.006,
+      0.13,
+      VIOLET,
+      { at: [0.0, 0.082, -0.04], rot: [0, 0.4, Math.PI / 2] },
+      8,
+    );
+  }, FRONT_S);
+}
+
+/** A low desk plant in a white pot: a few broad leaves. */
+function deskPlantModel(): Model {
+  return scaled((b) => {
+    b.cylinder(0.05, 0.04, 0.06, 0xe8e6e0, { at: [0, 0.03, 0] }, 16);
+    b.cylinder(0.046, 0.046, 0.004, 0x5a4636, { at: [0, 0.06, 0] }, 16);
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2 + 0.3;
+      b.sphere(
+        0.04,
+        k % 2 ? 0x5f8a5a : 0x76a070,
+        {
+          at: [Math.sin(a) * 0.045, 0.09, Math.cos(a) * 0.045],
+          rot: [Math.cos(a) * 0.9, 0, -Math.sin(a) * 0.9],
+        },
+        [0.5, 1.2, 0.18],
+      );
+    }
+  }, FRONT_S);
+}
+
 /** Every wall-top prop, by kind. */
 export const BOARDROOM_TOPS: Readonly<Record<BoardroomTopKind, () => Model>> = {
   stickyPads: stickyPadsModel,
@@ -509,4 +651,11 @@ export const BOARDROOM_TOPS: Readonly<Record<BoardroomTopKind, () => Model>> = {
   tablet: tabletModel,
   headset: headsetModel,
   monitorTurned: TOWER_TOPS.monitorTurned,
+  laptopHalf: laptopHalfModel,
+  markerCaddy: markerCaddyModel,
+  dndCard: dndCardModel,
+  lanyardTray: lanyardTrayModel,
+  jugGlasses: jugGlassesModel,
+  notebookStack: notebookStackModel,
+  deskPlant: deskPlantModel,
 };

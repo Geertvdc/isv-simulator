@@ -9,6 +9,7 @@ import { tint } from '../kit';
 import { FRONT_WALL_HEIGHT, STATION_HEIGHT, WALL_HEIGHT, levelBox } from '../layout';
 import { FLOOR_COLORS, PALETTE, WALL_COLORS } from '../look';
 import {
+  BOARD_FACE,
   BOARD_H,
   BOARDROOM_ART_MODELS,
   BOARDROOM_FLOOR_LOOKS,
@@ -18,6 +19,9 @@ import {
   DEPLOY_MAX_H,
   GOOD_CARPET,
   IDEAS_WALL_TOP,
+  RUG,
+  SIDE_LOW_TOP,
+  SILL_STONE,
   STONE,
   TERRAZZO,
   WALNUT,
@@ -31,8 +35,16 @@ import {
 } from '../roomModels/boardroom';
 import { BOARDROOM_TOPS } from '../setDressing/boardroomWallTops';
 import { ROOMS, floorDressing } from '.';
-import { BOARDROOM_ROOM } from './boardroom';
-import { BOARDROOM_SWAPS, type BoardroomArt, boardroomRoom, POCKET_SWAP } from './boardroomRoom';
+import { BOARDROOM_ROOM, BOARDROOM_TOP_Y } from './boardroom';
+import {
+  BOARDROOM_SWAPS,
+  type BoardroomArt,
+  FRONT_SILL_Y,
+  FRONT_TOP_MAX,
+  POCKET_SWAP,
+  boardroomRoom,
+  sideGlassSwap,
+} from './boardroomRoom';
 
 const luminance = (c: number) => {
   const { r, g, b } = new THREE.Color(c);
@@ -115,6 +127,9 @@ describe('Synergy room dressing', () => {
         TERRAZZO,
         GOOD_CARPET,
         BORDER,
+        RUG,
+        SILL_STONE,
+        BOARD_FACE,
         ...FLOOR_COLORS.boardroomFloors,
       ])
         expect(luminance(c)).toBeLessThan(luminance(top));
@@ -139,7 +154,7 @@ describe('Synergy room dressing', () => {
   it('keeps the wall-top kit small and the stubs’ scenes low', () => {
     for (const [kind, build] of Object.entries(BOARDROOM_TOPS))
       expect(bounds(build()).max.y, kind).toBeLessThanOrEqual(0.5);
-    for (const scene of ['ideasBoard', 'howMightWe', 'prod', 'credenza', 'stubNotes'] as const) {
+    for (const scene of ['ideasBoard', 'howMightWe', 'prod', 'badgeTray', 'stubNotes'] as const) {
       const box = bounds(stubSceneModel(scene, 2));
       // Low enough that the corridor behind still reads; never past the stub's own tiles.
       expect(box.max.y, scene).toBeLessThanOrEqual(FRONT_WALL_HEIGHT + 0.8);
@@ -147,6 +162,27 @@ describe('Synergy room dressing', () => {
       expect(box.min.z, scene).toBeGreaterThanOrEqual(-0.5);
     }
     expect(BOARD_H).toBeLessThanOrEqual(0.5);
+  });
+
+  it('keeps the front sill and its kit low, and the cut-down side glass under the front strip’s 0.6', () => {
+    const front = plan.tops.filter((t) => t.h === FRONT_SILL_Y);
+    expect(front.length).toBeGreaterThanOrEqual(9);
+    for (const t of front)
+      expect(bounds(BOARDROOM_TOPS[t.kind]()).max.y, t.kind).toBeLessThanOrEqual(FRONT_TOP_MAX);
+    for (const t of plan.tops.filter((q) => q.h !== FRONT_SILL_Y))
+      expect(t.h + 0.004).toBe(BOARDROOM_TOP_Y);
+    for (const [k, s] of Object.entries(plan.swaps)) {
+      if (!s.startsWith('frontSill:') && !s.includes(':low:')) continue;
+      const model = BOARDROOM_SWAP_MODELS[s];
+      expect(model, k).toBeDefined();
+      if (model) expect(bounds(model()).max.y, k).toBeLessThanOrEqual(0.6);
+    }
+    for (const side of ['left', 'right'] as const) {
+      const low = BOARDROOM_SWAP_MODELS[sideGlassSwap(side, 0, true)];
+      expect(low && bounds(low()).max.y).toBeLessThanOrEqual(SIDE_LOW_TOP + 0.04);
+      const full = BOARDROOM_SWAP_MODELS[sideGlassSwap(side, 0)];
+      expect(full && bounds(full()).max.y).toBeLessThanOrEqual(WALL_HEIGHT + 0.01);
+    }
   });
 
   it('keeps the inbox wall behind its station, the deploy desk and the PARKED box low', () => {

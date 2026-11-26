@@ -179,7 +179,7 @@ export const WALL_COLORS: Readonly<Record<WallTheme, { face: number; top: number
   // YOTTA Tower's glass partitions on a pale plinth, capped with a slim brushed head track over cool glass grey.
   tower: { face: 0xd3d6d8, top: 0x737c85 },
   // The tower's boardroom floor: walnut on a dark stone plinth, capped with dark honed stone.
-  boardroom: { face: 0x5a3e2c, top: 0x5e5c59 },
+  boardroom: { face: 0x5c5550, top: 0x5e5c59 },
 };
 
 /** Marks the room's warm lamps, which only `medium` and `high` quality light (see `Stage`). */
