@@ -1349,6 +1349,8 @@ describe('the summer afternoon (synergy)', () => {
     const [fr, , fb] = rgb(a.fill.color);
     expect(fb).toBeGreaterThan(fr);
     expect(a.fill.intensity).toBeLessThan(a.sky.intensity);
+    // A near-neutral bounce: shaded walnut and grey faces stay out of the warm cast.
+    expect(Math.max(...rgb(a.sky.ground)) - Math.min(...rgb(a.sky.ground))).toBeLessThanOrEqual(16);
     expect(warmth(a.backdrop?.inner ?? 0)).toBeGreaterThan(warmth(morning.backdrop?.inner ?? 0));
     expect(Math.min(...rgb(a.backdrop?.inner ?? 0))).toBeGreaterThan(200);
     // Golden haze, never brown, and later than the morning's.
@@ -1405,14 +1407,19 @@ describe('the summer afternoon (synergy)', () => {
     expect(a.petals).toBeUndefined();
   });
 
-  it('lays a lavender rug on the boardroom, near the morning’s strength, brighter when invited', () => {
-    // The good carpet is deep charcoal: a softer, lighter violet reads there without out-shouting the stations.
+  it('lays a soft grey lavender rug on the boardroom, weaker than the morning’s, brighter when invited', () => {
+    // The good carpet is deep charcoal under a warm sun: a greyer, lighter violet still reads
+    // there, but keeps the carpet less saturated than the keyboards and test benches.
     const [r, g, b] = rgb(a.rug?.color ?? 0);
     expect(b).toBeGreaterThan(Math.max(r, g) + 25);
     expect(Math.min(r, g, b)).toBeGreaterThan(140);
-    expect(a.rug?.opacity).toBeGreaterThanOrEqual(0.35);
-    expect(a.rug?.opacity).toBeLessThanOrEqual(morning.rug?.opacity ?? 0);
-    expect(a.rug?.invited).toBeGreaterThan(a.rug?.opacity ?? 1);
+    // HSV saturation of the tint itself: well under the morning's violet.
+    const sat = (c: number) => 1 - Math.min(...rgb(c)) / Math.max(...rgb(c));
+    expect(sat(a.rug?.color ?? 0)).toBeLessThan(0.25);
+    expect(sat(a.rug?.color ?? 0)).toBeLessThan(sat(morning.rug?.color ?? 0));
+    expect(a.rug?.opacity).toBeGreaterThanOrEqual(0.25);
+    expect(a.rug?.opacity).toBeLessThan(morning.rug?.opacity ?? 0);
+    expect(a.rug?.invited).toBeGreaterThan((a.rug?.opacity ?? 1) + 0.15);
     expect(a.rug?.perRoom).toBeUndefined();
     expect(poolPlacements(a, map)).toHaveLength(1);
   });
@@ -1429,5 +1436,28 @@ describe('the summer afternoon (synergy)', () => {
       const [cr, , cb] = rgb(accent.color);
       expect(cb).toBeGreaterThan(cr + 40);
     }
+  });
+
+  it('lifts the reception with three downlights and a cool glow under the order cards, stronger on low', () => {
+    const spots = accentSpots(a, map, []);
+    // Over each end of the desk and over the suits by the gates, left to right.
+    expect(spots).toHaveLength(3);
+    const xs = spots.map((s) => s.at.x);
+    expect([...xs].sort((p, q) => p - q)).toEqual(xs);
+    const cool = (c: number) => rgb(c)[2] > rgb(c)[0] && Math.min(...rgb(c)) > 200;
+    const top = a.vignette?.glows?.at(-1);
+    expect(top && cool(top.color)).toBe(true);
+    expect(top?.y).toBeLessThan(0.15);
+    expect(top?.opacity).toBeLessThanOrEqual(0.25);
+    // On low the downlights are off: the glow alone, a little stronger, stands in for them.
+    const low = a.vignette?.lowGlows ?? [];
+    expect(low).toHaveLength(1);
+    for (const g of low) {
+      expect(cool(g.color)).toBe(true);
+      expect(g.y).toBeLessThan(0.15);
+      expect(g.opacity + (top?.opacity ?? 0)).toBeLessThanOrEqual(0.55);
+    }
+    for (const [id, other] of Object.entries(ATMOSPHERES))
+      if (id !== 'synergy') expect(other.vignette?.lowGlows, id).toBeUndefined();
   });
 });

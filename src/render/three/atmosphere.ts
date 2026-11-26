@@ -143,6 +143,12 @@ export interface Atmosphere {
     /** More glows like `glow`, drawn over it in order: a second edge, a haze under the top. */
     glows?: { color: number; opacity: number; x: number; y: number; reach: number }[];
     /**
+     * More glows like `glows`, on `low` quality only, drawn over them: the
+     * light of the accent lamps `low` hides (see `accents`), where a part of
+     * the frame is lit mostly by them.
+     */
+    lowGlows?: { color: number; opacity: number; x: number; y: number; reach: number }[];
+    /**
      * The tone mapping exposure for this level instead of the stage's usual
      * 0.95: part of the grade, so every quality gets it.
      */
@@ -1109,11 +1115,11 @@ const SUMMER_AFTERNOON: Atmosphere = {
     radius: 2.4,
     meetings: true,
   },
-  sky: { sky: 0xd4e0f0, ground: 0xc8b496, intensity: 0.85 },
+  sky: { sky: 0xd4e0f0, ground: 0xbeb8ae, intensity: 0.85 },
   // Low hides the pendants and the station fill: the sky makes up for them there.
   lowSky: 0.92,
   // The shadows stay cool: a slightly blue fill from the camera side.
-  fill: { color: 0xc8d8f4, intensity: 0.6 },
+  fill: { color: 0xc8d8f4, intensity: 0.8 },
   environment: 0.16,
   backdrop: { inner: 0xfbeed8, outer: 0xb8c6d8 },
   // Golden haze over the city far below, late enough that the roofs keep their contrast.
@@ -1124,13 +1130,17 @@ const SUMMER_AFTERNOON: Atmosphere = {
     inner: 0.7,
     saturate: 1.2,
     contrast: 1.08,
-    exposure: 1.21,
+    exposure: 1.24,
     glows: [
       // The warm sky behind the city, under the order cards.
       { color: 0xffdcae, opacity: 0.2, x: 0.5, y: 0, reach: 0.55 },
       // The low west sun off the right edge, under the mute button.
       { color: 0xffcf96, opacity: 0.2, x: 1, y: 0.45, reach: 0.3 },
+      // The reception's cool, expensive light past the back glass, on every quality.
+      { color: 0xe4ecfa, opacity: 0.16, x: 0.62, y: 0.05, reach: 0.3 },
     ],
+    // On low the reception's downlights are off: the same cool light, a little stronger.
+    lowGlows: [{ color: 0xe4ecfa, opacity: 0.24, x: 0.66, y: 0.06, reach: 0.3 }],
   },
   lamps: {
     color: 0xfff0dc,
@@ -1154,29 +1164,19 @@ const SUMMER_AFTERNOON: Atmosphere = {
     forward: 0.85,
     kinds: ['testBench', 'pipeline'],
   },
-  // The executive reception behind the back glass: cool, expensive downlight on the stone.
-  accents: [
-    {
-      anchor: 'back',
-      color: 0xb4c8ff,
-      intensity: 26,
-      distance: 7,
-      height: 2.4,
-      out: 1.6,
-      along: 0.4,
-    },
-    {
-      anchor: 'back',
-      color: 0xb4c8ff,
-      intensity: 26,
-      distance: 7,
-      height: 2.4,
-      out: 1.6,
-      along: 0.68,
-    },
-  ],
+  // The executive reception behind the back glass: cool, expensive downlight on the stone,
+  // one over each end of the desk and one over the suits by the gates.
+  accents: [0.36, 0.6, 0.82].map((along) => ({
+    anchor: 'back' as const,
+    color: 0xb4c8ff,
+    intensity: 40,
+    distance: 9,
+    height: 2.4,
+    out: 1.6,
+    along,
+  })),
   // The usual violet, a touch lighter than 4-1's: on the good carpet's deep charcoal it glows.
-  rug: { color: 0xa496d0, opacity: 0.4, invited: 0.62 },
+  rug: { color: 0xaaa2c8, opacity: 0.3, invited: 0.55 },
 };
 
 /** Presets per `MapLook.scene` id. */
