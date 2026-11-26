@@ -120,11 +120,23 @@ const SYNERGY_SCENES: Scene[] = SYNERGY_LEVEL
     ]
   : [];
 
+const REORG_LEVEL = LEVELS.find((l) => l.id === 'the-reorg');
+
+/** The Reorg's Open Plan and Matrix layouts, and the floor a second and a half from its first reorg. */
+const REORG_SCENES: Scene[] = REORG_LEVEL
+  ? [
+      reorgScene('level-the-reorg-open-plan', REORG_LEVEL, 2, 1, 75),
+      reorgScene('level-the-reorg-matrix', REORG_LEVEL, 3, 2, 135),
+      reorgScene('the-reorg-shifting', REORG_LEVEL, 1, 0, 58.5),
+    ]
+  : [];
+
 // ---- Every scene ----
 
 export const SCENES: readonly Scene[] = [
   ...LEVELS.map(levelScene),
   ...SYNERGY_SCENES,
+  ...REORG_SCENES,
   castScene('cast-mixed', ['generalist', 'frontend', 'backend', 'qa']),
   castScene('cast-platform', ['platform', 'qa', 'frontend', 'backend']),
   castScene('cast-duplicates', ['generalist', 'generalist', 'generalist', 'generalist']),

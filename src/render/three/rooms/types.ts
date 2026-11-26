@@ -80,6 +80,18 @@ export interface MovingTilesLook {
   destroy(): void;
 }
 
+/**
+ * The live look of a level's badge turnstiles (`state.gates`, which way each
+ * lets people through, flipped by a reorg) and its meeting doors (their
+ * free / invited / in-session light, `meetingDoors`), in place of
+ * `Mechanics`' floor arrows and door lamps. Same rules as `MovingTilesLook`:
+ * read the state each frame, animate from the sim's tick.
+ */
+export interface GatesLook {
+  sync(state: GameState, timeMs: number): void;
+  destroy(): void;
+}
+
 /** A room's dressing, for one wall theme. `P` is its own plan, with whatever its story needs. */
 export interface RoomDressing<P extends RoomPlan = RoomPlan> {
   /** The plan of the room on `map`: pure and deterministic. */
@@ -122,4 +134,10 @@ export interface RoomDressing<P extends RoomPlan = RoomPlan> {
    * tables); left out, `Mechanics` draws plain partition and desk boxes.
    */
   movingTiles?(root: THREE.Group, map: LevelMap): MovingTilesLook;
+  /**
+   * Builds the turnstiles' and meeting doors' own look under `root` (badge
+   * gates, a staff door, door lights); left out, `Mechanics` draws floor
+   * arrows and a lamp over each door.
+   */
+  gates?(root: THREE.Group, map: LevelMap): GatesLook;
 }

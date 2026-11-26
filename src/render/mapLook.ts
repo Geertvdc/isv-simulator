@@ -31,6 +31,7 @@ export const WALL_THEMES = [
   'upperFloors',
   'tower',
   'boardroom',
+  'reorg',
 ] as const;
 export type WallTheme = (typeof WALL_THEMES)[number];
 
@@ -45,7 +46,9 @@ export type WallTheme = (typeof WALL_THEMES)[number];
  * the hot-desk floor, vinyl in the test lab and carpet in the meeting room,
  * `towerFloors` an HQ floor's new carpet in the offices and meeting rooms and a
  * hard corridor between them, `boardroomFloors` the same tower's boardroom
- * floor: the boardroom's carpet, the dev and ops sides' and the corridors'.
+ * floor: the boardroom's carpet, the dev and ops sides' and the corridors',
+ * `reorgFloors` the same floor mid-reorg: stripped carpet, the boardroom's
+ * own carpet and the shipping lobby.
  */
 export const FLOOR_THEMES = [
   'concrete',
@@ -62,6 +65,7 @@ export const FLOOR_THEMES = [
   'threeFloors',
   'towerFloors',
   'boardroomFloors',
+  'reorgFloors',
 ] as const;
 export type FloorTheme = (typeof FLOOR_THEMES)[number];
 
@@ -103,7 +107,8 @@ export const LEVEL_LOOKS: Readonly<Record<string, MapLook>> = {
   'back-to-back': { walls: 'tower', floor: 'towerFloors', scene: 'back-to-back' },
   // Synergy: the same tower's boardroom floor, summer afternoon; MONOLITH comes to align.
   synergy: { walls: 'boardroom', floor: 'boardroomFloors', scene: 'synergy' },
-  'the-reorg': { walls: 'glass', floor: 'carpet' },
+  // The Reorg: the same floor, reorganised twice before lunch; the logo goes lowercase.
+  'the-reorg': { walls: 'reorg', floor: 'reorgFloors', scene: 'the-reorg' },
   // Big Tech: a bright campus, wood and glass.
   'the-atrium': { walls: 'glass', floor: 'parquet' },
   'design-sprint': { walls: 'wood', floor: 'concrete' },
