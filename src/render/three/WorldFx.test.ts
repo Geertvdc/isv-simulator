@@ -1,11 +1,16 @@
 import { readFileSync } from 'node:fs';
+import * as THREE from 'three';
 import { BEFORE_MAPS } from './fixtures/beforeMaps';
 import { describe, expect, it } from 'vitest';
 import { parseLevelMap as parseDraftMap } from '../../sim/level';
 import { type LevelMap, type Tile, getTile, parseLevelMap } from '../../sim/level';
-import { ATMOSPHERES, DEFAULT_ATMOSPHERE, sceneOf } from './atmosphere';
+import { ATMOSPHERES, DEFAULT_ATMOSPHERE, atmosphereFor, sceneOf } from './atmosphere';
+import { SYNERGY, THE_REORG } from '../../sim/levels';
+import { createGame } from '../../sim/state';
+import { createLights } from './look';
 import {
   SWEEP_FLOOR,
+  WorldFx,
   ambientAnchors,
   beaconAngle,
   beaconFlare,
@@ -232,5 +237,70 @@ describe("the moving heads' sweep", () => {
     const build = SCENES['scale-up'];
     if (!build) throw new Error('no scale-up scene');
     expect(movingHeadLenses(build(MAPS.shipped as LevelMap), 2)).toEqual([]);
+  });
+});
+
+describe('the day passing (the-reorg)', () => {
+  const atmosphere = atmosphereFor('the-reorg');
+  const reorgs = THE_REORG.reorgs ?? [];
+
+  /** A round of The Reorg with its lights and `WorldFx`, and its sun and fill. */
+  function lit(level = THE_REORG, a = atmosphere) {
+    const world = new THREE.Scene();
+    world.add(...createLights(level.map, a));
+    const fx = new WorldFx(world, level.map, a);
+    const lights: THREE.DirectionalLight[] = [];
+    world.traverse((o) => {
+      if (o instanceof THREE.DirectionalLight) lights.push(o);
+    });
+    const [sun, fill] = lights;
+    if (!sun || !fill) throw new Error('no sun or fill');
+    return { fx, sun, fill, state: createGame(level, 1, [1]) };
+  }
+
+  it('moves the sun from the tick: the same still every time, the morning before the warning', () => {
+    const { fx, sun, fill, state } = lit();
+    const morning = sun.position.clone();
+    const color = sun.color.getHex();
+    fx.sync(state, 0);
+    expect(sun.position.distanceTo(morning)).toBeLessThan(1e-9);
+    const first = reorgs[0];
+    if (!first) throw new Error('no reorg');
+    state.tick = first.atTick - 90;
+    fx.sync(state, 123);
+    const half = sun.position.clone();
+    expect(half.distanceTo(morning)).toBeGreaterThan(0.5);
+    expect(sun.color.getHex()).not.toBe(color);
+    // Wall time plays no part.
+    fx.sync(state, 99999);
+    expect(sun.position.distanceTo(half)).toBeLessThan(1e-9);
+    // Another round at the same tick: the same light.
+    const other = lit();
+    other.state.tick = state.tick;
+    other.fx.sync(other.state, 5);
+    expect(other.sun.position.distanceTo(half)).toBeLessThan(1e-9);
+    expect(other.fill.intensity).toBeCloseTo(fill.intensity);
+    // Noon after the switch: higher in the sky than the morning, and no longer off to the left.
+    state.tick = first.atTick;
+    state.reorgPhase = first.phase;
+    state.nextReorg = 1;
+    fx.sync(state, 0);
+    const target = new THREE.Vector3();
+    sun.target.getWorldPosition(target);
+    const up = (p: THREE.Vector3) => (p.y - target.y) / Math.hypot(p.x - target.x, p.z - target.z);
+    expect(up(sun.position)).toBeGreaterThan(up(morning) * 1.5);
+    expect(sun.position.x).toBeGreaterThan(morning.x);
+  });
+
+  it('leaves every other level’s sun where it was', () => {
+    const synergy = ATMOSPHERES.synergy;
+    if (!synergy) throw new Error('no synergy');
+    const { fx, sun, state } = lit(SYNERGY, synergy);
+    const before = sun.position.clone();
+    const color = sun.color.getHex();
+    state.tick = 89 * 60;
+    fx.sync(state, 0);
+    expect(sun.position.distanceTo(before)).toBe(0);
+    expect(sun.color.getHex()).toBe(color);
   });
 });

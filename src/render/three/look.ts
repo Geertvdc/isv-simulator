@@ -192,6 +192,8 @@ export const LAMP_KEY = 'lamp';
 export const LAMP_INDEX_KEY = 'lampIndex';
 /** An accent light's place in `Atmosphere.accents` (see `accentSpots`). */
 export const ACCENT_INDEX_KEY = 'accentIndex';
+/** Marks the sun and the fill, which `WorldFx` moves through the day (`Atmosphere.day`). */
+export const DAY_LIGHT_KEY = 'dayLight';
 
 /**
  * Lights for a level: sky, sun with soft shadows fitted to the map, a fill
@@ -230,7 +232,10 @@ export function createLights(
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.025;
 
+  sun.userData[DAY_LIGHT_KEY] = 'sun';
+
   const fill = new THREE.DirectionalLight(FILL.color, FILL.intensity);
+  fill.userData[DAY_LIGHT_KEY] = 'fill';
   // From the camera side, so the front faces the sun leaves in shade aren't black.
   put(fill, gridToWorld(cx + width * 0.6, cy + height * 1.2, 6));
   put(fill.target, gridToWorld(cx, cy));

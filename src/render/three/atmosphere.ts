@@ -6,7 +6,9 @@
  * it can be tested; `look.ts` and `stage.ts` turn it into lights and effects.
  */
 
+import { REORG_WARNING_TICKS } from '../../sim/balance';
 import { type LevelMap, type Tile, getTile } from '../../sim/level';
+import { withoutReorgTiles } from '../../sim/reorgs';
 import { type CameraPose, type Vec3, gridToWorld, projectPoint } from '../projection';
 
 /**
@@ -30,6 +32,15 @@ export interface Atmosphere {
     /** The shadows' blur radius instead of the usual 4: higher for an overcast sky's soft ones. */
     softness?: number;
   };
+  /**
+   * The day passing with a reorg level's layouts: the sun and the fill per
+   * phase (`phases[0]` for phase 1, the map's own; the last for any phase
+   * past the end), blended over each reorg's warning up to its switch (see
+   * `dayClock`), from the sim's tick, so a still of any moment is the same
+   * every time. `sun` and `fill` are phase 1's. The sun keeps its `reach`
+   * and `softness`; nothing else changes.
+   */
+  day?: { phases: DayLight[] };
   /** Hemisphere light: sky color from above, bounce color from the ground. */
   sky: { sky: number; ground: number; intensity: number };
   /**
@@ -210,6 +221,14 @@ export interface Atmosphere {
      * wall line (a corridor along the back wall gets no lamps).
      */
     fromRow?: number;
+    /**
+     * One row along the back of the floor of a reorg level's fixed room
+     * (its moving tiles as floor, so the lamps stay put in every layout),
+     * leaving out the columns within `clear` tiles of a meeting room: the
+     * pendants on a wire, never over the boardroom. Runs shorter than three
+     * tiles get none.
+     */
+    backOfFloor?: { clear: number };
     /** Colors cycled along the lamps (`lampSpots` order) instead of `color`: a stage's gelled par cans. */
     colors?: number[];
     /**
@@ -421,10 +440,13 @@ export interface Atmosphere {
  * a share `along` of its depth from the back (`left`, `right`); `out` grid
  * units behind the outline's back edge, a share `along` of its width from
  * the left (`back`: a room behind the back wall, say); over the
- * middle of the interior walls (`core`, none without them); or in each
- * light well (`wells`, see `lightWellSpots`).
+ * middle of the interior walls (`core`, none without them); in each
+ * light well (`wells`, see `lightWellSpots`); or over the ship tiles,
+ * pulled `out` toward the room and `shift` along x like `inbox` (`ship`:
+ * a lobby's wall brackets either side of the goods lift).
  */
-export type AccentAnchor = 'inbox' | 'pager' | 'left' | 'right' | 'back' | 'core' | 'wells';
+export type AccentAnchor =
+  'inbox' | 'pager' | 'left' | 'right' | 'back' | 'core' | 'wells' | 'ship';
 
 export interface Accent {
   anchor: AccentAnchor;
@@ -439,6 +461,12 @@ export interface Accent {
   shift?: number;
   blink?: number;
   halo?: { size: number; opacity: number };
+}
+
+/** One phase's light in `Atmosphere.day`: the sun's color, strength and place, and the fill. */
+export interface DayLight {
+  sun: { color: number; intensity: number; from: SunPlacement };
+  fill: { color: number; intensity: number };
 }
 
 /** Marks what `Stage` hides on `low`: the ambient motion of `Atmosphere.ambient`. */
@@ -1179,6 +1207,116 @@ const SUMMER_AFTERNOON: Atmosphere = {
   rug: { color: 0xaaa2c8, opacity: 0.3, invited: 0.55 },
 };
 
+/** 4-3's Silos, morning: warm white, about 40° up from the front left: hypot(5, 3.5) × tan 40° ≈ 5.1. */
+const REORG_MORNING: DayLight = {
+  sun: { color: 0xfff0da, intensity: 3.4, from: { x: -5, y: 3.5, height: 5.1, perMapSize: false } },
+  fill: { color: 0xc8d8f4, intensity: 0.8 },
+};
+
+/** 4-3's morning, noon and after lunch (see `SUMMER_DAY`): the sun round the front, the fill cool. */
+const REORG_DAY: DayLight[] = [
+  REORG_MORNING,
+  // Open Plan, noon: white and high, about 60° up and a little left: hypot(1.5, 2.5) × tan 60° ≈ 5.05.
+  {
+    sun: {
+      color: 0xfffaf0,
+      intensity: 3.8,
+      from: { x: -1.5, y: 2.5, height: 5.05, perMapSize: false },
+    },
+    fill: { color: 0xd8e2f4, intensity: 0.6 },
+  },
+  // Matrix, after lunch: warmer, about 40° up from the front right.
+  {
+    sun: {
+      color: 0xffdcae,
+      intensity: 3.5,
+      from: { x: 5, y: 3.5, height: 5.1, perMapSize: false },
+    },
+    fill: { color: 0xccdaf4, intensity: 0.8 },
+  },
+];
+
+/**
+ * The day after Synergy on the same floor, summer, all day: the round's
+ * three layouts are three times of day (`day`, see `dayClock`), the sun
+ * coming round the front from the left in the morning, high and white at
+ * noon, lower and warmer from the right after lunch, the fill cool all
+ * day. The city far below in a pale summer haze, late enough that it keeps
+ * its contrast. Slim pendants on a wire along the back of the floor, never
+ * over the boardroom (it keeps its soft pool on the table); the shipping
+ * lobby a touch cooler and cleaner, lit by brackets either side of the
+ * goods lift; a little light on the side walls' test benches, one side or
+ * the other always away from the sun. A soft glow behind the `yotta.` sign
+ * going up at the back right. No motes.
+ */
+const SUMMER_DAY: Atmosphere = {
+  sun: { ...REORG_MORNING.sun, reach: 0.95, softness: 3 },
+  day: { phases: REORG_DAY },
+  pools: {
+    color: 0xfff0dc,
+    intensity: [0.9],
+    height: 7,
+    forward: 1.5,
+    depth: 0,
+    radius: 2.4,
+    meetings: true,
+  },
+  sky: { sky: 0xd6e2f2, ground: 0xbcbab4, intensity: 0.85 },
+  lowSky: 0.95,
+  fill: REORG_MORNING.fill,
+  environment: 0.16,
+  backdrop: { inner: 0xfbf2e2, outer: 0xb6c8dc },
+  fog: { color: 0xf0e4cc, start: 10, span: 38 },
+  vignette: {
+    color: 0x34364a,
+    opacity: 0.35,
+    inner: 0.7,
+    saturate: 1.15,
+    contrast: 1.06,
+    exposure: 1.22,
+    glows: [
+      // The summer sky behind the city, under the order cards.
+      { color: 0xffe4bc, opacity: 0.16, x: 0.4, y: 0, reach: 0.5 },
+      // The lit `yotta.` going up at the back right, a soft cool-white glow behind it.
+      { color: 0xeee8ff, opacity: 0.16, x: 0.7, y: 0.04, reach: 0.18 },
+    ],
+    // On low the lobby's brackets are off: a little cool light over it instead.
+    lowGlows: [{ color: 0xe4ecfa, opacity: 0.14, x: 0.5, y: 0.78, reach: 0.2 }],
+  },
+  lamps: {
+    color: 0xfff0dc,
+    intensity: 6,
+    distance: 3.4,
+    height: 2.1,
+    spacing: 3,
+    inset: 0.45,
+    // Back wall only: a pendant by the front wall would hang over the players' heads on screen.
+    frontFrom: 99,
+    backOfFloor: { clear: 1 },
+  },
+  // The side walls' test benches: in the morning the left one faces away from the sun, after lunch the right.
+  stationFill: {
+    color: 0xfff0dc,
+    intensity: 4,
+    distance: 2.6,
+    height: 1.3,
+    forward: 0.85,
+    kinds: ['testBench'],
+  },
+  // The shipping lobby's wall brackets either side of the goods lift: cool and clean.
+  accents: [-3.2, 3.2].map((shift) => ({
+    anchor: 'ship' as const,
+    color: 0xdce8ff,
+    intensity: 6,
+    distance: 4,
+    height: 1.7,
+    out: 1.4,
+    shift,
+  })),
+  // The good carpet from yesterday, the same soft grey lavender.
+  rug: { color: 0xaaa2c8, opacity: 0.3, invited: 0.55 },
+};
+
 /** Presets per `MapLook.scene` id. */
 export const ATMOSPHERES: Readonly<Record<string, Atmosphere>> = {
   garage: GOLDEN_HOUR,
@@ -1192,6 +1330,7 @@ export const ATMOSPHERES: Readonly<Record<string, Atmosphere>> = {
   'hot-desking': FRIDAY_AFTERNOON,
   'back-to-back': HEATWAVE_MORNING,
   synergy: SUMMER_AFTERNOON,
+  'the-reorg': SUMMER_DAY,
 };
 
 /** The light and air for a scene id; the default for none or an unknown one. */
@@ -1376,6 +1515,80 @@ export function sunPlacement(
   };
 }
 
+/** What `dayClock` reads off the round: the tick, the layout now and the reorg schedule. */
+export interface DayState {
+  tick: number;
+  reorgPhase: number;
+  nextReorg: number;
+  settings: { reorgs?: readonly { atTick: number; phase: number }[] };
+}
+
+/**
+ * Where the day stands (`Atmosphere.day`): the layout's phase `from`, the
+ * phase the next reorg brings (`to`), and how far the light has gone
+ * between them (`t`, 0 to 1, eased). It moves over the reorg's warning,
+ * `REORG_WARNING_TICKS` before the switch, and is all the way there on the
+ * switch's tick, when the layout's phase becomes `to`; in between reorgs `t` is 0.
+ */
+export function dayClock(state: DayState): { from: number; to: number; t: number } {
+  const from = state.reorgPhase;
+  const step = state.settings.reorgs?.[state.nextReorg];
+  if (!step) return { from, to: from, t: 0 };
+  const left = step.atTick - state.tick;
+  if (left >= REORG_WARNING_TICKS) return { from, to: from, t: 0 };
+  const k = Math.min(1, Math.max(0, 1 - left / REORG_WARNING_TICKS));
+  return { from, to: step.phase, t: k * k * (3 - 2 * k) };
+}
+
+/** The sun and fill for a moment of the day (see `dayClock`); the preset's own without `day`. */
+export function dayLight(
+  atmosphere: Atmosphere,
+  clock: { from: number; to: number; t: number },
+): DayLight {
+  const phases = atmosphere.day?.phases ?? [];
+  const own: DayLight = {
+    sun: {
+      color: atmosphere.sun.color,
+      intensity: atmosphere.sun.intensity,
+      from: atmosphere.sun.from,
+    },
+    fill: atmosphere.fill,
+  };
+  const at = (phase: number): DayLight =>
+    phases[Math.min(Math.max(phase, 1), phases.length) - 1] ?? own;
+  const a = at(clock.from);
+  const b = at(clock.to);
+  const t = clock.t;
+  const mix = (p: number, q: number) => p + (q - p) * t;
+  return {
+    sun: {
+      color: mixColor(a.sun.color, b.sun.color, t),
+      intensity: mix(a.sun.intensity, b.sun.intensity),
+      from: {
+        x: mix(a.sun.from.x, b.sun.from.x),
+        y: mix(a.sun.from.y, b.sun.from.y),
+        height: mix(a.sun.from.height, b.sun.from.height),
+        perMapSize: a.sun.from.perMapSize,
+      },
+    },
+    fill: {
+      color: mixColor(a.fill.color, b.fill.color, t),
+      intensity: mix(a.fill.intensity, b.fill.intensity),
+    },
+  };
+}
+
+/** Two 0xrrggbb colors mixed channel by channel, `t` of the way from `a` to `b`. */
+export function mixColor(a: number, b: number, t: number): number {
+  let out = 0;
+  for (const shift of [16, 8, 0]) {
+    const p = (a >> shift) & 255;
+    const q = (b >> shift) & 255;
+    out |= Math.round(p + (q - p) * t) << shift;
+  }
+  return out;
+}
+
 /**
  * Where the lamps hang: a row just inside the back wall, and in a room at
  * least `frontFrom` rows deep a second one inside the front wall, over the
@@ -1391,6 +1604,32 @@ export function lampSpots(
 ): Vec3[] {
   const lamps = atmosphere.lamps;
   if (!lamps) return [];
+  if (lamps.backOfFloor) {
+    const fixed = map.tiles && 'phases' in map ? withoutReorgTiles(map as LevelMap) : map;
+    const clear = lamps.backOfFloor.clear;
+    const rooms = meetingRooms(map);
+    const near = (x: number) => rooms.some((r) => x >= r.x0 - clear && x <= r.x1 + clear);
+    return floorRows(fixed, false, lamps.fromRow)
+      .flatMap((run) => {
+        // Split the run round the meeting rooms' columns.
+        const parts: { inside: number; x0: number; x1: number }[] = [];
+        for (let x = run.x0; x <= run.x1; x++) {
+          if (near(x)) continue;
+          const last = parts[parts.length - 1];
+          if (last && last.x1 === x - 1) last.x1 = x;
+          else parts.push({ inside: run.inside, x0: x, x1: x });
+        }
+        return parts.filter((p) => p.x1 - p.x0 >= 2);
+      })
+      .flatMap(({ inside, x0, x1 }) => {
+        const length = x1 - x0 + 1;
+        const count = Math.max(1, Math.round(length / lamps.spacing));
+        const y = inside - 0.5 + lamps.inset;
+        return Array.from({ length: count }, (_, i) =>
+          gridToWorld(x0 - 0.5 + (length * (i + 0.5)) / count, y, lamps.height),
+        );
+      });
+  }
   if (lamps.meetingRooms) {
     const rows = floorRows(map, true, lamps.fromRow).flatMap(({ inside, x0, x1 }) => {
       const length = x1 - x0 + 1;
@@ -1829,10 +2068,11 @@ function accentPoints(
       return [gridToWorld(-0.5 + map.width * (accent.along ?? 0.5), -0.5 - out, accent.height)];
     case 'wells':
       return wells.map((w) => ({ ...w.at, y: w.at.y + accent.height }));
-    case 'inbox': {
+    case 'inbox':
+    case 'ship': {
       if (!map.tiles) return [];
       const full = map as LevelMap;
-      const tiles = tilesOf(full, (t) => t === 'inbox');
+      const tiles = tilesOf(full, (t) => t === accent.anchor);
       if (tiles.length === 0) return [];
       const mx = tiles.reduce((a, t) => a + t.x, 0) / tiles.length;
       const my = tiles.reduce((a, t) => a + t.y, 0) / tiles.length;

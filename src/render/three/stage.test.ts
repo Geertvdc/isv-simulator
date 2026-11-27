@@ -134,11 +134,12 @@ describe('exposureFor', () => {
     expect(exposureFor(undefined)).toBe(EXPOSURE);
     expect(exposureFor({ color: 0, opacity: 0.3, inner: 0.7, exposure: 1.1 })).toBe(1.1);
     for (const [id, a] of Object.entries(ATMOSPHERES))
-      if (id !== 'hot-desking' && id !== 'back-to-back' && id !== 'synergy')
+      if (!['hot-desking', 'back-to-back', 'synergy', 'the-reorg'].includes(id))
         expect(exposureFor(a.vignette), id).toBe(EXPOSURE);
     // The Friday afternoon, the heatwave and the summer afternoon are lifted a little, on every quality.
     expect(exposureFor(ATMOSPHERES['hot-desking']?.vignette)).toBeGreaterThan(EXPOSURE);
     expect(exposureFor(ATMOSPHERES['back-to-back']?.vignette)).toBeGreaterThan(EXPOSURE);
     expect(exposureFor(ATMOSPHERES.synergy?.vignette)).toBeGreaterThan(EXPOSURE);
+    expect(exposureFor(ATMOSPHERES['the-reorg']?.vignette)).toBeGreaterThan(EXPOSURE);
   });
 });
