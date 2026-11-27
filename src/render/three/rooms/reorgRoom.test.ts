@@ -7,6 +7,7 @@ import {
   LOBBY_WEAR,
   REORG_KIND,
   REORG_WEAR,
+  BACK_ART,
   STENCIL_NAMES,
   reorgRoom,
   stencilOf,
@@ -51,11 +52,15 @@ describe('The Reorg room plan', () => {
         expect(flags(m.x, m.y) & CARPET_WEAR.xMark, `${m.x},${m.y}`).toBeTruthy();
   });
 
-  it('pulls the carpet up in a strip each side of the block, a ghost line beyond it', () => {
+  it('pulls the carpet up in a ragged strip each side of the block, a ghost line beyond it', () => {
     const access = Object.entries(plan.floorWear).filter(
       ([, w]) => w < REORG_KIND && w & CARPET_WEAR.access,
     );
-    expect(access.length).toBeGreaterThanOrEqual(4);
+    expect(access.length).toBeGreaterThanOrEqual(6);
+    // Ragged: each strip spans two columns, and one panel per strip is lifted.
+    const cols = new Set(access.map(([k]) => k.split(',')[0]));
+    expect(cols.size).toBe(4);
+    expect(access.filter(([, w]) => w & CARPET_WEAR.accessLift).length).toBe(2);
     const ghost = Object.values(plan.floorWear).filter(
       (w) => w < REORG_KIND && w & CARPET_WEAR.ghostZ,
     );
@@ -72,11 +77,11 @@ describe('The Reorg room plan', () => {
         expect(flags(x, map.height - 2) & LOBBY_WEAR.lift).toBeTruthy();
   });
 
-  it('strings the pendants’ wire between two side-wall tops', () => {
-    const w = plan.wire;
-    expect(w).not.toBeNull();
-    if (!w) return;
-    for (const e of [w.a, w.b]) expect(getTile(map, Math.round(e.x), Math.round(e.z))).toBe('wall');
+  it('leaves some back faces bare, so the art there reads big', () => {
+    const bare = BACK_ART.filter((a) => a === null).length;
+    expect(bare).toBeGreaterThanOrEqual(2);
+    const faces = plan.art.filter((a) => a.y === 0).length;
+    expect(faces).toBeLessThan(map.width - 6);
   });
 
   it('is deterministic', () => {

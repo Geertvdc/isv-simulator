@@ -22,8 +22,8 @@
  * every back face and the lobby's; the move's kit in chunky clusters on the
  * wall tops and the sills, Segfault's MATRIX box among it; the handover
  * desk behind the inbox, the shredding console at the bin, the goods lift
- * at the ship; slim pendants on a wire along the back half. No three.js
- * here, so it can be tested.
+ * at the ship; bronze uplighters on the back faces' tops (nothing hangs
+ * over the floor). No three.js here, so it can be tested.
  */
 
 import { type GridPoint, type LevelMap, getTile } from '../../../sim/level';
@@ -40,7 +40,6 @@ import {
   curtainSwap,
   partitionSwap,
   pierSwap,
-  solidSwap,
 } from './towerRoom';
 
 export type { Doorway, Side };
@@ -81,6 +80,8 @@ export const CARPET_WEAR = {
   xMark: 512,
   litter: 1024,
   mat: 16384,
+  /** On an `access` tile: one panel lifted out and propped against its neighbour. */
+  accessLift: 32768,
 } as const;
 /** The zone names stencilled on the tape: `stencil(n)` is added to the carpet's wear (n from 1). */
 export const STENCIL_NAMES = ['SILO A', 'SQUAD 3', 'TRIBE', 'CHAPTER'] as const;
@@ -117,21 +118,29 @@ export interface ReorgArtSpot {
   span: number;
 }
 
-/** Art that hangs on the glass (the partition stays glass behind it); the rest on a solid panel. */
-export const ON_GLASS: ReadonlySet<ReorgArt> = new Set(['deskVinyl', 'youAreHere']);
+/**
+ * Art that hangs on the glass (the partition stays glass behind it); the
+ * rest on a solid panel. None any more: the tower's glass reads as bright
+ * as a station from the camera, so the back is all grey panel.
+ */
+export const ON_GLASS: ReadonlySet<ReorgArt> = new Set<ReorgArt>();
 
-/** The order the back wall's other faces are dressed in, left to right (cycled past the end). */
-export const BACK_ART: readonly ReorgArt[] = [
+/**
+ * The order the back wall's other faces are dressed in, left to right
+ * (cycled past the end): `null` leaves a face a bare grey panel, so the
+ * art that is there reads big.
+ */
+export const BACK_ART: readonly (ReorgArt | null)[] = [
   'youAreHere',
   'reorgPoster',
   'orgChart',
-  'raci',
-  'moveSchedule',
-  'hotDeskRules',
+  null,
   'clock',
-  'deskVinyl',
-  'wrappedPortrait',
+  null,
   'changePoster',
+  'deskVinyl',
+  null,
+  'wrappedPortrait',
 ];
 
 /** The move's kit on the wall tops and sills. */
@@ -175,14 +184,6 @@ export interface ReorgTop {
   h: number;
 }
 
-/** The back half's pendant wire: its two ends (world x, z, the post's foot), and the fittings' x. */
-export interface ReorgWire {
-  a: Vec3;
-  b: Vec3;
-  /** The height the wire runs at, at the fittings (it sags a little between). */
-  y: number;
-}
-
 /** The boardroom's box: its tiles x0..x1, y0..y1. */
 export interface Box {
   x0: number;
@@ -208,7 +209,6 @@ export interface ReorgRoom {
   tops: ReorgTop[];
   /** Segfault's MATRIX box on a wall top: its tile and turn (the cat itself is a living scene piece). */
   segfault: { x: number; y: number; yaw: number } | null;
-  wire: ReorgWire | null;
   handover: Doorway | null;
   shredder: { x: number; y: number; side: Side } | null;
   goodsLift: Doorway | null;
@@ -295,7 +295,6 @@ export function reorgRoom(map: LevelMap): ReorgRoom {
       .filter((t) => !segfault || t.x !== segfault.x || t.y !== segfault.y)
       .sort((a, c) => a.y + a.dy - (c.y + c.dy) || a.x + a.dx - (c.x + c.dx)),
     segfault,
-    wire: wireOf(map, block),
     handover: findDoorways(map, 'inbox')[0] ?? null,
     shredder: binSpot(map),
     goodsLift: findDoorways(map, 'ship')[0] ?? null,
@@ -381,6 +380,8 @@ export const reorgSideSwap = (side: 'left' | 'right', look: number, low = false)
   `reorgSide:${side}:${low ? 'low' : 'full'}:${look}`;
 export const BADGE_LOOKS = 3;
 export const badgeLineSwap = (look: number) => `badgeLine:${look}`;
+/** The back wall's art panel: the tower's solid panel in this floor's own, darker grey. */
+export const REORG_PANEL_SWAP = 'reorgPanel';
 /** Every swap name the plan can use beyond the tower's and 4-2's front sill. */
 export const REORG_SWAPS: readonly string[] = [
   ...(['left', 'right'] as const).flatMap((side) =>
@@ -389,6 +390,7 @@ export const REORG_SWAPS: readonly string[] = [
     ),
   ),
   ...Array.from({ length: BADGE_LOOKS }, (_, l) => badgeLineSwap(l)),
+  REORG_PANEL_SWAP,
 ];
 
 /**
@@ -422,7 +424,7 @@ function wallSwaps(
       const side = outer[k];
       if (panel.has(k)) {
         // A lobby wall is a pier in the curtain wall's line; a back wall a pale panel in the glass.
-        out[k] = y > badgeRow ? pierSwap(look) : solidSwap('x');
+        out[k] = y > badgeRow ? pierSwap(look) : REORG_PANEL_SWAP;
         continue;
       }
       if (side === 'front' || (low && y >= badgeRow && side)) {
@@ -440,9 +442,13 @@ function wallSwaps(
         continue;
       }
       if (side === 'back') {
-        out[k] = isFace(map, x, y)
-          ? partitionSwap(look % PARTITION_LOOKS, 'x')
-          : curtainSwap(look, 'x');
+        // A bare face is a plain grey panel too (the glass reads as bright as a station).
+        const glass = art.some((q) => q.x === x && q.y === y && ON_GLASS.has(q.art));
+        out[k] = !isFace(map, x, y)
+          ? curtainSwap(look, 'x')
+          : glass
+            ? partitionSwap(look % PARTITION_LOOKS, 'x')
+            : REORG_PANEL_SWAP;
         continue;
       }
       out[k] = low ? badgeLineSwap(look % BADGE_LOOKS) : partitionSwap(look % PARTITION_LOOKS, 'x');
@@ -497,11 +503,11 @@ function placeArt(
       : near(p, 'review')
         ? 'signOff'
         : null;
-    const art: ReorgArt =
+    const art: ReorgArt | null =
       special && !out.some((a) => a.art === special)
         ? special
-        : (BACK_ART[i++ % BACK_ART.length] ?? 'reorgPoster');
-    out.push({ ...p, art, span: 1 });
+        : (BACK_ART[i++ % BACK_ART.length] ?? null);
+    if (art) out.push({ ...p, art, span: 1 });
   }
   for (const p of lobby)
     out.push({
@@ -634,10 +640,21 @@ function floorWearOf(
       });
     });
   }
-  // The carpet pulled up in a strip each side, two tiles out from the block, its upper rows.
-  const strip = Math.max(1, Math.min(3, block.y1 - block.y0 - 1));
-  for (const x of [block.x0 - 2, block.x1 + 2])
-    for (let y = block.y0 + 2; y < block.y0 + 2 + strip; y++) add(x, y, CARPET_WEAR.access);
+  // The carpet pulled up in a ragged strip each side, two tiles out from the block: down its
+  // column, a tile stepping out (away from the block) on the way, one panel lifted and propped.
+  for (const [x, out] of [
+    [block.x0 - 2, -1],
+    [block.x1 + 2, 1],
+  ] as const) {
+    const y0 = block.y0 + 2;
+    const rows = Math.max(1, Math.min(3, block.y1 - block.y0 - 1));
+    const strip: [number, number][] = [];
+    for (let y = y0; y < y0 + rows; y++) strip.push([x, y]);
+    if (rows >= 2) strip.splice(2, 0, [x + out, y0 + 1]);
+    strip.forEach(([sx, sy], k) => {
+      add(sx, sy, CARPET_WEAR.access | (k === 1 ? CARPET_WEAR.accessLift : 0));
+    });
+  }
   // A ghost line down the column three tiles out: yesterday's wall.
   for (const x of [block.x0 - 3, block.x1 + 3])
     for (let y = block.y0; y <= block.y1; y++)
@@ -840,64 +857,55 @@ function segfaultSpot(
       )
         spots.push({ x, y });
   const free = spots.find((p) => !taken.has(key(p.x, p.y))) ?? spots[0];
-  return free ? { ...free, yaw: -0.25 } : null;
+  return free ? { ...free, yaw: -0.1 } : null;
 }
 
-// ---- The pendants' wire ----
+// ---- The uplighters ----
 
-/** The pendants' height and the wire's row (world z, from the block's top row). */
-export const REORG_PENDANT_Y = WALL_HEIGHT + 0.24;
-/** How far behind the block's back edge the pendants hang (world z), so they never land on the back stations. */
-const WIRE_ROW = 1.3;
-
-/** The top of a cut-down side unit, where a wire's post can stand (the side glass's low head). */
-const ANCHOR_LOW = 0.58;
-/** How far into the room from its lamp spot each pendant hangs (world z): off the back row's stations on screen. */
-const PENDANT_FORWARD = 1.5;
-
-/** The side wall tile at the end of the wire, its post as near the wire's row as its tile allows. */
-function anchorOf(map: LevelMap, x: number, z: number): Vec3 | null {
-  for (const d of [0, -1, 1]) {
-    const y = Math.round(z) + d;
-    if (!isWall(map, x, y)) continue;
-    const zz = Math.min(y + 0.44, Math.max(y - 0.44, z));
-    // A cut-down unit's post stands on its low head.
-    const base = wallPiece(map, x, y) === 'wall-front' ? ANCHOR_LOW : WALL_HEIGHT;
-    return { x: x + (x === 0 ? 0.1 : -0.1), y: base, z: zz };
-  }
-  return null;
-}
+/** How far an uplighter keeps from a wall-top prop's middle along its face (tiles), at best. */
+const LIGHT_STEPS = [-0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3];
 
 /**
- * The wire the back half's pendants hang from at world row `z`, strung
- * from the left side wall's top to the right one's: each end on a post on
- * the nearest full side wall to the row (it slants a hair where a station
- * stands at the end of the row).
+ * The uplighter for the lamp spot `at` (see `RoomDressing.lamp.fit`): no
+ * pendants and no wire (anything hung in the room lands on the players'
+ * heads on screen), but a bronze wall-washer on the top of the dressed
+ * back face nearest the spot, at the head track's front edge, slid along
+ * the face clear of that tile's kit. Never on Segfault's tile (it would
+ * hide MATRIX), never over the boardroom's block, only for spots in the
+ * back half. Else none (the light itself stays at its spot).
  */
-export function reorgWireAt(map: LevelMap, z: number): ReorgWire | null {
-  const a = anchorOf(map, 0, z);
-  const b = anchorOf(map, map.width - 1, z);
-  if (!a || !b) return null;
-  return { a, b, y: REORG_PENDANT_Y };
-}
-
-function wireOf(map: LevelMap, block: Box): ReorgWire | null {
-  if (block.x1 < block.x0) return null;
-  return reorgWireAt(map, block.y0 + WIRE_ROW);
-}
-
-/**
- * The fitting for the lamp spot `at` (see `RoomDressing.lamp.fit`): at the
- * spot's own row, at the pendants' height, only in the back half and never
- * over the boardroom's block (a tile clear). Else none (the light itself
- * stays at its spot).
- */
-export function reorgPendantFit(at: Vec3, map: LevelMap, plan: ReorgRoom): Vec3 | null {
-  const { block } = plan;
+export function reorgLightFit(at: Vec3, plan: ReorgRoom): Vec3 | null {
+  const { block, segfault } = plan;
   if (at.z > (block.y0 + block.y1) / 2 + 0.01) return null;
   if (at.x > block.x0 - 1 && at.x < block.x1 + 1) return null;
-  if (at.x < 1 || at.x > map.width - 2) return null;
-  return { x: at.x, y: REORG_PENDANT_Y, z: at.z + PENDANT_FORWARD };
+  const faces = plan.art.filter(
+    (a) =>
+      a.y < at.z &&
+      plan.outer[key(a.x, a.y)] === 'back' &&
+      !(segfault && segfault.x === a.x && segfault.y === a.y) &&
+      (a.x < block.x0 - 0.5 || a.x > block.x1 + 0.5),
+  );
+  const tiles = faces.flatMap((a) =>
+    Array.from({ length: a.span }, (_, i) => ({ ...a, x: a.x + i })),
+  );
+  const kit = (x: number, y: number) =>
+    plan.tops.filter((t) => t.x === x && t.y === y && t.h === WALL_HEIGHT).map((t) => t.dx);
+  // The nearest face, a tile with kit on it counting a little farther.
+  const best = tiles
+    .map((t) => ({ t, d: Math.abs(t.x - at.x) + (kit(t.x, t.y).length > 0 ? 0.6 : 0) }))
+    .sort((p, q) => p.d - q.d || p.t.x - q.t.x)[0];
+  if (!best) return null;
+  const { x, y } = best.t;
+  const dxs = kit(x, y);
+  const slide =
+    dxs.length === 0
+      ? 0
+      : ([...LIGHT_STEPS].sort(
+          (p, q) =>
+            Math.min(...dxs.map((d) => Math.abs(q - d))) -
+              Math.min(...dxs.map((d) => Math.abs(p - d))) || Math.abs(p) - Math.abs(q),
+        )[0] ?? 0);
+  return { x: x + slide, y: WALL_HEIGHT, z: y + 0.5 };
 }
 
 // ---- The bin ----

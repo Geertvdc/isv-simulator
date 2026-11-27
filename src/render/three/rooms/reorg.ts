@@ -4,7 +4,6 @@ import { atmosphereFor, lampSpots } from '../atmosphere';
 import { WALL_HEIGHT } from '../layout';
 import { ReorgGates } from '../reorg/gates';
 import { Partitions } from '../reorg/partitions';
-import { PENDANT_HANG, boardroomPendantModel } from '../roomModels/boardroom';
 import {
   REORG_ART_MODELS,
   REORG_SWAP_MODELS,
@@ -15,13 +14,13 @@ import {
   reorgFloorModel,
   reorgLook,
   reorgTone,
+  reorgUplighterModel,
   reorgWallModel,
-  reorgWireModel,
   shredderModel,
 } from '../roomModels/reorg';
 import { TOWER_FOUNDATION_LOOKS, towerFoundationModel } from '../roomModels/tower';
 import { REORG_TOPS, matrixBoxModel } from '../setDressing/reorgWallTops';
-import { type ReorgRoom, type Side, reorgPendantFit, reorgRoom, reorgWireAt } from './reorgRoom';
+import { type ReorgRoom, type Side, reorgLightFit, reorgRoom } from './reorgRoom';
 import { OUT_YAW } from './towerRoom';
 import type { RoomDressing } from './types';
 
@@ -49,10 +48,10 @@ function planOf(map: LevelMap): ReorgRoom {
   return p;
 }
 
-/** The pendants' fittings for `map`: the atmosphere's lamp spots, fitted (see `reorgPendantFit`). */
+/** The uplighters for `map`: the atmosphere's lamp spots, fitted (see `reorgLightFit`). */
 export function reorgFittings(map: LevelMap, plan: ReorgRoom = planOf(map)) {
   return lampSpots(atmosphereFor('the-reorg'), map).flatMap((at) => {
-    const f = reorgPendantFit(at, map, plan);
+    const f = reorgLightFit(at, plan);
     return f ? [f] : [];
   });
 }
@@ -75,7 +74,8 @@ export function reorgFittings(map: LevelMap, plan: ReorgRoom = planOf(map)) {
  * ghost lines and castor tracks; 4-2's good carpet in the boardroom; the
  * lobby's stone. The handover desk behind the inbox, the shredding console
  * at the bin, the goods lift at the ship, the move's kit on the wall tops
- * and sills, Segfault's MATRIX box; slim pendants on a wire along the back.
+ * and sills, Segfault's MATRIX box; bronze uplighters on the back faces'
+ * tops (a pendant over the floor would hang on the players' heads).
  */
 export const REORG_ROOM: RoomDressing<ReorgRoom> = {
   plan: planOf,
@@ -86,10 +86,10 @@ export const REORG_ROOM: RoomDressing<ReorgRoom> = {
   swapModels: REORG_SWAP_MODELS,
   flat: FLAT,
   lamp: {
-    model: boardroomPendantModel,
-    fit: (at, map) => reorgPendantFit(at, map, planOf(map)),
+    model: reorgUplighterModel,
+    fit: (at, map) => reorgLightFit(at, planOf(map)),
   },
-  placeStory(plan, map, place) {
+  placeStory(plan, _map, place) {
     for (const a of plan.art)
       place(`art:${a.art}`, REORG_ART_MODELS[a.art], { at: gridToWorld(a.x, a.y), yaw: 0 });
     for (const t of plan.tops)
@@ -102,21 +102,6 @@ export const REORG_ROOM: RoomDressing<ReorgRoom> = {
         at: gridToWorld(plan.segfault.x, plan.segfault.y, WALL_HEIGHT + TOP_LIFT),
         yaw: plan.segfault.yaw,
       });
-    // The wire through the pendants' tops, from side wall to side wall.
-    const fits = reorgFittings(map, plan);
-    const first = fits[0];
-    const wire = first ? reorgWireAt(map, first.z) : null;
-    if (first && wire)
-      place(
-        `reorgWire:${first.z}`,
-        () =>
-          reorgWireModel(
-            wire,
-            fits.map((f) => f.x),
-            PENDANT_HANG + 0.02,
-          ),
-        { at: { x: 0, y: 0, z: 0 }, yaw: 0 },
-      );
     if (plan.handover) {
       const span = plan.handover.tiles.length;
       place(`handover:${span}`, () => handoverDeskModel(span), {

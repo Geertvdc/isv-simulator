@@ -25,8 +25,8 @@ import type { ReorgTopKind } from '../rooms/reorgRoom';
 /** Removal-crate blue, a touch dusty (desaturated so it never outshouts a station). */
 export const CRATE_BLUE = 0x3f6a9a;
 const CRATE_LID = 0x4f7aa8;
-/** Floor-tape yellow, desaturated. */
-export const TAPE_YELLOW = 0xc9b45c;
+/** Floor-tape yellow, well desaturated (it must never outshout a station). */
+export const TAPE_YELLOW = 0xb0a46e;
 /** The consultancy's teal. */
 export const TEAL = 0x3f8f8a;
 export const CARDBOARD = 0xa9865a;
@@ -567,51 +567,55 @@ export const REORG_TOPS: Readonly<Record<ReorgTopKind, () => Model>> = {
   deckPrint: grown(deckPrint, SILL_GROW),
 };
 
+/** How much bigger than the kit round it the MATRIX box is, so it's findable. */
+const MATRIX_GROW = 1.3;
 /** The MATRIX box's blanket top over the wall top: where Segfault lies (the scene's cat, `segfaultCat`, purring). */
-export const MATRIX_BED_Y = 0.13;
+export const MATRIX_BED_Y = 0.17;
 
 /**
- * Segfault's bed: an open cardboard box marked MATRIX in marker (TRIBE
+ * Segfault's bed: an open cardboard box marked MATRIX in big marker (TRIBE
  * crossed out above it), its flaps folded out, a grey blanket in it at
  * `MATRIX_BED_Y`. The cat is the World track's living piece.
  */
 export function matrixBoxModel(): Model {
   const b = new ModelBuilder();
-  const w = 0.44;
-  const d = 0.34;
-  const h = 0.17;
+  const g = MATRIX_GROW;
+  const w = 0.44 * g;
+  const d = 0.34 * g;
+  const h = 0.17 * g;
   b.box(w, 0.02, d, CARDBOARD_DARK, { at: [0, 0.01, 0] }, 0);
   for (const s of [-1, 1]) {
     b.box(0.018, h, d, CARDBOARD, { at: [s * (w / 2 - 0.009), h / 2, 0] }, 0);
     b.box(w, h, 0.018, CARDBOARD, { at: [0, h / 2, s * (d / 2 - 0.009)] }, 0);
-    // The flaps folded out.
-    b.box(
-      w,
-      0.012,
-      0.12,
-      tint(CARDBOARD, 0.05),
-      {
-        at: [0, h + 0.03, s * (d / 2 + 0.05)],
-        rot: [s * 0.6, 0, 0],
-      },
-      0,
-    );
+    // The back flap folded out (the front one's torn off: it would hide the lettering).
+    if (s === -1)
+      b.box(
+        w,
+        0.012,
+        0.12 * g,
+        tint(CARDBOARD, 0.05),
+        {
+          at: [0, h + 0.03, s * (d / 2 + 0.05 * g)],
+          rot: [s * 0.6, 0, 0],
+        },
+        0,
+      );
   }
   b.box(
-    0.12,
+    0.12 * g,
     0.012,
     d,
     tint(CARDBOARD, -0.04),
-    { at: [w / 2 + 0.05, h + 0.03, 0], rot: [0, 0, -0.6] },
+    { at: [w / 2 + 0.05 * g, h + 0.03, 0], rot: [0, 0, -0.6] },
     0,
   );
   // The blanket, rumpled.
-  b.box(w - 0.04, 0.03, d - 0.04, 0x7a8088, { at: [0, MATRIX_BED_Y - 0.015, 0] }, 0.012);
-  b.box(0.16, 0.04, 0.1, 0x6e747c, { at: [0.12, MATRIX_BED_Y, 0.08], rot: [0, 0.5, 0] }, 0.015);
-  // MATRIX in marker on its front, TRIBE crossed out above it.
+  b.box(w - 0.05, 0.03, d - 0.05, 0x7a8088, { at: [0, MATRIX_BED_Y - 0.015, 0] }, 0.012);
+  b.box(0.2, 0.04, 0.13, 0x6e747c, { at: [0.15, MATRIX_BED_Y, 0.1], rot: [0, 0.5, 0] }, 0.015);
+  // MATRIX in marker on its front, big; TRIBE crossed out above it.
   const f = d / 2 + 0.001;
-  text(b, 'MATRIX', 0, 0.075, f, 0.011, INK);
-  text(b, 'TRIBE', 0, 0.135, f, 0.0065, INK);
-  b.box(0.11, 0.006, 0.003, RED, { at: [0, 0.135, f + 0.002] }, 0);
+  text(b, 'MATRIX', 0, 0.085, f, 0.018, INK);
+  text(b, 'TRIBE', 0, 0.18, f, 0.008, INK);
+  b.box(0.16, 0.008, 0.003, RED, { at: [0, 0.18, f + 0.002] }, 0);
   return b.build();
 }
