@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { parseLevelMap } from '../../sim/level';
 import { CHAPTERS } from '../../sim/levels';
 import { levelSalt } from '../mapShape';
-import { Surroundings, placeSetPieces } from './surroundings';
+import { PACE, Surroundings, paceOffset, placeSetPieces } from './surroundings';
 import { SETTINGS, WALL_TOP_PROPS } from './setDressing';
 import { GLOW_BOOST, GLOW_BOOST_KEY, ModelBuilder } from './kit';
 import { SCENES } from './scenes';
@@ -290,6 +290,44 @@ describe('Surroundings', () => {
       }
       expect(seen).toEqual(new Set([true, false]));
       hot.destroy();
+    });
+
+    it('paces a `pace` piece and a pacing person on its row together, a short way, and keeps them still on low', () => {
+      const scenes = SCENES as Record<string, (m: typeof map) => Scene>;
+      const at = { x: -3, y: 0, z: -3 };
+      scenes['test-pace'] = () => ({
+        horizon: 0x222222,
+        ground: [],
+        pieces: [piece(-3, { alive: 'pace' })],
+        people: [{ at, yaw: 0, pose: 'carrying', pace: true }],
+        tufts: [],
+      });
+      try {
+        const w = new Surroundings(map, undefined, 'test-pace');
+        const meshes: THREE.Object3D[] = [];
+        w.root.traverse((o) => {
+          if (o instanceof THREE.Mesh && o.parent === w.root && o.position.z === -3) meshes.push(o);
+        });
+        const prop = meshes.find((o) => o.position.x === -3);
+        const man = w.root.children[w.root.children.length - 1];
+        if (!prop || !man) throw new Error('missing');
+        const xs: number[] = [];
+        for (let ms = 0; ms < 8000; ms += 250) {
+          w.update(ms, true);
+          expect(man.position.x).toBeCloseTo(prop.position.x);
+          expect(prop.position.z).toBe(-3);
+          xs.push(prop.position.x);
+          expect(paceOffset(-3, ms / 1000)).toBeCloseTo(prop.position.x + 3);
+        }
+        expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(PACE.reach * 1.5);
+        expect(Math.max(...xs.map((x) => Math.abs(x + 3)))).toBeLessThanOrEqual(PACE.reach + 1e-9);
+        const before = prop.position.x;
+        w.update(3333, false);
+        expect(prop.position.x).toBe(before);
+        w.destroy();
+      } finally {
+        delete scenes['test-pace'];
+      }
     });
 
     it("lays the horizon at the slab's foot, or `horizonY` from it", () => {
