@@ -463,10 +463,12 @@ export interface Accent {
   halo?: { size: number; opacity: number };
 }
 
-/** One phase's light in `Atmosphere.day`: the sun's color, strength and place, and the fill. */
+/** One phase's light in `Atmosphere.day`: the sun's color, strength and place, the fill, and the sky. */
 export interface DayLight {
   sun: { color: number; intensity: number; from: SunPlacement };
   fill: { color: number; intensity: number };
+  /** The sky's (hemisphere's) strength; the preset's `sky.intensity` without. On low, `lowSky` scales with it. */
+  sky?: number;
 }
 
 /** Marks what `Stage` hides on `low`: the ambient motion of `Atmosphere.ambient`. */
@@ -1209,7 +1211,11 @@ const SUMMER_AFTERNOON: Atmosphere = {
 
 /** 4-3's Silos, morning: warm white, about 40° up from the front left: hypot(5, 3.5) × tan 40° ≈ 5.1. */
 const REORG_MORNING: DayLight = {
-  sun: { color: 0xfff0da, intensity: 3.4, from: { x: -5, y: 3.5, height: 5.1, perMapSize: false } },
+  sun: {
+    color: 0xfff0da,
+    intensity: 3.55,
+    from: { x: -5, y: 3.5, height: 5.1, perMapSize: false },
+  },
   fill: { color: 0xc8d8f4, intensity: 0.8 },
 };
 
@@ -1220,16 +1226,18 @@ const REORG_DAY: DayLight[] = [
   {
     sun: {
       color: 0xfffaf0,
-      intensity: 3.8,
+      intensity: 2.8,
       from: { x: -1.5, y: 2.5, height: 5.05, perMapSize: false },
     },
-    fill: { color: 0xd8e2f4, intensity: 0.6 },
+    fill: { color: 0xd8e2f4, intensity: 0.5 },
+    // A shade less sky too: the pale floor and lobby stone go hot under it.
+    sky: 0.78,
   },
   // Matrix, after lunch: warmer, about 40° up from the front right.
   {
     sun: {
-      color: 0xffdcae,
-      intensity: 3.5,
+      color: 0xffcf96,
+      intensity: 4.3,
       from: { x: 5, y: 3.5, height: 5.1, perMapSize: false },
     },
     fill: { color: 0xccdaf4, intensity: 0.8 },
@@ -1271,21 +1279,22 @@ const SUMMER_DAY: Atmosphere = {
     color: 0x34364a,
     opacity: 0.35,
     inner: 0.7,
-    saturate: 1.15,
-    contrast: 1.06,
+    saturate: 1.2,
+    contrast: 1.08,
     exposure: 1.22,
     glows: [
       // The summer sky behind the city, under the order cards.
       { color: 0xffe4bc, opacity: 0.16, x: 0.4, y: 0, reach: 0.5 },
       // The lit `yotta.` going up at the back right, a soft cool-white glow behind it.
-      { color: 0xeee8ff, opacity: 0.16, x: 0.7, y: 0.04, reach: 0.18 },
+      { color: 0xeee8ff, opacity: 0.24, x: 0.69, y: 0.1, reach: 0.12 },
     ],
     // On low the lobby's brackets are off: a little cool light over it instead.
     lowGlows: [{ color: 0xe4ecfa, opacity: 0.14, x: 0.5, y: 0.78, reach: 0.2 }],
   },
+  // Soft: they hang over the back stations' tops, which a stronger lamp washes out.
   lamps: {
     color: 0xfff0dc,
-    intensity: 6,
+    intensity: 3,
     distance: 3.4,
     height: 2.1,
     spacing: 3,
@@ -1304,13 +1313,13 @@ const SUMMER_DAY: Atmosphere = {
     kinds: ['testBench'],
   },
   // The shipping lobby's wall brackets either side of the goods lift: cool and clean.
-  accents: [-3.2, 3.2].map((shift) => ({
+  accents: [-4.7, 4.7].map((shift) => ({
     anchor: 'ship' as const,
     color: 0xdce8ff,
-    intensity: 6,
+    intensity: 4,
     distance: 4,
     height: 1.7,
-    out: 1.4,
+    out: 1.6,
     shift,
   })),
   // The good carpet from yesterday, the same soft grey lavender.
@@ -1544,15 +1553,16 @@ export function dayClock(state: DayState): { from: number; to: number; t: number
 export function dayLight(
   atmosphere: Atmosphere,
   clock: { from: number; to: number; t: number },
-): DayLight {
+): Required<DayLight> {
   const phases = atmosphere.day?.phases ?? [];
-  const own: DayLight = {
+  const own: Required<DayLight> = {
     sun: {
       color: atmosphere.sun.color,
       intensity: atmosphere.sun.intensity,
       from: atmosphere.sun.from,
     },
     fill: atmosphere.fill,
+    sky: atmosphere.sky.intensity,
   };
   const at = (phase: number): DayLight =>
     phases[Math.min(Math.max(phase, 1), phases.length) - 1] ?? own;
@@ -1575,6 +1585,7 @@ export function dayLight(
       color: mixColor(a.fill.color, b.fill.color, t),
       intensity: mix(a.fill.intensity, b.fill.intensity),
     },
+    sky: mix(a.sky ?? own.sky, b.sky ?? own.sky),
   };
 }
 

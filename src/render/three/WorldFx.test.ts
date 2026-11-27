@@ -4,10 +4,10 @@ import { BEFORE_MAPS } from './fixtures/beforeMaps';
 import { describe, expect, it } from 'vitest';
 import { parseLevelMap as parseDraftMap } from '../../sim/level';
 import { type LevelMap, type Tile, getTile, parseLevelMap } from '../../sim/level';
-import { ATMOSPHERES, DEFAULT_ATMOSPHERE, atmosphereFor, sceneOf } from './atmosphere';
+import { ATMOSPHERES, DEFAULT_ATMOSPHERE, atmosphereFor, dayLight, sceneOf } from './atmosphere';
 import { SYNERGY, THE_REORG } from '../../sim/levels';
 import { createGame } from '../../sim/state';
-import { createLights } from './look';
+import { LOW_SKY_KEY, createLights } from './look';
 import {
   SWEEP_FLOOR,
   WorldFx,
@@ -255,7 +255,7 @@ describe('the day passing (the-reorg)', () => {
     });
     const [sun, fill] = lights;
     if (!sun || !fill) throw new Error('no sun or fill');
-    return { fx, sun, fill, state: createGame(level, 1, [1]) };
+    return { world, fx, sun, fill, state: createGame(level, 1, [1]) };
   }
 
   it('moves the sun from the tick: the same still every time, the morning before the warning', () => {
@@ -290,6 +290,39 @@ describe('the day passing (the-reorg)', () => {
     const up = (p: THREE.Vector3) => (p.y - target.y) / Math.hypot(p.x - target.x, p.z - target.z);
     expect(up(sun.position)).toBeGreaterThan(up(morning) * 1.5);
     expect(sun.position.x).toBeGreaterThan(morning.x);
+  });
+
+  it('turns the sky down a shade at noon, on either quality, and back up after lunch', () => {
+    const { world, fx, state } = lit();
+    let sky: THREE.HemisphereLight | undefined;
+    world.traverse((o) => {
+      if (o instanceof THREE.HemisphereLight) sky ??= o;
+    });
+    if (!sky) throw new Error('no sky');
+    const [first, second] = reorgs;
+    if (!first || !second) throw new Error('two reorgs');
+    const pair = () => sky?.userData[LOW_SKY_KEY] as { high: number; low: number };
+    fx.sync(state, 0);
+    expect(sky.intensity).toBeCloseTo(atmosphere.sky.intensity);
+    // As the stage leaves it on low: the stand-in sky, scaled the same way.
+    sky.intensity = pair().low;
+    state.tick = first.atTick;
+    state.reorgPhase = first.phase;
+    state.nextReorg = 1;
+    fx.sync(state, 0);
+    const noon = dayLight(atmosphere, { from: 2, to: 2, t: 0 }).sky;
+    expect(noon).toBeLessThan(atmosphere.sky.intensity);
+    const scale = noon / atmosphere.sky.intensity;
+    expect(sky.intensity).toBeCloseTo((atmosphere.lowSky ?? 0) * scale);
+    expect(pair().high).toBeCloseTo(noon);
+    expect(pair().low).toBeCloseTo((atmosphere.lowSky ?? 0) * scale);
+    // After lunch: the preset's own again.
+    state.tick = second.atTick;
+    state.reorgPhase = second.phase;
+    state.nextReorg = 2;
+    fx.sync(state, 0);
+    expect(sky.intensity).toBeCloseTo(atmosphere.lowSky ?? 0);
+    expect(pair().high).toBeCloseTo(atmosphere.sky.intensity);
   });
 
   it('leaves every other level’s sun where it was', () => {

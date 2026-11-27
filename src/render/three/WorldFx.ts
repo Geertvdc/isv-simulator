@@ -30,7 +30,7 @@ import {
   sunShaftSpots,
 } from './atmosphere';
 import { blockHeight, facingYaw, heroPlacement, stationFacing } from './layout';
-import { ACCENT_INDEX_KEY, DAY_LIGHT_KEY, LAMP_INDEX_KEY, LAMP_KEY } from './look';
+import { ACCENT_INDEX_KEY, DAY_LIGHT_KEY, LAMP_INDEX_KEY, LAMP_KEY, LOW_SKY_KEY } from './look';
 import { lightWellsFor } from './lightWells';
 import { loftRoom } from './rooms/loftRoom';
 import { SCENES } from './scenes';
@@ -278,11 +278,16 @@ export class WorldFx {
     group: THREE.Group;
   } | null = null;
   private shake = { untilMs: 0, intensity: 0 };
-  /** The sun and fill moving through the day (`Atmosphere.day`), and the moment last applied. */
+  /**
+   * The sun, fill and sky moving through the day (`Atmosphere.day`), the
+   * moment last applied, and the share of the preset's sky applied with it.
+   */
   private day: {
     atmosphere: Atmosphere;
     sun: THREE.DirectionalLight;
     fill: THREE.DirectionalLight | null;
+    sky: THREE.HemisphereLight | null;
+    skyScale: number;
     last: string;
   } | null = null;
   shakeEnabled = true;
@@ -426,12 +431,14 @@ export class WorldFx {
   private findDayLights(world: THREE.Scene, atmosphere: Atmosphere): void {
     if (!atmosphere.day) return;
     const lights: THREE.DirectionalLight[] = [];
+    let sky: THREE.HemisphereLight | null = null;
     world.traverse((obj) => {
       if (obj instanceof THREE.DirectionalLight) lights.push(obj);
+      if (obj instanceof THREE.HemisphereLight) sky ??= obj;
     });
     const sun = lights.find((l) => l.userData[DAY_LIGHT_KEY] === 'sun');
     const fill = lights.find((l) => l.userData[DAY_LIGHT_KEY] === 'fill') ?? null;
-    if (sun) this.day = { atmosphere, sun, fill, last: '' };
+    if (sun) this.day = { atmosphere, sun, fill, sky, skyScale: 1, last: '' };
   }
 
   /**
@@ -458,6 +465,16 @@ export class WorldFx {
     if (day.fill) {
       day.fill.color.setHex(light.fill.color);
       day.fill.intensity = light.fill.intensity;
+    }
+    // The sky as a share of the preset's, so it holds on either quality: the stage set
+    // the sky for that (`lowSky`), and reads the scaled pair again when the quality changes.
+    const base = day.atmosphere.sky.intensity;
+    const scale = base > 0 ? light.sky / base : 1;
+    if (day.sky && scale !== day.skyScale) {
+      day.sky.intensity *= scale / day.skyScale;
+      if (day.atmosphere.lowSky !== undefined)
+        day.sky.userData[LOW_SKY_KEY] = { high: light.sky, low: day.atmosphere.lowSky * scale };
+      day.skyScale = scale;
     }
   }
 

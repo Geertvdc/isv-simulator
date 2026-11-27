@@ -1510,6 +1510,7 @@ describe('summer, all day (the-reorg)', () => {
       expect(light.sun.color, id).toBe(other.sun.color);
       expect(light.sun.from, id).toEqual(other.sun.from);
       expect(light.fill, id).toEqual(other.fill);
+      expect(light.sky, id).toBe(other.sky.intensity);
     }
     expect(layouts).toHaveLength(3);
   });
@@ -1547,15 +1548,23 @@ describe('summer, all day (the-reorg)', () => {
       );
       expect(sideways).toBeLessThan(1.5);
     }
-    // Warm white, white, then warmer; never orange, and noon the brightest.
+    // Warm white, white, then warmer; never orange. Noon is high, not hot: no stronger than the morning.
     const [cm, cn, cl] = [1, 2, 3].map((p) => still(p).sun.color) as [number, number, number];
     expect(warmth(cn)).toBeLessThan(warmth(cm));
     expect(warmth(cl)).toBeGreaterThan(warmth(cm));
     expect(Math.min(...rgb(cn))).toBeGreaterThan(235);
-    expect(warmth(cl)).toBeLessThanOrEqual(warmth(afternoon.sun.color));
-    expect(Math.min(...rgb(cl))).toBeGreaterThan(160);
-    expect(still(2).sun.intensity).toBeGreaterThan(still(1).sun.intensity);
-    expect(still(2).sun.intensity).toBeGreaterThan(still(3).sun.intensity);
+    // After lunch a touch warmer than 4-2's late gold (so it reads on the floor), never orange.
+    expect(warmth(cl)).toBeLessThanOrEqual(warmth(afternoon.sun.color) + 12);
+    expect(Math.min(...rgb(cl))).toBeGreaterThan(140);
+    expect(still(2).sun.intensity).toBeLessThan(still(1).sun.intensity);
+    expect(still(2).fill.intensity).toBeLessThan(still(1).fill.intensity);
+    // And a shade less sky at noon; the morning and after lunch keep the preset's.
+    expect(still(1).sky).toBe(a.sky.intensity);
+    expect(still(2).sky).toBeLessThan(a.sky.intensity);
+    expect(still(3).sky).toBe(a.sky.intensity);
+    expect(dayLight(a, { from: 1, to: 2, t: 0.5 }).sky).toBeCloseTo(
+      (a.sky.intensity + still(2).sky) / 2,
+    );
   });
 
   it('keeps the fill only slightly cool all day, so shaded yellow fronts never go olive', () => {
@@ -1646,8 +1655,8 @@ describe('summer, all day (the-reorg)', () => {
       expect(b).toBeGreaterThan(r + 20);
     }
     const offsets = spots.map((s) => s.at.x - mid).sort((p, q) => p - q);
-    expect(offsets[0]).toBeCloseTo(-3.2);
-    expect(offsets[1]).toBeCloseTo(3.2);
+    expect(offsets[0]).toBeCloseTo(-4.7);
+    expect(offsets[1]).toBeCloseTo(4.7);
     // On low the brackets are off: a little cool light over the lobby instead.
     expect(a.vignette?.lowGlows?.length).toBe(1);
   });
