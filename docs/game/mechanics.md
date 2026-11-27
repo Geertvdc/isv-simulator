@@ -126,6 +126,8 @@ On a reorg level the floor plan changes during the round: partitions (`=`) fold 
 
 ![Synergy's folding walls coming back out of their closets half a second before the boardroom closes](images/mechanics/synergy-folding.webp)
 
+![The Reorg's partitions rolling in on their castors for Matrix, the turnstiles about to flip](images/mechanics/the-reorg-closing.webp)
+
 ## Gaps and odd shapes (from chapter 5, Big Tech)
 
 Levels don't have to be a rectangle any more. Blank tiles in a map are **void**: nothing there, not even floor. `~` is a **gap** (an atrium, a stairwell): you can't walk over it, but a thrown ticket flies right over it. A ticket that comes down in a gap or the void is gone: it goes back to its queue with all its work lost ("git reset --hard"), and the order keeps running.
