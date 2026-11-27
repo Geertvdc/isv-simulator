@@ -122,12 +122,14 @@ const SYNERGY_SCENES: Scene[] = SYNERGY_LEVEL
 
 const REORG_LEVEL = LEVELS.find((l) => l.id === 'the-reorg');
 
-/** The Reorg's Open Plan and Matrix layouts, and the floor a second and a half from its first reorg. */
+/** The Reorg's Open Plan and Matrix layouts, the floor a second and a half from its first reorg, and its partitions rolling in for Matrix. */
 const REORG_SCENES: Scene[] = REORG_LEVEL
   ? [
       reorgScene('level-the-reorg-open-plan', REORG_LEVEL, 2, 1, 75),
       reorgScene('level-the-reorg-matrix', REORG_LEVEL, 3, 2, 135),
       reorgScene('the-reorg-shifting', REORG_LEVEL, 1, 0, 58.5),
+      // Open Plan to Matrix, 25 ticks before the switch: the partitions mid-train.
+      reorgScene('the-reorg-closing', REORG_LEVEL, 2, 1, 120 - 25 / 60),
     ]
   : [];
 
