@@ -244,15 +244,29 @@ export function doorRise(
   return t < 0 ? 1 : 1 - ramp(t, 0, 18);
 }
 
-/** The gate glyphs' blink in the warning: which of the two directions shows (true: the coming one). */
-export function gateShowsNext(clock: ReorgClock, animate = true): boolean {
-  const { t } = clock;
-  if (clock.from === clock.to) return true;
-  if (t >= 0) return true;
-  if (t < -REORG_WARNING_TICKS) return false;
-  if (!animate) return false;
-  return !swapBlink(-t);
+/**
+ * Whether the gate glyphs show the coming direction as the live (green)
+ * one: only from the switch tick on. Through the warning the green way is
+ * the one the sim still enforces.
+ */
+export function gateShowsNext(clock: ReorgClock): boolean {
+  return clock.from === clock.to || clock.t >= 0;
 }
+
+/**
+ * The incoming direction's amber, 0 to 1, for a gate whose way flips: off
+ * outside the warning; in it, bright on the alternate beat of the
+ * quickening blink and dim on the live beat (steady on `low`).
+ */
+export function gateIncoming(clock: ReorgClock, animate = true): number {
+  const { t } = clock;
+  if (clock.from === clock.to || t >= 0 || t < -REORG_WARNING_TICKS) return 0;
+  if (!animate) return 1;
+  return swapBlink(-t) ? INCOMING_DIM : 1;
+}
+
+/** The incoming amber on the live beat. */
+export const INCOMING_DIM = 0.3;
 
 /** True for the current direction's half of the blink; the period quickens as the switch nears. */
 export function swapBlink(inTicks: number): boolean {

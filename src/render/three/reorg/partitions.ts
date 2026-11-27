@@ -13,23 +13,30 @@ import {
   type Leaf,
   type LeafMove,
   type PartitionLayout,
+  type SignSpot,
+  type StackSpot,
   allLeaves,
+  headerSigns,
+  parkedStacks,
   partitionLayout,
   rollingDesks,
   transition,
 } from './layouts';
 import {
-  LEAF_T,
   LOW_TOP,
   deskModel,
   leafGlassModel,
   leafLowerModel,
   leafUpperModel,
+  parkedStackModel,
+  SIGN_PX,
   signModel,
+  signWidth,
   tapeXModel,
   trolleyModel,
 } from './models';
-import { OPEN, TRAIN_END, TRAIN_START, deskPose, leafPose, ramp } from './motion';
+import { OPEN, TRAIN_END, TRAIN_START, deskPose, leafPose, leafWhole, ramp } from './motion';
+import { WALL_HEIGHT } from '../layout';
 
 /** The org vinyl per layout (Silos, Open Plan, Matrix, and round again). */
 const ORG_SIGNS: readonly (readonly string[])[] = [
@@ -45,8 +52,15 @@ interface LeafLook {
   group: THREE.Group;
   upper: THREE.Group;
   glass: THREE.Group;
-  /** Its sign per layout (index `phase - 1`), if it carries one there. */
+  /** Its header board per layout (index `phase - 1`), if it carries one there. */
   signs: (THREE.Group | null)[];
+}
+
+interface StackLook {
+  spot: StackSpot;
+  /** The layout it belongs to (index `phase - 1`). */
+  layout: number;
+  group: THREE.Group;
 }
 
 interface DeskLook {
@@ -90,6 +104,7 @@ export class Partitions implements MovingTilesLook {
   private readonly layouts: PartitionLayout[];
   private readonly leaves: LeafLook[] = [];
   private readonly desks: DeskLook[] = [];
+  private readonly stacks: StackLook[] = [];
   private readonly moves = new Map<string, Map<string, LeafMove>>();
   private readonly warnings = new Map<number, THREE.Mesh>();
   /** The panel trolleys at the trains' free ends, by end. */
@@ -109,7 +124,7 @@ export class Partitions implements MovingTilesLook {
     roughness: 0.4,
     metalness: 0,
     transparent: true,
-    opacity: 0.3,
+    opacity: 0.6,
     depthWrite: false,
   });
   /** Hidden by the stage on `low` quality: the kit snaps there instead of moving. */
@@ -123,8 +138,20 @@ export class Partitions implements MovingTilesLook {
     this.motionProbe.userData[AMBIENT_KEY] = true;
     this.group.add(this.motionProbe);
     this.layouts = layoutsOf(map).map((_, k) => partitionLayout(map, k + 1));
-    const signs = this.signLeaves();
+    const signs = this.layouts.map((layout, li) =>
+      headerSigns(layout, ORG_SIGNS[li % ORG_SIGNS.length] ?? []),
+    );
     for (const leaf of allLeaves(map).values()) this.leaves.push(this.buildLeaf(leaf, signs));
+    this.layouts.forEach((layout, li) => {
+      for (const spot of parkedStacks(map, layout, li + 1)) {
+        const group = this.mesh(parkedStackModel(spot.w, spot.d, spot.x * 13 + spot.y * 5 + li));
+        const top = spot.low ? LOW_TOP : WALL_HEIGHT;
+        group.position.set(spot.cx, top - 0.012, spot.cz);
+        group.visible = false;
+        this.group.add(group);
+        this.stacks.push({ spot, layout: li, group });
+      }
+    });
     rollingDesks(map).forEach((desk, k) => this.desks.push(this.buildDesk(desk.spots, k)));
   }
 
@@ -145,24 +172,7 @@ export class Partitions implements MovingTilesLook {
     return g;
   }
 
-  /** Per layout, the leaves that carry a sign: the middle of each row line two tiles long or more. */
-  private signLeaves(): Map<string, string>[] {
-    return this.layouts.map((layout, li) => {
-      const names = ORG_SIGNS[li % ORG_SIGNS.length] ?? [];
-      const out = new Map<string, string>();
-      let k = 0;
-      for (const line of layout.lines) {
-        if (line.axis !== 'x' || line.leaves.length < 4 || names.length === 0) continue;
-        const mid = line.leaves[Math.floor(line.leaves.length / 2) - 1];
-        if (!mid) continue;
-        out.set(mid.key, names[k % names.length] ?? '');
-        k++;
-      }
-      return out;
-    });
-  }
-
-  private buildLeaf(leaf: Leaf, signs: Map<string, string>[]): LeafLook {
+  private buildLeaf(leaf: Leaf, signs: Map<string, SignSpot>[]): LeafLook {
     const edge = leaf.outer === 1 ? leaf.b : leaf.a;
     // Feet on every second tile edge (and every line end), so a run doesn't read as a ladder.
     const lineEnd = this.layouts.some((l) =>
@@ -187,10 +197,13 @@ export class Partitions implements MovingTilesLook {
     group.add(lower, upper, glass);
     group.visible = false;
     const signGroups = signs.map((byLeaf) => {
-      const text = byLeaf.get(leaf.key);
-      if (!text) return null;
-      const sign = this.mesh(signModel(text));
-      sign.position.set(0, 0, LEAF_T / 2 - 0.006);
+      const spot = byLeaf.get(leaf.key);
+      if (!spot) return null;
+      // As big as the run has room for, up to the board's full size.
+      const cols = spot.text.length * 4 - 1;
+      const px = Math.min(SIGN_PX, (spot.room - 0.4 - signWidth('', 0)) / cols);
+      const sign = this.mesh(signModel(spot.text, px));
+      sign.position.set(spot.offset, WALL_HEIGHT, 0);
       sign.visible = false;
       group.add(sign);
       return sign;
@@ -228,12 +241,14 @@ export class Partitions implements MovingTilesLook {
     const moves = this.movesFor(clock);
     const now = clock.t < 0 ? clock.from : clock.to;
     const layout = this.layouts[now - 1];
+    const whole = new Set<string>();
     for (const look of this.leaves) {
       const move = moves.get(look.leaf.key);
       const pose = move ? leafPose(look.leaf, move, clock, animate) : null;
       const { group, leaf } = look;
       group.visible = pose?.visible ?? false;
       if (!pose?.visible) continue;
+      if (leafWhole(pose)) whole.add(look.leaf.key);
       const scale = pose.len / 0.5;
       group.scale.set(Math.max(0.001, scale), Math.max(0.001, pose.rise), 1);
       const [x, z] = leaf.axis === 'x' ? [pose.c, leaf.line] : [leaf.line, pose.c];
@@ -247,12 +262,15 @@ export class Partitions implements MovingTilesLook {
         false;
       look.upper.visible = !low;
       look.glass.visible = low;
+      // The board only on a whole leaf (a sliding one is squashed along its line).
       look.signs.forEach((sign, li) => {
-        if (!sign) return;
-        sign.visible = li === now - 1;
-        sign.position.y = low ? 0.36 : 0.92;
+        if (sign) sign.visible = li === now - 1 && leafWhole(pose);
       });
     }
+    // A parked stack shows once every leaf of its tiles stands whole.
+    for (const look of this.stacks)
+      look.group.visible =
+        look.layout === now - 1 && look.spot.leaves.every((key) => whole.has(key));
     this.syncTrolleys(moves, clock, animate);
     this.syncDesks(state, clock, animate);
     this.syncWarning(state);

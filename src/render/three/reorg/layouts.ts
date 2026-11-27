@@ -321,3 +321,139 @@ export function doorSpots(map: LevelMap): DoorSpot[] {
   });
   return [...out.values()];
 }
+
+/** An org header board on a run: on leaf `key`, `offset` along the line from its middle, `room` the run's length. */
+export interface SignSpot {
+  text: string;
+  offset: number;
+  room: number;
+}
+
+/**
+ * One header board per run: on every row line four leaves long or more
+ * (two tiles), at its middle, the names in turn. A run with another run
+ * right in front of it (a block two deep) leaves the board to the front one.
+ */
+export function headerSigns(
+  layout: PartitionLayout,
+  names: readonly string[],
+): Map<string, SignSpot> {
+  const out = new Map<string, SignSpot>();
+  if (names.length === 0) return out;
+  const rows = layout.lines.filter((l) => l.axis === 'x' && l.leaves.length >= 4);
+  let k = 0;
+  for (const line of rows) {
+    const front = rows.some(
+      (o) =>
+        o.line === line.line + 1 &&
+        Math.min(o.b, line.b) - Math.max(o.a, line.a) >= (line.b - line.a) / 2,
+    );
+    if (front) continue;
+    const mid = (line.a + line.b) / 2;
+    const leaf = line.leaves.find((l) => l.a <= mid + 1e-6 && l.b >= mid - 1e-6);
+    if (!leaf) continue;
+    out.set(leaf.key, {
+      text: names[k % names.length] ?? '',
+      offset: mid - (leaf.a + leaf.b) / 2,
+      room: line.b - line.a,
+    });
+    k++;
+  }
+  return out;
+}
+
+/** A parked stack over half a partition tile, in world units (its middle `cx`, `cz`; `w` along x, `d` along z). */
+export interface StackSpot {
+  x: number;
+  y: number;
+  cx: number;
+  cz: number;
+  w: number;
+  d: number;
+  /** On a cut-down tile (its top at the lower section's). */
+  low: boolean;
+  /** The leaves that must stand whole for it to show (its tile's, and the parallel run's across). */
+  leaves: string[];
+}
+
+/**
+ * Where a deep block would show floor between its fences: the half of a
+ * partition tile toward a parallel run beside it (a block two deep) or
+ * toward a fixed wall. A stack of panels parks there, level with the top
+ * rails, so the block reads solid.
+ */
+export function parkedStacks(map: LevelMap, layout: PartitionLayout, phase: number): StackSpot[] {
+  const layouts = layoutsOf(map);
+  const tiles = (layouts[phase - 1] ?? layouts[0])?.tiles ?? map.tiles;
+  const moving = new Set(reorgTiles(map));
+  const byTile = new Map<string, Leaf[]>();
+  for (const leaf of layout.leaves.values()) {
+    const k = `${leaf.x},${leaf.y}`;
+    byTile.set(k, [...(byTile.get(k) ?? []), leaf]);
+  }
+  const has = (x: number, y: number, d: Dir): boolean => layout.leaves.has(leafKey(x, y, d));
+  interface Want {
+    spot: StackSpot;
+    axis: 'x' | 'y';
+    d: Dir;
+    /** The tile has a leaf toward `d` itself (an end cap): only where the block runs on beside it. */
+    capped: boolean;
+  }
+  const wants: Want[] = [];
+  for (const mine of byTile.values()) {
+    const first = mine[0];
+    if (!first) continue;
+    const { x, y } = first;
+    for (const axis of ['x', 'y'] as const) {
+      const run = mine.filter((l) => l.axis === axis);
+      if (run.length === 0) continue;
+      const lo = run.some((l) => l.outer === -1) ? -0.5 : 0;
+      const hi = run.some((l) => l.outer === 1) ? 0.5 : 0;
+      if (hi - lo < 0.25) continue;
+      const across: Dir[] = axis === 'x' ? ['U', 'D'] : ['L', 'R'];
+      for (const d of across) {
+        const n = { x: x + STEP[d].x, y: y + STEP[d].y };
+        if (tileIn(map, tiles, n.x, n.y) !== 'wall') continue;
+        const them = byTile.get(`${n.x},${n.y}`) ?? [];
+        const fixed = !moving.has(n.y * map.width + n.x);
+        if (!fixed && !them.some((l) => l.axis === axis)) continue;
+        const sign = STEP[d].x + STEP[d].y;
+        const along = (lo + hi) / 2;
+        const [cx, cz, w, dd] =
+          axis === 'x'
+            ? [x + along, y + sign * 0.25, hi - lo, 0.5]
+            : [x + sign * 0.25, y + along, 0.5, hi - lo];
+        wants.push({
+          axis,
+          d,
+          capped: has(x, y, d),
+          spot: {
+            x,
+            y,
+            cx,
+            cz,
+            w,
+            d: dd,
+            low: mine.some((l) => layout.low.get(l.key) === true),
+            leaves: [...mine, ...them].map((l) => l.key),
+          },
+        });
+      }
+    }
+  }
+  // An end cap's tile parks a stack only where its run's next tile does the same way.
+  const open = new Set(wants.filter((w) => !w.capped).map((w) => `${w.spot.x},${w.spot.y},${w.d}`));
+  const out: StackSpot[] = [];
+  for (const w of wants) {
+    if (w.capped) {
+      const { x, y } = w.spot;
+      const steps: Dir[] = w.axis === 'x' ? ['L', 'R'] : ['U', 'D'];
+      const runsOn = steps.some(
+        (s) => has(x, y, s) && open.has(`${x + STEP[s].x},${y + STEP[s].y},${w.d}`),
+      );
+      if (!runsOn) continue;
+    }
+    out.push(w.spot);
+  }
+  return out;
+}

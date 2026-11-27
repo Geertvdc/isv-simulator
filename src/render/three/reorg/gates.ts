@@ -25,22 +25,32 @@ import {
   gateFlapModel,
   staffDoorModel,
 } from './models';
-import { doorRise, flapSwing, gateShowsNext } from './motion';
+import { doorRise, flapSwing, gateIncoming, gateShowsNext } from './motion';
 
 const GO = 0x3fe36a;
 const STOP = 0xff4a3d;
+/** The incoming direction through the reorg warning. */
+const INCOMING = 0xffb020;
 const DOOR_FREE = 0x4cd964;
 const DOOR_INVITED = 0xffa53d;
 const DOOR_IN_SESSION = 0xff4a3d;
 const DOOR_DARK = 0x4a5568;
 /** How far the glass door slides open along its line. */
 const DOOR_SLIDE = 0.8;
+/** The amber strip's length along a cabinet top. */
+const CAB_STRIP = 0.62;
 
 interface GateLook {
   at: GridPoint;
   index: number;
   /** The glyphs (arrows and crosses on the cabinets, the floor arrow), drawn for travel along local +z. */
   glyphs: THREE.Group;
+  /** The red crosses at the exit end, swapped for the amber arrows when the way is about to flip. */
+  crosses: THREE.Mesh[];
+  /** The incoming way's amber arrows (cabinets and floor), in `glyphs`, pointing back along local −z. */
+  incoming: THREE.Mesh[];
+  /** The amber strips along the cabinets' tops. */
+  strips: THREE.Mesh[];
   flaps: [THREE.Group, THREE.Group];
 }
 
@@ -90,6 +100,19 @@ export class ReorgGates implements GatesLook {
     color: 0xe2e6ea,
     transparent: true,
     opacity: 0.55,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  private readonly amber = new THREE.MeshBasicMaterial({
+    color: INCOMING,
+    transparent: true,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  private readonly floorAmber = new THREE.MeshBasicMaterial({
+    color: INCOMING,
+    transparent: true,
     depthWrite: false,
     toneMapped: false,
   });
@@ -148,20 +171,46 @@ export class ReorgGates implements GatesLook {
     const glyphs = new THREE.Group();
     const arrow = arrowGeometry(0.13, 0.2);
     const cross = crossGeometry(0.16, 0.045);
+    const crosses: THREE.Mesh[] = [];
+    const incoming: THREE.Mesh[] = [];
+    const strips: THREE.Mesh[] = [];
+    const strip = new THREE.PlaneGeometry(0.035, CAB_STRIP).rotateX(-Math.PI / 2);
     for (const side of [-1, 1]) {
       const a = new THREE.Mesh(arrow, this.go);
       a.position.set(side * CAB_X, GLYPH_Y + 0.01, -GLYPH_Z);
       const c = new THREE.Mesh(cross, this.stop);
       c.position.set(side * CAB_X, GLYPH_Y + 0.01, GLYPH_Z);
-      glyphs.add(a, c);
+      const back = new THREE.Mesh(arrow, this.amber);
+      back.position.copy(c.position);
+      back.rotation.y = Math.PI;
+      back.visible = false;
+      glyphs.add(a, c, back);
+      crosses.push(c);
+      incoming.push(back);
+      // Along the cabinet top's outer edge.
+      const s = new THREE.Mesh(strip, this.amber);
+      s.position.set(side * (CAB_X + 0.055), GLYPH_Y + 0.006, 0);
+      s.visible = false;
+      gate.add(s);
+      strips.push(s);
     }
     const floor = new THREE.Mesh(arrowGeometry(0.42, 0.62), this.floorGo);
     floor.position.y = 0.03;
     floor.renderOrder = 2;
     glyphs.add(floor);
+    // The incoming way on the floor: a slim amber arrow beside the green one, pointing back.
+    for (const side of [-1, 1]) {
+      const back = new THREE.Mesh(arrowGeometry(0.14, 0.4), this.floorAmber);
+      back.rotation.y = Math.PI;
+      back.position.set(side * 0.2, 0.032, 0.02);
+      back.renderOrder = 3;
+      back.visible = false;
+      glyphs.add(back);
+      incoming.push(back);
+    }
     gate.add(glyphs);
     this.group.add(gate);
-    return { at, index, glyphs, flaps };
+    return { at, index, glyphs, crosses, incoming, strips, flaps };
   }
 
   /** Open doorways in the badge line: floor between two walls in a turnstile's row, not a turnstile. */
@@ -238,7 +287,10 @@ export class ReorgGates implements GatesLook {
     const turnstiles = state.settings.turnstiles;
     const before = gatesFor(this.map, turnstiles, clock.from);
     const after = gatesFor(this.map, turnstiles, clock.to);
-    const showNext = gateShowsNext(clock, animate);
+    const showNext = gateShowsNext(clock);
+    const amber = gateIncoming(clock, animate);
+    this.amber.opacity = amber;
+    this.floorAmber.opacity = 0.9 * amber;
     const swing = flapSwing(clock, animate);
     for (const look of this.gates) {
       const from = before[look.index]?.dir ?? { x: 0, y: 1 };
@@ -247,6 +299,11 @@ export class ReorgGates implements GatesLook {
       // Along the passage: +1 the gate's local +z.
       const way = (d: GridPoint): number => (d.y !== 0 ? Math.sign(d.y) : Math.sign(d.x));
       look.glyphs.rotation.y = way(shown) > 0 ? 0 : Math.PI;
+      // Through the warning the live way stays green; the coming way flashes amber.
+      const flips = amber > 0 && way(from) !== way(to);
+      for (const m of look.incoming) m.visible = flips;
+      for (const m of look.strips) m.visible = flips;
+      for (const m of look.crosses) m.visible = !flips;
       // The flaps swing open the way through, through shut, as the way flips.
       const s = way(from) + (way(to) - way(from)) * swing;
       look.flaps[0].rotation.y = (-Math.PI / 2) * s;
