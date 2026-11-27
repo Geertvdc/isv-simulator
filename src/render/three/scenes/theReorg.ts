@@ -16,6 +16,10 @@ import {
   towerFacade,
 } from '../setDressing/backToBack';
 import { pigeon } from '../setDressing/businessPark';
+import { segfaultCat } from '../setDressing/onCall';
+import { MATRIX_BED_Y } from '../setDressing/reorgWallTops';
+import { reorgRoom } from '../rooms/reorgRoom';
+import { WALL_HEIGHT } from '../layout';
 import type { SetPiece } from '../setDressing/shared';
 import {
   CONDENSER_TOP,
@@ -44,8 +48,8 @@ import {
   coffeeTrolley,
   crateStack,
   danglingO,
-  darkWindows,
   deadPlant,
+  forLease,
   DOLLY_TOP,
   FLOOR,
   fullStop,
@@ -55,18 +59,22 @@ import {
   laptopCrate,
   lorryLight,
   monoVan,
+  monoWindows,
   moveSign,
   moveStickers,
   newSign,
   OLD_PX,
   oldLogo,
   palletTruck,
+  panelCarry,
   panelGraveyard,
   partitionTrolley,
   prodDolly,
   removalLorry,
   roofCrates,
+  roofHatch,
   rollCage,
+  SIGN,
   stepladder,
   STOP,
   tinyCrowd,
@@ -133,17 +141,26 @@ const PLAZA_L = 5.8;
 const STAGING = { depth: 3.2, wall: 2.35 } as const;
 /** A setback roof sits this far under the level's floor (a storey down). */
 export const SETBACK = 0.95;
-/** MONOLITH's tower: width, depth, its top (over the slab's foot) and its front. */
-const MONO = { w: 3.9, d: 2.4, top: -1.3, front: -6.3 } as const;
-/** MONOLITH's crown sign's pixel. */
+/** MONOLITH's tower across the river: width, depth, its top (over the slab's foot) and its front. */
+export const MONO = { w: 3.1, d: 2.0, top: -2.3, front: -8.2 } as const;
+/** MONOLITH's crown sign's pixel, and its FOR LEASE banner's. */
 export const MONO_PX = 0.07;
+export const LEASE_PX = 0.07;
+/**
+ * Where MONOLITH's crown starts on screen at 1440×810: right of the staging
+ * area, its whole crown in the frame (its foot, further down, leans in
+ * behind the room's corner).
+ */
+export const MONO_LEFT = 1294;
 const RIVER = { near: -2.5, far: -5.8 } as const;
 /** How far the scene's people fade toward grey: well past the default, so none reads as a player. */
 const PERSON_GREY = 0.5;
 /** MONOLITH's helicopter, bigger than life so it reads across the river. */
 const HELI = 1.7;
-/** The removal lorries far below, bigger than the city's cars so they read. */
-const LORRY = 0.8;
+/** MONOLITH's staff on its forecourt, bigger than the city's people so their boxes read. */
+const CROWD = 1.4;
+/** The removal lorries far below, bigger than the city's cars so they (and SWIFT MOVES) read. */
+export const LORRY = 1.3;
 const VIEW = { width: 1440, height: 810 };
 /** Screen rectangles the HUD covers at 1440×810: story props stay out of them. */
 const HUD: readonly (readonly [number, number, number, number])[] = [
@@ -165,9 +182,17 @@ const ALIVE: ReadonlyMap<SetPiece, AliveKind> = new Map<SetPiece, AliveKind>([
   [pigeon, 'peck'],
   [riverBoat, 'bob'],
   [condenserFan, 'spin'],
+  [fullStop, 'pace'],
+  [partitionTrolley, 'pace'],
 ]);
 /** Someone carrying something holds it this far out and this high. */
 const CARRY = { reach: 0.3 } as const;
+/**
+ * Where the manager stands (the map's `M`): nobody in the staging area
+ * stands within this far of it along x, or their head reads as a second
+ * Derek over his.
+ */
+export const MANAGER_CLEAR = 1.5;
 /** How far a pushing man stands behind the handle he holds (the `mowing` pose's grip). */
 const PUSH_REACH = 0.27;
 
@@ -360,8 +385,21 @@ export function theReorgScene(map: LevelMap): Scene {
     if (x1 - x0 > 0.01 && z1 - z0 > 0.01)
       ground.push({ kind, x0, x1, z0, z1, ...(y !== 0 ? { y } : {}) });
   };
-  const person = (x: number, z: number, yaw: number, p: ScenePerson['pose'], lift = FLOOR) =>
-    people.push({ at: gridToWorld(x, z, GROUND + lift), yaw, pose: p, grey: PERSON_GREY });
+  const person = (
+    x: number,
+    z: number,
+    yaw: number,
+    p: ScenePerson['pose'],
+    pace = false,
+    lift = FLOOR,
+  ) =>
+    people.push({
+      at: gridToWorld(x, z, GROUND + lift),
+      yaw,
+      pose: p,
+      grey: PERSON_GREY,
+      ...(pace ? { pace } : {}),
+    });
   const c = CITY;
 
   const topZ = -28;
@@ -390,18 +428,23 @@ export function theReorgScene(map: LevelMap): Scene {
   }
 
   // ---- MONOLITH across the river on the right, melting down ----
-  // Its left edge just right of the staging area on screen, so its crown and the broken sign
-  // show in the strip between the staging area and the frame's edge, under the mute button.
-  const monoX = xAt(1262, MONO.front, MONO.top) + MONO.w / 2;
+  // Well back across the river, its crown's left edge right of the staging area on screen and
+  // under the mute button's row, so it reads as the rival across the water, not next door.
+  const monoX = xAt(MONO_LEFT, MONO.front, MONO.top + 0.1) + MONO.w / 2;
   {
     const { w, d, front, top } = MONO;
     const h = top - DEEP;
+    const q = 0.3 * c;
+    // Its forecourt down to the far street, where its staff stand with their desk boxes.
+    patch('plaza', monoX - w / 2 - 0.4, monoX + w / 2 + 0.4, front, RIVER.far - q - st);
     put(monolithHQ(w, d, h), monoX, front, 0, 0, 'far', DEEP);
-    // Half its windows dark, whole floors and bays at a time.
-    put(darkWindows(w, d, h), monoX, front, 0, 0, 'far', DEEP);
+    // A new skin: 60% of its windows lit cool grey, 40% dark, whole floors and bays at a time.
+    put(monoWindows(w, d, h), monoX, front, 0, 0, 'far', DEEP);
+    // FOR LEASE hung off the front under the crown, on the right.
+    put(forLease(LEASE_PX), monoX + 0.25, front + 0.03, 0, 0, 'far', top - 0.62);
     // The crown sign, the O and the L gone, the O hanging off by one corner, still lit.
     const px = MONO_PX;
-    const lx = monoX - w / 2 + 1.75;
+    const lx = monoX - px;
     put(brokenLogo(px), lx, front + 0.03, 0, 0, 'far', top - 0.25);
     hot();
     const k = BROKEN[0];
@@ -416,13 +459,13 @@ export function theReorgScene(map: LevelMap): Scene {
     );
     hot();
     live('sway');
-    // One beacon left on the roof.
-    put(beacon, monoX + w / 2 - 0.25, front - d + 0.3, 0, 0, 'far', top + 0.18);
+    // One beacon left on the roof, at its back left (clear of the mute button).
+    put(beacon, monoX - w / 2 + 0.3, front - d + 0.3, 0, 0, 'far', top + 0.18);
     hot();
     // Its helicopter leaving: lifted off the helipad, rotor turning, heading away.
-    const hx = monoX - w * 0.1;
+    const hx = monoX - w * 0.42;
     const hz = front - d * 0.7;
-    const hy = top + 1.0;
+    const hy = top + 0.4;
     put(helicopter, hx, hz, 2.6, 0, 'far', hy, HELI);
     put(
       rotor,
@@ -434,15 +477,10 @@ export function theReorgScene(map: LevelMap): Scene {
       hy + HELI_MAST * HELI,
       HELI,
     );
-    // Its staff on the far quay with their desk boxes, its removal van beside them.
-    const qz = RIVER.far - 0.09;
-    // On screen the tower's foot is behind the room, so its staff show where they're walking
-    // out: on the quay past its right-hand corner, and streaming over the bridge with their
-    // boxes; the van waits on the far street past the corner.
-    const right = monoX + w / 2;
-    put(tinyCrowd(14, 1.4, 0), right + 0.9, qz, 0, 0, 'far', DEEP + 0.03, 1);
+    // Its staff out on the forecourt with their desk boxes, its removal van on the street.
+    put(tinyCrowd(20, 1.9, 0), monoX + 0.45, front + 0.75, 0, 0, 'far', DEEP + 0.03, CROWD);
     live('bob');
-    put(monoVan, right + 2.1, RIVER.far - 0.3 * c - st / 2, 0, 0, 'far', DEEP, 0.9);
+    put(monoVan, monoX + w * 0.3, RIVER.far - q - st / 2, 0, 0, 'far', DEEP, 0.9);
     for (const [k, t] of [0.2, 0.5, 0.8].entries()) {
       put(
         tinyCrowd(5, 0.5, 2 + k),
@@ -562,24 +600,30 @@ export function theReorgScene(map: LevelMap): Scene {
 
   // ---- Far below on the left: the removal lorries at the tower's foot, unloading partitions ----
   {
-    // On the plaza along the street, nose toward the river, beside the tower's foot.
-    for (const [k, z] of [RIVER.near + 1.0, RIVER.near + 3.0].entries()) {
-      const lx = xAt(62 - k * 18, z, DEEP);
-      put(removalLorry, lx, z, Math.PI / 2, k, 'far', DEEP + 0.02, LORRY);
-      put(lorryLight, lx, z, Math.PI / 2, 0, 'far', DEEP + 0.02, LORRY);
-      hot();
-      put(tinyCrowd(k === 0 ? 4 : 3, 0.5, 1), lx + 0.42, z + 0.42, 0, 0, 'far', DEEP + 0.02, 1);
-    }
+    // On the plaza in the strip left of the tower's foot, side on to us so SWIFT MOVES reads,
+    // its back to the tower and the tail lift down; two men walk a panel off it, toward the
+    // doors; YOTTA's own lorry waits up the street behind it, toward the river.
+    const lz = RIVER.near + 1.9;
+    const lx = xAt(50, lz, DEEP);
+    put(removalLorry, lx, lz, 0, 0, 'far', DEEP + 0.02, LORRY);
+    put(lorryLight, lx, lz, 0, 0, 'far', DEEP + 0.02, LORRY);
+    hot();
+    put(panelCarry, lx + 0.7 * LORRY, lz + 0.5, 0.3, 0, 'far', DEEP + 0.02, LORRY);
+    const bz = RIVER.near + 0.55;
+    const bx = xAt(-30, bz, DEEP);
+    put(removalLorry, bx, bz, 0, 1, 'far', DEEP + 0.02, LORRY);
+    put(lorryLight, bx, bz, 0, 0, 'far', DEEP + 0.02, LORRY);
+    hot();
     // More panels stacked on the plaza, waiting for the lift.
     put(
       panelGraveyard(2),
-      xAt(140, RIVER.near + 2.0, DEEP),
-      RIVER.near + 2.0,
+      xAt(215, RIVER.near + 1.2, DEEP),
+      RIVER.near + 1.2,
       0.1,
       0,
       'far',
       DEEP + 0.02,
-      0.35,
+      0.5,
     );
   }
 
@@ -629,31 +673,33 @@ export function theReorgScene(map: LevelMap): Scene {
     /** Everything on a roof: low, and out from under the HUD. */
     const on = (piece: SetPiece, x: number, z: number, rr: number, high: number, yaw = 0, v = 0) =>
       putClear(piece, x, z, rr, high, yaw, v, roof, 1, rr);
-    // The partition graveyard along the inner half, its stacks lying flat in film.
-    on(panelGraveyard(2), ix(1.05), z0 + 1.05, 0.85, 0.32, side * 0.08);
-    // Crates dumped at the back by the floor's edge, a dead pot plant, a stray panel trolley.
-    on(roofCrates, ix(0.75), z0 + 0.34, 0.65, 0.62, side * -0.1);
-    on(deadPlant, ix(0.38), z1 - 0.35, 0.22, 0.55, 0.4);
-    on(crateStack, ix(1.95), z1 - 0.4, 0.34, 0.31, side * 0.3, 0);
+    // The inner half (beside the lobby, the one the HUD leaves free on the left): the partition
+    // graveyard lying flat in film, crates dumped at the back (kept off the pipeline's corner), a
+    // roof hatch propped open, a dead pot plant and a crate in front, pigeons between them.
+    on(panelGraveyard(2), ix(1.05), z0 + 1.15, 0.85, 0.32, side * 0.08);
+    on(roofCrates, ix(1.25), z0 + 0.32, 0.65, 0.62, side * -0.1);
+    on(roofHatch, ix(0.75), z1 - 0.42, 0.3, 0.45, side * 0.15);
+    on(deadPlant, ix(1.55), z1 - 0.32, 0.22, 0.55, 0.4);
+    on(crateStack, ix(2.05), z1 - 0.55, 0.34, 0.31, side * 0.3, 0);
     // The good carpet, pulled up off the floor in strips and rolled.
     on(carpetRolls, ox(1.55), z0 + 1.55, 0.6, 0.3, side * 0.25);
     // The working roof out toward the outer edge: two condensers with their fans, a skylight,
-    // a dish, pigeons where they're a tile from the room.
+    // a dish.
     for (const [k2, cz] of [z0 + 0.45, z0 + 1.1].entries()) {
       if (on(condenser, ox(0.5), cz, 0.3, CONDENSER_TOP + 0.05, side * (Math.PI / 2)))
         put(condenserFan, ox(0.5), cz, k2 * 0.7, 0, 'near', roof + CONDENSER_TOP);
     }
     on(skylight, ox(1.35), z1 - 0.55, 0.42, 0.3);
     on(satelliteDish, ox(0.55), z1 - 0.5, 0.22, 0.45, side * 0.6);
+    // Pigeons where they're a tile from the room.
     const birds: [number, number][] = [
-      [1.0, z1 - 0.95],
-      [1.65, z1 - 1.25],
-      [2.3, z1 - 0.3],
+      [ix(1.3), z1 - 0.95],
+      [ix(2.2), z0 + 1.5],
+      [ix(1.2), z1 - 0.2],
+      [ox(1.0), z1 - 0.95],
     ];
-    for (const [j, [px, pz]] of birds.entries()) {
-      const x = ox(px);
+    for (const [j, [x, pz]] of birds.entries())
       if (clearOfRoom(x, pz)) on(pigeon, x, pz, 0.12, 0.2, side * (0.8 - j), k + j);
-    }
   }
 
   // ---- The staging area behind the back wall ----
@@ -664,10 +710,11 @@ export function theReorgScene(map: LevelMap): Scene {
     const cx = (rx0 + rx1) / 2;
     // The old logo on the wall, just right of the order cards.
     const logoW = 19 * OLD_PX;
-    const logoY = 1.12;
+    const logoY = 0.95;
     const oldX = xAt(752, zWall, FLOOR + logoY) + logoW / 2;
+    const left = oldX - logoW / 2;
     // The gantry right of it, the full stop's carriers right of that, Prod at the end.
-    const gx = oldX + logoW / 2 + 0.55 + GANTRY.span / 2;
+    const gx = oldX + logoW / 2 + 0.75 + GANTRY.span / 2;
     const gz = zWall + 0.75;
     put(receptionFloor(rx1 - rx0, rec.z1 - rec.z0), cx, (rec.z0 + rec.z1) / 2, 0, 0, 'far');
     put(
@@ -685,25 +732,28 @@ export function theReorgScene(map: LevelMap): Scene {
     put(curtainReturn(rec.z1 - rec.z0, STAGING.wall), rx0 + 0.04, rec.z0, 0, 0, 'far', FLOOR);
     put(curtainReturn(rec.z1 - rec.z0, STAGING.wall), rx1 - 0.04, rec.z1, Math.PI, 0, 'far', FLOOR);
 
-    // The old YOTTA coming off: the O hanging by its last screw, the Y down in bubble wrap,
-    // the stepladder under them.
+    // The old YOTTA coming off: the O hanging by its last screw over its ghost, the Y down in
+    // bubble wrap under its own ghost, the stepladder under the O.
     put(oldLogo, oldX, zWall + 0.02, 0, 0, 'near', FLOOR + logoY);
     const screwX = oldX + (7 - 19 / 2) * OLD_PX;
     put(hangingO, screwX, zWall + 0.04, 0, 0, 'near', FLOOR + logoY + 5 * OLD_PX);
-    put(stepladder, oldX - 0.55, zWall + 0.55, 0.2, 0, 'near', FLOOR);
-    put(wrappedY, oldX - logoW / 2 - 0.15, zWall + 0.75, 0.3, 0, 'near', FLOOR);
+    put(stepladder, left + 5.6 * OLD_PX, zWall + 0.55, 0.2, 0, 'near', FLOOR);
+    put(wrappedY, left + 1.4 * OLD_PX, zWall + 0.62, 0.2, 0, 'near', FLOOR);
 
     // The gantry and the new lit sign on its hook, swinging a little.
     put(gantry, gx, gz, 0, 0, 'near', FLOOR);
     put(newSign, gx, gz, 0, 0, 'near', FLOOR + GANTRY.beam - GANTRY.hook);
     hot();
 
-    // The full stop, carried in separately between two removal men, like a precious object.
-    const fx = gx + GANTRY.span / 2 + 0.95;
-    const fz = zWall + 1.25;
-    const hold = STOP.r - 0.05 + CARRY.reach;
-    person(fx - hold, fz, Math.PI / 2, 'carrying');
-    person(fx + hold, fz, -Math.PI / 2, 'carrying');
+    // The full stop, carried in on its own between two removal men like a precious object,
+    // shuffling it into place: just right of the `a` and a little under where the dot belongs.
+    const step = SIGN.w / 5.4;
+    const dotX = gx - SIGN.w / 2 + step * 5.25;
+    const fx = dotX + 0.4;
+    const fz = gz + 0.4;
+    const hold = STOP.r + STOP.rim / 2 - 0.04 + CARRY.reach;
+    person(fx - hold, fz, Math.PI / 2, 'carrying', true);
+    person(fx + hold, fz, -Math.PI / 2, 'carrying', true);
     put(fullStop, fx, fz, 0, 0, 'near', FLOOR);
     hot();
 
@@ -716,25 +766,16 @@ export function theReorgScene(map: LevelMap): Scene {
     // The pallet truck in front of Prod, a wrapped pallet of boxes on it.
     putClear(palletTruck, prodX - 0.25, zWall + 1.75, 0.7, 0.95, -0.15, 0, FLOOR, 1, 0.4);
 
-    // A consultant on the phone under the sign, directing the hoist.
-    person(gx + 0.7, zWall + 1.9, 0.4, 'phoning');
+    // Under the gantry's left leg, in front: a removal man pushing a trolley of partitions in
+    // to the right, shuffling it back and forth to line it up.
+    const tz = zWall + 1.6;
+    const pushX = gx - GANTRY.span / 2 + 0.05;
+    put(partitionTrolley, pushX + PUSH_REACH - TROLLEY_HANDLE_X, tz, 0, 0, 'near', FLOOR);
+    person(pushX, tz, Math.PI / 2, 'mowing', true);
 
-    // Between the old logo and the gantry, in front: a removal man pushing a trolley of
-    // partitions off to the left.
-    const tz = zWall + 1.5;
-    const tx = gx - GANTRY.span / 2 + 0.35;
-    put(partitionTrolley, tx, tz, Math.PI, 0, 'near', FLOOR);
-    // The trolley's handle at its −x end: turned round, that end is at +x.
-    person(tx - TROLLEY_HANDLE_X + PUSH_REACH, tz, -Math.PI / 2, 'mowing');
-
-    // Left of the old logo, just right of the order cards: the MOVE 3 OF 3 stand, a
-    // consultant presenting to it with a clicker, the laptop on a crate, the coffee trolley
-    // with a consultant sipping.
-    const mx = oldX - logoW / 2 - 0.2;
-    putClear(moveSign, mx + 0.95, zWall + 1.35, 0.42, 1.55, -0.25, 0, FLOOR, 1, 0.2);
-    person(mx + 1.6, zWall + 1.55, -Math.PI / 2 - 0.4, 'chatting');
-    putClear(laptopCrate, mx + 1.95, zWall + 1.15, 0.32, 0.55, -0.3, 0, FLOOR);
-    const ct = gx + GANTRY.span / 2 - 0.2;
+    // Between the old logo and the gantry, at the back: the coffee trolley, a consultant
+    // sipping in front of it.
+    const ct = oldX + logoW / 2 + 0.25;
     if (putClear(coffeeTrolley, ct, zWall + 0.45, 0.4, 1.2, 0, 0, FLOOR)) {
       put(
         urnSteam,
@@ -745,7 +786,31 @@ export function theReorgScene(map: LevelMap): Scene {
         'near',
         FLOOR + COFFEE_STEAM[1],
       );
-      person(ct - 0.15, zWall + 1.15, Math.PI - 0.3, 'sipping');
+      person(ct - 0.35, zWall + 1.05, Math.PI - 0.5, 'sipping');
+    }
+
+    // In front of the old logo: the MOVE 3 OF 3 stand, a consultant presenting to it with a
+    // clicker, the laptop on a crate; a consultant on the phone at the left end, by the cage.
+    const mx = left - 0.2;
+    putClear(moveSign, mx + 1.0, zWall + 1.4, 0.42, 1.55, -0.25, 0, FLOOR, 1, 0.2);
+    person(mx + 1.65, zWall + 1.6, -Math.PI / 2 - 0.4, 'chatting');
+    putClear(laptopCrate, mx + 2.05, zWall + 1.2, 0.32, 0.55, -0.3, 0, FLOOR);
+    person(left + 0.1, zWall + 2.0, 0.5, 'phoning');
+
+    // Segfault, asleep in the MATRIX box on the back wall's top (the Room's box).
+    const cat = reorgRoom(map).segfault;
+    if (cat) {
+      const i = n++;
+      pieces.push({
+        piece: segfaultCat,
+        variant: 0,
+        at: gridToWorld(cat.x, cat.y, WALL_HEIGHT + 0.004 + MATRIX_BED_Y),
+        yaw: cat.yaw + 0.3,
+        scale: [0.92, 0.92, 0.92],
+        tint: [0.98 + unit(i, 1, 3) * 0.02, 0.98, 0.98],
+        row: 'near',
+        alive: 'purr',
+      });
     }
 
     // The left half, under the order cards on screen, stays low and as far back as it can

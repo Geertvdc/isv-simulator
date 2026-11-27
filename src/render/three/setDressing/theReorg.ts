@@ -79,7 +79,7 @@ function mix(a: number, c: number, t: number): number {
 // ---- Lettering (the same blocky alphabet as 4-1's and 4-2's signs) ----
 
 const FONT: Readonly<Record<string, string>> = {
-  A: '010101111101101',
+  A: '111101111101101',
   D: '110101101101110',
   E: '111100110100111',
   F: '111100110100100',
@@ -170,17 +170,18 @@ const STEEL_DARK = 0x4c5258;
 const RUBBER = 0x24262a;
 const CARDBOARD = 0xb08c5e;
 const WRAP = 0xdfe6ea;
-/** The old logo's brushed steel. */
-const LETTER_FACE = 0xc6ccd2;
-const LETTER_RETURN = 0x7c838a;
+/** The old logo's brushed steel, over a dark return so each letter stands off the slats. */
+const LETTER_FACE = 0xd2d8de;
+const LETTER_RETURN = 0x5c636a;
+/** Where a letter came off: the slats behind it cleaner and paler, so its shape still reads. */
+const GHOST = 0xc4beb2;
 /** Plain colors for the far-off tiny people: greyed shirts and skins. */
 const SHIRTS = [0x7a8ca0, 0xb0a898, 0x6a6e78, 0xa07a6a, 0x8a9a7a, 0xc8c4bc] as const;
 const SKINS = [0xc8a890, 0xa08070, 0x8a6a5a] as const;
 /** MONOLITH's black. */
 const MONO_BLACK = 0x15171c;
+/** MONOLITH's crown letters, what's left of them: still bright, so the gaps read. */
 const MONO_WHITE = 0xe8eef8;
-/** MONOLITH's sign, failing: a tired grey-white, well under `yotta`'s. */
-const FAILING = 0x9aa2b0;
 
 // ---- Castors, the kit's common foot ----
 
@@ -435,8 +436,10 @@ export const wardrobeBoxes = looks([1.1, 0.55], 1, (b) => {
 
 // ---- The logo swap ----
 
-/** The old logo's pixel. */
-export const OLD_PX = 0.12;
+/** The old logo's pixel: big enough that Y-O-T-T-A reads from across the room. */
+export const OLD_PX = 0.156;
+/** How much bigger the old logo's pieces are than the 0.12 pixel they were drawn round. */
+const OLD_K = OLD_PX / 0.12;
 
 /**
  * The old steel `YOTTA` coming off the wall, `px` a pixel, centred on x = 0
@@ -451,8 +454,8 @@ export const oldLogo = looks([textWidth('YOTTA') * OLD_PX, 0.1], 1, (b) => {
   glyphs('YOTTA', (u, r, w, k) => {
     const at: V3 = [u * px, cy + (2 - r) * px, 0.04];
     if (k < 2) {
-      // The ghost where it stood: cleaner stone, a hair proud.
-      flat(b, w * px, px, 0.004, 0x7a787c, [at[0], at[1], 0.002]);
+      // The ghost where it stood: cleaner and paler than the slats round it, a hair proud.
+      flat(b, w * px, px, 0.004, GHOST, [at[0], at[1], 0.054]);
       return;
     }
     const skew = k === 2 ? 0.05 : 0;
@@ -474,7 +477,7 @@ export const oldLogo = looks([textWidth('YOTTA') * OLD_PX, 0.1], 1, (b) => {
       0.012,
       0.01,
       0x2a2a2e,
-      { at: [left + x * px, y * px, 0.006], rot: [Math.PI / 2, 0, 0] },
+      { at: [left + x * px, y * px, 0.058], rot: [Math.PI / 2, 0, 0] },
       6,
     );
 });
@@ -500,7 +503,7 @@ export const hangingO = looks([0.4, 0.1], 1, (b) => {
   b.cylinder(0.016, 0.016, 0.1, 0x5a5c60, { at: [0, 0, 0.05], rot: [Math.PI / 2, 0, 0] }, 6);
 });
 
-/** The old Y on the floor, leaning back on a crate, wrapped in bubble wrap and taped; 0.7 high. */
+/** The old Y on the floor, leaning back on a crate, wrapped in bubble wrap and taped; 0.9 high. */
 export const wrappedY = looks([0.6, 0.5], 1, (b) => {
   const px = OLD_PX;
   const lean = -0.35;
@@ -518,14 +521,16 @@ export const wrappedY = looks([0.6, 0.5], 1, (b) => {
       [lean, 0, 0],
     );
   });
-  // The wrap round it, puffy and pale, the tape.
-  b.add(
-    new THREE.BoxGeometry(0.46, 0.66, 0.16),
-    WRAP,
-    { at: [0, 0.32, -0.08], rot: [lean, 0, 0] },
-    'glass',
-  );
-  flat(b, 0.48, 0.05, 0.17, TAPE, [0, 0.3, -0.08], [lean, 0, 0]);
+  // Two bands of bubble wrap round it, puffy and pale, taped; the letter's face shows between.
+  const k = OLD_K;
+  for (const y of [0.2, 0.5])
+    b.add(
+      new THREE.BoxGeometry(0.5 * k, 0.11 * k, 0.15),
+      WRAP,
+      { at: [0, y * k * Math.cos(lean), 0.02 - y * k * Math.sin(lean) - 0.02], rot: [lean, 0, 0] },
+      'glass',
+    );
+  flat(b, 0.06, 0.13 * k, 0.16, TAPE, [0.12 * k, 0.2 * k * Math.cos(lean), 0.02], [lean, 0, 0]);
   // The crate it leans on.
   b.box(0.6, 0.26, 0.4, CRATE, { at: [0, 0.13, -0.38] }, 0.02);
   flat(b, 0.62, 0.03, 0.42, CRATE_LID, [0, 0.275, -0.38]);
@@ -670,35 +675,64 @@ export const newSign = looks([SIGN.w + 0.6, 0.2], 1, (b) => {
 });
 
 /**
- * The full stop, carried in on its own: a big lit violet dot in a white
- * frame, cardboard corners taped on, a "FRAGILE" strap; its centre
- * `STOP.y` above its foot (where two men's hands hold it at chest height).
- * Hot.
+ * The full stop, carried in on its own: the sign's missing dot, lit like
+ * its letters (a pale white-violet disc, a white core, a violet halo ring)
+ * on a dark back plate, tilted back so it faces the camera (`STOP.tilt` about x) and
+ * centred `STOP.y` over its foot (where two men hold it at chest height by
+ * its rim). Cardboard corners taped on, its power lead dangling with the
+ * plug, a cardboard FRAGILE tag on a string. Hot.
  */
-export const STOP = { r: 0.32, y: 0.56 } as const;
-export const fullStop = looks([0.6, 0.2], 1, (b) => {
-  const { r, y } = STOP;
-  b.cylinder(r + 0.04, r + 0.04, 0.12, 0xe8e6e2, { at: [0, y, 0], rot: [Math.PI / 2, 0, 0] }, 28);
-  for (const z of [-0.065, 0.065])
-    b.add(
-      new THREE.CircleGeometry(r, 28),
-      VIOLET,
-      { at: [0, y, z], rot: [0, z < 0 ? Math.PI : 0, 0] },
-      'glow',
+export const STOP = { r: 0.28, rim: 0.12, y: 0.6, tilt: -0.9 } as const;
+export const fullStop = looks([0.7, 0.3], 1, (b) => {
+  const { r, rim, y, tilt } = STOP;
+  const face = new THREE.Matrix4()
+    .makeTranslation(0, y, 0)
+    .multiply(new THREE.Matrix4().makeRotationX(tilt));
+  /** `g` placed at (x, y, z) in the dot's own plane (its face toward +z), turned by `rz` in it. */
+  const on = (
+    g: THREE.BufferGeometry,
+    color: number,
+    at: V3,
+    layer: 'body' | 'glow' = 'body',
+    rz = 0,
+  ) => {
+    g.applyMatrix4(
+      new THREE.Matrix4()
+        .multiplyMatrices(face, new THREE.Matrix4().makeTranslation(...at))
+        .multiply(new THREE.Matrix4().makeRotationZ(rz)),
     );
-  b.add(new THREE.CircleGeometry(r * 0.55, 20), NEON, { at: [0, y, 0.067] }, 'glow');
-  // Cardboard corners, the strap.
-  for (const a of [0.5, 2.6, 3.7, 5.8]) {
-    flat(
-      b,
-      0.12,
-      0.12,
-      0.16,
+    b.add(g, color, {}, layer);
+  };
+  const outer = r + rim / 2;
+  // The back plate and the can's edge.
+  on(
+    new THREE.CylinderGeometry(outer + 0.015, outer + 0.015, 0.08, 32).rotateX(Math.PI / 2),
+    tint(VIOLET, -0.55),
+    [0, 0, -0.03],
+  );
+  // The dot itself, lit like the letters' tubes: a violet halo ring round a pale disc, its
+  // white core brightest (a lamp, not a plate: no pale rim round a coloured middle).
+  on(new THREE.TorusGeometry(r, rim / 2, 10, 36), tint(VIOLET, -0.1), [0, 0, 0.0], 'glow');
+  on(new THREE.CircleGeometry(r, 32), NEON, [0, 0, 0.014], 'glow');
+  on(new THREE.CircleGeometry(r * 0.55, 24), NEON_CORE, [0, 0, 0.018], 'glow');
+  // Cardboard corners taped on.
+  for (const a of [0.6, 2.5, 3.8, 5.6])
+    on(
+      new THREE.BoxGeometry(0.1, 0.1, 0.12),
       CARDBOARD,
-      [Math.cos(a) * (r + 0.02), y + Math.sin(a) * (r + 0.02), 0],
-      [0, 0, a],
+      [Math.cos(a) * outer, Math.sin(a) * outer, -0.01],
+      'body',
+      a + Math.PI / 4,
     );
-  }
+  // The power lead out of its foot, the plug swinging under it.
+  bar(b, [0.04, y - outer * 0.75, -0.02], [0.08, 0.12, 0.08], 0.022, RUBBER);
+  b.box(0.05, 0.07, 0.035, 0x2a2c30, { at: [0.08, 0.09, 0.08] }, 0);
+  // The FRAGILE tag on its string, off the lower right ring.
+  const tx = outer * 0.7;
+  const ty = y - outer * 0.55;
+  bar(b, [tx - 0.02, ty + 0.06, 0.06], [tx + 0.04, ty - 0.08, 0.12], 0.008, 0xe8e0c8);
+  flat(b, 0.27, 0.1, 0.01, 0xd8c4a0, [tx + 0.06, ty - 0.13, 0.13]);
+  letters(b, 'FRAGILE', tx + 0.06, ty - 0.13, 0.132, 0.0085, 0xc0302a);
 });
 
 // ---- Prod on its removal dolly ----
@@ -736,39 +770,67 @@ export const moveStickers = looks([0.66, 0.05], 1, (b) => {
 // ---- Far below and across the river ----
 
 /**
- * A removal lorry far below along x (cab at +x): a white box body with a
- * band in `look`'s colors (teal "SWIFT MOVES", or YOTTA's violet), its tail
- * lift down at the back with partition panels on it. About 1.0 long.
+ * A removal lorry far below along x (cab at −x, its back at +x), its long side toward the
+ * camera (+z): a white box body with a big panel in `look`'s colors (teal
+ * with "SWIFT / MOVES" in white, or YOTTA's violet), its back doors open and
+ * the tail lift down at the back with partition panels on it. About 1.9
+ * long and 0.8 high; the beacon is `lorryLight`, at `LORRY_BEACON`.
  */
-export const removalLorry = looks([1.1, 0.36], 2, (b, v) => {
+export const LORRY_BEACON: V3 = [-0.6, 0.62, 0];
+export const removalLorry = looks([1.9, 0.5], 2, (b, v) => {
   const band = v === 0 ? TEAL : VIOLET;
-  b.box(0.72, 0.4, 0.34, 0xe4e2dc, { at: [-0.1, 0.3, 0] }, 0.02);
-  flat(b, 0.72, 0.08, 0.345, band, [-0.1, 0.3, 0]);
-  flat(b, 0.4, 0.04, 0.35, tint(band, 0.2), [-0.1, 0.18, 0]);
-  b.box(0.24, 0.28, 0.32, v === 0 ? 0xe8e6e0 : 0x5a4a8a, { at: [0.38, 0.22, 0] }, 0.03);
-  flat(b, 0.02, 0.12, 0.28, 0x34404e, [0.505, 0.27, 0]);
-  for (const x of [-0.3, 0.1, 0.36])
-    for (const s of [-1, 1])
+  // The chassis, the box body, its side panel and lettering.
+  flat(b, 1.7, 0.06, 0.4, 0x3a3c40, [0.1, 0.12, 0]);
+  b.box(1.22, 0.66, 0.46, 0xe4e2dc, { at: [0.19, 0.48, 0] }, 0.02);
+  flat(b, 1.12, 0.56, 0.006, band, [0.19, 0.48, 0.232]);
+  flat(b, 1.22, 0.04, 0.47, tint(0xe4e2dc, -0.12), [0.19, 0.79, 0]);
+  if (v === 0) {
+    letters(b, 'SWIFT', 0.19, 0.615, 0.234, 0.045, 0xf6f4ee);
+    letters(b, 'MOVES', 0.19, 0.335, 0.234, 0.045, 0xf6f4ee);
+  } else flat(b, 1.12, 0.08, 0.008, 0xf6f4ee, [0.19, 0.48, 0.234]);
+  // The cab: windscreen, side window, a bumper.
+  b.box(0.36, 0.5, 0.44, v === 0 ? 0xe8e6e0 : 0x5a4a8a, { at: [-0.6, 0.37, 0] }, 0.04);
+  flat(b, 0.01, 0.18, 0.36, 0x34404e, [-0.785, 0.5, 0]);
+  flat(b, 0.16, 0.14, 0.006, 0x34404e, [-0.62, 0.5, 0.222]);
+  flat(b, 0.05, 0.06, 0.46, 0x5a5c60, [-0.79, 0.16, 0]);
+  for (const x of [0.62, 0.38, -0.6])
+    for (const sz of [-1, 1])
       b.cylinder(
-        0.055,
-        0.055,
-        0.04,
+        0.085,
+        0.085,
+        0.05,
         RUBBER,
-        { at: [x, 0.055, s * 0.15], rot: [Math.PI / 2, 0, 0] },
-        10,
+        { at: [x, 0.085, sz * 0.2], rot: [Math.PI / 2, 0, 0] },
+        12,
       );
-  // The tail lift down, panels and a crate on it, the doors open.
-  flat(b, 0.24, 0.025, 0.32, STEEL, [-0.58, 0.05, 0]);
-  for (let k = 0; k < 3; k++) flat(b, 0.03, 0.26, 0.28, FRAME, [-0.64 + k * 0.05, 0.19, 0]);
-  for (const s of [-1, 1])
-    flat(b, 0.02, 0.38, 0.16, 0xd8d6d0, [-0.47, 0.3, s * 0.25], [0, s * 1.2, 0]);
-  // The amber beacon on the cab roof (`lorryLight` blinks there).
+  // The back doors swung open, the tail lift down, panels and a crate on it.
+  for (const sz of [-1, 1])
+    flat(b, 0.02, 0.62, 0.22, 0xd8d6d0, [0.86, 0.48, sz * 0.34], [0, -sz * 1.25, 0]);
+  flat(b, 0.32, 0.025, 0.44, STEEL, [0.98, 0.02, 0]);
+  for (let k = 0; k < 3; k++) flat(b, 0.03, 0.4, 0.36, FRAME, [1.04 - k * 0.06, 0.23, -0.02]);
+  b.box(0.16, 0.12, 0.2, CRATE, { at: [0.92, 0.09, 0.12] }, 0.01);
+});
+
+/**
+ * Two tiny removal men far below walking a partition panel down a lorry's
+ * ramp between them, along x; about 0.2 high, like `tinyCrowd`'s people.
+ */
+export const panelCarry = looks([0.6, 0.15], 1, (b) => {
+  for (const [k, x] of [-0.22, 0.22].entries()) {
+    flat(b, 0.05, 0.08, 0.035, 0x3a3c44, [x, 0.04, 0]);
+    b.box(0.065, 0.075, 0.045, 0x3a5a7a, { at: [x, 0.115, 0] }, 0.01);
+    b.sphere(0.026, nth(SKINS, k), { at: [x, 0.175, 0] });
+  }
+  flat(b, 0.36, 0.2, 0.014, FRAME, [0, 0.15, 0.03]);
+  flat(b, 0.3, 0.15, 0.016, FROST, [0, 0.15, 0.03]);
+  flat(b, 0.3, 0.03, 0.018, TEAL, [0, 0.18, 0.03]);
 });
 
 /** The lorry's amber beacon, on the cab roof: blinks; hot. */
 export const lorryLight = looks([0.1, 0.1], 1, (b) => {
-  b.cylinder(0.04, 0.045, 0.03, 0x5a3a10, { at: [0.38, 0.375, 0] }, 8);
-  b.led(0.05, 0xffa020, { at: [0.38, 0.41, 0] });
+  const [x, y, z] = LORRY_BEACON;
+  b.cylinder(0.04, 0.045, 0.03, 0x5a3a10, { at: [x, y + 0.015, z] }, 8);
+  b.led(0.05, 0xffa020, { at: [x, y + 0.05, z] });
 });
 
 /**
@@ -824,29 +886,66 @@ export const monoVan = looks([0.7, 0.3], 1, (b) => {
     ]);
 });
 
+/** MONOLITH's lit windows: cool grey office light in the daytime, and its dark ones. */
+export const MONO_LIT = 0x6c7a8c;
+const MONO_DARK = 0x0c0e12;
+const MONO_SPANDREL = 0x464e58;
+
+/** Whether MONOLITH's window `i` along floor `j` has gone dark: whole floors, and bays of three in clumps; about 40%. */
+export function monoWindowOut(i: number, j: number): boolean {
+  return hash01(j, 1, 421) < 0.16 || hash01(Math.floor(i / 3), j >> 1, 423) < 0.3;
+}
+
 /**
- * MONOLITH's tower going dark: an overlay for `monolithHQ(w, d, h)`'s front
- * (and the side toward the room) that blacks out whole floors and bays of
- * its windows, about half of them, in clumps. Its origin at the tower's
- * front foot, like the tower's.
+ * MONOLITH's tower going dark: a new skin for `monolithHQ(w, d, h)`'s front
+ * and the side toward the room (its origin at the tower's front foot, like
+ * the tower's): charcoal spandrels, and on every floor under the crown a
+ * row of windows, about 60% lit cool grey and 40% dark, whole floors and
+ * bays at a time (`monoWindowOut`).
  */
-export function darkWindows(w: number, d: number, h: number): SetPiece {
-  return once(`darkWindows:${w.toFixed(2)}:${d.toFixed(2)}:${h.toFixed(2)}`, () =>
+export function monoWindows(w: number, d: number, h: number): SetPiece {
+  return once(`monoWindows:${w.toFixed(2)}:${d.toFixed(2)}:${h.toFixed(2)}`, () =>
     looks([w, 0.05], 1, (b) => {
       const row = 0.2;
-      for (let y = h - 0.5, j = 0; y > 0.1; y -= row, j++) {
-        // Whole floors out, and in the rest, bays of four going dark.
-        const floorOut = hash01(j, 1, 421) < 0.3;
-        for (let x = -w / 2 + 0.09, i = 0; x < w / 2 - 0.05; x += 0.14, i++) {
-          const bay = Math.floor(i / 4);
-          const out = floorOut || hash01(bay, j >> 1, 423) < 0.42;
-          if (out) flat(b, 0.1, row * 0.66, 0.006, 0x0c0e12, [x, y, 0.01]);
-        }
-        for (let z = -0.09, i = 0; z > -d + 0.05; z -= 0.14, i++) {
-          const out = floorOut || hash01(Math.floor(i / 4), j >> 1, 425) < 0.42;
-          if (out) flat(b, 0.006, row * 0.66, 0.1, 0x0c0e12, [-w / 2 - 0.01, y, z]);
-        }
+      const top = h - 0.44;
+      flat(b, w - 0.02, top, 0.004, MONO_SPANDREL, [0, top / 2, 0.006]);
+      flat(b, 0.004, top, d - 0.02, MONO_SPANDREL, [-w / 2 - 0.006, top / 2, -d / 2]);
+      const lit = (i: number, j: number) =>
+        mix(MONO_LIT, 0xb8c4d2, 0.35 + hash01(i, j, 427) * 0.4 + (j % 3 === 0 ? 0.1 : 0));
+      for (let y = top - row / 2, j = 0; y > 0.1; y -= row, j++) {
+        for (let x = -w / 2 + 0.09, i = 0; x < w / 2 - 0.05; x += 0.14, i++)
+          flat(b, 0.11, row * 0.7, 0.006, monoWindowOut(i, j) ? MONO_DARK : lit(i, j), [
+            x,
+            y,
+            0.01,
+          ]);
+        for (let z = -0.09, i = 0; z > -d + 0.05; z -= 0.14, i++)
+          flat(b, 0.006, row * 0.7, 0.11, monoWindowOut(i + 40, j) ? MONO_DARK : lit(i + 40, j), [
+            -w / 2 - 0.01,
+            y,
+            z,
+          ]);
       }
+    }),
+  );
+}
+
+/**
+ * The red FOR LEASE banner hung off MONOLITH's front, `px` a letter pixel:
+ * "FOR" over "LEASE" in white on red, a white border, two ropes up to its
+ * top corners. Its origin at the middle of its top edge, face toward +z.
+ */
+export function forLease(px: number): SetPiece {
+  return once(`forLease:${px}`, () =>
+    looks([textWidth('LEASE') * px + 2 * px, 0.04], 1, (b) => {
+      const w = (textWidth('LEASE') + 3) * px;
+      const h = 13 * px;
+      flat(b, w + px * 0.6, h + px * 0.6, 0.008, 0xf2eee6, [0, -h / 2, 0.004]);
+      flat(b, w, h, 0.01, 0xc4362a, [0, -h / 2, 0.006]);
+      letters(b, 'FOR', 0, -px * 3.5, 0.011, px, 0xf8f6f2);
+      letters(b, 'LEASE', 0, -px * 9.5, 0.011, px, 0xf8f6f2);
+      for (const s of [-1, 1])
+        bar(b, [(s * w) / 2, 0, 0.008], [(s * w) / 2 + s * 0.02, px * 2.5, 0.008], 0.012, 0xd8d0c0);
     }),
   );
 }
@@ -865,13 +964,13 @@ export function brokenLogo(px: number): SetPiece {
       glyphs('MONOLITH', (u, r, w, k) => {
         const at: V3 = [px * 3 + u * px, (2 - r) * px, 0.004];
         if ((BROKEN as readonly number[]).includes(k)) return;
-        glowBox(b, w * px, px, 0.004, FAILING, at);
+        glowBox(b, w * px, px, 0.004, MONO_WHITE, at);
       });
       for (const k of BROKEN) {
         const x = px * 3 + (k * 4 + 1.5 - textWidth('MONOLITH') / 2) * px;
         for (const y of [-1.5, 1.5]) flat(b, px * 3, px * 0.3, 0.01, 0x3a3e46, [x, y * px, 0.004]);
       }
-      glowBox(b, px * 2, px * 7, 0.004, FAILING, [px * 3 - tw / 2 - px * 3, 0, 0.002]);
+      glowBox(b, px * 2, px * 7, 0.004, MONO_WHITE, [px * 3 - tw / 2 - px * 3, 0, 0.002]);
     }),
   );
 }
@@ -897,7 +996,7 @@ export function danglingO(px: number): SetPiece {
         const ly = -(r + 0.5) * px;
         b.add(
           new THREE.BoxGeometry(w * px, px, 0.004),
-          FAILING,
+          MONO_WHITE,
           {
             at: [lx * c - ly * s, lx * s + ly * c - drop, 0.004],
             rot: [0, 0, turn],
@@ -964,6 +1063,17 @@ export const deadPlant = looks([0.4, 0.4], 1, (b) => {
     );
   }
   flat(b, 0.12, 0.012, 0.08, 0xa08a5a, [0.2, 0.006, 0.12], [0, 0.6, 0]);
+});
+
+/** A roof access hatch, its lid propped open, a steel ladder's top rails showing; 0.45 high. */
+export const roofHatch = looks([0.6, 0.6], 1, (b) => {
+  b.box(0.56, 0.18, 0.56, 0x8a8e92, { at: [0, 0.09, 0] }, 0.02);
+  flat(b, 0.44, 0.01, 0.44, 0x1c1e22, [0, 0.185, 0]);
+  // The lid swung up and back, a stay holding it.
+  flat(b, 0.52, 0.03, 0.5, 0x9a9ea2, [0, 0.36, -0.36], [-1.1, 0, 0]);
+  bar(b, [0.22, 0.18, 0.12], [0.22, 0.32, -0.25], 0.015, STEEL_DARK);
+  for (const s of [-1, 1]) bar(b, [s * 0.12, 0.05, 0.1], [s * 0.12, 0.42, 0.06], 0.02, 0xc8a040);
+  flat(b, 0.24, 0.02, 0.02, 0xc8a040, [0, 0.42, 0.06]);
 });
 
 /** Removal crates dumped on the roof, low: two side by side, one on top skew; 0.62 high. */

@@ -56,10 +56,13 @@ export type GroundPainter = (b: ModelBuilder, g: GroundPatch, salt: number) => v
  * - `bob`: floats up and down a hair (a bird on a roof, a buoy, a float).
  * - `spin`: turns steadily about its upright axis (a fan in a condenser's
  *   top grille); build it round its hub.
+ * - `pace`: shuffles slowly back and forth along x, a short way (a trolley
+ *   being pushed, a load being carried in); everything that paces on the
+ *   same z moves in step, people with `pace` included (`paceOffset`).
  * Living props stay a tile from the room and keep still on low quality.
  */
 export type AliveKind =
-  'breathe' | 'purr' | 'spray' | 'sway' | 'blink' | 'peck' | 'wisp' | 'bob' | 'spin';
+  'breathe' | 'purr' | 'spray' | 'sway' | 'blink' | 'peck' | 'wisp' | 'bob' | 'spin' | 'pace';
 
 /** One prop in the scene. Near props cast shadows; far ones (the houses, the trees) don't. */
 export interface ScenePiece {
@@ -97,6 +100,8 @@ export interface ScenePerson {
   pose: ScenePose;
   /** How far their colors fade toward grey (default `SCENE_PERSON_GREY` in `Surroundings`, 0.3). */
   grey?: number;
+  /** Shuffles back and forth along x in step with the `pace` props on the same z (still on low quality). */
+  pace?: boolean;
 }
 
 /** A level's hand-built world, as data. */

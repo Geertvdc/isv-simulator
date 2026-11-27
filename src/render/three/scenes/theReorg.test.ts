@@ -5,7 +5,21 @@ import { type LevelMap, getTile, parseLevelMap } from '../../../sim/level';
 import { projectPoint } from '../../projection';
 import { WALL_HEIGHT } from '../layout';
 import { SCENES } from '.';
-import { MONO_PX, SETBACK, reorgPlan, theReorgScene } from './theReorg';
+import {
+  LEASE_PX,
+  LORRY,
+  MANAGER_CLEAR,
+  MONO,
+  MONO_LEFT,
+  MONO_PX,
+  SETBACK,
+  reorgPlan,
+  theReorgScene,
+} from './theReorg';
+import { PACE } from '../surroundings';
+import { segfaultCat } from '../setDressing/onCall';
+import { MATRIX_BED_Y } from '../setDressing/reorgWallTops';
+import { reorgRoom } from '../rooms/reorgRoom';
 import { scenePose } from './downTheHall';
 import { groundModel } from './ground';
 import type { ScenePiece } from './types';
@@ -124,8 +138,9 @@ for (const [phase, map] of Object.entries(MAPS))
         expect(getTile(map, x, map.height - 1)).not.toBe('void');
     });
 
-    it("stands nothing on the level's slab", () => {
+    it("stands nothing on the level's slab (but Segfault, in its box on the wall top)", () => {
       for (const p of scene.pieces) {
+        if (p.piece === segfaultCat) continue;
         const low = worldPoints(p).filter((v) => v.y - GROUND < WALL_HEIGHT + 0.45);
         const hit = low.find((v) => onSlab(map, v.x, v.z));
         expect(hit, `piece at ${p.at.x.toFixed(2)}, ${p.at.z.toFixed(2)}`).toBeUndefined();
@@ -194,30 +209,74 @@ for (const [phase, map] of Object.entries(MAPS))
       }
       const old = one(re.oldLogo);
       for (const s of screen(old)) expect(s.x).toBeGreaterThan(700);
+      // Big enough to read: about 0.16 a pixel, 0.78 high.
+      expect(re.OLD_PX).toBeGreaterThanOrEqual(0.155);
+      const ys = screen(old).map((p) => p.y);
+      expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(28);
       expect(one(re.hangingO).alive).toBe('sway');
       expect(find(re.wrappedY).length).toBe(1);
       expect(find(re.stepladder).length).toBe(1);
     });
 
-    it('carries the full stop in separately, between two removal men at chest height', () => {
+    it("carries the full stop in separately, between two removal men, just right of and under the sign's `a`", () => {
       const dot = one(re.fullStop);
+      const sign = one(re.newSign);
       expect(dot.hot).toBe(true);
+      expect(dot.alive).toBe('pace');
       const carriers = scene.people.filter((p) => p.pose === 'carrying');
       expect(carriers.length).toBe(2);
       const [a, b] = carriers as [(typeof carriers)[0], (typeof carriers)[0]];
       expect((a.at.x + b.at.x) / 2).toBeCloseTo(dot.at.x);
       expect(a.at.z).toBeCloseTo(dot.at.z);
-      // Facing each other.
+      // Shuffling it in, in step with it (the same z).
+      expect(a.pace && b.pace).toBe(true);
+      // Facing each other, their hands on its rim.
       expect(Math.sin(a.yaw) * Math.sign(b.at.x - a.at.x)).toBeGreaterThan(0.9);
       expect(Math.sin(b.yaw) * Math.sign(a.at.x - b.at.x)).toBeGreaterThan(0.9);
+      expect(Math.abs(b.at.x - a.at.x) / 2 - (re.STOP.r + re.STOP.rim / 2)).toBeLessThan(0.35);
+      // Facing the camera: tilted back about 50 degrees.
+      expect(re.STOP.tilt).toBeCloseTo(-0.9, 1);
+      // On screen just right of the sign's letters and a little under their baseline.
+      const s = screen(sign);
+      const signRight = Math.max(...s.map((p) => p.x));
+      const signBottom = Math.max(...s.map((p) => p.y));
+      const c = projectPoint(pose, { x: dot.at.x, y: dot.at.y + re.STOP.y, z: dot.at.z });
+      expect(c.x).toBeGreaterThan(signRight - 40);
+      expect(c.x).toBeLessThan(signRight + 40);
+      expect(c.y).toBeGreaterThan(signBottom - 20);
+      expect(c.y).toBeLessThan(signBottom + 40);
     });
 
-    it('pushes a partition trolley with a man at its handle', () => {
+    it("keeps everyone in the staging area clear of the manager's spot, even while they pace", () => {
+      const m = map.managerSpawns[0];
+      if (!m) throw new Error('no manager');
+      for (const p of scene.people) {
+        const reach = p.pace ? PACE.reach : 0;
+        expect(Math.abs(p.at.x - m.x) - reach, `${p.pose} at ${p.at.x}`).toBeGreaterThanOrEqual(
+          MANAGER_CLEAR,
+        );
+      }
+    });
+
+    it('puts Segfault, purring, in the MATRIX box on the back wall top', () => {
+      const spot = reorgRoom(map).segfault;
+      if (!spot) throw new Error('no box');
+      const cat = one(segfaultCat);
+      expect(cat.alive).toBe('purr');
+      expect(cat.at.x).toBeCloseTo(spot.x);
+      expect(cat.at.z).toBeCloseTo(spot.y);
+      expect(cat.at.y).toBeCloseTo(WALL_HEIGHT + 0.004 + MATRIX_BED_Y);
+      expect(find(segfaultCat).length).toBe(1);
+    });
+
+    it('pushes a partition trolley with a man at its handle, the two shuffling it along together', () => {
       const t = one(re.partitionTrolley);
       const pusher = scene.people.find((p) => p.pose === 'mowing');
       if (!pusher) throw new Error('no pusher');
       expect(pusher.at.z).toBeCloseTo(t.at.z);
-      // The handle (its −x end, turned round) a reach in front of him.
+      expect(t.alive).toBe('pace');
+      expect(pusher.pace).toBe(true);
+      // The handle (its −x end) a reach in front of him.
       const handle = t.at.x + re.TROLLEY_HANDLE_X * Math.cos(t.yaw);
       expect(Math.abs(pusher.at.x - handle)).toBeCloseTo(0.27);
     });
@@ -247,39 +306,112 @@ for (const [phase, map] of Object.entries(MAPS))
         expect(re.spellable(t), t).toBe(true);
     });
 
-    it('melts MONOLITH down across the river: its sign broken and clear of the mute button, windows dark, staff out, a van, the helicopter leaving', () => {
+    it('melts MONOLITH down across the river: its crown right of the staging area, broken, FOR LEASE, windows going dark, staff out, a van, the helicopter leaving', () => {
+      const h = MONO.top + 9.6;
+      const tower = one(bb.monolithHQ(MONO.w, MONO.d, h));
+      // Well back across the river, not next door.
+      expect(tower.at.z).toBeLessThan(-7.5);
+      const top = projectPoint(pose, {
+        x: tower.at.x - MONO.w / 2,
+        y: GROUND + MONO.top,
+        z: tower.at.z,
+      });
+      expect(top.x).toBeGreaterThanOrEqual(MONO_LEFT - 2);
+      const stageRight = Math.max(
+        ...scene.pieces
+          .filter((p) => p.row === 'near' && p.at.z < plan.staging.z1 && p.at.y > GROUND)
+          .flatMap((p) => screen(p).map((s) => s.x)),
+      );
+      expect(top.x).toBeGreaterThan(stageRight);
       const logo = one(re.brokenLogo(MONO_PX));
       expect(logo.hot).toBe(true);
       for (const s of screen(logo)) {
-        expect(s.x).toBeGreaterThan(1250);
+        expect(s.x).toBeGreaterThan(1290);
         expect(s.x).toBeLessThan(1440);
         expect(s.y).toBeGreaterThan(60);
       }
       expect(one(re.danglingO(MONO_PX)).alive).toBe('sway');
-      expect(find(re.darkWindows(3.9, 2.4, -1.3 + 9.6)).length).toBe(1);
-      const crowds = find(re.tinyCrowd(14, 1.4, 0));
-      expect(crowds.length).toBe(1);
+      expect(find(re.monoWindows(MONO.w, MONO.d, h)).length).toBe(1);
+      const lease = one(re.forLease(LEASE_PX));
+      for (const s of screen(lease)) {
+        expect(s.x).toBeGreaterThan(1290);
+        expect(s.x).toBeLessThan(1440);
+      }
+      expect(re.spellable('FOR LEASE')).toBe(true);
+      const crowd = one(re.tinyCrowd(20, 1.9, 0));
+      expect(crowd.scale[0]).toBeCloseTo(1.4);
       expect(find(re.monoVan).length).toBe(1);
       const heli = one(sy.helicopter);
-      const tower = one(bb.monolithHQ(3.9, 2.4, -1.3 + 9.6));
-      expect(heli.at.y).toBeGreaterThan(GROUND - 1.3 + 0.5);
+      expect(heli.at.y).toBeGreaterThan(GROUND + MONO.top + 0.3);
       expect(Math.abs(heli.at.x - tower.at.x)).toBeLessThan(2);
       expect(one(sy.rotor).alive).toBe('spin');
       for (const s of screen(heli)) if (s.y < 60) expect(s.x).toBeLessThan(1370);
     });
 
-    it('unloads removal lorries far below on the left, in view, their beacons blinking', () => {
+    it("darkens about 40% of MONOLITH's windows, in clumps", () => {
+      let out = 0;
+      let all = 0;
+      for (let j = 0; j < 30; j++)
+        for (let i = 0; i < 22; i++) {
+          all++;
+          if (re.monoWindowOut(i, j)) out++;
+        }
+      expect(out / all).toBeGreaterThan(0.32);
+      expect(out / all).toBeLessThan(0.48);
+    });
+
+    it('unloads removal lorries far below on the left, SWIFT MOVES side on in view, their beacons blinking', () => {
       const lorries = find(re.removalLorry);
       expect(lorries.length).toBe(2);
       for (const l of lorries) {
         expect(l.at.y).toBeLessThan(-8);
         expect(l.at.x).toBeLessThan(-2);
-        for (const s of screen(l)) {
-          expect(s.x).toBeGreaterThan(0);
-          expect(s.y).toBeGreaterThan(140);
-        }
+        expect(l.scale[0]).toBeGreaterThanOrEqual(1.3);
+        expect(l.scale[0]).toBeCloseTo(LORRY);
+        for (const s of screen(l)) expect(s.y).toBeGreaterThan(140);
       }
+      const swift = lorries.find((l) => l.variant === 0);
+      if (!swift) throw new Error('no SWIFT MOVES');
+      // Side on to the camera, and nearly all of it in the frame, above the player legend.
+      expect(swift.yaw).toBe(0);
+      const xs = screen(swift).map((s) => s.x);
+      expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(90);
+      expect(Math.min(...xs)).toBeGreaterThan(-10);
+      for (const s of screen(swift)) expect(s.y).toBeLessThan(619);
+      expect(re.spellable('SWIFT MOVES')).toBe(true);
+      expect(find(re.panelCarry).length).toBe(1);
       expect(find(re.lorryLight).every((p) => p.alive === 'blink' && p.hot)).toBe(true);
+    });
+
+    it("keeps the roofs' crates off the pipelines and gives each roof six story props in view", () => {
+      const pipes: { x: number; z: number }[] = [];
+      for (let z = 0; z < map.height; z++)
+        for (let x = 0; x < map.width; x++)
+          if (getTile(map, x, z) === 'pipeline') pipes.push({ x, z });
+      expect(pipes.length).toBe(2);
+      const lift = GROUND + re.FLOOR - SETBACK;
+      for (const c of find(re.roofCrates))
+        for (const pp of pipes) {
+          const dx = Math.max(0, Math.abs(c.at.x - pp.x) - 0.5 - 0.66);
+          const dz = Math.max(0, Math.abs(c.at.z - pp.z) - 0.5 - 0.27);
+          expect(Math.hypot(dx, dz), `crates at ${c.at.x}`).toBeGreaterThanOrEqual(0.4);
+        }
+      const quiet = new Set<unknown>([sy.condenserFan]);
+      for (const r of plan.corners) {
+        const story = scene.pieces.filter(
+          (p) =>
+            Math.abs(p.at.y - lift) < 0.5 &&
+            p.at.x > r.x0 &&
+            p.at.x < r.x1 &&
+            p.at.z > r.z0 &&
+            p.at.z < r.z1 &&
+            !quiet.has(p.piece) &&
+            p.piece !== sy.setbackRoof(r.x1 - r.x0 - 0.04, r.z1 - r.z0 - 0.04) &&
+            Math.min(...screen(p).map((s) => s.x)) >= 230,
+        );
+        expect(story.length).toBeGreaterThanOrEqual(6);
+        expect(story.some((p) => p.piece === re.roofHatch)).toBe(true);
+      }
     });
 
     it('makes each front corner a setback roof a storey down: the partition graveyard, crates, condensers, pigeons', () => {
@@ -306,7 +438,7 @@ for (const [phase, map] of Object.entries(MAPS))
 
     it('gives every living piece a body, a tile from the room, and enough of them', () => {
       const alive = scene.pieces.filter((q) => q.alive);
-      for (const kind of ['spin', 'peck', 'blink', 'sway', 'wisp', 'bob'])
+      for (const kind of ['spin', 'peck', 'blink', 'sway', 'wisp', 'bob', 'pace', 'purr'])
         expect(
           alive.some((p) => p.alive === kind),
           kind,
@@ -315,6 +447,7 @@ for (const [phase, map] of Object.entries(MAPS))
       for (const p of alive) {
         const { body } = p.piece.model(p.variant);
         expect(body.getAttribute('position').count).toBeGreaterThan(0);
+        if (p.piece === segfaultCat) continue;
         expect(aTileFromRoom(map, p.at.x, p.at.z), `alive at ${p.at.x}, ${p.at.z}`).toBe(true);
       }
     });

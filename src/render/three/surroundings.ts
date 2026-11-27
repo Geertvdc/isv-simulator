@@ -77,6 +77,8 @@ interface Extra {
   phase: number;
   /** Walkers pace back and forth along x between these, at `z`. */
   walk?: { from: number; to: number; z: number };
+  /** A scene person who shuffles back and forth round here (`paceOffset`). */
+  pace?: Vec3;
 }
 
 /** `tileHash` stirred, so its low bits don't cycle (a plain `% 4` of it does). */
@@ -367,7 +369,10 @@ export class Surroundings {
     for (const extra of this.extras) {
       const { character } = extra;
       const t = timeMs / 1000 + extra.phase * 10;
-      if (extra.pose === 'walking' && extra.walk) {
+      if (extra.pace) {
+        const at = extra.pace;
+        put(character.root, { x: at.x + paceOffset(at.z, timeMs / 1000), y: at.y, z: at.z });
+      } else if (extra.pose === 'walking' && extra.walk) {
         const { from, to, z } = extra.walk;
         const span = to - from;
         const cycle = (t * WALK_SPEED) % (span * 2);
@@ -444,7 +449,9 @@ export class Surroundings {
     for (const p of scene.pieces) if (p.alive) this.addAlive(p, p.alive, p.hot === true);
     scene.people.forEach((p, i) => {
       // Smaller and greyer than the players, so they read as the neighbourhood, not a fifth player.
-      const { character } = this.addExtra(i, p.at, p.yaw, p.pose);
+      const extra = this.addExtra(i, p.at, p.yaw, p.pose);
+      if (p.pace) extra.pace = { ...p.at };
+      const { character } = extra;
       character.root.scale.setScalar(SCENE_PERSON_SCALE);
       for (const g of character.geometries) desaturate(g, p.grey ?? SCENE_PERSON_GREY);
     });
@@ -481,7 +488,7 @@ export class Surroundings {
     this.root.add(mesh);
     // Tilts (a sway, a peck) turn about the prop's own axes, after its yaw.
     if (!OLD_KINDS.has(kind)) mesh.rotation.order = 'YXZ';
-    this.alive.push({ mesh, kind, yaw: p.yaw, scale: p.scale, y: p.at.y });
+    this.alive.push({ mesh, kind, yaw: p.yaw, scale: p.scale, x: p.at.x, y: p.at.y });
   }
 
   private addProps(placements: readonly (Placement & { hot?: boolean })[]): void {
@@ -585,8 +592,24 @@ interface Alive {
   kind: AliveKind;
   yaw: number;
   scale: [number, number, number];
-  /** Where it stands, so a `bob` floats round it. */
+  /** Where it stands, so a `bob` floats round it and a `pace` shuffles round it. */
+  x: number;
   y: number;
+}
+
+/** How far a `pace` goes each way, and how long one there-and-back takes (seconds). */
+export const PACE = { reach: 0.12, period: 6.5 } as const;
+
+/**
+ * How far along x a pacing prop or person at world `z` is from where it
+ * stands at time `t` (seconds): a slow back and forth with a pause at each
+ * end, the same for everything on that z, so a man and the trolley he
+ * pushes (or two men and what they carry between them) move together.
+ */
+export function paceOffset(z: number, t: number): number {
+  const k = Math.sin(((t / PACE.period) * 2 + ((z * 0.37) % 1)) * Math.PI);
+  // Eased toward the ends, so it lingers there like someone shuffling a load.
+  return PACE.reach * Math.sign(k) * Math.abs(k) ** 0.6;
 }
 
 /** The garage's kinds, which only ever turn about y (kept exactly as they were). */
@@ -659,6 +682,9 @@ function moveLiving(a: Alive, t: number): void {
     case 'spin':
       // About two turns a second, each fan from its own angle.
       m.rotation.y = a.yaw + (t * 2 + own) * Math.PI * 2;
+      return;
+    case 'pace':
+      m.position.x = a.x + paceOffset(p.z, t);
       return;
   }
 }
