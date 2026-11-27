@@ -3,7 +3,15 @@ import { REORG_WARNING_TICKS, TICKS_PER_SECOND } from '../../../sim/balance';
 import { THE_REORG } from '../../../sim/levels';
 import { type ReorgStep, layoutOf } from '../../../sim/reorgs';
 import { type ReorgClock, reorgClock } from '../boardroom/motion';
-import { allLeaves, doorSpots, partitionLayout, rollingDesks, transition } from './layouts';
+import {
+  allLeaves,
+  doorSpots,
+  headerSigns,
+  parkedStacks,
+  partitionLayout,
+  rollingDesks,
+  transition,
+} from './layouts';
 import motionSource from './motion.ts?raw';
 import layoutsSource from './layouts.ts?raw';
 import {
@@ -12,6 +20,7 @@ import {
   deskPose,
   doorRise,
   flapSwing,
+  gateIncoming,
   gateShowsNext,
   leafPose,
   leafWhole,
@@ -81,6 +90,39 @@ describe('the reorg partitions', () => {
       (l) => l.axis === 'y' && l.y <= 2 && l.x > 8 && l.x < 13,
     );
     expect(cross).toEqual([]);
+  });
+
+  it('park stacks over the deep block so no floor shows between its fences', () => {
+    const silos = LAYOUTS[0];
+    if (!silos) throw new Error('no layout');
+    const stacks = parkedStacks(MAP, silos, 1);
+    // Rows 1 and 2, columns 8 to 13: every tile's half toward the other run, and row 1's toward the wall.
+    for (let x = 8; x <= 13; x++) {
+      const at = (y: number, dz: number) =>
+        stacks.some((s) => s.x === x && s.y === y && Math.abs(s.cz - (y + dz)) < 1e-6);
+      expect(at(1, 0.25), `${x},1 down`).toBe(true);
+      expect(at(2, -0.25), `${x},2 up`).toBe(true);
+      expect(at(1, -0.25), `${x},1 up`).toBe(true);
+    }
+    // Every stack sits on a partition tile of that layout, never over walkable floor.
+    [1, 2, 3].forEach((phase) => {
+      const layout = LAYOUTS[phase - 1];
+      if (!layout) return;
+      const tiles = layoutOf(MAP, phase)?.tiles ?? MAP.tiles;
+      for (const s of parkedStacks(MAP, layout, phase))
+        expect(tiles[s.y * MAP.width + s.x], `${s.x},${s.y} in ${phase}`).toBe('wall');
+    });
+    // The Matrix's single runs and corners stay thin.
+    const matrix = LAYOUTS[2];
+    if (matrix) expect(parkedStacks(MAP, matrix, 3).filter((s) => s.y > 1)).toEqual([]);
+  });
+
+  it('give each run one header board, the deep block one in front', () => {
+    const names = ['A', 'B', 'C'];
+    const silos = [...headerSigns(LAYOUTS[0] ?? partitionLayout(MAP, 1), names).keys()];
+    const rows = silos.map((k) => Number(k.split(',')[1]));
+    expect(rows.sort()).toEqual([2, 6]);
+    expect(headerSigns(LAYOUTS[1] ?? partitionLayout(MAP, 2), names).size).toBe(0);
   });
 
   it('stand whole exactly on the tiles that are walls, at rest in every layout', () => {
@@ -196,15 +238,24 @@ describe('doors and gates', () => {
     expect(doorRise(false, true, { from: 2, to: 3, t: 0 })).toBe(1);
   });
 
-  it('blink both ways in the warning and settle on the new way at the switch', () => {
-    const shown = Array.from({ length: REORG_WARNING_TICKS }, (_, i) =>
-      gateShowsNext({ from: 1, to: 2, t: -REORG_WARNING_TICKS + i }),
-    );
-    expect(shown.some((s) => s)).toBe(true);
-    expect(shown.some((s) => !s)).toBe(true);
+  it('keep the live way green through the warning, flash the coming one amber, swap at the switch', () => {
+    const warning = Array.from({ length: REORG_WARNING_TICKS }, (_, i) => ({
+      from: 1,
+      to: 2,
+      t: -REORG_WARNING_TICKS + i,
+    }));
+    expect(warning.every((c) => !gateShowsNext(c))).toBe(true);
+    const amber = warning.map((c) => gateIncoming(c));
+    expect(amber.every((a) => a > 0)).toBe(true);
+    expect(amber.some((a) => a === 1)).toBe(true);
+    expect(amber.some((a) => a < 1)).toBe(true);
     expect(gateShowsNext({ from: 1, to: 2, t: 0 })).toBe(true);
+    expect(gateIncoming({ from: 1, to: 2, t: 0 })).toBe(0);
+    expect(gateIncoming({ from: 1, to: 2, t: -REORG_WARNING_TICKS - 1 })).toBe(0);
+    expect(gateIncoming({ from: 2, to: 2, t: -5 })).toBe(0);
     expect(flapSwing({ from: 1, to: 2, t: 30 })).toBe(1);
-    expect(gateShowsNext({ from: 1, to: 2, t: -5 }, false)).toBe(false);
+    // Low quality: a steady amber, no blink.
+    expect(warning.every((c) => gateIncoming(c, false) === 1)).toBe(true);
   });
 });
 

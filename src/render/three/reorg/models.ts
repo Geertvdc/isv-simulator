@@ -19,6 +19,9 @@ import { STATION_HEIGHT, WALL_HEIGHT } from '../layout';
 /** The powder-coated frame: a matte grey-white, under every station top's value. */
 export const FRAME = 0xb9bec3;
 const FRAME_SHADE = 0x9da3a9;
+/** The parked stacks over a deep block: a shade under the frame, like a wall top. */
+const STACK = 0x6c7279;
+const STACK_PANEL = 0x737b80;
 /** The frosted infill: cool grey with a hint of teal. */
 const INFILL = 0x98a4a8;
 const INFILL_LINE = 0x8d989c;
@@ -38,6 +41,8 @@ const LAMINATE = 0x464a51;
 const LAMINATE_EDGE = 0x5b6069;
 const SCREEN = 0x3c5f78;
 const TAPE = 0xcdb04e;
+/** The header boards' lettering. */
+const SIGN_INK = 0xf2f4f2;
 
 // ---- Sizes ----
 
@@ -50,6 +55,9 @@ export const LOW_TOP = 0.6;
 const POST_W = 0.035;
 const RAIL_H = 0.035;
 const STRIPE_Y = 0.8;
+/** The top rail's coping: this wide across the run and this tall. */
+export const RAIL_TOP_W = 0.16;
+const RAIL_TOP_H = 0.05;
 
 // ---- Pixel lettering ----
 
@@ -75,7 +83,7 @@ const GLYPHS: Readonly<Record<string, string>> = {
   S: '011100010001110',
   T: '111010010010010',
   U: '101101101101111',
-  V: '101101101101010',
+  V: '101101101010010',
   W: '101101111111101',
   ':': '000010000010000',
   ' ': '000000000000000',
@@ -223,7 +231,7 @@ export function leafUpperModel(look: LeafLook): Model {
     b.box(LEAF_LEN, 0.08, 0.004, TEAL, { at: [0, STRIPE_Y - LOW_TOP, z] }, 0);
     b.box(LEAF_LEN - 0.01, 0.008, 0.004, TEAL_DARK, { at: [0, STRIPE_Y - LOW_TOP - 0.045, z] }, 0);
   }
-  b.box(LEAF_LEN, RAIL_H, LEAF_T + 0.004, FRAME, { at: [0, h - RAIL_H / 2, 0] }, 0.008);
+  topRail(b, h);
   b.box(POST_W, h, LEAF_T + 0.004, FRAME, { at: [o * (half - POST_W / 2), h / 2, 0] }, 0.006);
   b.box(0.05, 0.05, LEAF_T + 0.02, STEEL_DARK, { at: [o * half, h - 0.16, 0] }, 0.008);
   const hash = tileHash(look.salt, 71);
@@ -241,6 +249,24 @@ export function leafUpperModel(look: LeafLook): Model {
   return b.build();
 }
 
+/**
+ * The top rail every leaf ends in, its top at `h`: a coping wider than the
+ * panel (so a run reads as a wall, not a railing), a shade darker with a
+ * pale lip on both faces.
+ */
+function topRail(b: ModelBuilder, h: number): void {
+  b.box(LEAF_LEN, RAIL_TOP_H, RAIL_TOP_W, FRAME_SHADE, { at: [0, h - RAIL_TOP_H / 2, 0] }, 0.01);
+  for (const side of [-1, 1])
+    b.box(
+      LEAF_LEN,
+      0.012,
+      0.008,
+      FRAME,
+      { at: [0, h - RAIL_TOP_H - 0.004, side * (RAIL_TOP_W / 2 - 0.006)] },
+      0,
+    );
+}
+
 /** A cut-down leaf's frosted glass over the lower section (its bottom middle at `LOW_TOP`), with the teal band. */
 export function leafGlassModel(look: LeafLook): Model {
   const b = new ModelBuilder();
@@ -250,34 +276,84 @@ export function leafGlassModel(look: LeafLook): Model {
   b.pane(LEAF_LEN - 0.01, h - 0.03, 0.014, FROST_GLASS, { at: [0, (h - 0.03) / 2, 0] });
   for (const side of [-1, 1])
     b.box(LEAF_LEN - 0.01, 0.045, 0.003, TEAL, { at: [0, STRIPE_Y - LOW_TOP, side * 0.009] }, 0);
-  b.box(LEAF_LEN, 0.028, 0.04, FRAME, { at: [0, h - 0.014, 0] }, 0.006);
-  b.box(0.022, h, 0.03, FRAME, { at: [o * (half - 0.011), h / 2, 0] }, 0);
+  topRail(b, h);
+  b.box(0.03, h, 0.04, FRAME, { at: [o * (half - 0.015), h / 2, 0] }, 0);
+  // A frosted band low down so the cut-down run still reads as a wall.
+  for (const side of [-1, 1])
+    b.box(LEAF_LEN - 0.01, 0.12, 0.003, INFILL, { at: [0, 0.07, side * 0.009] }, 0);
   return b.build();
 }
 
-/** A paper sign taped to a leaf's +z face, its middle at the origin: a teal header and the org name. */
-export function signModel(text: string): Model {
+/** The org header board's lettering: the pixel size, and the board's height. */
+export const SIGN_PX = 0.044;
+export const SIGN_H = 0.27;
+/** How far the board leans back from upright, so its face turns up toward the camera. */
+export const SIGN_TILT = 0.85;
+
+/** The header board's width for `text` at pixel size `px`. */
+export function signWidth(text: string, px = SIGN_PX): number {
+  return (text.length * 4 - 1) * px + 0.16;
+}
+
+/**
+ * The org header board that stands on a run's top rail, its bottom middle at
+ * the origin: a dark teal board in a pale frame, leaning back `SIGN_TILT`
+ * so its face turns toward the camera, the org name in big pale pixels, two
+ * clamps on the rail and a strut behind.
+ */
+export function signModel(text: string, px = SIGN_PX): Model {
   const b = new ModelBuilder();
-  const lines = text.split(' ');
-  const longest = Math.max(...lines.map((l) => l.length));
-  const px = Math.min(0.016, 0.3 / (longest * 4 - 1));
-  const h = 0.06 + lines.length * px * 7;
-  b.box(0.36, h, 0.004, PAPER, { at: [0, 0, 0] }, 0);
-  b.box(0.36, 0.022, 0.005, TEAL, { at: [0, h / 2 - 0.011, 0] }, 0);
-  lines.forEach((line, k) => {
-    const y = h / 2 - 0.04 - px * 3 - k * px * 7;
-    letter(b, line, px, 0, y, 0.004, INK);
-  });
-  // The tape at the top corners.
-  for (const x of [-0.16, 0.16])
-    b.box(
-      0.06,
-      0.02,
-      0.006,
-      0xd6d4c8,
-      { at: [x, h / 2, 0.001], rot: [0, 0, x > 0 ? -0.4 : 0.4] },
-      0,
-    );
+  const w = signWidth(text, px);
+  const h = SIGN_H;
+  const c = Math.cos(SIGN_TILT);
+  const s = Math.sin(SIGN_TILT);
+  // A point `u` up the board's face and `n` out of it, leant back.
+  const at = (x: number, u: number, n: number): [number, number, number] => [
+    x,
+    0.02 + u * c + n * s,
+    -u * s + n * c,
+  ];
+  const rot: [number, number, number] = [-SIGN_TILT, 0, 0];
+  b.box(w + 0.04, h + 0.04, 0.03, FRAME, { at: at(0, h / 2, -0.012), rot }, 0.008);
+  b.box(w, h, 0.012, TEAL_DARK, { at: at(0, h / 2, 0.006), rot }, 0);
+  b.box(w, 0.025, 0.004, TEAL, { at: at(0, h - 0.02, 0.013), rot }, 0);
+  for (const [dx, dy] of pixelText(text, px))
+    b.box(px, px, 0.004, SIGN_INK, { at: at(dx, h / 2 - 0.006 + dy, 0.014), rot }, 0);
+  // The clamps on the rail and a strut down the back.
+  for (const x of [-w / 2 + 0.12, w / 2 - 0.12]) {
+    b.box(0.06, 0.05, RAIL_TOP_W + 0.02, STEEL_DARK, { at: [x, 0.01, 0] }, 0.006);
+    b.box(0.025, 0.025, 0.2, STEEL_DARK, { at: at(x, h * 0.45, -0.1), rot: [0.5, 0, 0] }, 0);
+  }
+  return b.build();
+}
+
+/**
+ * A partition stack parked across a deep block's half tile (between two
+ * parallel runs, or a run and the wall behind it), `w` along the run and
+ * `d` across, its top middle at the origin: a slab in the frame's shade
+ * level with the top rails, with a panel or two laid flat on it and a teal
+ * edge, so no floor shows between the fences.
+ */
+export function parkedStackModel(w: number, d: number, salt: number): Model {
+  const b = new ModelBuilder();
+  b.box(w, 0.04, d, STACK, { at: [0, -0.02, 0] }, 0);
+  const hash = tileHash(salt, 41);
+  const turn = ((hash % 7) - 3) * 0.02;
+  const pw = Math.min(0.44, w - 0.08);
+  const pd = Math.min(0.36, d - 0.06);
+  if (pw > 0.1 && pd > 0.1) {
+    b.box(pw, 0.024, pd, STACK_PANEL, { at: [0, 0.012, 0], rot: [0, turn, 0] }, 0.006);
+    b.box(pw - 0.02, 0.026, 0.045, TEAL_DARK, { at: [0, 0.013, 0], rot: [0, turn, 0] }, 0);
+    if (hash % 3 === 0)
+      b.box(
+        pw - 0.04,
+        0.022,
+        pd - 0.04,
+        tint(STACK_PANEL, 0.06),
+        { at: [0.02, 0.035, 0.01], rot: [0, -turn, 0] },
+        0.006,
+      );
+  }
   return b.build();
 }
 
@@ -406,8 +482,9 @@ export function gateCabinetModel(side: 1 | -1): Model {
       0.006,
     );
   }
-  // `yotta.` vinyl on the face toward the camera.
-  letter(b, 'yotta.', 0.011, 0, CAB_H * 0.55, CAB_L / 2 + 0.003, 0xe6e9ec);
+  // A teal band on the end faces (the `yotta.` vinyl was too small to read).
+  for (const z of [-1, 1])
+    b.box(CAB_W - 0.02, 0.05, 0.004, TEAL, { at: [0, CAB_H * 0.55, z * (CAB_L / 2 + 0.002)] }, 0);
   return b.build();
 }
 
@@ -416,7 +493,6 @@ export function gateFlapModel(): Model {
   const b = new ModelBuilder();
   b.pane(0.22, 0.34, 0.016, 0xcfe2e6, { at: [0.11, 0.42, 0] });
   b.box(0.022, 0.36, 0.03, STEEL_DARK, { at: [0.008, 0.42, 0] }, 0);
-  for (const side of [-1, 1]) letter(b, 'yotta.', 0.006, 0.12, 0.5, side * 0.0095, 0xf2f4f5, side);
   return b.build();
 }
 
