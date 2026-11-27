@@ -1286,7 +1286,7 @@ const SUMMER_DAY: Atmosphere = {
       // The summer sky behind the city, under the order cards.
       { color: 0xffe4bc, opacity: 0.16, x: 0.4, y: 0, reach: 0.5 },
       // The lit `yotta.` going up at the back right, a soft cool-white glow behind it.
-      { color: 0xeee8ff, opacity: 0.24, x: 0.69, y: 0.1, reach: 0.12 },
+      { color: 0xeee8ff, opacity: 0.24, x: 0.73, y: 0.1, reach: 0.14 },
     ],
     // On low the lobby's brackets are off: a little cool light over it instead.
     lowGlows: [{ color: 0xe4ecfa, opacity: 0.14, x: 0.5, y: 0.78, reach: 0.2 }],
