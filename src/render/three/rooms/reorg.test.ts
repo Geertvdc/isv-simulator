@@ -18,19 +18,21 @@ import {
   REORG_SWAP_MODELS,
   SIDE_LOW_TOP,
   TABLE_TOP,
+  UPLIGHTER_OUT,
   goodsLiftModel,
   handoverDeskModel,
   reorgCounter,
   reorgFloorModel,
   reorgLook,
   reorgSideModel,
+  reorgUplighterModel,
   shredderModel,
   SHREDDER_H,
 } from '../roomModels/reorg';
 import { REORG_TOPS, matrixBoxModel } from '../setDressing/reorgWallTops';
 import { ROOMS, floorDressing } from '.';
 import { REORG_ROOM, REORG_TOP_Y, reorgFittings } from './reorg';
-import { REORG_SWAPS, SILL_TOP_MAX, SILL_Y, reorgRoom } from './reorgRoom';
+import { REORG_PANEL_SWAP, REORG_SWAPS, SILL_TOP_MAX, SILL_Y, reorgRoom } from './reorgRoom';
 
 const luminance = (c: number) => {
   const { r, g, b } = new THREE.Color(c);
@@ -47,6 +49,10 @@ const bounds = (m: Model) => {
 };
 const stationTops = Object.values(PALETTE.station).map((c) => tint(c, 0.4));
 const phases = [THE_REORG.map];
+const layouts = [
+  THE_REORG.map,
+  ...(THE_REORG.map.phases ?? []).map((l) => ({ ...THE_REORG.map, ...l })),
+];
 const map = withoutReorgTiles(THE_REORG.map);
 const plan = reorgRoom(map);
 
@@ -115,13 +121,17 @@ describe('The Reorg room dressing', () => {
         ...FLOOR_COLORS.reorgFloors,
       ])
         expect(luminance(c)).toBeLessThan(luminance(top));
+    // The art panels a step darker than the tower's pale ones (4-1, 4-2), so the stations lead.
+    expect(luminance(WALL_COLORS.reorg.face)).toBeLessThan(
+      luminance(WALL_COLORS.tower.face) * 0.85,
+    );
     const box = bounds(
-      reorgCounter({ minusEnd: true, plusEnd: false, legs: true, knob: false, yaw: 0 }).base,
+      reorgCounter({ minusEnd: true, plusEnd: true, legs: true, knob: false, yaw: 0 }).base,
     );
     expect(box.max.y).toBeLessThanOrEqual(STATION_HEIGHT + 0.01);
   });
 
-  it('dresses every face along the back and the lobby, with at least 10 distinct pieces', () => {
+  it('dresses the faces along the back and the lobby, with at least 10 distinct pieces', () => {
     const kinds = new Set(plan.art.map((a) => a.art));
     expect(kinds.size).toBeGreaterThanOrEqual(10);
     for (const must of ['thePlan', 'knownBugs', 'signOff', 'orgChart', 'youAreHere'] as const)
@@ -129,9 +139,10 @@ describe('The Reorg room dressing', () => {
     const dressed = new Set(
       plan.art.flatMap((a) => Array.from({ length: a.span }, (_, i) => `${a.x + i},${a.y}`)),
     );
+    // A face left bare is a plain grey panel; glass only behind the art that hangs on glass.
     for (let x = 0; x < map.width; x++)
-      if (map.tiles[x] === 'wall' && map.tiles[map.width + x] === 'floor')
-        expect(dressed.has(`${x},0`), `${x},0`).toBe(true);
+      if (map.tiles[x] === 'wall' && map.tiles[map.width + x] === 'floor' && !dressed.has(`${x},0`))
+        expect(plan.swaps[`${x},0`], `${x},0`).toBe(REORG_PANEL_SWAP);
     for (const [name, build] of Object.entries(REORG_ART_MODELS)) {
       const box = bounds(build());
       expect(box.max.y, name).toBeLessThanOrEqual(WALL_HEIGHT);
@@ -197,14 +208,54 @@ describe('The Reorg room dressing', () => {
     expect(plan.shredder).not.toBeNull();
   });
 
-  it('hangs pendants along the back half only, never over the boardroom, on a wire', () => {
+  it('lights the back with uplighters on the faces’ tops, nothing over a player’s head', () => {
     const fits = reorgFittings(map, plan);
     expect(fits.length).toBeGreaterThanOrEqual(2);
+    const lamp = bounds(reorgUplighterModel());
+    expect(lamp.max.y).toBeLessThanOrEqual(0.03);
+    expect(lamp.max.z).toBeLessThanOrEqual(UPLIGHTER_OUT);
+    const pose = fitCamera3d(levelBox(map), VIEW, roundInsets(VIEW));
+    const s = plan.segfault;
     for (const f of fits) {
-      expect(f.z).toBeLessThan((plan.block.y0 + plan.block.y1) / 2);
       expect(f.x < plan.block.x0 - 0.5 || f.x > plan.block.x1 + 0.5).toBe(true);
+      const face = plan.art.find((a) => Math.round(f.x) >= a.x && Math.round(f.x) < a.x + a.span);
+      expect(face, `${f.x}`).toBeDefined();
+      expect(f.z).toBe((face?.y ?? 0) + 0.5);
+      if (s) expect(Math.round(f.x) === s.x && Math.round(f.z - 0.5) === s.y).toBe(false);
+      // The fitting's lowest point on screen stays above the head of any player on the row in front.
+      const low = Math.max(
+        ...[lamp.min.x, lamp.max.x].flatMap((x) =>
+          [lamp.min.z, lamp.max.z].map(
+            (z) => projectPoint(pose, { x: f.x + x, y: f.y + lamp.min.y, z: f.z + z }).y,
+          ),
+        ),
+      );
+      for (const layout of layouts)
+        for (let x = 0; x < map.width; x++) {
+          if (Math.abs(x - f.x) > 1) continue;
+          for (let y = 0; y < map.height; y++) {
+            if (layout.tiles[y * map.width + x] !== 'floor') continue;
+            // A player pressed to the tile's back edge (radius 0.35), the top of the head 1.15 up.
+            const head = projectPoint(pose, { x, y: 1.15, z: y - 0.5 + 0.35 }).y;
+            expect(low, `${f.x} over ${x},${y}`).toBeLessThan(head);
+          }
+        }
     }
-    expect(placed.some((p) => p.key.startsWith('reorgWire'))).toBe(true);
+    expect(placed.some((p) => p.key.startsWith('reorgWire'))).toBe(false);
+  });
+
+  it('dresses the boardroom table with 4-2’s halves and chairs at its ends only', () => {
+    const half = (minusEnd: boolean) =>
+      bounds(reorgCounter({ minusEnd, plusEnd: !minusEnd, legs: true, knob: false, yaw: 0 }).base);
+    const left = half(true);
+    const right = half(false);
+    // The chairs poke out past the round ends, never past the sides (the meeting's label stays clear).
+    expect(left.min.x).toBeLessThan(-0.6);
+    expect(right.max.x).toBeGreaterThan(0.6);
+    for (const b of [left, right]) {
+      expect(b.max.z).toBeLessThanOrEqual(0.5);
+      expect(b.max.y).toBeLessThanOrEqual(0.9);
+    }
   });
 
   it('keeps every story piece out from under the HUD', () => {

@@ -1,16 +1,18 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { tileHash } from '../../mapShape';
 import { type Model, ModelBuilder, tint } from '../kit';
 import { FRONT_WALL_HEIGHT, STATION_HEIGHT, WALL_HEIGHT } from '../layout';
-import { FLOOR_COLORS } from '../look';
+import { FLOOR_COLORS, WALL_COLORS } from '../look';
+import { tableBoardModel, tableHalfModel } from '../boardroom/models';
 import type { CounterRun } from '../rooms/counterRun';
 import {
   BADGE_LOOKS,
   CARPET_WEAR,
   LOBBY_WEAR,
   REORG_KIND,
+  REORG_PANEL_SWAP,
   type ReorgArt,
-  type ReorgWire,
   SIDE_LOOKS,
   STENCIL_NAMES,
   badgeLineSwap,
@@ -20,7 +22,8 @@ import {
 import { CARDBOARD, CRATE_BLUE, TAPE_YELLOW, TEAL } from '../setDressing/reorgWallTops';
 import type { StationModel } from '../stationModels';
 import { framed, text } from './basement';
-import { BOARDROOM_SWAP_MODELS, BORDER, GOOD_CARPET, SILL_STONE, WALNUT } from './boardroom';
+import { taskChairModel } from './midRise';
+import { BOARDROOM_SWAP_MODELS, BORDER, GOOD_CARPET, SILL_STONE } from './boardroom';
 import { HEAD_TRACK, MULLION, YOTTA_VIOLET } from './tower';
 
 /**
@@ -99,19 +102,19 @@ export function reorgSideModel(look: number, room: 1 | -1, low: boolean): Model 
   }
   const [share, skew] = ODD_DROPS[look % ODD_DROPS.length] ?? [0.5, 0];
   const drop = Math.max(0.05, gh * share);
-  const bx = room * (half - 0.035);
-  b.box(0.05, 0.05, 0.94, SIDE_RAIL, { at: [bx, top - 0.03, 0] }, 0.006);
-  b.box(0.006, drop, 0.92, SIDE_BLIND, { at: [bx, top - 0.055 - drop / 2, 0] }, 0);
-  const slats = Math.round(drop / 0.05);
-  for (let k = 1; k < slats; k++)
+  const bx = room * (half - 0.05);
+  // The cassette on the head, the blind out of it a fair thickness, its slats' lines every 0.05.
+  b.box(0.06, 0.06, 0.95, SIDE_BLIND, { at: [bx, top - 0.032, 0] }, 0.01);
+  b.box(0.062, 0.008, 0.952, tint(SIDE_BLIND, -0.2), { at: [bx, top - 0.06, 0] }, 0);
+  b.box(0.03, drop, 0.92, SIDE_BLIND, { at: [bx, top - 0.062 - drop / 2, 0] }, 0);
+  const slats = Math.floor(drop / 0.05);
+  for (let k = 1; k <= slats; k++)
     b.box(
       0.004,
-      0.006,
+      0.008,
       0.92,
       tint(SIDE_BLIND, -0.12),
-      {
-        at: [bx + room * 0.004, top - 0.055 - (drop * k) / slats, 0],
-      },
+      { at: [bx + room * 0.016, top - 0.062 - k * 0.05, 0] },
       0,
     );
   b.box(
@@ -120,7 +123,7 @@ export function reorgSideModel(look: number, room: 1 | -1, low: boolean): Model 
     0.95,
     SIDE_RAIL,
     {
-      at: [bx, top - 0.055 - drop - 0.017, 0],
+      at: [bx, top - 0.062 - drop - 0.017, 0],
       rot: [skew, 0, 0],
     },
     0.006,
@@ -130,7 +133,7 @@ export function reorgSideModel(look: number, room: 1 | -1, low: boolean): Model 
     0.16,
     0.006,
     0x6a7078,
-    { at: [bx + room * 0.01, top - 0.055 - drop - 0.11, 0.4] },
+    { at: [bx + room * 0.02, top - 0.062 - drop - 0.11, 0.4] },
     0,
   );
   return b.build();
@@ -183,6 +186,7 @@ export const REORG_SWAP_MODELS: Readonly<Record<string, () => Model>> = (() => {
       out[reorgSideSwap('right', l, low)] = () => reorgSideModel(l, -1, low);
     }
   for (let l = 0; l < BADGE_LOOKS; l++) out[badgeLineSwap(l)] = () => badgeLineModel(l);
+  out[REORG_PANEL_SWAP] = reorgPanelModel;
   return out;
 })();
 
@@ -205,15 +209,15 @@ export function reorgTone(x: number, y: number, salt: number): number {
 export const CARPET = FLOOR_COLORS.reorgFloors[0];
 const CARPET_ALT = FLOOR_COLORS.reorgFloors[1];
 /** The raised-floor access tiles under it, their joints and lift-out handles. */
-export const ACCESS = 0x7a7e84;
-const ACCESS_JOINT = 0x6a6e73;
+export const ACCESS = 0x70747a;
+const ACCESS_JOINT = 0x666a70;
 /** A desk's parking corners: a faint warm grey, quieter than the tape. */
 const DESK_CORNER = 0x8f9096;
 /** The tape on the floor: tape yellow, a little worn into the carpet. */
 const TAPE = TAPE_YELLOW;
 /** The lobby's clean cool stone and its joints. */
-export const LOBBY_STONE = 0x9a9ca1;
-const LOBBY_JOINT = 0x84868b;
+export const LOBBY_STONE = 0x8e9196;
+const LOBBY_JOINT = 0x7a7d82;
 /** The mats' grey and their lettering. */
 export const MAT = 0x5c6066;
 
@@ -230,17 +234,36 @@ function mark(
   b.box(w, 0.002, d, color, { at: [x, y, z], rot: [0, turn, 0] }, 0);
 }
 
-/** Carpet over the whole tile: its base, faint pile rows, flecks, its tile joints. */
+/** The four carpet tiles' (and access panels') middles in a floor tile. */
+const QUADS: readonly [number, number][] = [
+  [-0.25, -0.25],
+  [0.25, -0.25],
+  [-0.25, 0.25],
+  [0.25, 0.25],
+];
+
+/**
+ * Carpet over the whole tile: four carpet tiles laid quarter-turned (each
+ * its pile rows the other way and a shade apart, so it reads as carpet
+ * tiles, not tarmac), a few flecks, the joints between them.
+ */
 function carpet(b: ModelBuilder, variant: number): void {
   const base = variant === 2 ? CARPET_ALT : CARPET;
   b.box(1, 0.012, 1, base, { at: [0, -0.006, 0] }, 0);
-  for (let z = -0.44; z < 0.5; z += 0.125) mark(b, 1, 0.018, tint(base, -0.035), 0, z, 0.0008);
-  for (let k = 0; k < 10; k++)
+  QUADS.forEach(([qx, qz], q) => {
+    const turned = q === 1 || q === 2;
+    const shade = tint(base, turned ? -0.025 : 0.012);
+    mark(b, 0.49, 0.49, shade, qx, qz, 0.0005);
+    for (let k = -0.2; k < 0.24; k += 0.1)
+      if (turned) mark(b, 0.012, 0.47, tint(shade, -0.04), qx + k, qz, 0.0009);
+      else mark(b, 0.47, 0.012, tint(shade, -0.04), qx, qz + k, 0.0009);
+  });
+  for (let k = 0; k < 4; k++)
     mark(
       b,
       0.014,
       0.014,
-      k % 2 ? tint(base, 0.14) : 0x7a6eaa,
+      tint(base, 0.1),
       -0.44 + rnd(variant * 31 + k, 3) * 0.88,
       -0.44 + rnd(variant * 31 + k, 7) * 0.88,
       0.0016,
@@ -254,35 +277,68 @@ function carpet(b: ModelBuilder, variant: number): void {
     mark(b, w, d, tint(base, -0.07), x, z, 0.0021);
 }
 
-/** Raised-floor access tiles where the carpet's pulled up: four panels, their handles, one lifted on a variant. */
-function access(b: ModelBuilder, variant: number): void {
-  b.box(1, 0.012, 1, ACCESS_JOINT, { at: [0, -0.006, 0] }, 0);
-  for (const [px, pz] of [
-    [-0.25, -0.25],
-    [0.25, -0.25],
-    [-0.25, 0.25],
-    [0.25, 0.25],
-  ] as const) {
-    const lifted = variant === 1 && px > 0 && pz > 0;
-    if (lifted) {
-      // The void under it: cables in it, the panel leant on its neighbour.
-      mark(b, 0.47, 0.47, 0x55595e, px, pz, 0.0006);
-      b.box(0.4, 0.012, 0.012, 0xc86a32, { at: [px, 0.004, pz - 0.08], rot: [0, 0.2, 0] }, 0);
-      b.box(0.4, 0.012, 0.012, 0x3a5a90, { at: [px, 0.004, pz + 0.06], rot: [0, -0.15, 0] }, 0);
-      continue;
+/** Which access panels (`QUADS`) each variant has bare: all four, three, or a half, so a strip runs ragged. */
+const ACCESS_BARE: readonly (readonly number[])[] = [
+  [0, 1, 2, 3],
+  [0, 1, 3],
+  [0, 2],
+];
+
+/**
+ * Raised-floor access tiles where the carpet's pulled up, raggedly: the
+ * carpet left on some quarters (its torn edge rolled along the bare ones),
+ * the bare panels quiet with their lift-out handles; with `lift`, the first
+ * panel lifted out (the void under it, its cables) and propped on its
+ * neighbour.
+ */
+function access(b: ModelBuilder, variant: number, lift: boolean): void {
+  carpet(b, variant);
+  const bare = ACCESS_BARE[variant % ACCESS_BARE.length] ?? [0];
+  const isBare = (q: number) => bare.includes(q);
+  QUADS.forEach(([px, pz], q) => {
+    if (!isBare(q)) return;
+    mark(b, 0.5, 0.5, ACCESS_JOINT, px, pz, 0.0024);
+    if (lift && q === 0) {
+      // The void under it, its cables.
+      mark(b, 0.47, 0.47, 0x55595e, px, pz, 0.0028);
+      b.box(0.4, 0.012, 0.012, 0xa0704e, { at: [px, 0.006, pz - 0.08], rot: [0, 0.2, 0] }, 0);
+      b.box(0.4, 0.012, 0.012, 0x4e6488, { at: [px, 0.006, pz + 0.06], rot: [0, -0.15, 0] }, 0);
+      return;
     }
-    b.box(0.47, 0.01, 0.47, tint(ACCESS, (px + pz) * 0.03), { at: [px, 0.003, pz] }, 0.002);
-    mark(b, 0.1, 0.03, ACCESS_JOINT, px, pz - 0.12, 0.0092);
-    mark(b, 0.1, 0.03, ACCESS_JOINT, px, pz + 0.12, 0.0092);
+    b.box(0.47, 0.008, 0.47, tint(ACCESS, (px + pz) * 0.015), { at: [px, 0.006, pz] }, 0.002);
+    mark(b, 0.08, 0.025, tint(ACCESS, -0.06), px, pz - 0.12, 0.0102);
+  });
+  if (lift && isBare(0)) {
+    // Propped on its neighbour along x (or z, where that one's still carpet): low, a hand's height.
+    const alongX = isBare(1);
+    const [vx, vz] = QUADS[0] ?? [-0.25, -0.25];
+    const a = 0.38;
+    b.box(
+      0.47,
+      0.012,
+      0.47,
+      tint(ACCESS, 0.03),
+      {
+        at: [vx + (alongX ? 0.12 : 0), 0.1, vz + (alongX ? 0 : 0.12)],
+        rot: alongX ? [0, 0, a] : [-a, 0, 0],
+      },
+      0.002,
+    );
   }
-  // The torn edge of the carpet along the back, rolled a little.
-  b.box(1, 0.02, 0.06, CARPET, { at: [0, 0.008, -0.47] }, 0.008);
+  // The carpet's torn edge, rolled a little, along each bare quarter's side that meets carpet.
+  QUADS.forEach(([px, pz], q) => {
+    if (!isBare(q)) return;
+    const nx = QUADS.findIndex(([x, z]) => x === -px && z === pz);
+    const nz = QUADS.findIndex(([x, z]) => x === px && z === -pz);
+    if (!isBare(nx)) b.box(0.03, 0.018, 0.5, CARPET, { at: [0, 0.009, pz] }, 0.008);
+    if (!isBare(nz)) b.box(0.5, 0.018, 0.03, CARPET, { at: [px, 0.009, 0] }, 0.008);
+  });
 }
 
-/** The floor tape along the edges in `flags`, a band 0.06 wide just inside each. */
+/** The floor tape along the edges in `flags`, a band 0.05 wide just inside each. */
 function tape(b: ModelBuilder, flags: number): void {
   const F = CARPET_WEAR;
-  const w = 0.06;
+  const w = 0.05;
   const at = 0.5 - w / 2 - 0.02;
   if (flags & F.tapeN) mark(b, 1, w, TAPE, 0, -at, 0.0028);
   if (flags & F.tapeS) mark(b, 1, w, TAPE, 0, at, 0.0028);
@@ -357,12 +413,23 @@ function carpetWear(b: ModelBuilder, flags: number, variant: number): void {
   if (flags & F.mat) mat(b);
 }
 
-/** A BADGE IN mat, mid grey with its lettering and an arrow, inside the tile's edge. */
+/** The mats' badge: a bold off-white, no lettering (it reads from the camera). */
+const MAT_BADGE = 0xd4d6da;
+
+/**
+ * A mat at a turnstile, mid grey inside the tile's edge, a bold badge on
+ * it (a card with its clip and photo): no direction, since the gates flip
+ * theirs every layout.
+ */
 function mat(b: ModelBuilder): void {
   b.box(0.82, 0.012, 0.6, MAT, { at: [0, 0.006, 0] }, 0.004);
-  const t = framed(b, [0, 0.0125, 0.05], [-Math.PI / 2, 0, 0]);
-  text(t, 'BADGE IN', 0, 0.05, 0, 0.014, 0x8e9298, 0.001);
-  t.box(0.2, 0.02, 0.001, 0x8e9298, { at: [0, -0.06, 0] }, 0);
+  b.box(0.7, 0.003, 0.48, tint(MAT, 0.12), { at: [0, 0.0125, 0] }, 0);
+  b.box(0.66, 0.004, 0.44, MAT, { at: [0, 0.0135, 0] }, 0);
+  b.box(0.26, 0.004, 0.3, MAT_BADGE, { at: [0, 0.015, 0.02] }, 0.01);
+  b.box(0.08, 0.004, 0.03, MAT, { at: [0, 0.0175, -0.1] }, 0);
+  b.box(0.08, 0.004, 0.09, tint(MAT, 0.05), { at: [-0.05, 0.0175, 0.04] }, 0);
+  for (const z of [0.03, 0.08])
+    b.box(0.07, 0.004, 0.018, tint(MAT, 0.05), { at: [0.07, 0.0175, z] }, 0);
 }
 
 /** Lobby stone over the tile: two big slabs a tile, a fine joint, a faint vein. */
@@ -435,9 +502,9 @@ export function reorgFloorModel(look: number): Model {
     for (const z of [-0.47, 0.47]) b.box(1, 0.006, 0.05, STEEL, { at: [0, 0.003, z] }, 0);
     return b.build();
   }
-  if (flags & CARPET_WEAR.access) access(b, variant);
+  if (flags & CARPET_WEAR.access) access(b, variant, (flags & CARPET_WEAR.accessLift) !== 0);
   else carpet(b, variant);
-  carpetWear(b, flags & ~CARPET_WEAR.access, variant);
+  carpetWear(b, flags & ~(CARPET_WEAR.access | CARPET_WEAR.accessLift), variant);
   tape(b, flags);
   const n = stencilOf(flags);
   if (n > 0) stencil(b, n);
@@ -450,35 +517,81 @@ export function reorgFloorModel(look: number): Model {
 export const TABLE_TOP = 0x4a3a2e;
 const TABLE_BODY = 0x3a332e;
 
+/** `parts` (each turned by `yaw` and moved to `at`) as one model. */
+function combine(parts: readonly [Model, [number, number, number], number][]): Model {
+  const layer = (k: 'body' | 'glow' | 'glass') => {
+    const list = parts.flatMap(([m, at, yaw]) => {
+      const g = m[k];
+      // An empty layer (a builder with nothing in it) has no attributes to merge.
+      if (!g || !('position' in g.attributes)) return [];
+      const t = new THREE.Matrix4()
+        .makeTranslation(...at)
+        .multiply(new THREE.Matrix4().makeRotationY(yaw));
+      return [g.clone().applyMatrix4(t)];
+    });
+    for (const [m] of parts) m[k]?.dispose();
+    if (list.length === 0) return null;
+    const merged = mergeGeometries(list, false);
+    for (const g of list) g.dispose();
+    return merged;
+  };
+  return {
+    body: layer('body') ?? new THREE.BufferGeometry(),
+    glow: layer('glow'),
+    glass: layer('glass'),
+  };
+}
+
+/** How far out past the table's round end its chairs stand (their seats' middles, from the tile's middle). */
+export const TABLE_CHAIR_X = 0.6;
+
 /**
- * The boardroom table, the one thing that never moves: a walnut top on a
- * dark pedestal, its grain, and on the run's first tile a paper sign taped
- * to its front edge: BOARDROOM – DO NOT MOVE.
+ * The boardroom table, the one thing that never moves: 4-2's long walnut
+ * table (a half each end of the run, the seam between; a straight piece on
+ * a tile between), two mesh chairs tucked in at each round end (none along
+ * the sides, so the meeting's label stays clear), the name cards on the
+ * first half, and on the run's first tile a paper sign taped to its front
+ * edge, big enough to read: BOARDROOM – DO NOT MOVE. A one-tile run is a
+ * plain walnut top.
  */
 export function reorgCounter(run: CounterRun): StationModel {
-  const b = new ModelBuilder();
   const h = STATION_HEIGHT;
-  const t = 0.05;
-  b.box(0.7, 0.04, 0.6, 0x2e2a26, { at: [0, 0.02, 0] }, 0.01);
-  b.box(0.6, h - t - 0.04, 0.5, TABLE_BODY, { at: [0, 0.04 + (h - t - 0.04) / 2, 0] }, 0.012);
-  b.box(1.0, t, 0.96, TABLE_TOP, { at: [0, h - t / 2, 0] }, run.minusEnd || run.plusEnd ? 0.02 : 0);
-  for (const [z, w] of [
-    [-0.3, 0.7],
-    [-0.06, 0.5],
-    [0.2, 0.8],
-  ] as const)
-    b.box(w, 0.002, 0.008, tint(TABLE_TOP, -0.15), { at: [0.05, h + 0.0005, z] }, 0);
-  b.box(1.0, 0.012, 0.004, tint(WALNUT, 0.1), { at: [0, h - t + 0.004, 0.482] }, 0);
+  const b = new ModelBuilder();
+  const parts: [Model, [number, number, number], number][] = [];
+  const end = run.minusEnd !== run.plusEnd;
+  if (end) {
+    // The half's round end out toward the run's end (built round end toward −x).
+    const yaw = run.minusEnd ? 0 : Math.PI;
+    parts.push([tableHalfModel(), [0, 0, 0], yaw]);
+    const out = run.minusEnd ? -1 : 1;
+    for (const z of [-0.2, 0.2])
+      parts.push([taskChairModel(), [out * (TABLE_CHAIR_X - 0.32), 0, z], -out * (Math.PI / 2)]);
+    if (run.minusEnd) parts.push([tableBoardModel(['ALIGNCO', 'DEREK'], 3), [0, 0, 0], 0]);
+  } else {
+    const t = 0.05;
+    b.box(0.7, 0.04, 0.6, 0x2e2a26, { at: [0, 0.02, 0] }, 0.01);
+    b.box(0.6, h - t - 0.04, 0.5, TABLE_BODY, { at: [0, 0.04 + (h - t - 0.04) / 2, 0] }, 0.012);
+    b.box(1.0, t, run.minusEnd ? 0.96 : 0.76, TABLE_TOP, { at: [0, h - t / 2, 0] }, 0.02);
+  }
   if (run.minusEnd) {
     // The sign, taped on at the corners, centred on a two-tile table.
     const x = run.plusEnd ? 0 : 0.5;
-    b.box(0.5, 0.1, 0.004, PAPER, { at: [x, h - 0.09, 0.484], rot: [0, 0, -0.03] }, 0);
-    text(b, 'BOARDROOM', x, h - 0.07, 0.487, 0.0075, INK);
-    text(b, 'DO NOT MOVE', x, h - 0.11, 0.487, 0.0075, RED);
-    for (const sx of [-0.24, 0.24])
-      b.box(0.05, 0.025, 0.003, 0xd8d6c8, { at: [x + sx, h - 0.045, 0.488], rot: [0, 0, 0.6] }, 0);
+    const z = (run.plusEnd ? 0.48 : 0.38) + 0.004;
+    b.box(0.76, 0.2, 0.004, PAPER, { at: [x, h - 0.12, z], rot: [0, 0, -0.03] }, 0);
+    text(b, 'BOARDROOM', x, h - 0.075, z + 0.003, 0.014, INK);
+    text(b, 'DO NOT MOVE', x, h - 0.165, z + 0.003, 0.0145, RED);
+    for (const sx of [-0.36, 0.36])
+      b.box(
+        0.07,
+        0.03,
+        0.003,
+        0xd8d6c8,
+        { at: [x + sx, h - 0.03, z + 0.004], rot: [0, 0, 0.6] },
+        0,
+      );
   }
-  return { base: b.build(), hero: null, heroAt: [0, 0] };
+  parts.push([b.build(), [0, 0, 0], 0]);
+  return { base: combine(parts), hero: null, heroAt: [0, 0] };
 }
 
 // ---- What hangs on the faces ----
@@ -533,8 +646,9 @@ function youAreHere(): Model {
   sheet(b, 0.04, cy - 0.02, 0.56, 0.42, 0xe8e6dc, 0.05);
   sheet(b, 0, cy, 0.52, 0.4, PAPER, -0.1);
   const f = framed(b, [0, cy, FACE + 0.006], [0, 0, -0.1]);
-  f.box(0.48, 0.05, 0.002, TEAL, { at: [0, 0.15, 0] }, 0);
-  text(f, 'YOU ARE HERE', 0, 0.15, 0.001, 0.0085, WHITE);
+  f.box(0.66, 0.18, 0.002, TEAL, { at: [0, 0.2, 0] }, 0);
+  text(f, 'YOU ARE', 0, 0.24, 0.001, 0.023, WHITE);
+  text(f, 'HERE?', 0, 0.16, 0.001, 0.023, WHITE);
   for (const [x, y, w, h] of [
     [-0.12, 0.02, 0.18, 0.14],
     [0.1, 0.04, 0.16, 0.1],
@@ -547,7 +661,7 @@ function youAreHere(): Model {
   }
   // The red dot, and (PROBABLY) under it.
   f.cylinder(0.022, 0.022, 0.004, RED, { at: [0.04, -0.03, 0.002], rot: [Math.PI / 2, 0, 0] }, 12);
-  text(f, '(PROBABLY)', 0, -0.18, 0.002, 0.0065, RED);
+
   return b.build();
 }
 
@@ -576,43 +690,52 @@ function knownBugs(): Model {
   return b.build();
 }
 
+/**
+ * A bold poster: one or two big words (`title`, a line each, at `px`), an
+ * accent rule under them and a picture (`draw`); no small print, so it
+ * reads from the camera.
+ */
 function poster(
-  title: string[],
-  sub: string,
+  title: readonly [string, number][],
   ground: number,
   accent: number,
   draw?: (b: ModelBuilder, cy: number, f: number) => void,
 ): Model {
   const b = new ModelBuilder();
-  const cy = 0.7;
-  b.box(0.56, 0.7, 0.012, ground, { at: [0, cy, FACE + 0.006] }, 0.004);
+  const cy = 0.68;
+  b.box(0.8, 0.78, 0.012, ground, { at: [0, cy, FACE + 0.006] }, 0.004);
   const f = FACE + 0.013;
-  title.forEach((t, i) => {
-    text(b, t, 0, cy + 0.24 - i * 0.06, f, 0.009, WHITE);
-  });
-  b.box(0.44, 0.012, 0.002, accent, { at: [0, cy + 0.24 - title.length * 0.06 + 0.02, f] }, 0);
+  let y = cy + 0.29;
+  for (const [t, px] of title) {
+    y -= px * 2.5;
+    text(b, t, 0, y, f, px, WHITE);
+    y -= px * 2.5 + 0.035;
+  }
+  b.box(0.6, 0.016, 0.002, accent, { at: [0, y + 0.01, f] }, 0);
   draw?.(b, cy, f);
-  text(b, sub, 0, cy - 0.29, f, 0.0055, tint(ground, 0.6));
   return b.build();
 }
 
 const reorgPoster = () =>
   poster(
-    ['REORG 3.0', 'NOW WITH MORE', 'ALIGNMENT'],
-    'BROUGHT TO YOU BY ALIGNCO',
+    [
+      ['REORG', 0.03],
+      ['3.0', 0.036],
+    ],
     TEAL,
     TAPE_YELLOW,
     (b, cy, f) => {
       // Three arrows, aligned (one isn't).
       for (let k = 0; k < 3; k++) {
-        const y = cy - 0.06 - k * 0.07;
-        b.box(0.28, 0.03, 0.002, WHITE, { at: [0, y, f], rot: [0, 0, k === 2 ? 0.25 : 0] }, 0);
+        const y = cy - 0.15 - k * 0.075;
+        const r = k === 2 ? 0.3 : 0;
+        b.box(0.34, 0.035, 0.002, WHITE, { at: [-0.02, y, f], rot: [0, 0, r] }, 0);
         b.box(
-          0.05,
-          0.05,
+          0.06,
+          0.06,
           0.002,
           WHITE,
-          { at: [0.15, y, f], rot: [0, 0, Math.PI / 4 + (k === 2 ? 0.25 : 0)] },
+          { at: [0.16, y + r * 0.16, f], rot: [0, 0, Math.PI / 4 + r] },
           0,
         );
       }
@@ -620,26 +743,20 @@ const reorgPoster = () =>
   );
 
 const changePoster = () =>
-  poster(
-    ['CHANGE IS', 'THE ONLY', 'CONSTANT'],
-    'ALIGNCO - WE MOVE YOU',
-    0x34495e,
-    TEAL,
-    (b, cy, f) => {
-      // A bar chart going up, a sticky note on it: AGAIN?
-      for (let k = 0; k < 4; k++)
-        b.box(
-          0.06,
-          0.05 + k * 0.04,
-          0.002,
-          TEAL,
-          { at: [-0.13 + k * 0.09, cy - 0.22 + (0.05 + k * 0.04) / 2, f] },
-          0,
-        );
-      b.box(0.1, 0.08, 0.003, 0xe6d064, { at: [0.16, cy - 0.04, f + 0.002], rot: [0, 0, 0.2] }, 0);
-      text(b, 'AGAIN?', 0.16, cy - 0.04, f + 0.004, 0.0045, INK);
-    },
-  );
+  poster([['CHANGE', 0.03]], 0x34495e, TEAL, (b, cy, f) => {
+    // A bar chart going up, a sticky note on it: AGAIN?
+    for (let k = 0; k < 4; k++)
+      b.box(
+        0.09,
+        0.07 + k * 0.06,
+        0.002,
+        TEAL,
+        { at: [-0.2 + k * 0.12, cy - 0.3 + (0.07 + k * 0.06) / 2, f] },
+        0,
+      );
+    b.box(0.3, 0.16, 0.003, 0xe6d064, { at: [0.12, cy + 0.0, f + 0.002], rot: [0, 0, 0.12] }, 0);
+    text(b, 'AGAIN?', 0.12, cy + 0.0, f + 0.004, 0.011, INK);
+  });
 
 function orgChart(): Model {
   const b = new ModelBuilder();
@@ -681,22 +798,9 @@ function thePlan(): Model {
   b.screen(1.32, 0.6, 0x1f3a42, { at: [cx, cy + 0.02, FACE + 0.011] });
   const f = FACE + 0.012;
   b.screen(1.32, 0.12, TEAL, { at: [cx, cy + 0.26, f] });
-  text(b, 'THE PLAN V3', cx, cy + 0.26, f + 0.001, 0.015, WHITE);
-  const lines: [string, number][] = [
-    ['1. SILOS', 0xc9d4e0],
-    ['2. OPEN PLAN', 0xc9d4e0],
-    ['3. MATRIX', 0xffd27a],
-    ['4. SEE PAGE 2', 0xc9d4e0],
-  ];
-  lines.forEach(([t, c], i) => {
-    text(b, t, cx - 0.22, cy + 0.12 - i * 0.08, f + 0.001, 0.008, c);
-  });
-  // A 2x2 that's mostly arrows.
-  for (let k = 0; k < 4; k++)
-    b.screen(0.14, 0.1, k === 3 ? TAPE_YELLOW : 0x5a8a90, {
-      at: [cx + 0.3 + (k % 2) * 0.16, cy + 0.06 - Math.floor(k / 2) * 0.12, f + 0.001],
-    });
-  text(b, 'P. 1 OF 80', cx + 0.46, cy - 0.23, f + 0.001, 0.0075, 0xffffff);
+  text(b, 'THE PLAN', cx, cy + 0.26, f + 0.001, 0.022, WHITE);
+  // Page one of eighty, big: the reorg's whole joke.
+  text(b, 'P. 1/80', cx, cy - 0.06, f + 0.001, 0.044, 0xffd27a);
   b.screen(0.02, 0.4, 0x0f1a20, { at: [cx, cy - 0.38, FACE + 0.006] });
   return b.build();
 }
@@ -1116,55 +1220,63 @@ export function goodsLiftModel(span: number): Model {
   return b.build();
 }
 
-// ---- The pendants' wire ----
+// ---- The uplighters ----
 
-const WIRE = 0x8a9096;
+const BRONZE = 0x4a4036;
+/** How far the uplighter's bowl stands out from the face, at most. */
+export const UPLIGHTER_OUT = 0.2;
 
 /**
- * The wire the back half's pendants hang from, in world x, y and z: from a
- * post on each end's side-wall top through the top of every fitting
- * (`at`, world x, each `hang` over the wire's height), sagging a little
- * between.
+ * A bronze wall-washer on a back face's top (its origin on the head track's
+ * front edge, the room on +z): a clamp over the track, a short arm, a
+ * shallow trough just in front of the face's top with its warm diffuser lit
+ * along the open top (the camera looks down into it). Nothing hangs over
+ * the floor.
  */
-export function reorgWireModel(w: ReorgWire, at: readonly number[], hang: number): Model {
+export function reorgUplighterModel(): Model {
   const b = new ModelBuilder();
-  const wy = w.y + hang;
-  const zAt = (x: number) => w.a.z + ((w.b.z - w.a.z) * (x - w.a.x)) / (w.b.x - w.a.x || 1);
-  const pts: [number, number][] = [
-    [w.a.x, wy + 0.06],
-    ...at.map((x): [number, number] => [x, wy]),
-    [w.b.x, wy + 0.06],
-  ];
-  for (let i = 0; i + 1 < pts.length; i++) {
-    const [x0, y0] = pts[i] ?? [0, 0];
-    const [x1, y1] = pts[i + 1] ?? [0, 0];
-    const p = (t: number): [number, number] => [
-      x0 + (x1 - x0) * t,
-      y0 + (y1 - y0) * t - 0.03 * 4 * t * (1 - t),
-    ];
-    for (let k = 0; k < 5; k++) {
-      const [ax, ay] = p(k / 5);
-      const [bx, by] = p((k + 1) / 5);
-      const mx = (ax + bx) / 2;
-      b.box(
-        Math.hypot(bx - ax, by - ay) + 0.002,
-        0.012,
-        0.012,
-        WIRE,
-        {
-          at: [mx, (ay + by) / 2, zAt(mx)],
-          rot: [0, 0, Math.atan2(by - ay, bx - ax)],
-        },
-        0,
-      );
-    }
+  b.box(0.1, 0.02, 0.09, BRONZE, { at: [0, 0.012, -0.03] }, 0.004);
+  b.box(0.1, 0.07, 0.016, BRONZE, { at: [0, -0.025, 0.01] }, 0.004);
+  b.box(0.03, 0.024, 0.08, BRONZE, { at: [0, -0.05, 0.06] }, 0.004);
+  // The trough, its rim a hair lighter, the diffuser lit along its top.
+  b.box(0.42, 0.06, 0.1, BRONZE, { at: [0, -0.06, 0.14] }, 0.012);
+  b.box(0.43, 0.01, 0.11, tint(BRONZE, 0.2), { at: [0, -0.028, 0.14] }, 0.003);
+  for (const s of [-1, 1])
+    b.box(0.014, 0.064, 0.104, tint(BRONZE, -0.3), { at: [s * 0.21, -0.06, 0.14] }, 0.004);
+  b.add(new THREE.BoxGeometry(0.38, 0.006, 0.07), 0xfff0d8, { at: [0, -0.024, 0.14] }, 'glow');
+  return b.build();
+}
+
+// ---- The art panels ----
+
+/** The art panel's grey (the theme's face: darker than 4-1's and 4-2's, so the stations lead). */
+const PANEL = WALL_COLORS.reorg.face;
+const PANEL_PLINTH = tint(PANEL, -0.18);
+
+/**
+ * A solid partition panel where the consultants' art hangs, in this
+ * floor's own grey: a darker plinth with an aluminium shoe, the panel with
+ * a slim dark frame at its corners and a shadow joint, under the tower's
+ * head track (the same line along the top as the glass beside it).
+ */
+export function reorgPanelModel(): Model {
+  const b = new ModelBuilder();
+  b.box(1.012, 0.09, 1.012, PANEL_PLINTH, { at: [0, 0.045, 0] }, 0);
+  b.box(1.004, 0.012, 1.004, tint(PANEL_PLINTH, -0.5), { at: [0, 0.006, 0] }, 0);
+  b.box(1.016, 0.03, 1.016, 0x8a9198, { at: [0, 0.105, 0] }, 0);
+  const g0 = 0.12;
+  const g1 = WALL_HEIGHT - 0.04;
+  b.box(0.98, g1 - g0, 0.98, PANEL, { at: [0, (g0 + g1) / 2, 0] }, 0);
+  for (const z of [-0.5, 0.5]) {
+    b.box(0.04, g1 - g0, 0.014, MULLION, { at: [-0.48, (g0 + g1) / 2, z] }, 0);
+    b.box(0.006, g1 - g0 - 0.04, 0.004, tint(PANEL, -0.14), { at: [0.3, (g0 + g1) / 2, z] }, 0);
   }
-  for (const e of [w.a, w.b]) {
-    const top = wy + 0.09;
-    b.box(0.024, top - e.y, 0.024, STEEL_DARK, { at: [e.x, e.y + (top - e.y) / 2, e.z] }, 0.004);
-    b.box(0.07, 0.014, 0.07, STEEL_DARK, { at: [e.x, e.y + 0.007, e.z] }, 0.003);
-    b.box(0.032, 0.022, 0.032, STEEL, { at: [e.x, top, e.z] }, 0.004);
-  }
+  // The head track: an aluminium lip proud of the faces, the cap's infill flush in it.
+  const h = WALL_HEIGHT;
+  b.box(1.02, 0.03, 1.02, HEAD_TRACK, { at: [0, h - 0.019, 0] }, 0);
+  b.box(1.016, 0.005, 1.016, tint(HEAD_TRACK, -0.45), { at: [0, h - 0.0365, 0] }, 0);
+  b.box(1.0, 0.012, 1.0, WALL_COLORS.reorg.top, { at: [0, h - 0.006, 0] }, 0);
+  b.box(1.0, 0.004, 0.026, HEAD_TRACK, { at: [0, h + 0.002, 0] }, 0);
   return b.build();
 }
 
