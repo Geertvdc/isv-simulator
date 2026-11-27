@@ -1,12 +1,17 @@
 # The Reorg environment pass
 
-**Status:** brief and plumbing; round 1 not started. Level 4-3 (`the-reorg`, "The Reorg"), the Enterprise finale, gets a hand-built world after [Synergy](synergy-environment.md) (4-2). Same floor of YOTTA Tower, the next day; the consultants have taken it over. **The bar:** 4-2 Synergy, plus the user's new Overcooked 2 references for **style and creativity**: a snowy castle kitchen under siege by gingerbread men, a mine over water with rope bridges, two ships with a steak flying between them, the Negi Sushi neon street kitchen. Each of those has one **big idea** in its surroundings that you can tell from a thumbnail. This level needs one too (see "The big idea").
+**Status:** two rounds done (build, critic review at 6.5/10, fixes); round 2 not re-scored. Level 4-3 (`the-reorg`, "The Reorg"), the Enterprise finale, gets a hand-built world after [Synergy](synergy-environment.md) (4-2). Same floor of YOTTA Tower, the next day; the consultants have taken it over. **The bar:** 4-2 Synergy, plus the user's new Overcooked 2 references for **style and creativity**: a snowy castle kitchen under siege by gingerbread men, a mine over water with rope bridges, two ships with a steak flying between them, the Negi Sushi neon street kitchen. Each of those has one **big idea** in its surroundings that you can tell from a thumbnail. This level needs one too (see "The big idea").
 
-| Before (Silos)                                | Before (Open Plan)                                      | Before (Matrix)                                      |
-| --------------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------- |
-| ![](images/the-reorg-environment/before.webp) | ![](images/the-reorg-environment/before-open-plan.webp) | ![](images/the-reorg-environment/before-matrix.webp) |
+|        | Silos (morning)                               | Open Plan (noon)                                        | Matrix (after lunch)                                 |
+| ------ | --------------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------- |
+| Before | ![](images/the-reorg-environment/before.webp) | ![](images/the-reorg-environment/before-open-plan.webp) | ![](images/the-reorg-environment/before-matrix.webp) |
+| After  | ![](images/the-reorg-environment/after.webp)  | ![](images/the-reorg-environment/after-open-plan.webp)  | ![](images/the-reorg-environment/after-matrix.webp)  |
 
-**Goal:** the world around the level tells one story, the way Overcooked 2 levels do. Render-only (`src/render/`); the sim, the maps and balance don't change. Three screenshot scenes join the docs (`src/sim/sceneCatalog.ts`): `levels/the-reorg-open-plan` (phase 2), `levels/the-reorg-matrix` (phase 3) and `mechanics/the-reorg-shifting` (Silos, 1.5 s before the floor turns into Open Plan).
+The partitions rolling in on their castors for Matrix, 25 ticks before the switch, the turnstiles about to flip (`mechanics/the-reorg-closing`):
+
+![](images/the-reorg-environment/closing.webp)
+
+**Goal:** the world around the level tells one story, the way Overcooked 2 levels do. Render-only (`src/render/`); the sim, the maps and balance don't change. Four screenshot scenes join the docs (`src/sim/sceneCatalog.ts`): `levels/the-reorg-open-plan` (phase 2), `levels/the-reorg-matrix` (phase 3), `mechanics/the-reorg-shifting` (Silos, 1.5 s before the floor turns into Open Plan) and `mechanics/the-reorg-closing` (Open Plan to Matrix, mid-train).
 
 ## The story in two sentences
 
@@ -164,12 +169,31 @@ Four agents in one worktree at once, with strict file ownership. The shared plum
 
 ## Done when
 
-- [ ] The shot reads as "YOTTA's floor on moving day, the consultants in charge" without explanation, in all three phases, and nothing in it reads as food or a kitchen.
-- [ ] The storyline beat reads with no explanation: the partitions on castors, the floor tape, the logo going lowercase, MONOLITH falling apart across the river.
-- [ ] The partitions and desks look like the consultants' mobile kit and move like it: the train closing, the roll-off opening, desks rolling, telegraphed and readable, solid on time; meeting doors and turnstiles look real and their state reads at a glance.
-- [ ] The outside connects to the play: the handover desk (inbox), the badge line and the goods lift (ship).
-- [ ] The running gags are in place: the logo swap, `yotta.`, MONOLITH, Prod on a trolley, Segfault in the MATRIX box, the 80-page plan.
-- [ ] The detail budget is met and the critic scores density.
-- [ ] Mean luminance about 105+ on every phase shot; stations the most saturated things on screen.
-- [ ] Other levels unchanged (4-1, 4-2 and one more checked).
-- [ ] `npm run check` passes.
+- [x] The shot reads as "YOTTA's floor on moving day, the consultants in charge" without explanation, in all three phases, and nothing in it reads as food or a kitchen.
+- [x] The storyline beat reads with no explanation: the partitions on castors, the floor tape, the logo going lowercase, MONOLITH falling apart across the river.
+- [x] The partitions and desks look like the consultants' mobile kit and move like it: the train closing, the roll-off opening, desks rolling, telegraphed and readable, solid on time; meeting doors and turnstiles look real and their state reads at a glance.
+- [x] The outside connects to the play: the handover desk (inbox), the badge line and the goods lift (ship).
+- [x] The running gags are in place: the logo swap, `yotta.`, MONOLITH, Prod on a trolley, Segfault in the MATRIX box, the 80-page plan.
+- [x] The detail budget is met and the critic scores density.
+- [ ] Mean luminance about 105+ on every phase shot (done: 113–116); stations the most saturated things on screen (not quite: see leftovers).
+- [x] Other levels unchanged (4-1, 4-2 and one more checked).
+- [x] `npm run check` passes.
+
+## How it went
+
+**Round 1** (four tracks in parallel, one commit each): **Light** made `SUMMER_DAY` with the day passing through the phases, blended over the 3 s warning from the sim's tick (`dayClock`, `dayLight` in `atmosphere.ts`, `passDay` in `WorldFx.ts`). **Moving** built `reorg/`: partitions on castors rolling in as a train from their line's free ends and off into them, rolling bench desks paired in reading order, glass meeting doors with lamp boxes, badge speed gates, the staff door; poses from the tick, tested for every step of 1→2→3→1→3→2. **Room** built the floor (stripped carpet, layout tape, stencils, access tiles, ghost lines, the good carpet, the lobby's stone), the back faces' consultants' art, the handover desk, the shredding console, the goods lift, 27 wall-top props and the MATRIX box. **World** built the staging area with the logo swap, Prod on a dolly, MONOLITH melting down, the removal lorries and the setback roofs.
+
+**Critic:** 6.5/10 (before 3/10; Synergy round 2 about 7.5). The yellow gantry with the lit `yotta` read as the level's thumbnail, and the partition train was "the best mechanic frame in the campaign so far". Against it: washed out (the tape more saturated than the stations), noon overexposed (L 129), signs and the full stop unreadable (the full stop read as a plate), pendants over players' heads, the two-deep partition block in Silos showing walkable-looking floor, and a turnstile still frame showing the next direction in full green during the warning.
+
+**Round 2** (four chunks, no shared files): **Moving:** parked stacks so the two-deep block reads solid, 0.16 top rails and denser frost, one leaning header board per run (SILO: DEV, TRIBE, SQUAD, CHAPTER, GUILD), the live way stays green through the warning and the coming way flashes amber. **Room:** bronze wall-washers on the back faces instead of pendants, tape 0xb0a46e (sat ≤0.25), darker back panels (0x899096) with fewer, bigger posters, lobby stone 0x8e9196, badge mats without a direction (they can never contradict a flipped gate), visible blinds, a ragged access strip with a lifted panel, 4-2's table with chairs at its ends, a bigger MATRIX box. **World:** the full stop lit and facing the camera beside the sign, a readable old YOTTA, MONOLITH further away with 40% dark floors, FOR LEASE and 20 staff with boxes, a bigger SWIFT MOVES lorry, fuller roofs, Segfault purring in the box, and a generic `pace` alive kind (`surroundings.ts`, opt-in) so the carriers and the trolley pusher move. **Light:** noon sun 3.8 → 2.8 with a per-phase sky, a warmer after-lunch sun, Synergy's grade, softer lamps, the glow behind the sign.
+
+**Measured** (1440×810, SwiftShader, not checked on a real GPU): mean luminance Silos 113.4, Open Plan 116.1, Matrix 113.0, shifting 116.2, closing 113.7 (before: 99.3, 95.9, 100.9). Lobby at noon L 167. Matrix floor R−B +17 (warm), Open Plan −22. 4-1, 4-2 and 1-2 differ from their docs shots by a mean of about 1 grey level (render noise).
+
+## Leftovers
+
+- **Station tops wash out:** keyboards, review desk and test bench sit at saturation about 0.31 in Silos and Open Plan (0.37–0.39 in Matrix), because `stationTop` in `stationModels.ts` tints tops 40% toward white for every level. Fixing it is a shared change for all levels, not this pass.
+- The partition runs keep a slight railing rhythm on their cut-down front runs; Matrix shows six header boards, which may be busy.
+- MONOLITH's foot leans in behind the room's right corner in perspective; only its crown and upper floors sit clear of the room.
+- The partition trolley reads as a white box from the front; the wrapped Y is half hidden behind the MOVE stand; SWIFT MOVES only just reads.
+- The wall-washers are small on screen; the face at x 1 sits under the order cards.
+- Round 2 was not re-scored by a critic.

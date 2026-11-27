@@ -387,6 +387,10 @@ I.1..............4.P
 
 ![The Reorg](images/levels/the-reorg.webp)
 
+![The Reorg in Open Plan, at noon](images/levels/the-reorg-open-plan.webp)
+
+![The Reorg in Matrix, after lunch](images/levels/the-reorg-matrix.webp)
+
 The finale of Enterprise: three floor plans round a fixed boardroom, Silos, Open Plan and Matrix, a minute each. Walls, doors and desks move; badge turnstiles into the shipping lobby only go one way and flip in Open Plan. The staff door is always two-way.
 
 - **New here:** Three floor plans and badge turnstiles.
