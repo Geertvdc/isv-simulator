@@ -15,6 +15,7 @@ import {
   OPEN_PLAN,
   SEED_ROUND,
   SYNERGY,
+  THE_REORG,
 } from '../../sim/levels';
 import draftText from '../../../maps/level-01-garage.txt?raw';
 import openPlanDraft from '../../../maps/level-02-open-plan.txt?raw';
@@ -35,11 +36,14 @@ import {
   atmosphereFor,
   blinkOn,
   cssRgba,
+  dayClock,
+  dayLight,
   fogRange,
   glintSpots,
   lampColor,
   lampSpots,
   meetingRooms,
+  mixColor,
   moteSeeds,
   lightWellSpots,
   mullionShade,
@@ -104,6 +108,7 @@ describe('atmosphereFor', () => {
       HOT_DESKING.id,
       BACK_TO_BACK.id,
       SYNERGY.id,
+      THE_REORG.id,
     ]);
     for (const level of LEVELS) {
       if (lit.has(level.id)) continue;
@@ -310,7 +315,7 @@ describe('the stage wash and the side lights', () => {
   });
 
   it('gives only the stage (and the few sets lit by lamps) a brighter sky on low, where its working lights are off', () => {
-    const lit = ['demo-day', 'on-call', 'hot-desking', 'back-to-back', 'synergy'];
+    const lit = ['demo-day', 'on-call', 'hot-desking', 'back-to-back', 'synergy', 'the-reorg'];
     for (const [id, other] of Object.entries(ATMOSPHERES))
       expect(other.lowSky !== undefined, id).toBe(lit.includes(id));
     expect(DEFAULT_ATMOSPHERE.lowSky).toBeUndefined();
@@ -562,7 +567,10 @@ describe('the spring morning (middle-management)', () => {
     expect(a.vignette?.saturate).toBeLessThan(1.6);
     // No other preset is graded but 3-2's rain: their pictures stay exactly as they were.
     for (const [id, other] of Object.entries(ATMOSPHERES))
-      if (other !== a && !['hypergrowth', 'hot-desking', 'back-to-back', 'synergy'].includes(id))
+      if (
+        other !== a &&
+        !['hypergrowth', 'hot-desking', 'back-to-back', 'synergy', 'the-reorg'].includes(id)
+      )
         expect(other.vignette?.saturate, id).toBeUndefined();
   });
 
@@ -822,7 +830,7 @@ describe('the Friday afternoon (hot-desking)', () => {
     // Without tiles, or for the other presets, none.
     expect(stationFillSpots(a, SHIPPED)).toEqual([]);
     for (const [id, other] of Object.entries(ATMOSPHERES))
-      if (other !== a && id !== 'back-to-back' && id !== 'synergy')
+      if (other !== a && !['back-to-back', 'synergy', 'the-reorg'].includes(id))
         expect(stationFillSpots(other, map), id).toEqual([]);
   });
 
@@ -951,7 +959,8 @@ describe('the heatwave morning (back-to-back)', () => {
     expect(a.vignette?.contrast).toBeLessThanOrEqual(1.15);
     expect(a.lowSky).toBeGreaterThan(a.sky.intensity);
     for (const [id, other] of Object.entries(ATMOSPHERES))
-      if (other !== a && id !== 'synergy') expect(other.vignette?.contrast, id).toBeUndefined();
+      if (other !== a && id !== 'synergy' && id !== 'the-reorg')
+        expect(other.vignette?.contrast, id).toBeUndefined();
   });
 
   it('tints each meeting rug for its own carpet, so both show the same violet', () => {
@@ -1037,7 +1046,8 @@ describe('the heatwave morning (back-to-back)', () => {
       expect(p.angle).toBeLessThan(Math.PI / 4);
     });
     for (const [id, other] of Object.entries(ATMOSPHERES))
-      if (other !== a && id !== 'synergy') expect(other.pools?.meetings, id).toBeUndefined();
+      if (other !== a && id !== 'synergy' && id !== 'the-reorg')
+        expect(other.pools?.meetings, id).toBeUndefined();
   });
 
   it('hangs faint heat shimmer in the air over the city below only: never over the room or the terrace', () => {
@@ -1458,6 +1468,204 @@ describe('the summer afternoon (synergy)', () => {
       expect(g.opacity + (top?.opacity ?? 0)).toBeLessThanOrEqual(0.55);
     }
     for (const [id, other] of Object.entries(ATMOSPHERES))
-      if (id !== 'synergy') expect(other.vignette?.lowGlows, id).toBeUndefined();
+      if (id !== 'synergy' && id !== 'the-reorg')
+        expect(other.vignette?.lowGlows, id).toBeUndefined();
+  });
+});
+
+describe('summer, all day (the-reorg)', () => {
+  const a = atmosphereFor('the-reorg');
+  const afternoon = atmosphereFor('synergy');
+  const map = THE_REORG.map;
+  const reorgs = THE_REORG.reorgs ?? [];
+  const rgb = (c: number) => [(c >> 16) & 255, (c >> 8) & 255, c & 255] as const;
+  const warmth = (c: number) => rgb(c)[0] - rgb(c)[2];
+  /** Every layout of the map: Silos, Open Plan, Matrix. */
+  const layouts = (map.phases ?? []).map((p) => ({ ...map, tiles: p.tiles }));
+  const sunAt = (light: ReturnType<typeof dayLight>) => {
+    const { position: s, target: t } = sunPlacement(
+      { ...a, sun: { ...a.sun, from: light.sun.from } },
+      map,
+    );
+    const flat = Math.hypot(s.x - t.x, s.z - t.z);
+    return { s, t, elevation: Math.atan2(s.y - t.y, flat) * (180 / Math.PI) };
+  };
+  const still = (phase: number) => dayLight(a, { from: phase, to: phase, t: 0 });
+  const round = (tick: number, reorgPhase: number, nextReorg: number) => ({
+    tick,
+    reorgPhase,
+    nextReorg,
+    settings: { reorgs },
+  });
+
+  it('gives the-reorg its own light, not 4-2s', () => {
+    expect(atmosphereFor(LEVEL_LOOKS[THE_REORG.id]?.scene)).toBe(ATMOSPHERES['the-reorg']);
+    for (const [id, other] of Object.entries(ATMOSPHERES))
+      if (id !== 'the-reorg') expect(other, id).not.toBe(a);
+    // Only this level's day passes: every other preset keeps its own sun.
+    for (const [id, other] of Object.entries(ATMOSPHERES)) {
+      if (id === 'the-reorg') continue;
+      expect(other.day, id).toBeUndefined();
+      const light = dayLight(other, { from: 1, to: 2, t: 0.5 });
+      expect(light.sun.color, id).toBe(other.sun.color);
+      expect(light.sun.from, id).toEqual(other.sun.from);
+      expect(light.fill, id).toEqual(other.fill);
+    }
+    expect(layouts).toHaveLength(3);
+  });
+
+  it('starts the day on the preset’s own sun and fill', () => {
+    const morning = still(1);
+    expect(morning.sun.color).toBe(a.sun.color);
+    expect(morning.sun.intensity).toBe(a.sun.intensity);
+    expect(morning.sun.from).toEqual(a.sun.from);
+    expect(morning.fill).toEqual(a.fill);
+  });
+
+  it('passes the day: morning from the front left, noon high, after lunch from the front right and warmer', () => {
+    const [m, n, l] = [1, 2, 3].map((p) => sunAt(still(p)));
+    if (!m || !n || !l) return;
+    // Silos, morning: about 40° up, from the left and in front.
+    expect(m.elevation).toBeGreaterThan(38);
+    expect(m.elevation).toBeLessThan(42);
+    expect(m.s.x).toBeLessThan(m.t.x);
+    expect(m.s.z).toBeGreaterThan(m.t.z);
+    // Open Plan, noon: about 60° up, short shadows.
+    expect(n.elevation).toBeGreaterThan(58);
+    expect(n.elevation).toBeLessThan(62);
+    expect(n.s.z).toBeGreaterThan(n.t.z);
+    // Matrix, after lunch: about 40° up from the right and in front.
+    expect(l.elevation).toBeGreaterThan(38);
+    expect(l.elevation).toBeLessThan(42);
+    expect(l.s.x).toBeGreaterThan(l.t.x);
+    expect(l.s.z).toBeGreaterThan(l.t.z);
+    // A full-height wall's shadow reaches at most a tile and a half sideways at any time.
+    for (const { s, t, elevation } of [m, n, l]) {
+      const flat = Math.hypot(s.x - t.x, s.z - t.z);
+      const sideways = Math.abs(
+        (WALL_HEIGHT / Math.tan((elevation * Math.PI) / 180)) * ((s.x - t.x) / flat),
+      );
+      expect(sideways).toBeLessThan(1.5);
+    }
+    // Warm white, white, then warmer; never orange, and noon the brightest.
+    const [cm, cn, cl] = [1, 2, 3].map((p) => still(p).sun.color) as [number, number, number];
+    expect(warmth(cn)).toBeLessThan(warmth(cm));
+    expect(warmth(cl)).toBeGreaterThan(warmth(cm));
+    expect(Math.min(...rgb(cn))).toBeGreaterThan(235);
+    expect(warmth(cl)).toBeLessThanOrEqual(warmth(afternoon.sun.color));
+    expect(Math.min(...rgb(cl))).toBeGreaterThan(160);
+    expect(still(2).sun.intensity).toBeGreaterThan(still(1).sun.intensity);
+    expect(still(2).sun.intensity).toBeGreaterThan(still(3).sun.intensity);
+  });
+
+  it('keeps the fill only slightly cool all day, so shaded yellow fronts never go olive', () => {
+    for (const phase of [1, 2, 3]) {
+      const [r, g, b] = rgb(still(phase).fill.color);
+      expect(b, `${phase}`).toBeGreaterThan(r);
+      expect(b - r, `${phase}`).toBeLessThan(60);
+      expect(g, `${phase}`).toBeGreaterThan(r);
+      expect(still(phase).fill.intensity).toBeLessThan(a.sky.intensity);
+    }
+  });
+
+  it('turns the day over each reorg’s warning, from the tick, and is there on the switch', () => {
+    const [first, second] = reorgs;
+    if (!first || !second) throw new Error('the reorg has two reorgs');
+    // Well before the warning: the layout's own light.
+    expect(dayClock(round(first.atTick - 10 * 60, 1, 0))).toEqual({ from: 1, to: 1, t: 0 });
+    // The warning's first tick: not moved yet.
+    expect(dayClock(round(first.atTick - 3 * 60, 1, 0)).t).toBe(0);
+    // Halfway through the warning (the shifting shot): halfway there, toward Open Plan.
+    const mid = dayClock(round(first.atTick - 90, 1, 0));
+    expect(mid).toEqual({ from: 1, to: 2, t: 0.5 });
+    // The tick before the switch: nearly there; on the switch the layout is Open Plan.
+    expect(dayClock(round(first.atTick - 1, 1, 0)).t).toBeGreaterThan(0.99);
+    expect(dayClock(round(first.atTick, 2, 1))).toEqual({ from: 2, to: 2, t: 0 });
+    // The same at every later moment too, and never backwards in between.
+    let last = 0;
+    for (let tick = second.atTick - 3 * 60 + 1; tick < second.atTick; tick++) {
+      const { from, to, t } = dayClock(round(tick, 2, 1));
+      expect([from, to]).toEqual([2, 3]);
+      expect(t).toBeGreaterThanOrEqual(last);
+      last = t;
+    }
+    // After the last reorg the afternoon stays.
+    expect(dayClock(round(170 * 60, 3, 2))).toEqual({ from: 3, to: 3, t: 0 });
+    // No reorgs at all: the map's own.
+    expect(dayClock({ tick: 100, reorgPhase: 1, nextReorg: 0, settings: {} }).t).toBe(0);
+  });
+
+  it('blends the sun and fill smoothly between two phases, back to the morning too', () => {
+    const half = dayLight(a, { from: 1, to: 2, t: 0.5 });
+    const m = still(1);
+    const n = still(2);
+    expect(half.sun.intensity).toBeCloseTo((m.sun.intensity + n.sun.intensity) / 2);
+    expect(half.sun.from.x).toBeCloseTo((m.sun.from.x + n.sun.from.x) / 2);
+    expect(half.sun.color).toBe(mixColor(m.sun.color, n.sun.color, 0.5));
+    expect(dayLight(a, { from: 3, to: 1, t: 1 })).toEqual(m);
+    // A phase past the end keeps the last.
+    expect(dayLight(a, { from: 4, to: 4, t: 0 })).toEqual(still(3));
+    expect(mixColor(0x000000, 0xff8040, 0.5)).toBe(0x804020);
+    expect(mixColor(0x123456, 0xabcdef, 0)).toBe(0x123456);
+    expect(mixColor(0x123456, 0xabcdef, 1)).toBe(0xabcdef);
+  });
+
+  it('hangs the pendants along the back of the floor, the same in every layout, never near the boardroom', () => {
+    const spots = lampSpots(a, map);
+    expect(spots.length).toBeGreaterThanOrEqual(4);
+    const rooms = meetingRooms(map);
+    expect(rooms).toHaveLength(1);
+    const room = rooms[0];
+    if (!room) return;
+    for (const layout of layouts) expect(lampSpots(a, layout)).toEqual(spots);
+    for (const p of spots) {
+      const x = Math.round(p.x);
+      const z = Math.round(p.z);
+      // Under the back wall, on the work floor's first row (moving tiles as floor).
+      expect(isSolid(getTile(map, x, z - 1) ?? 'void'), `${p.x},${p.z}`).toBe(true);
+      expect(z).toBeLessThan(map.height / 2);
+      // Clear of the boardroom's columns by a tile either side.
+      expect(p.x < room.x0 - 1.5 || p.x > room.x1 + 1.5, `${p.x}`).toBe(true);
+    }
+    expect(spots.filter((p) => p.x < room.x0)).toHaveLength(
+      spots.filter((p) => p.x > room.x1).length,
+    );
+  });
+
+  it('lights the shipping lobby cool and clean from brackets either side of the goods lift', () => {
+    const spots = accentSpots(a, map, []);
+    expect(spots).toHaveLength(2);
+    const ship = map.tiles.flatMap((t, i) => (t === 'ship' ? [i % map.width] : []));
+    const mid = ship.reduce((p, q) => p + q, 0) / ship.length;
+    for (const { at, accent } of spots) {
+      expect(accent.anchor).toBe('ship');
+      expect(getTile(map, Math.round(at.x), Math.round(at.z))).toBe('floor');
+      // In the lobby, in front of the floor's front wall.
+      expect(at.z).toBeGreaterThan(map.height - 4);
+      const [r, , b] = rgb(accent.color);
+      expect(b).toBeGreaterThan(r + 20);
+    }
+    const offsets = spots.map((s) => s.at.x - mid).sort((p, q) => p - q);
+    expect(offsets[0]).toBeCloseTo(-3.2);
+    expect(offsets[1]).toBeCloseTo(3.2);
+    // On low the brackets are off: a little cool light over the lobby instead.
+    expect(a.vignette?.lowGlows?.length).toBe(1);
+  });
+
+  it('keeps the grade gentle, the haze late and the boardroom rug calm', () => {
+    expect(a.vignette?.opacity).toBeCloseTo(0.35);
+    expect(a.vignette?.inner).toBeCloseTo(0.7);
+    expect(a.vignette?.saturate).toBeLessThanOrEqual(afternoon.vignette?.saturate ?? 0);
+    expect(a.vignette?.contrast).toBeLessThanOrEqual(afternoon.vignette?.contrast ?? 0);
+    expect(a.fog?.start).toBeGreaterThanOrEqual(afternoon.fog?.start ?? 0);
+    expect(Math.min(...rgb(a.fog?.color ?? 0))).toBeGreaterThanOrEqual(190);
+    expect(a.rug).toEqual(afternoon.rug);
+    expect(poolPlacements(a, map)).toHaveLength(1);
+    expect(a.motes).toBeUndefined();
+    expect(a.lowSky).toBeGreaterThan(a.sky.intensity);
+    // The test benches on the side walls get a little light, one or the other always turned from the sun.
+    const fills = stationFillSpots(a, map);
+    expect(fills).toHaveLength(2);
+    for (const p of fills) expect(getTile(map, Math.round(p.x), Math.round(p.z))).toBe('floor');
   });
 });

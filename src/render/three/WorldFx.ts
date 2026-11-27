@@ -14,6 +14,8 @@ import {
   type RainSeed,
   accentSpots,
   blinkOn,
+  dayClock,
+  dayLight,
   glintSpots,
   moteSeeds,
   mullionShade,
@@ -24,10 +26,11 @@ import {
   snowSeeds,
   stutterIndex,
   stutterLevel,
+  sunPlacement,
   sunShaftSpots,
 } from './atmosphere';
 import { blockHeight, facingYaw, heroPlacement, stationFacing } from './layout';
-import { ACCENT_INDEX_KEY, LAMP_INDEX_KEY, LAMP_KEY } from './look';
+import { ACCENT_INDEX_KEY, DAY_LIGHT_KEY, LAMP_INDEX_KEY, LAMP_KEY } from './look';
 import { lightWellsFor } from './lightWells';
 import { loftRoom } from './rooms/loftRoom';
 import { SCENES } from './scenes';
@@ -275,6 +278,13 @@ export class WorldFx {
     group: THREE.Group;
   } | null = null;
   private shake = { untilMs: 0, intensity: 0 };
+  /** The sun and fill moving through the day (`Atmosphere.day`), and the moment last applied. */
+  private day: {
+    atmosphere: Atmosphere;
+    sun: THREE.DirectionalLight;
+    fill: THREE.DirectionalLight | null;
+    last: string;
+  } | null = null;
   shakeEnabled = true;
 
   constructor(
@@ -317,6 +327,7 @@ export class WorldFx {
     this.buildNight(world, atmosphere);
     this.buildSpring(atmosphere);
     this.buildRain(atmosphere);
+    this.findDayLights(world, atmosphere);
     // The level's own meeting rug (`Atmosphere.rug`), for a carpet the usual violet sinks into.
     this.rugOpacity = {
       idle: atmosphere.rug?.opacity ?? RUG_OPACITY,
@@ -345,6 +356,7 @@ export class WorldFx {
   }
 
   sync(state: GameState, timeMs: number): void {
+    this.passDay(state);
     for (const pipeline of state.pipelines) this.syncPipeline(pipeline, timeMs);
     const invited = state.invites.length > 0;
     const pulse = invited ? 0.5 + 0.5 * Math.sin(timeMs / RUG_PULSE_MS) : 0;
@@ -408,6 +420,45 @@ export class WorldFx {
       x: (Math.random() * 2 - 1) * k * canvas.width,
       y: (Math.random() * 2 - 1) * k * canvas.height,
     };
+  }
+
+  /** The sun and fill `createLights` made, for a day that passes (`Atmosphere.day`). */
+  private findDayLights(world: THREE.Scene, atmosphere: Atmosphere): void {
+    if (!atmosphere.day) return;
+    const lights: THREE.DirectionalLight[] = [];
+    world.traverse((obj) => {
+      if (obj instanceof THREE.DirectionalLight) lights.push(obj);
+    });
+    const sun = lights.find((l) => l.userData[DAY_LIGHT_KEY] === 'sun');
+    const fill = lights.find((l) => l.userData[DAY_LIGHT_KEY] === 'fill') ?? null;
+    if (sun) this.day = { atmosphere, sun, fill, last: '' };
+  }
+
+  /**
+   * Moves the sun and fill to the round's moment of the day (see
+   * `dayClock`): from the sim's tick, so a still is the same every time.
+   * Only when the moment changes: a few numbers, the shadow map follows on its own.
+   */
+  private passDay(state: GameState): void {
+    const day = this.day;
+    if (!day) return;
+    const clock = dayClock(state);
+    const key = `${clock.from}:${clock.to}:${clock.t.toFixed(4)}`;
+    if (key === day.last) return;
+    day.last = key;
+    const light = dayLight(day.atmosphere, clock);
+    day.sun.color.setHex(light.sun.color);
+    day.sun.intensity = light.sun.intensity;
+    const { position } = sunPlacement(
+      { ...day.atmosphere, sun: { ...day.atmosphere.sun, from: light.sun.from } },
+      this.map,
+    );
+    day.sun.position.set(position.x, position.y, position.z);
+    day.sun.updateMatrixWorld();
+    if (day.fill) {
+      day.fill.color.setHex(light.fill.color);
+      day.fill.intensity = light.fill.intensity;
+    }
   }
 
   /** Steam, smoke, ripples and halos from the scene's props, and the lamps to flicker. */
